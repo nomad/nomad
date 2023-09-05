@@ -1,0 +1,9 @@
+[package]
+name = "seph"
+version.workspace = true
+edition.workspace = true
+
+[features]
+
+[dependencies]
+common = { path = "../nvim-common" }

@@ -1,0 +1,13 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Riccardo Mazzarini <me@noib3.dev>"]
+
+[workspace.dependencies]
+nvim-oxi = { version = "0.3", features = ["neovim-0-9"] }
+serde = { version = "1.0" }
+thiserror = "1.0"

@@ -1,0 +1,13 @@
+[package]
+name = "common"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["neovim-0-9"]
+neovim-0-9 = ["nvim-oxi/neovim-0-9"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
+[dependencies]
+nvim-oxi = { workspace = true }
+serde = { workspace = true }
