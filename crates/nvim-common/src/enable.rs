@@ -14,6 +14,20 @@ fn yes() -> bool {
     true
 }
 
+impl<T: Default> Default for Enable<T> {
+    fn default() -> Self {
+        Self { enable: true, config: T::default() }
+    }
+}
+
+impl<T> Deref for Enable<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.config
+    }
+}
+
 impl<T> Enable<T> {
     pub fn enable(&self) -> bool {
         self.enable
@@ -29,13 +43,5 @@ impl<T> Enable<T> {
 
     pub fn into_inner(self) -> T {
         self.config
-    }
-}
-
-impl<T> Deref for Enable<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.config
     }
 }

@@ -15,9 +15,10 @@ pub(crate) enum ConfigError {
 
 /// TODO: docs
 pub(crate) fn config(config: Object) -> Result<(), Infallible> {
-    serde_path_to_error::deserialize::<_, Enable<Config>>(
+    serde_path_to_error::deserialize::<_, Option<Enable<Config>>>(
         nvim::serde::Deserializer::new(config),
     )
+    .map(Option::unwrap_or_default)
     .map(|config| {
         let mad_enabled = config.enable();
 
@@ -37,6 +38,7 @@ pub(crate) fn config(config: Object) -> Result<(), Infallible> {
     })
 }
 
+#[derive(Default)]
 struct Config(HashMap<String, Object>);
 
 impl<'de> de::Deserialize<'de> for Config {
