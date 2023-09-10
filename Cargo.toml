@@ -8,6 +8,6 @@ edition = "2021"
 authors = ["Riccardo Mazzarini <me@noib3.dev>"]
 
 [workspace.dependencies]
-nvim-oxi = { version = "0.3", features = ["libuv"] }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
 serde = { version = "1.0" }
 thiserror = "1.0"
