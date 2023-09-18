@@ -6,7 +6,7 @@ edition.workspace = true
 [features]
 
 [dependencies]
-common = { path = "../nvim-common" }
+common = { path = "../common" }
 
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }

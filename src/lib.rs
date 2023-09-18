@@ -1,9 +1,5 @@
-mod config;
-mod mad;
-mod runtime;
-
-use common::nvim;
 use mad::Mad;
+use nvim_oxi as nvim;
 
 #[nvim::module]
 fn mad() -> nvim::Result<nvim::Dictionary> {

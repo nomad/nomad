@@ -214,7 +214,6 @@ version = "0.1.0"
 dependencies = [
  "common",
  "nvim-oxi",
- "seph",
  "serde",
  "serde_path_to_error",
  "thiserror",
@@ -234,6 +233,16 @@ checksum = "08959a387a676302eebf4ddbcbc611da04285579f76f88ee0506c63b1a61dd4b"
 dependencies = [
  "memchr",
  "version_check",
+]
+
+[[package]]
+name = "nomad"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "mad",
+ "nvim-oxi",
+ "seph",
 ]
 
 [[package]]

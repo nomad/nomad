@@ -1,3 +1,24 @@
+[package]
+name = "nomad"
+version = "0.1.0"
+edition = "2021"
+authors = ["Riccardo Mazzarini <me@noib3.dev>"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = ["neovim-0-9"]
+neovim-0-9 = ["common/neovim-0-9"]
+neovim-nightly = ["common/neovim-nightly"]
+
+[dependencies]
+common = { path = "crates/common" }
+mad = { path = "crates/mad" }
+seph = { path = "crates/seph" }
+
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
+
 [workspace]
 members = ["crates/*"]
 resolver = "2"
@@ -10,4 +31,5 @@ authors = ["Riccardo Mazzarini <me@noib3.dev>"]
 [workspace.dependencies]
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
 serde = { version = "1.0" }
-thiserror = "1.0"
+serde_path_to_error = "0.1"
+thiserror = { version = "1.0" }

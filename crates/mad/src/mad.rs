@@ -9,7 +9,7 @@ use crate::config;
 use crate::runtime::{self, MadRuntime};
 
 /// TODO: docs
-pub(crate) struct Mad {
+pub struct Mad {
     /// TODO: docs
     api: HashMap<&'static str, Dictionary>,
 
@@ -72,7 +72,7 @@ impl Mad {
 use std::sync::mpsc;
 
 /// TODO: docs
-pub fn start<P: Plugin>() -> (Rc<P>, Sender<P::Message>) {
+pub(crate) fn start<P: Plugin>() -> (Rc<P>, Sender<P::Message>) {
     let plugin = Rc::new(P::default());
 
     let (msg_sender, msg_receiver) = mpsc::channel();

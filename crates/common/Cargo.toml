@@ -11,4 +11,4 @@ neovim-nightly = ["nvim-oxi/neovim-nightly"]
 [dependencies]
 nvim-oxi = { workspace = true }
 serde = { workspace = true }
-serde_path_to_error = "0.1"
+serde_path_to_error = { workspace = true }

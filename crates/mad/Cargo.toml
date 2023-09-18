@@ -1,0 +1,12 @@
+[package]
+name = "mad"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+
+nvim-oxi = { workspace = true }
+serde = { workspace = true }
+serde_path_to_error = { workspace = true }
+thiserror = { workspace = true }
