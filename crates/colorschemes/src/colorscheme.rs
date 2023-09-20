@@ -67,6 +67,13 @@ pub trait BuiltinColorscheme {
             .foreground(palette.foreground)
             .background(palette.background)
     }
+
+    /// The highlighting applied to the [`NormalNC`][normal] highlight group.
+    ///
+    /// [normal]: https://neovim.io/doc/user/syntax.html#hl-NormalNC
+    fn normal_nc(palette: &Palette) -> HighlightGroup {
+        Self::normal(palette)
+    }
 }
 
 /// This trait sets the highlight groups that are linked to syntax groups.

@@ -20,8 +20,13 @@ where
 {
     let palette = colorscheme.palette();
 
-    set_hl("Normal", C::normal(&palette))?;
+    // Builtin highlight groups.
     set_hl("ColorColumn", C::color_column(&palette))?;
+    set_hl("Normal", C::normal(&palette))?;
+    set_hl("NormalNC", C::normal_nc(&palette))?;
+
+    // Syntax highlight groups.
+    set_hl("String", C::string(&palette))?;
 
     Ok(())
 }
