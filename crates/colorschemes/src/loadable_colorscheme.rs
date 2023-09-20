@@ -18,12 +18,11 @@ fn load_colorscheme<C>(colorscheme: &C) -> nvim::Result<()>
 where
     C: Colorscheme,
 {
-    if let Some(normal) = colorscheme.normal() {
-        set_hl("Normal", normal)?;
-    }
-    if let Some(color_column) = colorscheme.color_column() {
-        set_hl("ColorColumn", color_column)?;
-    }
+    let palette = colorscheme.palette();
+
+    set_hl("Normal", C::normal(&palette))?;
+    set_hl("ColorColumn", C::color_column(&palette))?;
+
     Ok(())
 }
 

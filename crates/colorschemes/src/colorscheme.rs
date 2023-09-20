@@ -1,10 +1,6 @@
-use crate::HighlightGroup;
+#![allow(unused_variables)]
 
-/// TODO: docs
-pub trait Palette {
-    /// TODO: docs
-    const PALETTE: crate::palette::Palette;
-}
+use crate::{HighlightGroup, Palette};
 
 /// A [`Colorscheme`] is a collection of [`HighlightGroup`]s that are applied
 /// to the UI elements of Neovim.
@@ -45,6 +41,9 @@ pub trait Colorscheme:
 {
     /// TODO: docs
     const NAME: &'static str;
+
+    /// TODO: docs
+    fn palette(&self) -> Palette;
 }
 
 /// This trait sets the highlight groups that are builtin to (Neo)Vim.
@@ -52,22 +51,21 @@ pub trait Colorscheme:
 /// See [this page][builtin] for more infos.
 ///
 /// [builtin]: https://neovim.io/doc/user/syntax.html#highlight-default
-pub trait BuiltinColorscheme: Palette {
+pub trait BuiltinColorscheme {
     /// The highlighting applied to the [`ColorColumn`][cc] highlight group.
     ///
     /// [cc]: https://neovim.io/doc/user/syntax.html#hl-ColorColumn
-    fn color_column(&self) -> Option<HighlightGroup> {
-        None
+    fn color_column(palette: &Palette) -> HighlightGroup {
+        HighlightGroup::default()
     }
 
     /// The highlighting applied to the [`Normal`][normal] highlight group.
     ///
     /// [normal]: https://neovim.io/doc/user/syntax.html#hl-Normal
-    fn normal(&self) -> Option<HighlightGroup> {
+    fn normal(palette: &Palette) -> HighlightGroup {
         HighlightGroup::new()
-            .with_foreground(Self::PALETTE.foreground)
-            .with_background(Self::PALETTE.background)
-            .into_some()
+            .foreground(palette.foreground)
+            .background(palette.background)
     }
 }
 
@@ -76,24 +74,24 @@ pub trait BuiltinColorscheme: Palette {
 /// See [this page][syntax] for more infos.
 ///
 /// [syntax]: https://neovim.io/doc/user/syntax.html#group-name
-pub trait SyntaxColorscheme: Palette {
+pub trait SyntaxColorscheme {
     /// The highlighting applied to the `String` highlight group.
-    fn string(&self) -> Option<HighlightGroup> {
-        HighlightGroup::new().with_foreground(Self::PALETTE.string).into_some()
+    fn string(palette: &Palette) -> HighlightGroup {
+        HighlightGroup::new().foreground(palette.string)
     }
 }
 
 /// TODO: docs
-pub trait DiagnosticColorscheme: Palette {}
+pub trait DiagnosticColorscheme {}
 
 /// TODO: docs
-pub trait LspColorscheme: Palette {}
+pub trait LspColorscheme {}
 
 /// TODO: docs
-pub trait TreeSitterColorscheme: Palette {}
+pub trait TreeSitterColorscheme {}
 
 /// TODO: docs
-pub trait NomadColorscheme: Palette {}
+pub trait NomadColorscheme {}
 
 /// TODO: docs
-pub trait TelescopeColorscheme: Palette {}
+pub trait TelescopeColorscheme {}

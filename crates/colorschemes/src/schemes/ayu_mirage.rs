@@ -1,18 +1,18 @@
-use crate::{colorscheme::Palette as ColorschemePalette, *};
+use crate::*;
 
 #[derive(Default)]
 pub(crate) struct AyuMirage;
 
-impl ColorschemePalette for AyuMirage {
-    const PALETTE: Palette = Palette {
-        foreground: hex!("#252935"),
-        background: hex!("#cccac3"),
-        string: hex!("#ddfc90"),
-    };
-}
-
 impl Colorscheme for AyuMirage {
     const NAME: &'static str = "Ayu Mirage";
+
+    fn palette(&self) -> Palette {
+        Palette {
+            foreground: hex!("#252935"),
+            background: hex!("#cccac3"),
+            string: hex!("#ddfc90"),
+        }
+    }
 }
 
 impl BuiltinColorscheme for AyuMirage {}
