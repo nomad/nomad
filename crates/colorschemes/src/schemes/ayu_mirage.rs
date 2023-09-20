@@ -8,8 +8,8 @@ impl Colorscheme for AyuMirage {
 
     fn palette(&self) -> Palette {
         Palette {
-            foreground: hex!("#252935"),
-            background: hex!("#cccac3"),
+            foreground: hex!("#cccac3"),
+            background: hex!("#252935"),
             string: hex!("#ddfc90"),
         }
     }

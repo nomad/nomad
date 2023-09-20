@@ -23,7 +23,7 @@ impl Plugin for Colorschemes {
 
     type Message = Message;
 
-    type Config = ();
+    type Config = Config;
 
     type InitError = Infallible;
 
@@ -46,9 +46,14 @@ impl Plugin for Colorschemes {
         builder.function("open").on_execute(|()| Message::Open).build();
     }
 
-    fn update_config(&mut self, config: Enable<()>) {
+    fn update_config(&mut self, config: Enable<Config>) {
         if !config.enable() {
             self.disable();
+            return;
+        }
+
+        if let Some(colorscheme) = config.into_inner().enabled_colorscheme() {
+            self.sender.send(Message::Load(colorscheme));
         }
     }
 

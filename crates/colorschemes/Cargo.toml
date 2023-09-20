@@ -8,3 +8,5 @@ common = { path = "../common" }
 hex = { path = "hex" }
 
 once_cell = { workspace = true }
+phf = { workspace = true, features = ["macros"] }
+serde = { workspace = true }

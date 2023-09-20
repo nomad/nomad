@@ -122,10 +122,8 @@ fn create_static_module(
     path: &Path,
 ) -> io::Result<()> {
     let colorscheme_names = {
-        let mut names = colorschemes
-            .iter()
-            .map(|c| &c.colorscheme_name)
-            .collect::<Vec<_>>();
+        let mut names =
+            colorschemes.iter().map(|c| c.api_name()).collect::<Vec<_>>();
 
         names.sort();
 
@@ -135,6 +133,18 @@ fn create_static_module(
             .collect::<Vec<_>>()
             .join(",\n")
     };
+
+    let api_names_to_colorscheme_names = colorschemes
+        .iter()
+        .map(|c| {
+            format!(
+                "        \"{}\" => \"{}\"",
+                c.api_name(),
+                c.colorscheme_name
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",\n");
 
     let colorschemes = colorschemes
         .iter()
@@ -153,6 +163,7 @@ fn create_static_module(
 
 use std::collections::HashMap;
 
+use phf::phf_map;
 use once_cell::sync::Lazy;
 
 use super::*;
@@ -166,20 +177,30 @@ static COLORSCHEMES: Lazy<
     ])
 }});
 
-const COLORSCHEME_NAMES: &[&str] = &[
+const COLORSCHEME_API_NAMES: &[&str] = &[
 {}
 ];
+
+const API_NAMES_TO_COLORSCHEME_NAMES: phf::Map<&'static str, &'static str> = phf_map! {{
+{}
+}};
 
 pub(crate) fn colorschemes<'a>(
 ) -> &'a HashMap<&'static str, Box<dyn LoadableColorscheme>> {{
     &COLORSCHEMES
 }}
 
-pub(crate) fn colorscheme_names() -> &'static [&'static str] {{
-    COLORSCHEME_NAMES
+pub(crate) fn colorscheme_api_names() -> &'static [&'static str] {{
+    COLORSCHEME_API_NAMES
+}}
+
+pub(crate) fn api_name_to_colorscheme_name(
+    api_name: &str,
+) -> Option<&'static str> {{
+    API_NAMES_TO_COLORSCHEME_NAMES.get(api_name).copied()
 }}
 "#,
-        colorschemes, colorscheme_names,
+        colorschemes, colorscheme_names, api_names_to_colorscheme_names,
     );
 
     write_file(path, &contents)
