@@ -148,6 +148,9 @@ dependencies = [
 [[package]]
 name = "fuzzy-modal"
 version = "0.1.0"
+dependencies = [
+ "common",
+]
 
 [[package]]
 name = "glob"

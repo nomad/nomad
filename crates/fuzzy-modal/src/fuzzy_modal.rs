@@ -1,4 +1,6 @@
-use crate::FuzzyItem;
+use common::nvim;
+
+use crate::{FuzzyItem, Prompt};
 
 type OnExit = Box<dyn FnOnce(Option<FuzzyItem>) + 'static>;
 type OnSelect = Box<dyn FnMut(&FuzzyItem) + 'static>;
@@ -7,12 +9,13 @@ type OnConfirm = Box<dyn FnOnce(FuzzyItem) + 'static>;
 /// TODO: docs
 #[derive(Default)]
 pub struct FuzzyModal {
-    starting_text: Option<String>,
     items: Vec<FuzzyItem>,
-    selected_item_idx: Option<usize>,
+    on_confirm: Option<OnConfirm>,
     on_exit: Option<OnExit>,
     on_select: Option<OnSelect>,
-    on_confirm: Option<OnConfirm>,
+    prompt: Option<Prompt>,
+    selected_item_idx: Option<usize>,
+    starting_text: Option<String>,
 }
 
 impl FuzzyModal {
@@ -26,6 +29,22 @@ impl FuzzyModal {
     /// Note that calling this will trigger the `on_exit` callback, if one was
     /// set.
     pub fn close(self) {}
+
+    /// TODO: docs
+    fn open(&mut self) {
+        let len = self.items.len();
+
+        let prompt = Prompt::new(
+            self.starting_text.clone(),
+            self.items.len() as _,
+            move |query| {
+                nvim::print!("new query is {query}");
+                len as _
+            },
+        );
+
+        self.prompt = Some(prompt);
+    }
 }
 
 pub struct FuzzyModalBuilder {
@@ -73,7 +92,8 @@ impl FuzzyModalBuilder {
     }
 
     /// TODO: docs
-    pub fn open(self) -> FuzzyModal {
+    pub fn open(mut self) -> FuzzyModal {
+        self.modal.open();
         self.modal
     }
 
@@ -83,6 +103,7 @@ impl FuzzyModalBuilder {
         selected_item_idx: usize,
     ) -> FuzzyModal {
         self.modal.selected_item_idx = Some(selected_item_idx);
+        self.modal.open();
         self.modal
     }
 
