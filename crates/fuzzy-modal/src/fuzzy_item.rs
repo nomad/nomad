@@ -1,6 +1,6 @@
 /// TODO: docs
 pub struct FuzzyItem {
-    text: String,
+    pub text: String,
 }
 
 impl FuzzyItem {

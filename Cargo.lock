@@ -116,6 +116,7 @@ name = "colorschemes"
 version = "0.1.0"
 dependencies = [
  "common",
+ "fuzzy-modal",
  "hex",
  "once_cell",
  "phf",

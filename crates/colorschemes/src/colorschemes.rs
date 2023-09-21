@@ -1,13 +1,14 @@
 use std::convert::Infallible;
 
 use common::*;
+use fuzzy_modal::*;
 
 use crate::*;
 
 #[derive(Default)]
 pub struct Colorschemes {
     is_disabled: bool,
-
+    choose_modal: Option<FuzzyModal>,
     sender: LateInit<Sender<Message>>,
 }
 
@@ -15,7 +16,7 @@ pub enum Message {
     Close,
     Disable,
     Load(String),
-    Open,
+    Choose,
 }
 
 impl Plugin for Colorschemes {
@@ -43,7 +44,7 @@ impl Plugin for Colorschemes {
             .on_execute(|colorscheme: String| Message::Load(colorscheme))
             .build();
 
-        builder.function("choose").on_execute(|()| Message::Open).build();
+        builder.function("choose").on_execute(|()| Message::Choose).build();
     }
 
     fn update_config(&mut self, config: Enable<Config>) {
@@ -53,7 +54,7 @@ impl Plugin for Colorschemes {
         }
 
         if let Some(colorscheme) = config.into_inner().enabled_colorscheme() {
-            self.sender.send(Message::Load(colorscheme));
+            self.send(Message::Load(colorscheme));
         }
     }
 
@@ -63,10 +64,10 @@ impl Plugin for Colorschemes {
         }
 
         match msg {
-            Message::Close => self.close(),
+            Message::Close => self.close_choose_modal(),
             Message::Disable => self.disable(),
             Message::Load(colorscheme) => self.load(&colorscheme),
-            Message::Open => self.open(),
+            Message::Choose => self.choose_colorscheme(),
         };
 
         Ok(())
@@ -74,7 +75,21 @@ impl Plugin for Colorschemes {
 }
 
 impl Colorschemes {
-    fn close(&mut self) {}
+    fn close_choose_modal(&mut self) {
+        if let Some(modal) = self.choose_modal.take() {
+            modal.close();
+        }
+    }
+
+    fn choose_colorscheme(&mut self) {
+        self.close_choose_modal();
+        self.open_choose_modal();
+    }
+
+    fn disable(&mut self) {
+        self.is_disabled = true;
+        self.close_choose_modal();
+    }
 
     fn load(&mut self, colorscheme: &str) {
         let Some(colorscheme) = schemes::colorschemes().get(colorscheme)
@@ -84,13 +99,37 @@ impl Colorschemes {
         colorscheme.load().unwrap();
     }
 
-    fn disable(&mut self) {
-        self.is_disabled = true;
+    fn open_choose_modal(&mut self) {
+        // TODO: get current colorscheme.
+        let original_colorscheme = "Ayu Mirage".to_owned();
+
+        let on_select_sender = self.sender.clone();
+
+        let on_confirm_sender = self.sender.clone();
+
+        let on_exit_sender = self.sender.clone();
+
+        let modal = FuzzyModal::builder()
+            .with_starting_text("Choose colorscheme...")
+            .with_items(
+                schemes::colorschemes().keys().copied().map(FuzzyItem::new),
+            )
+            .on_select(move |item| {
+                let colorscheme = item.text.clone();
+                on_select_sender.send(Message::Load(colorscheme));
+            })
+            .on_confirm(move |item| {
+                let colorscheme = item.text;
+                on_confirm_sender.send(Message::Load(colorscheme));
+            })
+            .on_exit(move |_| {
+                on_exit_sender.send(Message::Load(original_colorscheme));
+            })
+            .open();
+
+        self.choose_modal = Some(modal);
     }
 
-    fn open(&mut self) {}
-
-    #[allow(dead_code)]
     fn send(&mut self, msg: Message) {
         self.sender.send(msg);
     }

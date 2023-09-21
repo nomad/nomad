@@ -1,8 +1,8 @@
 use crate::FuzzyItem;
 
-type OnExit = Box<dyn FnMut(Option<FuzzyItem>) + 'static>;
+type OnExit = Box<dyn FnOnce(Option<FuzzyItem>) + 'static>;
 type OnSelect = Box<dyn FnMut(&FuzzyItem) + 'static>;
-type OnConfirm = Box<dyn FnMut(FuzzyItem) + 'static>;
+type OnConfirm = Box<dyn FnOnce(FuzzyItem) + 'static>;
 
 /// TODO: docs
 #[derive(Default)]
@@ -20,6 +20,12 @@ impl FuzzyModal {
     pub fn builder() -> FuzzyModalBuilder {
         FuzzyModalBuilder { modal: Self::default() }
     }
+
+    /// Closes the modal.
+    ///
+    /// Note that calling this will trigger the `on_exit` callback, if one was
+    /// set.
+    pub fn close(self) {}
 }
 
 pub struct FuzzyModalBuilder {
@@ -32,7 +38,7 @@ impl FuzzyModalBuilder {
     /// The argument of the function is the item that was confirmed.
     pub fn on_confirm<F>(mut self, fun: F) -> Self
     where
-        F: FnMut(FuzzyItem) + 'static,
+        F: FnOnce(FuzzyItem) + 'static,
     {
         self.modal.on_confirm = Some(Box::new(fun));
         self
@@ -45,7 +51,7 @@ impl FuzzyModalBuilder {
     /// modal was exited (if there was one).
     pub fn on_exit<F>(mut self, fun: F) -> Self
     where
-        F: FnMut(Option<FuzzyItem>) + 'static,
+        F: FnOnce(Option<FuzzyItem>) + 'static,
     {
         self.modal.on_exit = Some(Box::new(fun));
         self

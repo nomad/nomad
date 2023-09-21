@@ -6,6 +6,7 @@ authors.workspace = true
 
 [dependencies]
 common = { path = "../common" }
+fuzzy-modal = { path = "../fuzzy-modal" }
 hex = { path = "hex" }
 
 once_cell = { workspace = true }
