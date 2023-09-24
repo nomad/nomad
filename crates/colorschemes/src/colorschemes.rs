@@ -58,7 +58,11 @@ impl Plugin for Colorschemes {
         }
     }
 
-    fn handle_message(&mut self, msg: Message) -> Result<(), Infallible> {
+    fn handle_message(
+        &mut self,
+        msg: Message,
+        ctx: &Ctx<Self>,
+    ) -> Result<(), Infallible> {
         if self.is_disabled {
             return Ok(());
         }
@@ -67,7 +71,7 @@ impl Plugin for Colorschemes {
             Message::Close => self.close_choose_modal(),
             Message::Disable => self.disable(),
             Message::Load(colorscheme) => self.load(&colorscheme),
-            Message::Choose => self.choose_colorscheme(),
+            Message::Choose => self.choose_colorscheme(ctx),
         };
 
         Ok(())
@@ -81,9 +85,9 @@ impl Colorschemes {
         }
     }
 
-    fn choose_colorscheme(&mut self) {
+    fn choose_colorscheme(&mut self, ctx: &Ctx<Self>) {
         self.close_choose_modal();
-        self.open_choose_modal();
+        self.open_choose_modal(ctx);
     }
 
     fn disable(&mut self) {
@@ -99,7 +103,7 @@ impl Colorschemes {
         colorscheme.load().unwrap();
     }
 
-    fn open_choose_modal(&mut self) {
+    fn open_choose_modal(&mut self, ctx: &Ctx<Self>) {
         // TODO: get current colorscheme.
         let original_colorscheme = "Ayu Mirage".to_owned();
 
@@ -109,11 +113,8 @@ impl Colorschemes {
 
         let on_exit_sender = self.sender.clone();
 
-        // TODO: get fuzzy modal via downcasting.
-        let fuzzy: &FuzzyModal = unsafe { std::mem::transmute(&()) };
-
-        let modal = fuzzy
-            .builder()
+        let modal = ctx
+            .with_plugin::<FuzzyModal, _, _>(FuzzyModal::builder)
             .with_starting_text("Choose colorscheme...")
             .with_items(
                 schemes::colorschemes().keys().copied().map(FuzzyItem::new),

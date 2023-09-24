@@ -45,5 +45,6 @@ pub trait Plugin: Default + 'static {
     fn handle_message(
         &mut self,
         msg: Self::Message,
+        ctx: &Ctx<Self>,
     ) -> Result<(), Self::HandleMessageError>;
 }

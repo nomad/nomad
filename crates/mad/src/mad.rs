@@ -1,20 +1,24 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::rc::Rc;
 
 use common::nvim::{Dictionary, Function, Object};
-use common::*;
+use common::{
+    runtime::{self, Runtime},
+    *,
+};
 
 use crate::config;
-use crate::runtime::{self, MadRuntime};
 
 /// TODO: docs
+#[derive(Default)]
 pub struct Mad {
     /// TODO: docs
     api: HashMap<&'static str, Dictionary>,
 
     /// TODO: docs
-    runtime: MadRuntime,
+    runtime: Rc<RefCell<Runtime>>,
 }
 
 impl Mad {
@@ -40,16 +44,16 @@ impl Mad {
     }
 
     pub fn new() -> Self {
-        Self { api: HashMap::new(), runtime: MadRuntime::new() }
+        Self::default()
     }
 
     /// Registers a new plugin.
     pub fn with_plugin<P: Plugin>(mut self) -> Self {
-        let (plugin, msg_sender) = start::<P>();
+        let (plugin, msg_sender) = start::<P>(Rc::clone(&self.runtime));
 
         {
             // SAFETY: todo.
-            let plugin = unsafe { rc_to_mut(&plugin) };
+            let mut plugin = plugin.borrow_mut();
             if let Err(err) = plugin.init(&msg_sender) {
                 display_error(err, Some(P::NAME));
             }
@@ -64,7 +68,7 @@ impl Mad {
         };
 
         self.api.insert(P::NAME, api);
-        self.runtime.add_plugin(plugin);
+        self.runtime.borrow_mut().add_plugin(plugin);
         self
     }
 }
@@ -72,22 +76,27 @@ impl Mad {
 use std::sync::mpsc;
 
 /// TODO: docs
-pub(crate) fn start<P: Plugin>() -> (Rc<P>, Sender<P::Message>) {
-    let plugin = Rc::new(P::default());
+pub(crate) fn start<P: Plugin>(
+    runtime: Rc<RefCell<Runtime>>,
+) -> (Rc<RefCell<P>>, Sender<P::Message>) {
+    let plugin = Rc::new(RefCell::new(P::default()));
 
     let (msg_sender, msg_receiver) = mpsc::channel();
 
     let cloned = Rc::clone(&plugin);
 
+    let ctx = Ctx::<P>::new(runtime);
+
     let plugin_loop = move || {
         while let Ok(msg) = msg_receiver.try_recv() {
             let plugin = Rc::clone(&cloned);
 
-            nvim::schedule(move |_| {
-                // SAFETY: todo.
-                let plugin = unsafe { rc_to_mut(&plugin) };
+            let ctx = ctx.clone();
 
-                if let Err(err) = plugin.handle_message(msg) {
+            nvim::schedule(move |_| {
+                let mut plugin = plugin.borrow_mut();
+
+                if let Err(err) = plugin.handle_message(msg, &ctx) {
                     display_error(err, Some(P::NAME));
                 }
 

@@ -42,7 +42,11 @@ impl Plugin for FuzzyModal {
         self.send(Message::UpdateConfig(Some(window_config)));
     }
 
-    fn handle_message(&mut self, msg: Message) -> Result<(), Infallible> {
+    fn handle_message(
+        &mut self,
+        msg: Message,
+        _: &Ctx<Self>,
+    ) -> Result<(), Infallible> {
         if self.is_disabled {
             return Ok(());
         }

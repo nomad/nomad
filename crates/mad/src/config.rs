@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 
 use common::nvim::{self, Object};
-use common::*;
+use common::{
+    runtime::{self, Runtime},
+    *,
+};
 use serde::de;
-
-use crate::runtime;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum ConfigError {

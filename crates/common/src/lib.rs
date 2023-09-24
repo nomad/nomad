@@ -1,13 +1,16 @@
 mod api_builder;
 mod command_builder;
+mod ctx;
 mod enable;
 mod lateinit;
 mod plugin;
+pub mod runtime;
 mod sender;
 mod window_config;
 
 pub use api_builder::ApiBuilder;
 pub use command_builder::CommandBuilder;
+pub use ctx::Ctx;
 pub use enable::Enable;
 pub use lateinit::LateInit;
 pub use nvim_oxi as nvim;
