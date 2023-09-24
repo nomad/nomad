@@ -1,4 +1,4 @@
 mod config;
 mod mad;
 
-pub use mad::Mad;
+pub use mad::{Api, Mad};

@@ -11,3 +11,4 @@ nvim-oxi = { workspace = true }
 serde = { workspace = true }
 serde_path_to_error = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }

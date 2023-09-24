@@ -15,10 +15,12 @@ neovim-nightly = ["common/neovim-nightly"]
 [dependencies]
 colorschemes = { path = "crates/colorschemes" }
 common = { path = "crates/common" }
+fuzzy-modal = { path = "crates/fuzzy-modal" }
 mad = { path = "crates/mad" }
 seph = { path = "crates/seph" }
 
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 [workspace]
 members = ["crates/*"]
@@ -36,3 +38,4 @@ phf = { version = "0.11" }
 serde = { version = "1.0" }
 serde_path_to_error = "0.1"
 thiserror = { version = "1.0" }
+tracing = { version = "0.1" }

@@ -8,41 +8,18 @@ use common::{
     runtime::{self, Runtime},
     *,
 };
+use tracing::Subscriber;
 
 use crate::config;
 
 /// TODO: docs
 #[derive(Default)]
 pub struct Mad {
-    /// TODO: docs
-    api: HashMap<&'static str, Dictionary>,
-
-    /// TODO: docs
+    api: Api,
     runtime: Rc<RefCell<Runtime>>,
 }
 
 impl Mad {
-    /// Returns the dictionary describing the APIs exposed by the plugins that
-    /// have been registered.
-    pub fn api(self) -> Dictionary {
-        let api = self.create_api();
-        runtime::init(self.runtime);
-        api
-    }
-
-    /// TODO: docs
-    fn create_api(&self) -> Dictionary {
-        self.api
-            .iter()
-            .filter(|(_, api)| (!api.is_empty()))
-            .map(|(name, api)| (*name, Object::from(api.clone())))
-            .chain(core::iter::once((
-                "config",
-                Function::from_fn(config::config).into(),
-            )))
-            .collect()
-    }
-
     pub fn new() -> Self {
         Self::default()
     }
@@ -70,6 +47,47 @@ impl Mad {
         self.api.insert(P::NAME, api);
         self.runtime.borrow_mut().add_plugin(plugin);
         self
+    }
+
+    /// TODO: docs
+    pub fn with_tracing_subscriber<S>(mut self, subscriber: S) -> Self
+    where
+        S: Subscriber,
+    {
+        self
+    }
+
+    /// Returns the dictionary describing the APIs exposed by the plugins that
+    /// have been registered.
+    pub fn init(self) -> Api {
+        let Self { api, runtime } = self;
+        runtime::init(runtime);
+        api
+    }
+}
+
+/// TODO: docs
+#[derive(Default)]
+pub struct Api {
+    plugin_apis: HashMap<&'static str, Dictionary>,
+}
+
+impl Api {
+    fn insert(&mut self, name: &'static str, api: Dictionary) {
+        self.plugin_apis.insert(name, api);
+    }
+
+    /// TODO: docs
+    pub fn api(self) -> Dictionary {
+        self.plugin_apis
+            .into_iter()
+            .filter(|(_, api)| (!api.is_empty()))
+            .map(|(name, api)| (name, Object::from(api)))
+            .chain(core::iter::once((
+                "config",
+                Function::from_fn(config::config).into(),
+            )))
+            .collect()
     }
 }
 
