@@ -150,6 +150,8 @@ impl Prompt {
 
     /// TODO: docs
     pub fn update_matched(&mut self, new_matched_results: u64) {
+        assert!(new_matched_results <= self.config.total_results);
+
         self.matched_results = new_matched_results;
 
         self.update_matched_on_total(
@@ -211,6 +213,8 @@ impl Prompt {
 
     /// TODO: docs
     pub fn update_total(&mut self, new_total_results: u64) {
+        assert!(new_total_results >= self.matched_results);
+
         self.config.total_results = new_total_results;
 
         self.update_matched_on_total(
