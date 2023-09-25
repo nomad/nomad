@@ -20,7 +20,7 @@ pub enum Message {
     Open(FuzzyConfig),
 
     /// TODO: docs
-    PromptChanged(String),
+    PromptChanged(PromptDiff),
 
     /// TODO: docs
     SelectNextItem,

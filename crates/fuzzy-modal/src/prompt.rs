@@ -1,3 +1,6 @@
+use std::cmp::Ordering;
+use std::ops::Range;
+
 use common::{nvim, WindowConfig, *};
 use nvim::api::{opts::*, types::*, Buffer, Window};
 
@@ -232,6 +235,20 @@ fn format_matched_on_total(
     nvim::String::from(formatted.as_str())
 }
 
+/// TODO: docs
+#[derive(Debug)]
+pub enum PromptDiff {
+    /// TODO: docs
+    Insertion(usize, String),
+
+    /// TODO: docs
+    Deletion(Range<usize>),
+
+    /// TODO: docs
+    Replacement(String),
+}
+
+/// TODO: docs
 fn on_bytes(
     sender: Sender<Message>,
 ) -> impl Fn(OnBytesArgs) -> Result<bool, nvim::api::Error> {
@@ -249,19 +266,21 @@ fn on_bytes(
         // the prompt has a single line.
         _start_col,
         // The byte offset where the change started.
-        byte_offset,
+        start_offset,
         // The row containing the last changed byte before the change. Always
         // 0 because the prompt has a single line.
         _old_end_row,
         // The column containing the last changed byte before the change. Equal
         // to `old_end_len` because the prompt always has a single line.
         _old_end_col,
+        // The length of the changed region before the change.
         old_end_len,
         // The row containing the last changed byte after the change. Always 0.
         _new_end_row,
         // The column containing the last changed byte after the change. Equal
         // to `new_end_len` because the prompt always has a single line.
         _new_end_col,
+        // The length of the changed region after the change.
         new_end_len,
     ): (
         String,
@@ -277,24 +296,84 @@ fn on_bytes(
         usize,
         usize,
     )| {
-        let new_len = buffer.get_offset(1).unwrap() - 1;
+        let old_end_offset = start_offset + old_end_len;
 
-        let was_empty = new_end_len == new_len;
+        let new_end_offset = start_offset + new_end_len;
 
-        if was_empty {
-            sender.send(Message::HidePlaceholder);
-        }
-
-        let is_empty = new_len == 0;
-
-        if is_empty {
-            sender.send(Message::ShowPlaceholder);
-        }
-
-        nvim::print!(
-            "{:?}",
-            (byte_offset, old_end_len, new_end_len, new_len,)
+        handle_on_bytes(
+            buffer,
+            start_offset,
+            old_end_offset,
+            new_end_offset,
+            &sender,
         );
+
         Ok(false)
     }
+}
+
+/// TODO: docs
+fn handle_on_bytes(
+    buffer: Buffer,
+    start_offset: usize,
+    old_end_offset: usize,
+    new_end_offset: usize,
+    sender: &Sender<Message>,
+) {
+    let new_len = buffer.get_offset(1).unwrap() - 1;
+
+    let was_empty = (new_end_offset - start_offset) == new_len;
+
+    let is_empty = new_len == 0;
+
+    if was_empty {
+        sender.send(Message::HidePlaceholder);
+    } else if is_empty {
+        sender.send(Message::ShowPlaceholder);
+    }
+
+    let diff = match old_end_offset.cmp(&new_end_offset) {
+        // The text that was in the `start_offset..old_end_offset` range
+        // has been deleted.
+        Ordering::Greater if start_offset == new_end_offset => {
+            PromptDiff::Deletion(start_offset..old_end_offset)
+        },
+
+        // The text that's in the `start_offset..new_end_offset` has just been
+        // inserted.
+        Ordering::Less if start_offset == old_end_offset => {
+            let insertion = buffer
+                .get_text(
+                    0..1,
+                    start_offset,
+                    new_end_offset,
+                    &GetTextOpts::default(),
+                )
+                .unwrap()
+                .next()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+
+            PromptDiff::Insertion(start_offset, insertion)
+        },
+
+        // Anything that's not clearly an insertion or a deletion is just
+        // considered a replacement of the whole prompt.
+        _ => {
+            let prompt = buffer
+                .get_lines(0..1, true)
+                .unwrap()
+                .next()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+
+            PromptDiff::Replacement(prompt)
+        },
+    };
+
+    nvim::print!("diff: {diff:?}");
+
+    sender.send(Message::PromptChanged(diff));
 }

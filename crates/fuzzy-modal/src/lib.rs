@@ -15,7 +15,7 @@ pub use fuzzy_modal::FuzzyModal;
 pub use handle::FuzzyHandle;
 use message::Message;
 use modal_config::{FuzzyBuilder, FuzzyConfig};
-use prompt::{Prompt, PromptConfig};
+use prompt::{Prompt, PromptConfig, PromptDiff};
 use results::Results;
 use view::View;
 
