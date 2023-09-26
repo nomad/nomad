@@ -1,12 +1,14 @@
 use std::env;
 use std::path::PathBuf;
 
+use time::format_description::FormatItem;
+use time::macros::format_description;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
-use tracing_subscriber::{filter, fmt, fmt::format};
+use tracing_subscriber::{filter, fmt, fmt::format, fmt::time::UtcTime};
 
 type FmtSubscriber = fmt::Subscriber<
     format::DefaultFields,
-    format::Format<format::Full>,
+    format::Format<format::Full, UtcTime<&'static [FormatItem<'static>]>>,
     filter::LevelFilter,
     NonBlocking,
 >;
@@ -14,7 +16,7 @@ type FmtSubscriber = fmt::Subscriber<
 const LOG_FILE_NAME: &str = "nomad.log";
 
 /// TODO: docs
-pub struct Subscriber {
+struct Subscriber {
     subscriber: FmtSubscriber,
     _guard: WorkerGuard,
 }
@@ -25,8 +27,14 @@ pub fn subscriber() -> impl tracing::Subscriber {
 
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
+    let timer = UtcTime::new(format_description!(
+        "[year]-[month]-[day]T[hour]:[minute]:[second]Z"
+    ));
+
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
+        .with_thread_names(true)
+        .with_timer(timer)
         .with_writer(non_blocking)
         .finish();
 

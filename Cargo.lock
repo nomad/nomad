@@ -331,6 +331,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_threads"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "nvim-oxi"
 version = "0.3.0"
 source = "git+https://github.com/noib3/nvim-oxi#e39502484d84b89b786388993c9bc5c1fcada52c"
@@ -692,6 +701,8 @@ checksum = "426f806f4089c493dcac0d24c29c01e2c38baf8e30f1b716ee37e83d200b18fe"
 dependencies = [
  "deranged",
  "itoa",
+ "libc",
+ "num_threads",
  "serde",
  "time-core",
  "time-macros",
@@ -772,6 +783,7 @@ name = "tracing-subscriber"
 version = "0.1.0"
 dependencies = [
  "home",
+ "time",
  "tracing",
  "tracing-appender",
  "tracing-subscriber 0.3.17",
@@ -787,6 +799,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "time",
  "tracing-core",
  "tracing-log",
 ]

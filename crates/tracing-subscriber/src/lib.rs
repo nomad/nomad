@@ -1,3 +1,3 @@
 mod subscriber;
 
-pub use subscriber::{subscriber, Subscriber};
+pub use subscriber::subscriber;
