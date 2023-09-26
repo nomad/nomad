@@ -54,7 +54,7 @@ impl Mad {
     where
         S: Subscriber + Send + Sync + 'static,
     {
-        tracing::subscriber::set_global_default(subscriber).unwrap();
+        self.runtime.borrow_mut().add_tracing_subscriber(subscriber);
         self
     }
 

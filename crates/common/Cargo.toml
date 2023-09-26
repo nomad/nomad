@@ -13,3 +13,4 @@ neovim-nightly = ["nvim-oxi/neovim-nightly"]
 nvim-oxi = { workspace = true }
 serde = { workspace = true }
 serde_path_to_error = { workspace = true }
+tracing = { workspace = true }

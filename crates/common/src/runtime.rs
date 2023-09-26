@@ -2,6 +2,9 @@ use std::any::Any;
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use tracing::Subscriber;
 
 use crate::nvim::{self, Object};
 use crate::*;
@@ -37,9 +40,11 @@ impl<P: Plugin> ConfigurablePlugin for P {
 pub struct Runtime {
     plugins: HashMap<&'static str, Rc<RefCell<dyn ConfigurablePlugin>>>,
     plugins_as_any: HashMap<&'static str, Rc<RefCell<dyn Any>>>,
+    tracing_subscriber: Option<Arc<dyn tracing::Subscriber>>,
 }
 
 impl Runtime {
+    /// TODO: docs
     #[track_caller]
     pub fn with_plugin<P, F, R>(&self, fun: F) -> R
     where
@@ -57,6 +62,19 @@ impl Runtime {
         };
 
         fun(plugin)
+    }
+
+    /// TODO: docs
+    pub fn add_tracing_subscriber<S>(&mut self, subscriber: S)
+    where
+        S: Subscriber + Send + Sync + 'static,
+    {
+        let subscriber = Arc::new(subscriber);
+
+        tracing::subscriber::set_global_default(Arc::clone(&subscriber))
+            .unwrap();
+
+        self.tracing_subscriber = Some(subscriber);
     }
 
     pub fn add_plugin<P: Plugin>(&mut self, plugin: Rc<RefCell<P>>) {

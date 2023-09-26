@@ -136,6 +136,7 @@ dependencies = [
  "nvim-oxi",
  "serde",
  "serde_path_to_error",
+ "tracing",
 ]
 
 [[package]]
@@ -182,6 +183,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "serde",
+ "tracing",
 ]
 
 [[package]]

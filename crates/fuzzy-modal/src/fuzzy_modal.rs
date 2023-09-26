@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use common::*;
+use tracing::*;
 
 use crate::*;
 
@@ -70,6 +71,7 @@ impl FuzzyModal {
     }
 
     fn open(&mut self, fuzzy_config: FuzzyConfig) {
+        info!("Opening fuzzy modal");
         self.view.close();
         self.view.open(fuzzy_config, self.config.window.clone());
     }

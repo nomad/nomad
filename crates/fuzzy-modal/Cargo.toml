@@ -8,3 +8,4 @@ authors.workspace = true
 common = { path = "../common" }
 
 serde = { version = "1.0", features = ["derive"] }
+tracing = { workspace = true }

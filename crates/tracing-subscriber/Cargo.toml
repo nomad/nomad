@@ -6,6 +6,6 @@ authors.workspace = true
 
 [dependencies]
 home = { version = "0.5" }
-tracing = { version = "0.1" }
+tracing = { workspace = true }
 tracing-appender = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
