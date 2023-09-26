@@ -33,7 +33,6 @@ pub fn subscriber() -> impl tracing::Subscriber {
 
     let subscriber = tracing_subscriber::fmt()
         .with_ansi(false)
-        .with_thread_names(true)
         .with_timer(timer)
         .with_writer(non_blocking)
         .finish();

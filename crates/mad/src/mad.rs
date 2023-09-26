@@ -55,6 +55,7 @@ impl Mad {
         S: Subscriber + Send + Sync + 'static,
     {
         self.runtime.borrow_mut().add_tracing_subscriber(subscriber);
+        info!("========== starting Nomad ==========");
         self
     }
 
@@ -66,10 +67,24 @@ impl Mad {
         runtime::init(runtime);
 
         std::panic::set_hook(Box::new(|infos| {
-            error!("{}", infos);
+            if let Some(location) = infos.location() {
+                tracing::error!(
+                    "panicked at {}:{}:{}{}",
+                    location.file(),
+                    location.line(),
+                    location.column(),
+                    infos
+                        .payload()
+                        .downcast_ref::<&str>()
+                        .map(|msg| format!(": {msg}"))
+                        .unwrap_or_default(),
+                );
+            } else {
+                tracing::error!("{}", infos);
+            }
         }));
 
-        info!("Finished initialization");
+        info!("finished initialization");
 
         api
     }
