@@ -53,6 +53,7 @@ impl Plugin for FuzzyModal {
         }
 
         match msg {
+            Message::AddResults(items) => self.view.add_results(items),
             Message::Close => self.view.close(),
             Message::Open(config) => self.open(config),
             Message::HidePlaceholder => self.hide_placeholder(),
@@ -71,7 +72,6 @@ impl FuzzyModal {
     }
 
     fn open(&mut self, fuzzy_config: FuzzyConfig) {
-        info!("Opening fuzzy modal");
         self.view.close();
         self.view.open(fuzzy_config, self.config.window.clone());
     }

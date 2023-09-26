@@ -4,17 +4,26 @@ use crate::*;
 
 pub(crate) struct View {
     prompt: Prompt,
-    // results: Results,
+    results: Results,
 }
 
 impl View {
+    pub fn add_results(&mut self, new_results: Vec<FuzzyItem>) {
+        self.results.extend(new_results);
+        let total = self.results.num_total();
+        self.prompt.update_total(total);
+    }
+
     pub fn close(&mut self) {
         self.prompt.close();
-        // self.results.close();
+        self.results.close();
     }
 
     pub fn new(sender: Sender<Message>) -> Self {
-        Self { prompt: Prompt::new(sender) }
+        Self {
+            prompt: Prompt::new(sender.clone()),
+            results: Results::new(sender),
+        }
     }
 
     pub fn open(&mut self, config: FuzzyConfig, window_config: WindowConfig) {

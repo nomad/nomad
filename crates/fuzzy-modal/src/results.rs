@@ -1,8 +1,9 @@
 use std::ops::{Add, Index, Sub};
 
-use common::nvim::api::{Buffer, Window};
+use common::*;
+use nvim::api::{Buffer, Window};
 
-use crate::FuzzyItem;
+use crate::*;
 
 pub(crate) struct Results {
     /// The current contents of the prompt, which is used to filter the
@@ -29,13 +30,13 @@ pub(crate) struct Results {
     /// when the last result is selected will select the first result.
     rollover: bool,
 
-    window: Window,
+    window: Option<Window>,
 
     buffer: Buffer,
 }
 
 impl Results {
-    pub fn close(self) {
+    pub fn close(&mut self) {
         todo!();
     }
 
@@ -50,6 +51,22 @@ impl Results {
 
     fn is_displayed_last(&self, idx: DisplayedIdx) -> bool {
         self.displayed_results.is_first(idx)
+    }
+
+    pub fn new(sender: Sender<Message>) -> Self {
+        Self {
+            query: String::new(),
+            space: ResultSpace::default(),
+            displayed_results: DisplayedResults::default(),
+            selected_result: None,
+            rollover: false,
+            window: None,
+            buffer: nvim::api::create_buf(false, true).unwrap(),
+        }
+    }
+
+    pub fn num_total(&self) -> u64 {
+        self.space.items.len() as _
     }
 
     /// Returns the currently selected item in the results list, if there is
@@ -118,11 +135,14 @@ impl Results {
 
     fn select_idx(&mut self, idx: DisplayedIdx) {
         assert!(idx.0 < self.displayed_results.len());
-        self.window.set_cursor(idx.0, 0);
+        if let Some(window) = &mut self.window {
+            window.set_cursor(idx.0, 0).unwrap();
+        }
         self.selected_result = Some(idx);
     }
 }
 
+#[derive(Default)]
 struct ResultSpace {
     items: Vec<FuzzyItem>,
 }
@@ -152,6 +172,7 @@ impl ResultSpace {
     }
 }
 
+#[derive(Default)]
 struct DisplayedResults {
     /// The indices of the results that are currently being displayed.
     ///
