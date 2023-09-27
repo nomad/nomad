@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 
+[features]
+neovim-0-9 = []
+
 [dependencies]
 common = { path = "../common" }
 

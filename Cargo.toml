@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [features]
 default = ["neovim-0-9"]
-neovim-0-9 = ["common/neovim-0-9"]
+neovim-0-9 = ["common/neovim-0-9", "fuzzy-modal/neovim-0-9"]
 neovim-nightly = ["common/neovim-nightly"]
 
 [dependencies]

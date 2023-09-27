@@ -36,9 +36,7 @@ pub(crate) struct Results {
 }
 
 impl Results {
-    pub fn close(&mut self) {
-        todo!();
-    }
+    pub fn close(&mut self) {}
 
     pub fn extend(&mut self, items: impl IntoIterator<Item = FuzzyItem>) {
         self.space.extend(items);

@@ -108,7 +108,26 @@ impl Prompt {
     ///
     /// TODO: docs.
     pub fn new(sender: Sender<Message>) -> Self {
-        let buffer = nvim::api::create_buf(false, true).unwrap();
+        let mut buffer = nvim::api::create_buf(false, true).unwrap();
+
+        // Neovim 0.9 has a bug that causes `nvim_buf_get_offset` to return -1
+        // on newly created buffers. To work around this, we set its first line
+        // to an empty string and immediately delete it, which seems to fix it.
+        //
+        // See [1] and [2] for more infos.
+        //
+        // [1]: https://github.com/neovim/neovim/issues/25390
+        // [2]: https://github.com/neovim/neovim/issues/24930
+        #[cfg(feature = "neovim-0-9")]
+        {
+            buffer
+                .set_lines(0..1, true, std::iter::once(nvim::String::from("")))
+                .unwrap();
+
+            buffer
+                .set_lines(.., true, std::iter::empty::<nvim::String>())
+                .unwrap();
+        }
 
         buffer
             .attach(
