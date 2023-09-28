@@ -32,22 +32,22 @@ impl WindowConfig {
         }
     }
 
-    pub fn x(mut self, x: impl Into<ScreenUnit>) -> Self {
+    pub fn at_x(mut self, x: impl Into<ScreenUnit>) -> Self {
         self.x = x.into().to_cells(self.tot_width);
         self
     }
 
-    pub fn y(mut self, y: impl Into<ScreenUnit>) -> Self {
+    pub fn at_y(mut self, y: impl Into<ScreenUnit>) -> Self {
         self.y = y.into().to_cells(self.tot_height);
         self
     }
 
-    pub fn width(mut self, width: impl Into<ScreenUnit>) -> Self {
+    pub fn with_width(mut self, width: impl Into<ScreenUnit>) -> Self {
         self.width = width.into().to_cells(self.tot_width);
         self
     }
 
-    pub fn height(mut self, height: impl Into<ScreenUnit>) -> Self {
+    pub fn with_height(mut self, height: impl Into<ScreenUnit>) -> Self {
         self.height = height.into().to_cells(self.tot_height);
         self
     }

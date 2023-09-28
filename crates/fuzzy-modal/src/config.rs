@@ -10,7 +10,11 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            window: WindowConfig::new().x(0.3).y(0.2).width(0.4).height(0.3),
+            window: WindowConfig::new()
+                .at_x(0.325)
+                .at_y(0.15)
+                .with_width(0.35)
+                .with_height(0.45),
         }
     }
 }
