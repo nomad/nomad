@@ -75,9 +75,15 @@ impl View {
         let (prompt_window_config, results_window_config) =
             window_config.bisect_vertical(1);
 
-        self.prompt.open(prompt, &prompt_window_config, modal_id);
+        // We open the results window first because doing the opposite would
+        // cause the prompt to lose focus, which would in turn cause the whole
+        // modal to be closed.
         self.results.open(results, &results_window_config, modal_id);
+
+        self.prompt.open(prompt, &prompt_window_config, modal_id);
+
         self.on_confirm = on_confirm;
+
         self.on_cancel = on_cancel;
     }
 

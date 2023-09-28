@@ -141,7 +141,7 @@ impl Results {
         self.displayed_results.is_first(idx)
     }
 
-    pub fn new(sender: Sender) -> Self {
+    pub fn new(_sender: Sender) -> Self {
         Self {
             config: ResultsConfig::default(),
             query: String::new(),
@@ -161,8 +161,39 @@ impl Results {
         &mut self,
         config: ResultsConfig,
         window_config: &WindowConfig,
-        modal_id: ModalId,
+        _modal_id: ModalId,
     ) {
+        self.config = config;
+
+        self.displayed_results =
+            (0..self.config.space.len()).map(ResultIdx).collect();
+
+        self.populate_buffer();
+
+        self.open_window(window_config);
+
+        if let Some(start_with_selected) = self.config.start_with_selected {
+            self.select_idx(DisplayedIdx(start_with_selected));
+        } else if !self.config.space.is_empty() {
+            self.select_first();
+        }
+    }
+
+    fn open_window(&mut self, window_config: &WindowConfig) {
+        let window =
+            nvim::api::open_win(&self.buffer, true, &window_config.into())
+                .unwrap();
+
+        self.window = Some(window);
+    }
+
+    fn populate_buffer(&mut self) {
+        let lines = self
+            .displayed_results
+            .iter()
+            .map(|idx| self.config.space[idx].text.as_str());
+
+        self.buffer.set_lines(.., true, lines).unwrap();
     }
 
     /// Returns the currently selected item in the results list, if there is
@@ -223,7 +254,16 @@ impl Results {
         let old_selected = self.selected_result;
 
         if let Some(window) = &mut self.window {
-            window.set_cursor(idx.0, 0).unwrap();
+            tracing::info!("{:?}", self.buffer.line_count());
+            tracing::info!("{idx:?}");
+
+            if let Err(err) = window.set_cursor(idx.0, 0) {
+                tracing::error!("{err:?}");
+            }
+
+            if old_selected.is_none() {
+                window.set_option("cursorline", true).unwrap();
+            }
         }
 
         self.selected_result = Some(idx);
@@ -266,16 +306,17 @@ impl ResultSpace {
         self.items.drain(range)
     }
 
-    pub fn extend(
-        &mut self,
-        items: impl IntoIterator<Item = FuzzyItem>,
-    ) -> Vec<ResultIdx> {
+    pub fn extend(&mut self, items: impl IntoIterator<Item = FuzzyItem>) {
         self.items.extend(items);
-        todo!();
+        // TODO: rank the new results.
     }
 
     fn filter(&self, query: &str) -> Vec<ResultIdx> {
         todo!();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     pub fn len(&self) -> usize {
@@ -322,6 +363,15 @@ impl Index<DisplayedIdx> for DisplayedResults {
     }
 }
 
+impl FromIterator<ResultIdx> for DisplayedResults {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = ResultIdx>,
+    {
+        Self { items: iter.into_iter().collect() }
+    }
+}
+
 impl DisplayedResults {
     fn clear(&mut self) {
         self.items.clear();
@@ -341,5 +391,9 @@ impl DisplayedResults {
 
     fn is_last(&self, idx: DisplayedIdx) -> bool {
         !self.is_empty() && (idx.0 == self.len() - 1)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = ResultIdx> + '_ {
+        self.items.iter().copied()
     }
 }
