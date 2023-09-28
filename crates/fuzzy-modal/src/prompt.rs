@@ -2,10 +2,10 @@ use std::cmp::Ordering;
 use std::convert::Infallible;
 use std::ops::Range;
 
-use common::{nvim, WindowConfig, *};
+use common::{nvim, WindowConfig};
 use nvim::api::{opts::*, types::*, Buffer, Window};
 
-use crate::*;
+use crate::{Sender, *};
 
 type OnBytesArgs = (
     String,
@@ -43,7 +43,7 @@ pub(crate) struct Prompt {
 
     /// A sender used to send [`Message::PromptChanged`] messages to the parent
     /// plugin when the prompt changes.
-    sender: Sender<Message>,
+    sender: Sender,
 
     /// The current configuration of the prompt, which changes every time the
     /// prompt is opened.
@@ -71,7 +71,7 @@ pub(crate) struct Prompt {
 
 impl Prompt {
     /// TODO: docs
-    fn create_autocmds(&mut self) {
+    fn create_autocmds(&mut self, modal_id: ModalId) {
         let mut builder = CreateAutocmdOpts::builder();
 
         let builder = builder
@@ -83,7 +83,7 @@ impl Prompt {
 
         let win_close_opts = builder
             .callback(move |_args| {
-                close_sender.send(Message::Close);
+                close_sender.send((modal_id, Message::Close));
                 // Returning `true` deletes the autocmd.
                 Ok::<_, Infallible>(true)
             })
@@ -99,7 +99,7 @@ impl Prompt {
 
         let win_leave_opts = builder
             .callback(move |_args| {
-                closed_sender.send(Message::Closed);
+                closed_sender.send((modal_id, Message::Closed));
                 // Returning `true` deletes the autocmd.
                 Ok::<_, Infallible>(true)
             })
@@ -144,6 +144,7 @@ impl Prompt {
         &mut self,
         config: PromptConfig,
         window_config: &WindowConfig,
+        modal_id: ModalId,
     ) {
         if let Some(placeholder) = config.placeholder_text.as_ref() {
             self.update_placeholder(placeholder);
@@ -156,7 +157,7 @@ impl Prompt {
 
         self.open_window(window_config);
 
-        self.create_autocmds();
+        self.create_autocmds(modal_id);
 
         self.matched_results = config.total_results;
 
@@ -176,7 +177,7 @@ impl Prompt {
     /// Initializes the prompt.
     ///
     /// TODO: docs.
-    pub fn new(sender: Sender<Message>) -> Self {
+    pub fn new(sender: Sender) -> Self {
         let mut buffer = nvim::api::create_buf(false, true).unwrap();
 
         // Neovim 0.9 has a bug that causes `nvim_buf_get_offset` to return -1
@@ -341,7 +342,7 @@ pub enum PromptDiff {
 
 /// TODO: docs
 fn on_bytes(
-    sender: Sender<Message>,
+    sender: Sender,
 ) -> impl Fn(OnBytesArgs) -> Result<bool, nvim::api::Error> {
     move |(
         // The string "bytes".
@@ -409,10 +410,10 @@ fn handle_on_bytes(
     start_offset: usize,
     old_end_offset: usize,
     new_end_offset: usize,
-    sender: &Sender<Message>,
+    sender: &Sender,
 ) {
     if buffer.line_count().unwrap() > 1 {
-        sender.send(Message::Close);
+        sender.send((PASSTHROUGH_ID, Message::Close));
         return;
     }
 
@@ -423,9 +424,9 @@ fn handle_on_bytes(
     let was_empty = !is_empty && (new_end_offset - start_offset) == new_len;
 
     if is_empty {
-        sender.send(Message::ShowPlaceholder);
+        sender.send((PASSTHROUGH_ID, Message::ShowPlaceholder));
     } else if was_empty {
-        sender.send(Message::HidePlaceholder);
+        sender.send((PASSTHROUGH_ID, Message::HidePlaceholder));
     }
 
     let diff = match old_end_offset.cmp(&new_end_offset) {
@@ -469,7 +470,5 @@ fn handle_on_bytes(
         },
     };
 
-    // nvim::print!("diff: {diff:?}");
-
-    sender.send(Message::PromptChanged(diff));
+    sender.send((PASSTHROUGH_ID, Message::PromptChanged(diff)));
 }

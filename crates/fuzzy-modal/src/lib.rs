@@ -12,6 +12,7 @@ mod view;
 use config::Config;
 pub use fuzzy_item::FuzzyItem;
 pub use fuzzy_modal::FuzzyModal;
+use fuzzy_modal::Sender;
 pub use handle::FuzzyHandle;
 use message::Message;
 use modal_config::{FuzzyBuilder, FuzzyConfig};
@@ -20,3 +21,5 @@ use results::Results;
 use view::View;
 
 type ModalId = u64;
+
+const PASSTHROUGH_ID: ModalId = u64::MAX;

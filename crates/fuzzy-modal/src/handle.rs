@@ -3,7 +3,8 @@ use common::Sender;
 use crate::*;
 
 pub struct FuzzyHandle {
-    sender: Sender<Message>,
+    sender: Sender<(ModalId, Message)>,
+    modal_id: ModalId,
 }
 
 impl FuzzyHandle {
@@ -17,11 +18,14 @@ impl FuzzyHandle {
         self.send(Message::Close)
     }
 
-    pub(crate) fn new(sender: Sender<Message>) -> Self {
-        Self { sender }
+    pub(crate) fn new(
+        sender: Sender<(ModalId, Message)>,
+        modal_id: ModalId,
+    ) -> Self {
+        Self { sender, modal_id }
     }
 
     fn send(&self, msg: Message) {
-        self.sender.send(msg)
+        self.sender.send((self.modal_id, msg))
     }
 }

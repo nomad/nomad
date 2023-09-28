@@ -1,4 +1,4 @@
-use common::*;
+use common::WindowConfig;
 
 use crate::*;
 
@@ -24,20 +24,25 @@ impl View {
         self.results.closed();
     }
 
-    pub fn new(sender: Sender<Message>) -> Self {
+    pub fn new(sender: Sender) -> Self {
         Self {
             prompt: Prompt::new(sender.clone()),
             results: Results::new(sender),
         }
     }
 
-    pub fn open(&mut self, config: FuzzyConfig, window_config: WindowConfig) {
+    pub fn open(
+        &mut self,
+        config: FuzzyConfig,
+        window_config: WindowConfig,
+        modal_id: ModalId,
+    ) {
         let FuzzyConfig { prompt, .. } = config;
 
         let (prompt_window_config, _results_window_config) =
             window_config.bisect_vertical(1);
 
-        self.prompt.open(prompt, &prompt_window_config);
+        self.prompt.open(prompt, &prompt_window_config, modal_id);
     }
 
     pub fn prompt_mut(&mut self) -> &mut Prompt {

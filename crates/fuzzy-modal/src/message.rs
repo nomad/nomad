@@ -23,7 +23,7 @@ pub enum Message {
     HidePlaceholder,
 
     /// TODO: docs
-    Open(FuzzyConfig),
+    Open((FuzzyConfig, ModalId)),
 
     /// TODO: docs
     PromptChanged(PromptDiff),

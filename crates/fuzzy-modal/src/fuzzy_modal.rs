@@ -1,22 +1,37 @@
 use std::convert::Infallible;
 
 use common::*;
-use tracing::*;
 
 use crate::*;
 
+pub(crate) type Sender = common::Sender<(ModalId, Message)>;
+
+/// TODO: docs
 #[derive(Default)]
 pub struct FuzzyModal {
-    is_disabled: bool,
+    /// TODO: docs
     config: Config,
-    sender: LateInit<Sender<Message>>,
+
+    /// TODO: docs
+    current_modal: Option<ModalId>,
+
+    /// TODO: docs
+    id_counter: ModalId,
+
+    /// TODO: docs
+    is_disabled: bool,
+
+    /// TODO: docs
+    sender: LateInit<Sender>,
+
+    /// TODO: docs
     view: LateInit<View>,
 }
 
 impl Plugin for FuzzyModal {
     const NAME: &'static str = "fuzzy_modal";
 
-    type Message = Message;
+    type Message = (ModalId, Message);
 
     type Config = Config;
 
@@ -24,10 +39,7 @@ impl Plugin for FuzzyModal {
 
     type HandleMessageError = Infallible;
 
-    fn init(
-        &mut self,
-        sender: &Sender<Self::Message>,
-    ) -> Result<(), Infallible> {
+    fn init(&mut self, sender: &Sender) -> Result<(), Infallible> {
         self.sender.init(sender.clone());
         self.view.init(View::new(sender.clone()));
         Ok(())
@@ -40,27 +52,40 @@ impl Plugin for FuzzyModal {
         }
 
         let window_config = config.into_inner().window;
-        self.send(Message::UpdateConfig(Some(window_config)));
+
+        self.sender.send((
+            PASSTHROUGH_ID,
+            Message::UpdateConfig(Some(window_config)),
+        ));
     }
 
     fn handle_message(
         &mut self,
-        msg: Message,
+        (modal_id, msg): (ModalId, Message),
         _: &Ctx<Self>,
     ) -> Result<(), Infallible> {
         if self.is_disabled {
             return Ok(());
         }
 
+        // Filter messages that refer to old modals.
+        if self.current_modal != Some(modal_id) && modal_id != PASSTHROUGH_ID {
+            return Ok(());
+        }
+
         match msg {
             Message::AddResults(items) => self.view.add_results(items),
-            Message::Close => self.view.close(),
-            Message::Closed => self.view.closed(),
+            Message::Close => self.close(),
+            Message::Closed => self.closed(),
+            Message::Confirmed => {},
             Message::DoneFiltering(matched) => self.done_filtering(matched),
             Message::HidePlaceholder => self.hide_placeholder(),
-            Message::Open(config) => self.open(config),
+            Message::Open((config, id)) => self.open(config, id),
+            Message::PromptChanged(_diff) => {},
             Message::ShowPlaceholder => self.show_placeholder(),
-            _ => (),
+            Message::SelectNextItem => {},
+            Message::SelectPrevItem => {},
+            Message::UpdateConfig(_window_config) => {},
         };
 
         Ok(())
@@ -70,16 +95,28 @@ impl Plugin for FuzzyModal {
 impl FuzzyModal {
     /// TODO: docs
     pub fn builder(&self) -> FuzzyBuilder {
-        FuzzyBuilder::new((*self.sender).clone())
+        FuzzyBuilder::new((*self.sender).clone(), self.id_counter)
+    }
+
+    fn close(&mut self) {
+        self.view.close();
+        self.current_modal = None;
+    }
+
+    fn closed(&mut self) {
+        self.view.closed();
+        self.current_modal = None;
     }
 
     fn done_filtering(&mut self, matched: u64) {
         self.view.prompt_mut().update_matched(matched);
     }
 
-    fn open(&mut self, fuzzy_config: FuzzyConfig) {
+    fn open(&mut self, fuzzy_config: FuzzyConfig, modal_id: ModalId) {
         self.view.close();
-        self.view.open(fuzzy_config, self.config.window.clone());
+        self.current_modal = Some(modal_id);
+        self.view.open(fuzzy_config, self.config.window.clone(), modal_id);
+        self.id_counter += 1;
     }
 
     fn disable(&mut self) {
@@ -89,10 +126,6 @@ impl FuzzyModal {
 
     fn hide_placeholder(&mut self) {
         self.view.prompt_mut().remove_placeholder();
-    }
-
-    fn send(&mut self, msg: Message) {
-        self.sender.send(msg);
     }
 
     fn show_placeholder(&mut self) {

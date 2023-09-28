@@ -8,7 +8,8 @@ type OnConfirm = Box<dyn FnOnce(FuzzyItem) + 'static>;
 
 pub struct FuzzyBuilder {
     config: FuzzyConfig,
-    sender: Sender<Message>,
+    sender: Sender<(ModalId, Message)>,
+    modal_id: ModalId,
 }
 
 /// TODO: docs
@@ -64,9 +65,9 @@ impl FuzzyBuilder {
 
     /// TODO: docs
     pub fn open(self) -> FuzzyHandle {
-        let Self { sender, config } = self;
-        sender.send(Message::Open(config));
-        FuzzyHandle::new(sender)
+        let Self { sender, config, modal_id } = self;
+        sender.send((PASSTHROUGH_ID, Message::Open((config, modal_id))));
+        FuzzyHandle::new(sender, modal_id)
     }
 
     /// TODO: docs
@@ -78,8 +79,11 @@ impl FuzzyBuilder {
         self.open()
     }
 
-    pub(crate) fn new(sender: Sender<Message>) -> Self {
-        Self { sender, config: FuzzyConfig::default() }
+    pub(crate) fn new(
+        sender: Sender<(ModalId, Message)>,
+        modal_id: ModalId,
+    ) -> Self {
+        Self { sender, config: FuzzyConfig::default(), modal_id }
     }
 
     /// TODO: docs

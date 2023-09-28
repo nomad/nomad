@@ -3,7 +3,7 @@ use std::ops::{Add, Index, Sub};
 use common::*;
 use nvim::api::{Buffer, Window};
 
-use crate::*;
+use crate::{Sender, *};
 
 pub(crate) struct Results {
     /// The current contents of the prompt, which is used to filter the
@@ -55,7 +55,7 @@ impl Results {
         self.displayed_results.is_first(idx)
     }
 
-    pub fn new(sender: Sender<Message>) -> Self {
+    pub fn new(sender: Sender) -> Self {
         Self {
             query: String::new(),
             space: ResultSpace::default(),
