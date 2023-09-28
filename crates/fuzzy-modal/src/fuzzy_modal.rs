@@ -83,8 +83,8 @@ impl Plugin for FuzzyModal {
             Message::Open((config, id)) => self.open(config, id),
             Message::PromptChanged(_diff) => {},
             Message::ShowPlaceholder => self.show_placeholder(),
-            Message::SelectNextItem => {},
-            Message::SelectPrevItem => {},
+            Message::SelectNextItem => self.select_next(),
+            Message::SelectPrevItem => self.select_prev(),
             Message::UpdateConfig(_window_config) => {},
         };
 
@@ -132,6 +132,14 @@ impl FuzzyModal {
 
     fn hide_placeholder(&mut self) {
         self.view.prompt_mut().remove_placeholder();
+    }
+
+    fn select_next(&mut self) {
+        self.view.results_mut().select_next();
+    }
+
+    fn select_prev(&mut self) {
+        self.view.results_mut().select_prev();
     }
 
     fn show_placeholder(&mut self) {

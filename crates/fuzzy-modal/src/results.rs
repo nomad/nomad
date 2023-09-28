@@ -7,18 +7,20 @@ use crate::{Sender, *};
 
 #[derive(Default)]
 pub(crate) struct ResultsConfig {
-    pub space: Vec<FuzzyItem>,
+    /// The result space from which we filter results based on the current
+    /// query.
+    pub space: ResultSpace,
     pub start_with_selected: Option<usize>,
+    pub on_select: Option<OnSelect>,
 }
 
 pub(crate) struct Results {
+    /// TODO: docs
+    config: ResultsConfig,
+
     /// The current contents of the prompt, which is used to filter the
     /// results.
     query: String,
-
-    /// The result space from which we filter results based on the current
-    /// query.
-    space: ResultSpace,
 
     /// The results that are currently being displayed.
     displayed_results: DisplayedResults,
@@ -31,9 +33,20 @@ pub(crate) struct Results {
     /// when the last result is selected will select the first result.
     rollover: bool,
 
+    /// TODO: docs
     window: Option<Window>,
 
+    /// TODO: docs
     buffer: Buffer,
+}
+
+/// TODO: docs
+enum SelectResult {
+    /// TODO: docs
+    Changed,
+
+    /// TODO: docs
+    Unchanged,
 }
 
 impl Results {
@@ -64,15 +77,60 @@ impl Results {
         }
     }
 
-    /// TODO: docs
-    pub fn take_selected(&mut self) -> Option<FuzzyItem> {
-        let selected_idx = self.selected_result.take()?;
-        self.space.drain(..).nth(selected_idx.0)
+    fn execute_on_select(&mut self) {
+        // I'm afraid we have to copy `Self::selected`'s body here if we want
+        // to avoid cloning the selected item (because of a double borrow).
+        let selected = self.selected_result.map(|displayed_idx| {
+            let result_idx = self.displayed_results[displayed_idx];
+            &self.config.space[result_idx]
+        });
+
+        if let Some(selected) = selected {
+            if let Some(on_select) = &mut self.config.on_select {
+                on_select(selected);
+            }
+        }
     }
 
     pub fn extend(&mut self, items: impl IntoIterator<Item = FuzzyItem>) {
-        self.space.extend(items);
+        self.config.space.extend(items);
         // TODO: rank the new items and update the displayed results.
+    }
+
+    fn inner_select_prev(&mut self) -> SelectResult {
+        if self.displayed_results.is_empty() {
+            return SelectResult::Unchanged;
+        }
+
+        if let Some(selected_idx) = self.selected_result {
+            if !self.is_displayed_first(selected_idx) {
+                self.select_idx(selected_idx - 1)
+            } else if self.rollover {
+                self.select_last()
+            } else {
+                SelectResult::Unchanged
+            }
+        } else {
+            self.select_last()
+        }
+    }
+
+    fn inner_select_next(&mut self) -> SelectResult {
+        if self.displayed_results.is_empty() {
+            return SelectResult::Unchanged;
+        }
+
+        if let Some(selected_idx) = self.selected_result {
+            if !self.is_displayed_last(selected_idx) {
+                self.select_idx(selected_idx + 1)
+            } else if self.rollover {
+                self.select_first()
+            } else {
+                SelectResult::Unchanged
+            }
+        } else {
+            self.select_first()
+        }
     }
 
     fn is_displayed_first(&self, idx: DisplayedIdx) -> bool {
@@ -85,8 +143,8 @@ impl Results {
 
     pub fn new(sender: Sender) -> Self {
         Self {
+            config: ResultsConfig::default(),
             query: String::new(),
-            space: ResultSpace::default(),
             displayed_results: DisplayedResults::default(),
             selected_result: None,
             rollover: false,
@@ -96,7 +154,7 @@ impl Results {
     }
 
     pub fn num_total(&self) -> u64 {
-        self.space.items.len() as _
+        self.config.space.len() as _
     }
 
     pub fn open(
@@ -112,7 +170,7 @@ impl Results {
     pub fn selected(&self) -> Option<&FuzzyItem> {
         self.selected_result.map(|displayed_idx| {
             let result_idx = self.displayed_results[displayed_idx];
-            &self.space[result_idx]
+            &self.config.space[result_idx]
         })
     }
 
@@ -124,15 +182,15 @@ impl Results {
     /// # Panics
     ///
     /// Panics if the [`DisplayedResults`] are empty.
-    fn select_first(&mut self) {
-        self.select_idx(DisplayedIdx(0));
+    fn select_first(&mut self) -> SelectResult {
+        self.select_idx(DisplayedIdx(0))
     }
 
     /// # Panics
     ///
     /// Panics if the [`DisplayedResults`] are empty.
-    fn select_last(&mut self) {
-        self.select_idx(DisplayedIdx(self.displayed_results.len() - 1));
+    fn select_last(&mut self) -> SelectResult {
+        self.select_idx(DisplayedIdx(self.displayed_results.len() - 1))
     }
 
     /// Selects the next result.
@@ -142,18 +200,8 @@ impl Results {
     ///
     /// If there are no results, then this does nothing.
     pub fn select_next(&mut self) {
-        if self.displayed_results.is_empty() {
-            return;
-        }
-
-        if let Some(selected_idx) = self.selected_result {
-            if !self.is_displayed_last(selected_idx) {
-                self.select_idx(selected_idx + 1);
-            } else if self.rollover {
-                self.select_first();
-            }
-        } else {
-            self.select_first();
+        if let SelectResult::Changed = self.inner_select_next() {
+            self.execute_on_select();
         }
     }
 
@@ -164,37 +212,43 @@ impl Results {
     ///
     /// If there are no results, then this does nothing.
     pub fn select_prev(&mut self) {
-        if self.displayed_results.is_empty() {
-            return;
-        }
-
-        if let Some(selected_idx) = self.selected_result {
-            if !self.is_displayed_first(selected_idx) {
-                self.select_idx(selected_idx - 1)
-            } else if self.rollover {
-                self.select_last();
-            }
-        } else {
-            self.select_last();
+        if let SelectResult::Changed = self.inner_select_prev() {
+            self.execute_on_select();
         }
     }
 
-    fn select_idx(&mut self, idx: DisplayedIdx) {
+    fn select_idx(&mut self, idx: DisplayedIdx) -> SelectResult {
         assert!(idx.0 < self.displayed_results.len());
+
+        let old_selected = self.selected_result;
+
         if let Some(window) = &mut self.window {
             window.set_cursor(idx.0, 0).unwrap();
         }
+
         self.selected_result = Some(idx);
+
+        if old_selected != self.selected_result {
+            SelectResult::Changed
+        } else {
+            SelectResult::Unchanged
+        }
+    }
+
+    /// TODO: docs
+    pub fn take_selected(&mut self) -> Option<FuzzyItem> {
+        let selected_idx = self.selected_result.take()?;
+        self.config.space.drain(..).nth(selected_idx.0)
     }
 }
 
 #[derive(Default)]
-struct ResultSpace {
+pub(crate) struct ResultSpace {
     items: Vec<FuzzyItem>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ResultIdx(usize);
+pub(crate) struct ResultIdx(usize);
 
 impl Index<ResultIdx> for ResultSpace {
     type Output = FuzzyItem;
@@ -205,7 +259,14 @@ impl Index<ResultIdx> for ResultSpace {
 }
 
 impl ResultSpace {
-    fn extend(
+    fn drain<R>(&mut self, range: R) -> impl Iterator<Item = FuzzyItem> + '_
+    where
+        R: std::ops::RangeBounds<usize>,
+    {
+        self.items.drain(range)
+    }
+
+    pub fn extend(
         &mut self,
         items: impl IntoIterator<Item = FuzzyItem>,
     ) -> Vec<ResultIdx> {
@@ -217,11 +278,8 @@ impl ResultSpace {
         todo!();
     }
 
-    fn drain<R>(&mut self, range: R) -> impl Iterator<Item = FuzzyItem> + '_
-    where
-        R: std::ops::RangeBounds<usize>,
-    {
-        self.items.drain(range)
+    pub fn len(&self) -> usize {
+        self.items.len()
     }
 }
 

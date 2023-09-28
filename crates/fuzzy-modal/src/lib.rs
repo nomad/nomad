@@ -17,7 +17,7 @@ pub use handle::FuzzyHandle;
 use message::Message;
 use modal_config::*;
 use prompt::{Prompt, PromptConfig, PromptDiff};
-use results::{Results, ResultsConfig};
+use results::*;
 use view::{ConfirmResult, View};
 
 type ModalId = u64;

@@ -5,7 +5,6 @@ use crate::*;
 pub(crate) struct View {
     prompt: Prompt,
     results: Results,
-    on_select: Option<OnSelect>,
     on_confirm: Option<OnConfirm>,
     on_cancel: Option<OnExit>,
 }
@@ -62,7 +61,6 @@ impl View {
         Self {
             prompt: Prompt::new(sender.clone()),
             results: Results::new(sender),
-            on_select: None,
             on_confirm: None,
             on_cancel: None,
         }
@@ -70,13 +68,7 @@ impl View {
 
     pub fn open(
         &mut self,
-        FuzzyConfig {
-            prompt,
-            results,
-            on_select,
-            on_confirm,
-            on_cancel,
-        }: FuzzyConfig,
+        FuzzyConfig { prompt, results, on_confirm, on_cancel }: FuzzyConfig,
         window_config: WindowConfig,
         modal_id: ModalId,
     ) {
@@ -85,12 +77,15 @@ impl View {
 
         self.prompt.open(prompt, &prompt_window_config, modal_id);
         self.results.open(results, &results_window_config, modal_id);
-        self.on_select = on_select;
         self.on_confirm = on_confirm;
         self.on_cancel = on_cancel;
     }
 
     pub fn prompt_mut(&mut self) -> &mut Prompt {
         &mut self.prompt
+    }
+
+    pub fn results_mut(&mut self) -> &mut Results {
+        &mut self.results
     }
 }

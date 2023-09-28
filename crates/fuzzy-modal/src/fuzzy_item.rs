@@ -1,4 +1,5 @@
 /// TODO: docs
+#[derive(Clone)]
 pub struct FuzzyItem {
     pub text: String,
 }
