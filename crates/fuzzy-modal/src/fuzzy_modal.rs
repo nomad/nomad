@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use common::*;
-use nvim::api::types::Mode;
+use nvim::api::{types::*, Window};
 
 use crate::*;
 
@@ -14,7 +14,7 @@ pub struct FuzzyModal {
     config: Config,
 
     /// TODO: docs
-    current_modal: Option<ModalId>,
+    current_modal: Option<Modal>,
 
     /// TODO: docs
     id_counter: ModalId,
@@ -94,8 +94,10 @@ impl Plugin for FuzzyModal {
             return Ok(());
         }
 
+        let current_id = self.current_modal.as_ref().map(Modal::id);
+
         // Filter messages that refer to old modals.
-        if self.current_modal != Some(modal_id) && modal_id != PASSTHROUGH_ID {
+        if current_id != Some(modal_id) && modal_id != PASSTHROUGH_ID {
             return Ok(());
         }
 
@@ -126,12 +128,18 @@ impl FuzzyModal {
 
     fn close(&mut self) {
         self.view.close();
-        self.current_modal = None;
+
+        if let Some(modal) = self.current_modal.take() {
+            modal.close()
+        }
     }
 
     fn closed(&mut self) {
         self.view.closed();
-        self.current_modal = None;
+
+        if let Some(modal) = self.current_modal.take() {
+            modal.close()
+        }
     }
 
     fn confirm(&mut self) {
@@ -140,24 +148,24 @@ impl FuzzyModal {
         }
     }
 
-    fn done_filtering(&mut self, matched: u64) {
-        self.view.prompt_mut().update_matched(matched);
-    }
-
-    fn open(&mut self, fuzzy_config: FuzzyConfig, modal_id: ModalId) {
-        self.view.close();
-        self.current_modal = Some(modal_id);
-        self.view.open(fuzzy_config, self.config.window.clone(), modal_id);
-        self.id_counter += 1;
-    }
-
     fn disable(&mut self) {
         self.is_disabled = true;
         self.view.close();
     }
 
+    fn done_filtering(&mut self, matched: u64) {
+        self.view.prompt_mut().update_matched(matched);
+    }
+
     fn hide_placeholder(&mut self) {
         self.view.prompt_mut().remove_placeholder();
+    }
+
+    fn open(&mut self, fuzzy_config: FuzzyConfig, modal_id: ModalId) {
+        self.view.close();
+        self.current_modal = Some(Modal::open(modal_id));
+        self.view.open(fuzzy_config, self.config.window.clone(), modal_id);
+        let _ = nvim::api::command("startinsert");
     }
 
     fn select_next(&mut self) {
@@ -170,5 +178,63 @@ impl FuzzyModal {
 
     fn show_placeholder(&mut self) {
         self.view.prompt_mut().show_placeholder();
+    }
+}
+
+/// TODO: docs
+struct Modal {
+    /// TODO: docs
+    id: ModalId,
+
+    /// TODO: docs
+    parent_window: Window,
+
+    /// TODO: docs
+    opened_in_mode: Mode,
+
+    /// TODO: docs
+    opened_at_position: Option<(usize, usize)>,
+}
+
+impl Modal {
+    /// TODO: docs
+    fn close(mut self) {
+        if self.opened_in_mode.is_insert() {
+            return;
+        }
+
+        let _ = nvim::api::command("stopinsert");
+
+        if let Some((line, col)) = self.opened_at_position {
+            // I'm not really sure why it's necessary to add 1 to the original
+            // column for the cursor to be placed at its original position if
+            // the modal was opened while in normal mode.
+            let _ = self.parent_window.set_cursor(line, col + 1);
+        }
+    }
+
+    fn id(&self) -> ModalId {
+        self.id
+    }
+
+    /// TODO: docs
+    fn open(id: ModalId) -> Self {
+        let current_mode =
+            if let Ok(GotMode { mode, .. }) = nvim::api::get_mode() {
+                mode
+            } else {
+                Mode::Normal
+            };
+
+        let parent_window = nvim::api::Window::current();
+
+        let current_pos = parent_window.get_cursor().ok();
+
+        Self {
+            id,
+            parent_window,
+            opened_in_mode: current_mode,
+            opened_at_position: current_pos,
+        }
     }
 }

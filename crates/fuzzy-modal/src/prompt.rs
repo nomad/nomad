@@ -174,8 +174,6 @@ impl Prompt {
             nvim::api::open_win(&self.buffer, true, &window_config.into())
                 .unwrap();
 
-        nvim::api::command("startinsert").unwrap();
-
         self.window = Some(window);
     }
 
