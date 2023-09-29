@@ -138,7 +138,7 @@ impl Results {
     }
 
     fn is_displayed_last(&self, idx: DisplayedIdx) -> bool {
-        self.displayed_results.is_first(idx)
+        self.displayed_results.is_last(idx)
     }
 
     pub fn new(_sender: Sender) -> Self {
@@ -254,10 +254,13 @@ impl Results {
         let old_selected = self.selected_result;
 
         if let Some(window) = &mut self.window {
-            tracing::info!("{:?}", self.buffer.line_count());
-            tracing::info!("{idx:?}");
+            tracing::info!("line count {:?}", self.buffer.line_count());
+            tracing::info!("idx {idx:?}");
 
-            if let Err(err) = window.set_cursor(idx.0, 0) {
+            // Lines are 1-indexed.
+            let line = idx.0 + 1;
+
+            if let Err(err) = window.set_cursor(line, 0) {
                 tracing::error!("{err:?}");
             }
 
