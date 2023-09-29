@@ -20,6 +20,13 @@ use prompt::{Prompt, PromptConfig, PromptDiff};
 use results::*;
 use view::{ConfirmResult, View};
 
+/// TODO: docs
 type ModalId = u64;
 
+/// TODO: docs
 const PASSTHROUGH_ID: ModalId = u64::MAX;
+
+/// TODO: docs
+fn passthrough(msg: Message) -> (ModalId, Message) {
+    (PASSTHROUGH_ID, msg)
+}

@@ -1,4 +1,5 @@
-use common::WindowConfig;
+use common::{nvim, WindowConfig};
+use nvim::api::types::WindowBorder;
 
 use crate::*;
 
@@ -72,8 +73,22 @@ impl View {
         window_config: WindowConfig,
         modal_id: ModalId,
     ) {
-        let (prompt_window_config, results_window_config) =
+        let (mut prompt_window_config, mut results_window_config) =
             window_config.bisect_vertical(1);
+
+        prompt_window_config =
+            prompt_window_config.with_border(WindowBorder::Anal(
+                '┌'.into(),
+                '─'.into(),
+                '┐'.into(),
+                '│'.into(),
+                '┤'.into(),
+                '─'.into(),
+                '├'.into(),
+                '│'.into(),
+            ));
+
+        results_window_config.shift_down(1);
 
         // We open the results window first because doing the opposite would
         // cause the prompt to lose focus, which would in turn cause the whole

@@ -14,7 +14,7 @@ pub enum Message {
     Closed,
 
     /// TODO: docs
-    Confirmed,
+    Confirm,
 
     /// TODO: docs
     DoneFiltering(u64),
@@ -29,10 +29,10 @@ pub enum Message {
     PromptChanged(PromptDiff),
 
     /// TODO: docs
-    SelectNextItem,
+    SelectNext,
 
     /// TODO: docs
-    SelectPrevItem,
+    SelectPrev,
 
     /// TODO: docs
     ShowPlaceholder,

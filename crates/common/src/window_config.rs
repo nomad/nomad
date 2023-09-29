@@ -12,6 +12,7 @@ pub struct WindowConfig {
     y: u16,
     width: u16,
     height: u16,
+    border: WindowBorder,
 }
 
 impl Default for WindowConfig {
@@ -25,6 +26,7 @@ impl WindowConfig {
         Self {
             tot_width: columns(),
             tot_height: lines(),
+            border: WindowBorder::None,
             x: 0,
             y: 0,
             width: 0,
@@ -42,6 +44,11 @@ impl WindowConfig {
         self
     }
 
+    pub fn with_border(mut self, border: WindowBorder) -> Self {
+        self.border = border;
+        self
+    }
+
     pub fn with_width(mut self, width: impl Into<ScreenUnit>) -> Self {
         self.width = width.into().to_cells(self.tot_width);
         self
@@ -55,7 +62,7 @@ impl WindowConfig {
     pub fn bisect_horizontal(self, at: u16) -> (Self, Self) {
         let left_width = at;
         let right_width = self.width - left_width;
-        let left = Self { width: left_width, ..self };
+        let left = Self { width: left_width, ..self.clone() };
         let right = Self { width: right_width, x: left_width, ..self };
         (left, right)
     }
@@ -63,10 +70,14 @@ impl WindowConfig {
     pub fn bisect_vertical(self, at: u16) -> (Self, Self) {
         let top_height = at;
         let bottom_height = self.height - top_height;
-        let top = Self { height: top_height, ..self };
+        let top = Self { height: top_height, ..self.clone() };
         let bottom =
             Self { height: bottom_height, y: self.y + top_height, ..self };
         (top, bottom)
+    }
+
+    pub fn shift_down(&mut self, amount: u16) {
+        self.y += amount;
     }
 }
 
@@ -77,6 +88,7 @@ impl From<&WindowConfig> for NvimWindowConfig {
             .height(config.height as _)
             .col(config.x)
             .row(config.y)
+            .border(config.border.clone())
             .anchor(WindowAnchor::NorthWest)
             .relative(WindowRelativeTo::Editor)
             .focusable(false)

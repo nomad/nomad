@@ -52,22 +52,29 @@ impl Plugin for FuzzyModal {
         builder
             .in_mode(Mode::Insert)
             .in_buffer(prompt_buffer.clone())
+            .map("<CR>")
+            .to(|| passthrough(Message::Confirm))
+            .build();
+
+        builder
+            .in_mode(Mode::Insert)
+            .in_buffer(prompt_buffer.clone())
             .map("<Esc>")
-            .to(|| (PASSTHROUGH_ID, Message::Close))
+            .to(|| passthrough(Message::Close))
             .build();
 
         builder
             .in_mode(Mode::Insert)
             .in_buffer(prompt_buffer.clone())
             .map("<Up>")
-            .to(|| (PASSTHROUGH_ID, Message::SelectPrevItem))
+            .to(|| passthrough(Message::SelectPrev))
             .build();
 
         builder
             .in_mode(Mode::Insert)
             .in_buffer(prompt_buffer.clone())
             .map("<Down>")
-            .to(|| (PASSTHROUGH_ID, Message::SelectNextItem))
+            .to(|| passthrough(Message::SelectNext))
             .build();
     }
 
@@ -79,10 +86,9 @@ impl Plugin for FuzzyModal {
 
         let window_config = config.into_inner().window;
 
-        self.sender.send((
-            PASSTHROUGH_ID,
-            Message::UpdateConfig(Some(window_config)),
-        ));
+        let msg = Message::UpdateConfig(Some(window_config));
+
+        self.sender.send(passthrough(msg));
     }
 
     fn handle_message(
@@ -105,14 +111,14 @@ impl Plugin for FuzzyModal {
             Message::AddResults(items) => self.view.add_results(items),
             Message::Close => self.close(),
             Message::Closed => self.closed(),
-            Message::Confirmed => self.confirm(),
+            Message::Confirm => self.confirm(),
             Message::DoneFiltering(matched) => self.done_filtering(matched),
             Message::HidePlaceholder => self.hide_placeholder(),
             Message::Open((config, id)) => self.open(config, id),
             Message::PromptChanged(_diff) => {},
             Message::ShowPlaceholder => self.show_placeholder(),
-            Message::SelectNextItem => self.select_next(),
-            Message::SelectPrevItem => self.select_prev(),
+            Message::SelectNext => self.select_next(),
+            Message::SelectPrev => self.select_prev(),
             Message::UpdateConfig(_window_config) => {},
         };
 
