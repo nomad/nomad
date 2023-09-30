@@ -5,7 +5,6 @@ edition.workspace = true
 authors.workspace = true
 
 [features]
-default = ["neovim-0-9"]
 neovim-0-9 = ["nvim-oxi/neovim-0-9"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
