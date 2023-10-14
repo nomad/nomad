@@ -70,12 +70,19 @@ impl Layout for PromptOnTop {
         Ok(())
     }
 
-    fn close(&mut self) -> nvim::Result<()> {
+    fn close(&mut self) -> nvim::Result<Option<usize>> {
         self.outer_prompt.close();
         self.outer_results.close();
         self.prompt.close();
-        self.results.close();
-        Ok(())
+        self.results.close()
+    }
+
+    fn select_next(&mut self) -> Option<usize> {
+        self.results.select_next()
+    }
+
+    fn select_prev(&mut self) -> Option<usize> {
+        self.results.select_prev()
     }
 }
 
@@ -276,8 +283,20 @@ impl OuterResults {
 
 /// TODO: docs
 struct Results {
+    /// TODO: docs
     config: WindowConfigBuilder,
+
+    /// TODO: docs
     window: Option<Window>,
+
+    /// TODO: docs
+    rollover: bool,
+
+    /// TODO: docs
+    selected_result: Option<usize>,
+
+    /// TODO: docs
+    total_results: usize,
 }
 
 impl Default for Results {
@@ -292,7 +311,13 @@ impl Default for Results {
             .style(WindowStyle::Minimal)
             .zindex(OUTER_RESULTS_Z_INDEX);
 
-        Self { config, window: None }
+        Self {
+            config,
+            window: None,
+            rollover: false,
+            selected_result: None,
+            total_results: 0,
+        }
     }
 }
 
@@ -320,9 +345,78 @@ impl Results {
         Ok(())
     }
 
-    fn close(&mut self) {
+    fn close(&mut self) -> nvim::Result<Option<usize>> {
         if let Some(window) = self.window.take() {
             let _ = window.close(true);
         }
+
+        Ok(self.selected_result)
+    }
+
+    fn is_first(&self, idx: usize) -> bool {
+        idx == 0
+    }
+
+    fn is_last(&self, idx: usize) -> bool {
+        idx == self.total_results - 1
+    }
+
+    fn select_idx(&mut self, idx: usize) -> Option<usize> {
+        let old_selected = self.selected_result;
+
+        self.selected_result = Some(idx);
+
+        if old_selected != self.selected_result {
+            if let Some(window) = &mut self.window {
+                if old_selected.is_some() {
+                    window.set_option("cursorline", true).unwrap();
+                }
+                window.set_cursor(idx + 1, 0).unwrap();
+            }
+
+            Some(idx)
+        } else {
+            None
+        }
+    }
+
+    fn select_next(&mut self) -> Option<usize> {
+        if self.total_results == 0 {
+            return None;
+        }
+
+        let select_idx = if let Some(selected_idx) = self.selected_result {
+            if !self.is_last(selected_idx) {
+                selected_idx + 1
+            } else if self.rollover {
+                0
+            } else {
+                return None;
+            }
+        } else {
+            0
+        };
+
+        self.select_idx(select_idx)
+    }
+
+    fn select_prev(&mut self) -> Option<usize> {
+        if self.total_results == 0 {
+            return None;
+        }
+
+        let select_idx = if let Some(selected_idx) = self.selected_result {
+            if !self.is_first(selected_idx) {
+                selected_idx - 1
+            } else if self.rollover {
+                self.total_results - 1
+            } else {
+                return None;
+            }
+        } else {
+            self.total_results - 1
+        };
+
+        self.select_idx(select_idx)
     }
 }

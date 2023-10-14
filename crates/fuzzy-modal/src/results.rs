@@ -10,8 +10,9 @@ pub(crate) struct ResultsConfig {
     /// The result space from which we filter results based on the current
     /// query.
     pub space: ResultSpace,
+
+    /// TODO: docs
     pub start_with_selected: Option<usize>,
-    pub on_select: Option<OnSelect>,
 }
 
 pub(crate) struct Results {
@@ -24,14 +25,6 @@ pub(crate) struct Results {
 
     /// The results that are currently being displayed.
     displayed_results: DisplayedResults,
-
-    /// The index of the currently selected result in the displayed results.
-    selected_result: Option<DisplayedIdx>,
-
-    /// If true, then selecting the previous result when the first result is
-    /// selected will select the last result, and selecting the next result
-    /// when the last result is selected will select the first result.
-    rollover: bool,
 
     /// TODO: docs
     buffer: Buffer,
@@ -51,14 +44,14 @@ impl Results {
         &self.buffer
     }
 
-    pub fn close(&mut self) -> Option<FuzzyItem> {
+    pub fn close(&mut self) -> impl Iterator<Item = FuzzyItem> + '_ {
         self.query.clear();
         self.displayed_results.clear();
         self.clear_buffer();
-        self.take_selected()
+        self.config.space.drain(..)
     }
 
-    pub fn closed(&mut self) -> Option<FuzzyItem> {
+    pub fn closed(&mut self) -> impl Iterator<Item = FuzzyItem> + '_ {
         self.close()
     }
 
@@ -69,60 +62,19 @@ impl Results {
             .unwrap();
     }
 
-    fn execute_on_select(&mut self) {
-        // I'm afraid we have to copy `Self::selected`'s body here if we want
-        // to avoid cloning the selected item (because of a double borrow).
-        let selected = self.selected_result.map(|displayed_idx| {
-            let result_idx = self.displayed_results[displayed_idx];
-            &self.config.space[result_idx]
-        });
+    pub fn displayed(&self, idx: usize) -> &FuzzyItem {
+        let idx = DisplayedIdx(idx);
+        &self.config.space[self.displayed_results[idx]]
+    }
 
-        if let Some(selected) = selected {
-            if let Some(on_select) = &mut self.config.on_select {
-                on_select(selected);
-            }
-        }
+    pub fn displayed_to_result(&self, idx: usize) -> ResultIdx {
+        let idx = DisplayedIdx(idx);
+        self.displayed_results[idx]
     }
 
     pub fn extend(&mut self, items: impl IntoIterator<Item = FuzzyItem>) {
         self.config.space.extend(items);
         // TODO: rank the new items and update the displayed results.
-    }
-
-    fn inner_select_prev(&mut self) -> SelectResult {
-        if self.displayed_results.is_empty() {
-            return SelectResult::Unchanged;
-        }
-
-        if let Some(selected_idx) = self.selected_result {
-            if !self.is_displayed_first(selected_idx) {
-                self.select_idx(selected_idx - 1)
-            } else if self.rollover {
-                self.select_last()
-            } else {
-                SelectResult::Unchanged
-            }
-        } else {
-            self.select_last()
-        }
-    }
-
-    fn inner_select_next(&mut self) -> SelectResult {
-        if self.displayed_results.is_empty() {
-            return SelectResult::Unchanged;
-        }
-
-        if let Some(selected_idx) = self.selected_result {
-            if !self.is_displayed_last(selected_idx) {
-                self.select_idx(selected_idx + 1)
-            } else if self.rollover {
-                self.select_first()
-            } else {
-                SelectResult::Unchanged
-            }
-        } else {
-            self.select_first()
-        }
     }
 
     fn is_displayed_first(&self, idx: DisplayedIdx) -> bool {
@@ -138,8 +90,6 @@ impl Results {
             config: ResultsConfig::default(),
             query: String::new(),
             displayed_results: DisplayedResults::default(),
-            selected_result: None,
-            rollover: false,
             buffer: nvim::api::create_buf(false, true).unwrap(),
         }
     }
@@ -155,12 +105,6 @@ impl Results {
             (0..self.config.space.len()).map(ResultIdx).collect();
 
         self.populate_buffer();
-
-        if let Some(start_with_selected) = self.config.start_with_selected {
-            self.select_idx(DisplayedIdx(start_with_selected));
-        } else if !self.config.space.is_empty() {
-            self.select_first();
-        }
     }
 
     fn populate_buffer(&mut self) {
@@ -171,94 +115,6 @@ impl Results {
 
         self.buffer.set_lines(.., true, lines).unwrap();
     }
-
-    /// Returns the currently selected item in the results list, if there is
-    /// one.
-    pub fn selected(&self) -> Option<&FuzzyItem> {
-        self.selected_result.map(|displayed_idx| {
-            let result_idx = self.displayed_results[displayed_idx];
-            &self.config.space[result_idx]
-        })
-    }
-
-    /// TODO: docs
-    fn selected_idx(&self) -> Option<DisplayedIdx> {
-        self.selected_result
-    }
-
-    /// # Panics
-    ///
-    /// Panics if the [`DisplayedResults`] are empty.
-    fn select_first(&mut self) -> SelectResult {
-        self.select_idx(DisplayedIdx(0))
-    }
-
-    /// # Panics
-    ///
-    /// Panics if the [`DisplayedResults`] are empty.
-    fn select_last(&mut self) -> SelectResult {
-        self.select_idx(DisplayedIdx(self.displayed_results.len() - 1))
-    }
-
-    /// Selects the next result.
-    ///
-    /// If the last result is currently selected, then this will select the
-    /// first result if `rollover` is true.
-    ///
-    /// If there are no results, then this does nothing.
-    pub fn select_next(&mut self) {
-        if let SelectResult::Changed = self.inner_select_next() {
-            self.execute_on_select();
-        }
-    }
-
-    /// Selects the previous result.
-    ///
-    /// If the first result is currently selected, then this will select the
-    /// last result if `rollover` is true.
-    ///
-    /// If there are no results, then this does nothing.
-    pub fn select_prev(&mut self) {
-        if let SelectResult::Changed = self.inner_select_prev() {
-            self.execute_on_select();
-        }
-    }
-
-    fn select_idx(&mut self, idx: DisplayedIdx) -> SelectResult {
-        assert!(idx.0 < self.displayed_results.len());
-
-        let old_selected = self.selected_result;
-
-        // if let Some(window) = &mut self.window {
-        //     tracing::info!("line count {:?}", self.buffer.line_count());
-        //     tracing::info!("idx {idx:?}");
-        //
-        //     // Lines are 1-indexed.
-        //     let line = idx.0 + 1;
-        //
-        //     if let Err(err) = window.set_cursor(line, 0) {
-        //         tracing::error!("{err:?}");
-        //     }
-        //
-        //     if old_selected.is_none() {
-        //         window.set_option("cursorline", true).unwrap();
-        //     }
-        // }
-
-        self.selected_result = Some(idx);
-
-        if old_selected != self.selected_result {
-            SelectResult::Changed
-        } else {
-            SelectResult::Unchanged
-        }
-    }
-
-    /// TODO: docs
-    pub fn take_selected(&mut self) -> Option<FuzzyItem> {
-        let selected_idx = self.selected_result.take()?;
-        self.config.space.drain(..).nth(selected_idx.0)
-    }
 }
 
 #[derive(Default)]
@@ -267,7 +123,7 @@ pub(crate) struct ResultSpace {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ResultIdx(usize);
+pub(crate) struct ResultIdx(pub usize);
 
 impl Index<ResultIdx> for ResultSpace {
     type Output = FuzzyItem;

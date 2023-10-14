@@ -21,6 +21,9 @@ pub(crate) struct Modal {
     ctx: Option<OpenCtx>,
 
     /// TODO: docs
+    on_select: Option<OnSelect>,
+
+    /// TODO: docs
     on_confirm: Option<OnConfirm>,
 
     /// TODO: docs
@@ -43,8 +46,20 @@ impl Modal {
         self.prompt.update_total(total);
     }
 
+    fn take_selected(&mut self) -> Option<FuzzyItem> {
+        let selected_idx = self
+            .layout
+            .close()
+            .unwrap()
+            .map(|idx| self.results.displayed_to_result(idx))?;
+
+        let mut results = self.results.close();
+
+        results.nth(selected_idx.0)
+    }
+
     pub fn close(&mut self) {
-        self.layout.close().unwrap();
+        let selected = self.take_selected();
 
         self.prompt.close();
 
@@ -52,10 +67,8 @@ impl Modal {
             ctx.close();
         }
 
-        let maybe_selected = self.results.close();
-
         if let Some(on_cancel) = self.on_cancel.take() {
-            on_cancel(maybe_selected);
+            on_cancel(selected);
         }
     }
 
@@ -65,7 +78,7 @@ impl Modal {
 
     /// TODO: docs
     pub fn confirm(&mut self) -> ConfirmResult {
-        if let Some(selected_result) = self.results.take_selected() {
+        if let Some(selected_result) = self.take_selected() {
             if let Some(on_confirm) = self.on_confirm.take() {
                 on_confirm(selected_result);
             }
@@ -90,6 +103,7 @@ impl Modal {
             results: Results::new(sender),
             layout,
             ctx: None,
+            on_select: None,
             on_confirm: None,
             on_cancel: None,
         }
@@ -97,7 +111,13 @@ impl Modal {
 
     pub fn open(
         &mut self,
-        FuzzyConfig { prompt, results, on_confirm, on_cancel }: FuzzyConfig,
+        FuzzyConfig {
+            prompt,
+            results,
+            on_select,
+            on_confirm,
+            on_cancel,
+        }: FuzzyConfig,
         rectangle: Rectangle,
         modal_id: ModalId,
     ) {
@@ -107,12 +127,13 @@ impl Modal {
             .open(self.prompt.buffer(), self.results.buffer(), rectangle)
             .unwrap();
 
-        // TODO: switch
         self.results.open(results, modal_id);
 
         self.prompt.open(prompt, modal_id);
 
         self.ctx = Some(OpenCtx::open(modal_id));
+
+        self.on_select = on_select;
 
         self.on_confirm = on_confirm;
 
@@ -131,6 +152,22 @@ impl Modal {
 
     pub fn results_mut(&mut self) -> &mut Results {
         &mut self.results
+    }
+
+    pub fn select_next(&mut self) {
+        if let Some(new_selected) = self.layout.select_next() {
+            if let Some(on_select) = &mut self.on_select {
+                on_select(self.results.displayed(new_selected));
+            }
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if let Some(new_selected) = self.layout.select_next() {
+            if let Some(on_select) = &mut self.on_select {
+                on_select(self.results.displayed(new_selected));
+            }
+        }
     }
 }
 

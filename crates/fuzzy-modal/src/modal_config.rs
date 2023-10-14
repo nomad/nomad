@@ -19,6 +19,7 @@ pub struct FuzzyConfig {
     pub(crate) prompt: PromptConfig,
     pub(crate) on_confirm: Option<OnConfirm>,
     pub(crate) on_cancel: Option<OnExit>,
+    pub(crate) on_select: Option<OnSelect>,
 }
 
 impl FuzzyBuilder {
@@ -57,7 +58,7 @@ impl FuzzyBuilder {
     where
         F: FnMut(&FuzzyItem) + 'static,
     {
-        self.config.results.on_select = Some(Box::new(fun));
+        self.config.on_select = Some(Box::new(fun));
         self
     }
 

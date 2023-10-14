@@ -163,11 +163,11 @@ impl FuzzyModal {
     }
 
     fn select_next(&mut self) {
-        self.modal.results_mut().select_next();
+        self.modal.select_next();
     }
 
     fn select_prev(&mut self) {
-        self.modal.results_mut().select_prev();
+        self.modal.select_prev();
     }
 
     fn show_placeholder(&mut self) {
