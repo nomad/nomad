@@ -51,5 +51,5 @@ neovim-nightly = [
 [dependencies]
 common = { workspace = true }
 nomad = { workspace = true }
-nvim-oxi = { workspace = true }
+nvim-oxi = { workspace = true, features = ["libuv"] }
 tracing-subscriber = { workspace = true }
