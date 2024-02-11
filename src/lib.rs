@@ -1,5 +1,7 @@
 extern crate alloc;
 
+use core::convert::Infallible;
+
 use api::opts::*;
 use nvim_oxi::api;
 
@@ -66,8 +68,12 @@ where
         let root_view = self.root_view.take().unwrap();
 
         let async_handle = AsyncHandle::new(move || {
-            root_view.view(&mut pond).render();
-            Ok::<_, core::convert::Infallible>(())
+            let render = root_view.view(&mut pond);
+            nvim_oxi::schedule(move |_| {
+                render.render();
+                Ok(())
+            });
+            Ok::<_, Infallible>(())
         })?;
 
         let handle = NeovimHandle { async_handle };
@@ -114,7 +120,10 @@ struct PrintCoordinates {
 }
 
 impl View for PrintCoordinates {
-    fn view<R: Runtime>(&self, pond: &mut ReadCtx<Pond<R>>) -> impl Render {
+    fn view<R: Runtime>(
+        &self,
+        pond: &mut ReadCtx<Pond<R>>,
+    ) -> impl Render + 'static {
         let line: Line = *self.line.get(pond);
         let offset: Offset = *self.offset.get(pond);
         CoordinatesSnapshot::new(line, offset)

@@ -70,7 +70,10 @@ impl<R: Runtime> Pond<R> {
 }
 
 pub trait View {
-    fn view<R: Runtime>(&self, pond: &mut ReadCtx<Pond<R>>) -> impl Render;
+    fn view<R: Runtime>(
+        &self,
+        pond: &mut ReadCtx<Pond<R>>,
+    ) -> impl Render + 'static;
 }
 
 pub trait Render {
