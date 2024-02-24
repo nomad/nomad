@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+members = ["crates/*", "neovim"]
 
 [workspace.package]
 version = "0.1.0"
