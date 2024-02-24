@@ -5,7 +5,13 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = ["neovim-0-9"]
+neovim-0-9 = ["nvim-oxi/neovim-0-9"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
 [dependencies]
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
 
 [lints]
 workspace = true
