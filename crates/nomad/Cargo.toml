@@ -1,13 +1,13 @@
 [package]
-name = "collab"
+name = "nomad"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
 [dependencies]
+macros = { path = "./macros" }
 neovim = { workspace = true }
-nomad = { workspace = true }
 
 [lints]
 workspace = true

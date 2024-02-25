@@ -1,1 +1,3 @@
+//! # Neovim
+//!
 //! TODO: docs
