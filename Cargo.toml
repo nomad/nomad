@@ -1,15 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "neovim"]
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Nomad <hello@nomad.foo>"]
 license = "MIT"
+publish = false
 
 [workspace.dependencies]
-neovim = { path = "./neovim" }
+neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }
 once_cell = "1.18"
 serde = "1.0"
