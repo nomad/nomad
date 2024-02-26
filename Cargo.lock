@@ -29,6 +29,7 @@ name = "neovim"
 version = "0.1.0"
 dependencies = [
  "nvim-oxi",
+ "pond",
 ]
 
 [[package]]
@@ -120,6 +121,11 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
+
+[[package]]
+name = "pond"
+version = "0.1.0"
+source = "git+ssh://git@github.com/nomad/pond.git#4eac4f08b8dd852b390be75ea7b5e01d23ef04dd"
 
 [[package]]
 name = "proc-macro2"

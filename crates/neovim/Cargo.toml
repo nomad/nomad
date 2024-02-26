@@ -13,6 +13,7 @@ neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
 nvim-oxi = { workspace = true, features = ["libuv"] }
+pond = { git = "ssh://git@github.com/nomad/pond.git" }
 
 [lints]
 workspace = true
