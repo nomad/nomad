@@ -1,4 +1,5 @@
 /// TODO: docs
+#[derive(PartialEq, Eq, Hash)]
 pub struct ActionName {
     name: &'static str,
 }
@@ -18,6 +19,12 @@ impl core::fmt::Display for ActionName {
 }
 
 impl ActionName {
+    /// TODO: docs
+    #[inline]
+    pub(crate) fn as_str(&self) -> &'static str {
+        self.name
+    }
+
     #[doc(hidden)]
     pub const fn from_str(name: &'static str) -> Self {
         Self { name }

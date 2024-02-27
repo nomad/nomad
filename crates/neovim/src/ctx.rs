@@ -21,6 +21,13 @@ impl Ctx {
 
     /// TODO: docs
     #[inline]
+    pub fn as_set(&mut self) -> &mut SetCtx {
+        // SAFETY: `SetCtx` and `Ctx` have the same layout.
+        unsafe { mem::transmute(self) }
+    }
+
+    /// TODO: docs
+    #[inline]
     pub fn new_input<T>(&self, input: T) -> (Get<T>, Set<T>) {
         self.as_init().new_input(input)
     }

@@ -1,4 +1,5 @@
 /// TODO: docs
+#[derive(PartialEq, Eq, Hash)]
 pub struct ModuleName {
     name: &'static str,
 }
