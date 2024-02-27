@@ -1,5 +1,12 @@
-#[nvim_oxi::module]
-fn nomad() {}
+use nomad::prelude::*;
+
+#[nvim::module]
+fn nomad() -> nvim::Dictionary {
+    Nomad::new()
+        // .with_module::<collab::Collab>()
+        .with_module::<collab::Collab>()
+        .api()
+}
 
 // fn root_view(nvim: &mut Neovim) -> impl View<Neovim> {
 //     let (line, mut line_set) = nvim.var(Line::default());
