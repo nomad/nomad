@@ -11,6 +11,7 @@ neovim-0-9 = ["neovim/neovim-0-9"]
 neovim-nightly = ["neovim/neovim-nightly"]
 
 [dependencies]
+async-task = "4"
 futures = { workspace = true }
 macros = { path = "./macros" }
 neovim = { workspace = true }

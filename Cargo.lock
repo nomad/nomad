@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "async-task"
+version = "4.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbb36e985947064623dbd357f727af08ffd077f93d696782f3c56365fa2e2799"
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -158,6 +164,7 @@ dependencies = [
 name = "nomad"
 version = "0.1.0"
 dependencies = [
+ "async-task",
  "futures",
  "macros",
  "neovim",
