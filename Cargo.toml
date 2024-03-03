@@ -10,6 +10,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+async-net = "2"
 futures = "0.3"
 neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }
