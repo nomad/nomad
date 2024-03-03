@@ -9,7 +9,6 @@ use crate::runtime;
 use crate::{EnableConfig, Module, ObjectSafeModule};
 
 /// TODO: docs
-#[derive(Default)]
 pub struct Nomad {
     /// TODO: docs
     api: Dictionary,
@@ -18,6 +17,13 @@ pub struct Nomad {
     ctx: Rc<RefCell<Ctx>>,
     // /// TODO: docs
     // modules: Vec<Box<dyn ObjectSafeModule>>,
+}
+
+impl Default for Nomad {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Nomad {
@@ -29,18 +35,20 @@ impl Nomad {
         api
     }
 
-    // We don't derive Default because we want the `new` method to be the only
-    // way to create a `Nomad` instance.
-    #[inline]
-    fn default() -> Self {
-        Self { api: Dictionary::default(), ctx: Rc::default() }
-    }
-
     /// TODO: docs
     #[inline]
     pub fn new() -> Self {
         log::init();
-        Self::default()
+
+        log::info!("======== Starting Nomad ========");
+
+        Self::new_default()
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn new_default() -> Self {
+        Self { api: Dictionary::default(), ctx: Rc::default() }
     }
 
     /// TODO: docs
