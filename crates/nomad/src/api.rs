@@ -1,8 +1,8 @@
-use neovim::nvim::{self, Object};
 use serde::de::Deserialize;
 
 use crate::action::Action;
 use crate::action_name::ActionName;
+use crate::nvim::{self, Object};
 use crate::prelude::SetCtx;
 
 /// TODO: docs

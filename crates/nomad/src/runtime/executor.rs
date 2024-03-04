@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use async_task::{Builder, Runnable};
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use neovim::nvim::{libuv, schedule};
 
 use super::JoinHandle;
+use crate::nvim::{libuv, schedule};
 
 thread_local! {
     static LOCAL_EXECUTOR: LocalExecutor = const { LocalExecutor::new() };

@@ -24,6 +24,6 @@ pub trait Module: 'static + DefaultEnable + Sized {
     /// TODO: docs
     fn load(
         &self,
-        ctx: &mut SetCtx,
+        // ctx: &mut SetCtx,
     ) -> impl Future<Output = impl MaybeResult<()>>;
 }

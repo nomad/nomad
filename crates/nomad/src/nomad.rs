@@ -1,12 +1,7 @@
-use alloc::rc::Rc;
-use core::cell::RefCell;
-
-use neovim::Ctx;
-
-use crate::log;
-use crate::prelude::nvim::Dictionary;
-use crate::runtime;
-use crate::{EnableConfig, Module, ObjectSafeModule};
+use crate::ctx::Ctx;
+use crate::nvim::{Dictionary, Function};
+use crate::{config, log, runtime};
+use crate::{EnableConfig, Module};
 
 /// TODO: docs
 pub struct Nomad {
@@ -14,9 +9,7 @@ pub struct Nomad {
     api: Dictionary,
 
     /// TODO: docs
-    ctx: Rc<RefCell<Ctx>>,
-    // /// TODO: docs
-    // modules: Vec<Box<dyn ObjectSafeModule>>,
+    ctx: Ctx,
 }
 
 impl Default for Nomad {
@@ -30,8 +23,8 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn api(self) -> Dictionary {
-        let Self { api, .. } = self;
-        // load(ctx, modules);
+        let Self { mut api, .. } = self;
+        api.insert("config", config::config());
         api
     }
 
@@ -48,54 +41,57 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     fn new_default() -> Self {
-        Self { api: Dictionary::default(), ctx: Rc::default() }
+        Self { api: Dictionary::default(), ctx: Ctx::default() }
     }
 
     /// TODO: docs
     #[inline]
     pub fn with_module<M: Module>(mut self) -> Self {
-        let ctx = self.ctx.borrow();
-
-        let init_ctx = ctx.as_init();
+        // Create a new input for the module's config and initialize the
+        // module.
+        let (module, set_config) = self.ctx.with_init(|init_ctx| {
+            let default_config = EnableConfig::<M>::default();
+            let (get, set) = init_ctx.new_input(default_config);
+            let module = M::init(get, init_ctx);
+            (module, set)
+        });
 
         // TODO: docs
-        let (config, _set_config) =
-            init_ctx.new_input(EnableConfig::<M>::default());
+        config::with_module::<M>(set_config, &self.ctx);
 
-        let module = M::init(config, init_ctx);
+        // Add the module's API to the global API.
+        self.api.insert(M::NAME.as_str(), module_api(&module, &self.ctx));
 
-        drop(ctx);
-
-        let module_api = ObjectSafeModule::api(&module, &self.ctx);
-
-        self.api.insert(M::NAME.as_str(), module_api);
-
+        // TODO: Create the module's commands.
         for _command in module.commands() {}
 
         let ctx = self.ctx.clone();
 
-        runtime::spawn(
-            #[allow(clippy::await_holding_refcell_ref)]
-            async move {
-                let ctx = &mut *ctx.borrow_mut();
-                let set_ctx = ctx.as_set();
-                let _ = module.load(set_ctx).await;
-            },
-        )
+        // Spawn a new task that loads the module asynchronously.
+        runtime::spawn(async move {
+            let _ = ctx.with_set(|_set_ctx| module.load()).await;
+        })
         .detach();
 
         self
     }
 }
 
-// /// TODO: docs
-// fn load(ctx: Rc<RefCell<Ctx>>, modules: Vec<Box<dyn ObjectSafeModule>>) {
-//     nvim::schedule(move |()| {
-//         let ctx = &mut *ctx.borrow_mut();
-//         let set_ctx = ctx.as_set();
-//         for module in modules {
-//             module.load(set_ctx);
-//         }
-//         Ok(())
-//     });
-// }
+/// TODO: docs
+#[inline]
+fn module_api<M: Module>(module: &M, ctx: &Ctx) -> Dictionary {
+    let mut dict = Dictionary::new();
+
+    for (action_name, action) in module.api().into_iter() {
+        let ctx = ctx.clone();
+
+        let function = move |object| {
+            ctx.with_set(|set_ctx| action(object, set_ctx));
+            Ok::<_, core::convert::Infallible>(())
+        };
+
+        dict.insert(action_name.as_str(), Function::from_fn(function));
+    }
+
+    dict
+}

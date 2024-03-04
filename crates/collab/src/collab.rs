@@ -41,10 +41,16 @@ impl Module for Collab {
     }
 
     #[inline]
-    async fn load(&self, _ctx: &mut SetCtx) -> impl MaybeResult<()> {
+    async fn load(
+        &self,
+        // _ctx: &mut SetCtx,
+    ) -> impl MaybeResult<()> {
+        let mut count = 0;
+
         loop {
-            nvim::print!("Loading {}...", Self::NAME);
+            nvim::print!("{}'s count is {count}", Self::NAME);
             sleep(Duration::from_secs(1)).await;
+            count += 1;
         }
     }
 }

@@ -4,8 +4,9 @@ use core::task::{Context, Poll};
 use core::time::Duration;
 use std::time::Instant;
 
-use neovim::nvim::libuv;
 use pin_project_lite::pin_project;
+
+use crate::nvim::libuv;
 
 /// TODO: docs.
 #[inline]

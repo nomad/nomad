@@ -7,8 +7,8 @@ license.workspace = true
 publish = false
 
 [features]
-neovim-0-9 = ["neovim/neovim-0-9"]
-neovim-nightly = ["neovim/neovim-nightly"]
+neovim-0-9 = ["nvim-oxi/neovim-0-9"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
 async-task = "4.7"
@@ -16,8 +16,9 @@ concurrent-queue = "2.4"
 futures = { workspace = true }
 home = "0.5"
 macros = { path = "./macros" }
-neovim = { workspace = true }
+nvim-oxi = { workspace = true, features = ["libuv"] }
 pin-project-lite = { workspace = true }
+pond = { git = "ssh://git@github.com/nomad/pond.git" }
 serde = { workspace = true }
 time = { version = "0.3", features = ["macros"] }
 tracing = "0.1"
