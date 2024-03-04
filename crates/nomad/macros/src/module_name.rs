@@ -37,7 +37,7 @@ pub fn module_name(name: LitStr) -> Result<TokenStream, Error> {
         }
     }
 
-    Ok(quote! { ::nomad::ModuleName::from_str(#name) })
+    Ok(quote! { ::nomad::module::ModuleName::from_str(#name) })
 }
 
 struct ContainsOther;

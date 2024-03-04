@@ -1,7 +1,7 @@
 use crate::ctx::Ctx;
 use crate::nvim::{Dictionary, Function};
+use crate::prelude::{EnableConfig, Module};
 use crate::{config, log, runtime};
-use crate::{EnableConfig, Module};
 
 /// TODO: docs
 pub struct Nomad {

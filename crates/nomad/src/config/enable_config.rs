@@ -2,13 +2,7 @@ use core::ops::Deref;
 
 use serde::Deserialize;
 
-use crate::module::Module;
-
-/// TODO: docs
-pub trait DefaultEnable {
-    /// TODO: docs
-    const ENABLE: bool;
-}
+use crate::module::{DefaultEnable, Module};
 
 /// TODO: docs
 #[derive(Debug, Clone, Deserialize)]
