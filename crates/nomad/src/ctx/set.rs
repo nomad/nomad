@@ -26,4 +26,10 @@ impl<T> Set<T> {
     {
         self.inner.update(update_with, ctx.as_engine_mut())
     }
+
+    /// TODO: docs
+    #[inline]
+    pub fn set(&self, new_value: T, ctx: &mut SetCtx) {
+        self.inner.set(new_value, ctx.as_engine_mut())
+    }
 }
