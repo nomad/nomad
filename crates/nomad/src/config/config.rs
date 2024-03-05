@@ -23,7 +23,7 @@ thread_local! {
 pub(crate) fn config() -> Function<Object, ()> {
     Function::from_fn(|object| {
         let deserializer = Deserializer::new(object);
-        UpdateConfigs::deserialize(deserializer).unwrap();
+        UpdateConfigs::deserialize(deserializer).expect("never fails");
         Ok::<_, core::convert::Infallible>(())
     })
 }
@@ -178,11 +178,26 @@ impl<'de> de::Visitor<'de> for UpdateConfigsVisitor {
         // In this case, the `foo` module would be updated, but the `bar`
         // module wouldn't because the `config` function would return an error
         // when it gets to `"hello"`.
-
         let mut buffer = Vec::new();
 
-        while let Some(module_name) = map.next_key::<String>()? {
-            let module_config = map.next_value::<Object>()?;
+        loop {
+            let module_name = match map.next_key::<String>() {
+                Ok(Some(name)) => name,
+                Ok(None) => break,
+                Err(err) => {
+                    Warning::new().msg(invalid_key_msg::<A>(err)).print();
+                    return Ok(UpdateConfigs);
+                },
+            };
+
+            let module_config = match map.next_value::<Object>() {
+                Ok(obj) => obj,
+                Err(err) => {
+                    Warning::new().msg(invalid_object_msg::<A>(err)).print();
+                    return Ok(UpdateConfigs);
+                },
+            };
+
             buffer.push((module_name, module_config));
         }
 
@@ -194,6 +209,28 @@ impl<'de> de::Visitor<'de> for UpdateConfigsVisitor {
 
         Ok(UpdateConfigs)
     }
+}
+
+/// TODO: docs
+#[inline]
+fn invalid_key_msg<'de, A>(err: A::Error) -> WarningMsg
+where
+    A: de::MapAccess<'de>,
+{
+    let mut msg = WarningMsg::new();
+    msg.add("couldn't deserialize config key: ").add(err.to_string().as_str());
+    msg
+}
+
+/// TODO: docs
+#[inline]
+fn invalid_object_msg<'de, A>(err: A::Error) -> WarningMsg
+where
+    A: de::MapAccess<'de>,
+{
+    let mut msg = WarningMsg::new();
+    msg.add("couldn't deserialize object: ").add(err.to_string().as_str());
+    msg
 }
 
 /// TODO: docs
