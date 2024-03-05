@@ -213,8 +213,33 @@ enum InvalidModuleMsgKind {
 
 impl InvalidModuleMsgKind {
     #[inline]
-    fn from_str(_module_name: &str) -> Self {
-        Self::ListAllModules
+    fn from_str(module: &str) -> Self {
+        let mut min_distance = usize::MAX;
+
+        let mut idx_closest = 0;
+
+        for (idx, valid) in valid_modules().iter().enumerate() {
+            let distance = strsim::damerau_levenshtein(module, valid.as_str());
+
+            if distance < min_distance {
+                min_distance = distance;
+                idx_closest = idx;
+            }
+        }
+
+        let should_suggest_closest = match module.len() {
+            3 => min_distance <= 1,
+            4..=6 => min_distance <= 2,
+            7..=10 => min_distance <= 3,
+            _ => false,
+        };
+
+        if should_suggest_closest {
+            let closest = valid_modules()[idx_closest];
+            Self::SuggestClosest(closest)
+        } else {
+            Self::ListAllModules
+        }
     }
 }
 

@@ -20,6 +20,7 @@ nvim-oxi = { workspace = true, features = ["libuv"] }
 pin-project-lite = { workspace = true }
 pond = { git = "ssh://git@github.com/nomad/pond.git" }
 serde = { workspace = true }
+strsim = "0.11"
 time = { version = "0.3", features = ["macros"] }
 tracing = "0.1"
 tracing-appender = "0.2"
