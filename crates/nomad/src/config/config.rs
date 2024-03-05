@@ -23,7 +23,11 @@ thread_local! {
 pub(crate) fn config() -> Function<Object, ()> {
     Function::from_fn(|object| {
         let deserializer = Deserializer::new(object);
-        UpdateConfigs::deserialize(deserializer).expect("never fails");
+
+        if let Err(err) = UpdateConfigs::deserialize(deserializer) {
+            Warning::new().msg(invalid_config_msg(err)).print();
+        }
+
         Ok::<_, core::convert::Infallible>(())
     })
 }
@@ -211,28 +215,6 @@ impl<'de> de::Visitor<'de> for UpdateConfigsVisitor {
 
 /// TODO: docs
 #[inline]
-fn invalid_key_msg<'de, A>(err: A::Error) -> WarningMsg
-where
-    A: de::MapAccess<'de>,
-{
-    let mut msg = WarningMsg::new();
-    msg.add("couldn't deserialize config key: ").add(err.to_string().as_str());
-    msg
-}
-
-/// TODO: docs
-#[inline]
-fn invalid_object_msg<'de, A>(err: A::Error) -> WarningMsg
-where
-    A: de::MapAccess<'de>,
-{
-    let mut msg = WarningMsg::new();
-    msg.add("couldn't deserialize object: ").add(err.to_string().as_str());
-    msg
-}
-
-/// TODO: docs
-#[inline]
 fn update_config(
     module_name: String,
     module_config: Object,
@@ -276,7 +258,9 @@ impl Error {
                 }
             },
 
-            Self::DeserializeModule(de_err) => invalid_config_msg(de_err),
+            Self::DeserializeModule(de_err) => {
+                invalid_module_config_msg(de_err)
+            },
         };
 
         Warning::new().msg(msg)
@@ -323,6 +307,36 @@ impl InvalidModuleMsgKind {
             Self::ListAllModules
         }
     }
+}
+
+/// TODO: docs
+#[inline]
+fn invalid_config_msg<E: core::fmt::Display>(err: E) -> WarningMsg {
+    let mut msg = WarningMsg::new();
+    msg.add("couldn't deserialize config: ").add(err.to_string().highlight());
+    msg
+}
+
+/// TODO: docs
+#[inline]
+fn invalid_key_msg<'de, A>(err: A::Error) -> WarningMsg
+where
+    A: de::MapAccess<'de>,
+{
+    let mut msg = WarningMsg::new();
+    msg.add("couldn't deserialize config key: ").add(err.to_string().as_str());
+    msg
+}
+
+/// TODO: docs
+#[inline]
+fn invalid_object_msg<'de, A>(err: A::Error) -> WarningMsg
+where
+    A: de::MapAccess<'de>,
+{
+    let mut msg = WarningMsg::new();
+    msg.add("couldn't deserialize object: ").add(err.to_string().as_str());
+    msg
 }
 
 /// TODO: docs
@@ -383,7 +397,7 @@ fn suggest_closest_msg(invalid: &str, closest: ModuleName) -> WarningMsg {
 
 /// TODO: docs
 #[inline]
-fn invalid_config_msg(err: &DeserializationError) -> WarningMsg {
+fn invalid_module_config_msg(err: &DeserializationError) -> WarningMsg {
     let mut msg = WarningMsg::new();
 
     msg.add("couldn't deserialize ")
