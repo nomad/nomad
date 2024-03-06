@@ -1,11 +1,13 @@
 use core::cell::{OnceCell, RefCell};
+use core::fmt;
 use std::collections::HashMap;
 
 use serde::de::{self, Deserialize};
+use serde_path_to_error::Segment;
 
 use crate::ctx::{Ctx, Set};
 use crate::module::{Module, ModuleId, ModuleName};
-use crate::nvim::{serde::Deserializer, Function, Object};
+use crate::nvim::{self, serde::Deserializer, Function, Object};
 use crate::warning::{ChunkExt, Warning, WarningMsg};
 
 thread_local! {
@@ -98,19 +100,16 @@ impl ConfigDeserializers {
     }
 }
 
-type DeserializationError =
-    serde_path_to_error::Error<nvim_oxi::serde::DeserializeError>;
-
 /// TODO: docs
 struct ConfigDeserializer {
-    deserializer: Box<dyn Fn(Object) -> Result<(), DeserializationError>>,
+    deserializer: Box<dyn Fn(Object) -> Result<(), DeserializeError>>,
     module_name: ModuleName,
 }
 
 impl ConfigDeserializer {
     /// TODO: docs
     #[inline]
-    fn deserialize(&self, config: Object) -> Result<(), DeserializationError> {
+    fn deserialize(&self, config: Object) -> Result<(), DeserializeError> {
         (self.deserializer)(config)
     }
 
@@ -125,12 +124,86 @@ impl ConfigDeserializer {
     fn new<M: Module>(set_config: Set<M::Config>, ctx: Ctx) -> Self {
         let deserializer = move |config: Object| {
             let deserializer = Deserializer::new(config);
-            let config = serde_path_to_error::deserialize(deserializer)?;
+            let config = serde_path_to_error::deserialize(deserializer)
+                .map_err(|err| DeserializeError::new(M::NAME, err))?;
             ctx.with_set(|set_ctx| set_config.set(config, set_ctx));
             Ok(())
         };
 
         Self { deserializer: Box::new(deserializer), module_name: M::NAME }
+    }
+}
+
+struct DeserializeError {
+    module_name: ModuleName,
+    error: serde_path_to_error::Error<nvim::serde::DeserializeError>,
+}
+
+impl DeserializeError {
+    #[inline]
+    fn inner(&self) -> &nvim_oxi::serde::DeserializeError {
+        self.error.inner()
+    }
+
+    #[inline]
+    fn new(
+        module_name: ModuleName,
+        error: serde_path_to_error::Error<nvim_oxi::serde::DeserializeError>,
+    ) -> Self {
+        Self { module_name, error }
+    }
+
+    #[inline]
+    fn path(&self) -> impl fmt::Display + '_ {
+        PathToError { err: self }
+    }
+}
+
+struct PathToError<'a> {
+    err: &'a DeserializeError,
+}
+
+impl fmt::Display for PathToError<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use nvim_oxi::serde::DeserializeError::*;
+
+        write!(f, "{}", self.err.module_name)?;
+
+        let segments = self.err.error.path().iter();
+
+        let num_segments = segments.len();
+
+        if num_segments == 0 {
+            return Ok(());
+        }
+
+        let should_print_last_segment = matches!(
+            self.err.error.inner(),
+            Custom { .. } | UnknownVariant { .. }
+        );
+
+        for (idx, segment) in segments.enumerate() {
+            let is_last = idx + 1 == num_segments;
+
+            let should_print = !is_last | should_print_last_segment;
+
+            if should_print {
+                match segment {
+                    Segment::Seq { index } => {
+                        write!(f, ".[{}]", index)?;
+                    },
+                    Segment::Map { key } | Segment::Enum { variant: key } => {
+                        write!(f, ".{}", key)?;
+                    },
+                    Segment::Unknown => {
+                        write!(f, ".?")?;
+                    },
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -239,7 +312,7 @@ enum Error {
     InvalidModule(String),
 
     /// TODO: docs
-    DeserializeModule(DeserializationError),
+    DeserializeModule(DeserializeError),
 }
 
 impl Error {
@@ -293,7 +366,7 @@ impl Error {
 
 /// TODO: docs
 #[inline]
-fn invalid_config_msg<E: core::fmt::Display>(err: E) -> WarningMsg {
+fn invalid_config_msg<E: fmt::Display>(err: E) -> WarningMsg {
     let mut msg = WarningMsg::new();
     msg.add("couldn't deserialize config: ").add(err.to_string());
     msg
