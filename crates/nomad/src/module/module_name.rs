@@ -20,6 +20,13 @@ impl core::fmt::Display for ModuleName {
     }
 }
 
+impl AsRef<str> for ModuleName {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.name
+    }
+}
+
 impl ModuleName {
     /// TODO: docs
     #[inline]

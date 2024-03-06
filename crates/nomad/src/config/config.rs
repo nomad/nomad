@@ -99,7 +99,8 @@ impl ConfigDeserializers {
     }
 }
 
-type DeserializationError = serde_path_to_error::Error<nvim_oxi::serde::Error>;
+type DeserializationError =
+    serde_path_to_error::Error<nvim_oxi::serde::DeserializeError>;
 
 /// TODO: docs
 struct ConfigDeserializer {
@@ -247,13 +248,17 @@ impl Error {
     fn to_warning(&self) -> Warning {
         let msg = match self {
             Self::InvalidModule(module) => {
-                match InvalidModuleMsgKind::from_str(module) {
-                    InvalidModuleMsgKind::ListAllModules => {
-                        list_all_modules_msg(module)
-                    },
+                let valid_modules = valid_modules();
 
-                    InvalidModuleMsgKind::SuggestClosest(closest) => {
-                        suggest_closest_msg(module, closest)
+                match InvalidStrMsgKind::from_str(module, valid_modules) {
+                    InvalidStrMsgKind::ListAll => list_all_modules_msg(module),
+
+                    InvalidStrMsgKind::SuggestClosest { idx } => {
+                        suggest_closest_msg(
+                            module,
+                            "module",
+                            valid_modules[idx],
+                        )
                     },
                 }
             },
@@ -267,25 +272,35 @@ impl Error {
     }
 }
 
-enum InvalidModuleMsgKind {
-    ListAllModules,
-    SuggestClosest(ModuleName),
+/// TODO: docs
+enum InvalidStrMsgKind {
+    /// TODO: docs
+    ListAll,
+
+    /// TODO: docs
+    SuggestClosest { idx: usize },
 }
 
-impl InvalidModuleMsgKind {
+impl InvalidStrMsgKind {
     #[inline]
-    fn from_str(module: &str) -> Self {
-        let valid_modules = valid_modules();
+    fn from_str<T, V>(invalid: &str, valid: V) -> Self
+    where
+        V: IntoIterator<Item = T>,
+        V::IntoIter: ExactSizeIterator,
+        T: AsRef<str>,
+    {
+        let valid = valid.into_iter();
 
-        if valid_modules.is_empty() {
-            return Self::ListAllModules;
+        if valid.len() == 0 {
+            return Self::ListAll;
         }
 
         let mut min_distance = usize::MAX;
         let mut idx_closest = 0;
 
-        for (idx, valid) in valid_modules.iter().enumerate() {
-            let distance = strsim::damerau_levenshtein(module, valid.as_str());
+        for (idx, valid) in valid.enumerate() {
+            let distance =
+                strsim::damerau_levenshtein(invalid, valid.as_ref());
 
             if distance < min_distance {
                 min_distance = distance;
@@ -293,7 +308,7 @@ impl InvalidModuleMsgKind {
             }
         }
 
-        let should_suggest_closest = match module.len() {
+        let should_suggest_closest = match invalid.len() {
             // These ranges and cutoffs are arbitrary.
             3 => min_distance <= 1,
             4..=6 => min_distance <= 2,
@@ -302,9 +317,9 @@ impl InvalidModuleMsgKind {
         };
 
         if should_suggest_closest {
-            Self::SuggestClosest(valid_modules[idx_closest])
+            Self::SuggestClosest { idx: idx_closest }
         } else {
-            Self::ListAllModules
+            Self::ListAll
         }
     }
 }
@@ -383,13 +398,19 @@ fn list_all_modules_msg(invalid: &str) -> WarningMsg {
 
 /// TODO: docs
 #[inline]
-fn suggest_closest_msg(invalid: &str, closest: ModuleName) -> WarningMsg {
+fn suggest_closest_msg(
+    invalid: &str,
+    invalid_what: &str,
+    closest: impl AsRef<str>,
+) -> WarningMsg {
     let mut msg = WarningMsg::new();
 
-    msg.add("invalid module ")
+    msg.add("invalid ")
+        .add(invalid_what)
+        .add(" ")
         .add(invalid.highlight())
         .add(", did you mean ")
-        .add(closest.as_str().highlight())
+        .add(closest.as_ref().highlight())
         .add("?");
 
     msg
