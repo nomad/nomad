@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use serde::de::{self, Deserialize};
 
-use super::EnableConfig;
 use crate::ctx::{Ctx, Set};
 use crate::module::{Module, ModuleId, ModuleName};
 use crate::nvim::{serde::Deserializer, Function, Object};
@@ -60,12 +59,12 @@ fn valid_modules() -> &'static [ModuleName] {
 
 /// TODO: docs
 #[inline]
-pub(crate) fn with_module<M>(set_config: Set<EnableConfig<M>>, ctx: Ctx)
+pub(crate) fn with_module<M>(set_config: Set<M::Config>, ctx: Ctx)
 where
     M: Module,
 {
     DESERIALIZERS.with(|deserializers| {
-        let deserializer = ConfigDeserializer::new(set_config, ctx);
+        let deserializer = ConfigDeserializer::new::<M>(set_config, ctx);
         deserializers.insert(M::NAME.id(), deserializer)
     });
 }
@@ -123,7 +122,7 @@ impl ConfigDeserializer {
 
     /// TODO: docs
     #[inline]
-    fn new<M: Module>(set_config: Set<EnableConfig<M>>, ctx: Ctx) -> Self {
+    fn new<M: Module>(set_config: Set<M::Config>, ctx: Ctx) -> Self {
         let deserializer = move |config: Object| {
             let deserializer = Deserializer::new(config);
             let config = serde_path_to_error::deserialize(deserializer)?;

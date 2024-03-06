@@ -1,6 +1,6 @@
 use crate::ctx::Ctx;
+use crate::module::Module;
 use crate::nvim::{Dictionary, Function};
-use crate::prelude::{EnableConfig, Module};
 use crate::{config, log, runtime};
 
 /// TODO: docs
@@ -50,8 +50,7 @@ impl Nomad {
         // Create a new input for the module's config and initialize the
         // module.
         let (module, set_config) = self.ctx.with_init(|init_ctx| {
-            let default_config = EnableConfig::<M>::default();
-            let (get, set) = init_ctx.new_input(default_config);
+            let (get, set) = init_ctx.new_input(M::Config::default());
             let module = M::init(get, init_ctx);
             (module, set)
         });

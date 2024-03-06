@@ -6,13 +6,9 @@ use crate::CollabConfig;
 
 /// TODO: docs.
 pub struct Collab {
-    config: Get<EnableConfig<Self>>,
+    config: Get<CollabConfig>,
     increment: Increment,
     print: Print,
-}
-
-impl DefaultEnable for Collab {
-    const ENABLE: bool = false;
 }
 
 impl Module for Collab {
@@ -21,7 +17,7 @@ impl Module for Collab {
     type Config = CollabConfig;
 
     #[inline]
-    fn init(config: Get<EnableConfig<Self>>, ctx: &InitCtx) -> Self {
+    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Self {
         let (counter, set_counter) = ctx.new_input(0u64);
         let increment = Increment { set_counter };
         let print = Print { counter };
@@ -51,6 +47,7 @@ impl Module for Collab {
             nvim::print!("{}'s count is {count}", Self::NAME);
             sleep(Duration::from_secs(1)).await;
             count += 1;
+            break;
         }
     }
 }

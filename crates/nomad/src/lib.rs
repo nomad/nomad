@@ -29,7 +29,6 @@ pub use nvim_oxi as nvim;
 pub mod prelude {
     //! TODO: docs
 
-    pub use config::EnableConfig;
     pub use ctx::*;
     pub use log::*;
     pub use module::*;

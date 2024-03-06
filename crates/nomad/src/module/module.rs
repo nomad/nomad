@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use crate::prelude::*;
 
 /// TODO: docs
-pub trait Module: 'static + DefaultEnable + Sized {
+pub trait Module: 'static + Sized {
     /// TODO: docs
     const NAME: ModuleName;
 
@@ -13,7 +13,7 @@ pub trait Module: 'static + DefaultEnable + Sized {
     type Config: Default + DeserializeOwned;
 
     /// TODO: docs
-    fn init(config: Get<EnableConfig<Self>>, ctx: &InitCtx) -> Self;
+    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Self;
 
     /// TODO: docs
     fn api(&self) -> Api;
