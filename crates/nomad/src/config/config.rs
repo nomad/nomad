@@ -264,7 +264,6 @@ impl Error {
 
                 match err.inner() {
                     Custom { msg: err_msg } => {
-                        println!("got custom");
                         msg.add(err_msg.as_str());
                     },
 
@@ -277,7 +276,6 @@ impl Error {
                     },
 
                     UnknownField { variant: field, expected } => {
-                        println!("got unknown field");
                         msg::invalid_str(field, expected, "field", &mut msg);
                     },
 
@@ -409,10 +407,10 @@ mod msg {
             .add(invalid.highlight());
 
         match valid {
-            [] => return,
+            [] => {},
 
             [one] => {
-                msg.add(", the only valid")
+                msg.add(", the only valid ")
                     .add(invalid_what)
                     .add(" is ")
                     .add(one.as_ref().highlight());
