@@ -4,35 +4,29 @@
 
 extern crate alloc;
 
-mod action;
-mod action_name;
-mod api;
-pub mod command;
+pub mod action;
+pub mod api;
 mod config;
-pub mod ctx;
 pub mod log;
-mod maybe_result;
+pub mod maybe_result;
 pub mod module;
 mod nomad;
 pub mod runtime;
-mod warning;
+pub mod warning;
 
-pub use action::Action;
-pub use action_name::ActionName;
-pub use api::Api;
-pub use macros::action_name;
-pub use maybe_result::MaybeResult;
 pub use nomad::Nomad;
-pub use nvim_oxi as nvim;
 
 pub mod prelude {
     //! TODO: docs
 
-    pub use command::*;
-    pub use ctx::*;
-    pub use log::*;
-    pub use module::*;
-    pub use runtime::*;
+    pub use nvim;
 
-    pub use super::*;
+    pub use crate::action::*;
+    pub use crate::api::*;
+    pub use crate::log::*;
+    pub use crate::maybe_result::*;
+    pub use crate::module::*;
+    pub use crate::runtime::*;
+    pub use crate::warning::*;
+    pub use crate::Nomad;
 }

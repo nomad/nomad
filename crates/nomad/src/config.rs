@@ -2,14 +2,11 @@ use core::cell::{OnceCell, RefCell};
 use core::fmt;
 use std::collections::HashMap;
 
+use nvim::{serde::Deserializer, Function, Object};
 use serde::de::{self, Deserialize};
 use serde_path_to_error::Segment;
 
-use crate::action_name::ActionName;
-use crate::ctx::{Ctx, Set};
-use crate::module::{Module, ModuleId, ModuleName};
-use crate::nvim::{self, serde::Deserializer, Function, Object};
-use crate::warning::{ChunkExt, Warning, WarningMsg};
+use crate::prelude::*;
 
 /// TODO: docs
 pub(crate) const CONFIG_NAME: ActionName = ActionName::from_str("config");
@@ -151,14 +148,14 @@ struct DeserializeError {
 
 impl DeserializeError {
     #[inline]
-    fn inner(&self) -> &nvim_oxi::serde::DeserializeError {
+    fn inner(&self) -> &nvim::serde::DeserializeError {
         self.error.inner()
     }
 
     #[inline]
     fn new(
         module_name: ModuleName,
-        error: serde_path_to_error::Error<nvim_oxi::serde::DeserializeError>,
+        error: serde_path_to_error::Error<nvim::serde::DeserializeError>,
     ) -> Self {
         Self { module_name, error }
     }
@@ -176,7 +173,7 @@ struct PathToError<'a> {
 impl fmt::Display for PathToError<'_> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use nvim_oxi::serde::DeserializeError::*;
+        use nvim::serde::DeserializeError::*;
 
         write!(f, "{}", self.err.module_name)?;
 
@@ -342,7 +339,7 @@ impl Error {
                     .add(err.path().to_string().highlight())
                     .add(": ");
 
-                use nvim_oxi::serde::DeserializeError::*;
+                use nvim::serde::DeserializeError::*;
 
                 match err.inner() {
                     Custom { msg: err_msg } => {

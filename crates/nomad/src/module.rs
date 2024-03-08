@@ -1,4 +1,30 @@
-use super::ModuleId;
+//! TODO: docs
+
+use core::future::Future;
+use core::hash::{Hash, Hasher};
+
+pub use macros::module_name;
+use serde::de::DeserializeOwned;
+
+use crate::prelude::*;
+
+/// TODO: docs
+pub trait Module: 'static + Sized {
+    /// TODO: docs
+    const NAME: ModuleName;
+
+    /// TODO: docs
+    type Config: Default + DeserializeOwned;
+
+    /// TODO: docs
+    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Api<Self>;
+
+    /// TODO: docs
+    fn run(
+        &self,
+        // ctx: &mut SetCtx,
+    ) -> impl Future<Output = impl MaybeResult<()>>;
+}
 
 /// TODO: docs
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -44,5 +70,20 @@ impl ModuleName {
     #[inline]
     pub(crate) fn id(&self) -> ModuleId {
         ModuleId::from_module_name(self.name)
+    }
+}
+
+/// TODO: docs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct ModuleId(u64);
+
+impl ModuleId {
+    /// TODO: docs
+    #[inline]
+    pub(crate) fn from_module_name(name: &str) -> Self {
+        let mut hasher = std::hash::DefaultHasher::new();
+        name.hash(&mut hasher);
+        let hash = hasher.finish();
+        Self(hash)
     }
 }

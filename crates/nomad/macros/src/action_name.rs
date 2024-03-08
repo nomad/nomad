@@ -37,7 +37,7 @@ pub fn action_name(name: LitStr) -> Result<TokenStream, Error> {
         }
     }
 
-    Ok(quote! { ::nomad::ActionName::from_str(#name) })
+    Ok(quote! { ::nomad::action::ActionName::from_str(#name) })
 }
 
 struct ContainsDigit;

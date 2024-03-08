@@ -1,7 +1,6 @@
-use crate::api::Api;
-use crate::ctx::Ctx;
-use crate::module::Module;
-use crate::nvim::Dictionary;
+use nvim::Dictionary;
+
+use crate::prelude::*;
 use crate::{config, log, runtime};
 
 /// TODO: docs

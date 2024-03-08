@@ -8,8 +8,8 @@ publish = false
 
 [features]
 default = ["neovim-0-9"]
-neovim-0-9 = ["nvim-oxi/neovim-0-9"]
-neovim-nightly = ["nvim-oxi/neovim-nightly"]
+neovim-0-9 = ["nvim/neovim-0-9"]
+neovim-nightly = ["nvim/neovim-nightly"]
 
 [dependencies]
 async-task = "4.7"
@@ -17,7 +17,7 @@ concurrent-queue = "2.4"
 futures = { workspace = true }
 home = "0.5"
 macros = { path = "./macros" }
-nvim-oxi = { workspace = true, features = ["libuv"] }
+nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi", features = ["libuv"] }
 pin-project-lite = { workspace = true }
 pond = { git = "ssh://git@github.com/nomad/pond.git" }
 serde = { workspace = true }

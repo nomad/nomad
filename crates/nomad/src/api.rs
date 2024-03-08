@@ -1,12 +1,9 @@
+//! TODO: docs
+
+use nvim::{self, Object};
 use serde::de::Deserialize;
 
-use crate::action::Action;
-use crate::action_name::ActionName;
-use crate::command::CommandArgs;
-use crate::ctx::Ctx;
-use crate::nvim::{self, Object};
-use crate::prelude::{Module, SetCtx};
-use crate::warning::WarningMsg;
+use crate::prelude::*;
 
 /// TODO: docs
 pub struct Api<M: Module> {
@@ -82,3 +79,6 @@ impl Functions {
         self.functions.push((A::NAME, Box::new(function)));
     }
 }
+
+/// TODO: docs
+pub struct CommandArgs {}
