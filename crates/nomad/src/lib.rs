@@ -6,6 +6,7 @@ extern crate alloc;
 
 pub mod action;
 pub mod api;
+mod command;
 mod config;
 pub mod log;
 pub mod maybe_result;

@@ -1,5 +1,6 @@
 use nvim::Dictionary;
 
+use crate::command::Command;
 use crate::prelude::*;
 use crate::{config, log, runtime};
 
@@ -7,6 +8,9 @@ use crate::{config, log, runtime};
 pub struct Nomad {
     /// TODO: docs
     api: Dictionary,
+
+    /// TODO: docs
+    command: Command,
 
     /// TODO: docs
     ctx: Ctx,
@@ -23,8 +27,12 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn api(self) -> Dictionary {
-        let Self { mut api, .. } = self;
+        let Self { mut api, command, ctx } = self;
+
+        command.create(ctx);
+
         api.insert(config::CONFIG_NAME.as_str(), config::config());
+
         api
     }
 
@@ -41,7 +49,11 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     fn new_default() -> Self {
-        Self { api: Dictionary::default(), ctx: Ctx::default() }
+        Self {
+            api: Dictionary::default(),
+            command: Command::default(),
+            ctx: Ctx::default(),
+        }
     }
 
     /// TODO: docs
@@ -58,14 +70,15 @@ impl Nomad {
         // TODO: docs
         config::with_module::<M>(set_config, self.ctx.clone());
 
-        let Api { module, functions } = api;
+        let Api { commands, functions, module } = api;
+
+        // Add the module's commands as sub-commands of the `Nomad` command.
+        self.command.add_module::<M>(commands);
 
         // Add the module's API to the global API.
         for (name, function) in functions.into_iter(self.ctx.clone()) {
             self.api.insert(name.as_str(), function);
         }
-
-        // TODO: Create the module's commands.
 
         let ctx = self.ctx.clone();
 
