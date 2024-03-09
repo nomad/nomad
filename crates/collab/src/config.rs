@@ -6,6 +6,7 @@ use url::Url;
 /// TODO: docs
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[allow(dead_code)]
 pub struct CollabConfig {
     /// TODO: docs
     #[serde(default = "default_enable")]
