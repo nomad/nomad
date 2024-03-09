@@ -60,20 +60,24 @@ pub(crate) struct Functions {
 impl Functions {
     /// TODO: docs
     #[inline]
-    pub(crate) fn into_iter(
-        self,
-        ctx: Ctx,
-    ) -> impl Iterator<Item = (ActionName, nvim::Function<Object, Object>)>
-    {
-        self.functions.into_iter().map(move |(name, function)| {
-            let ctx = ctx.clone();
+    pub(crate) fn into_dict(self, ctx: Ctx) -> nvim::Dictionary {
+        let mut dict = nvim::Dictionary::new();
 
-            let function = nvim::Function::from_fn(move |object: Object| {
-                ctx.with_set(|set_ctx| function(object, set_ctx))
+        let functions =
+            self.functions.into_iter().map(move |(name, function)| {
+                let ctx = ctx.clone();
+                let function =
+                    nvim::Function::from_fn(move |object: Object| {
+                        ctx.with_set(|set_ctx| function(object, set_ctx))
+                    });
+                (name, function)
             });
 
-            (name, function)
-        })
+        for (name, function) in functions {
+            dict.insert(name.as_str(), function);
+        }
+
+        dict
     }
 
     /// TODO: docs

@@ -76,9 +76,8 @@ impl Nomad {
         self.command.add_module::<M>(commands);
 
         // Add the module's API to the global API.
-        for (name, function) in functions.into_iter(self.ctx.clone()) {
-            self.api.insert(name.as_str(), function);
-        }
+        let module_api = functions.into_dict(self.ctx.clone());
+        self.api.insert(M::NAME.as_str(), module_api);
 
         let ctx = self.ctx.clone();
 
