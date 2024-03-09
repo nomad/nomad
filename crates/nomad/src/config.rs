@@ -330,8 +330,7 @@ impl Error {
         match self {
             Self::InvalidModule(module) => {
                 msg.add("couldn't deserialize config: ");
-
-                msg::invalid_str(module, valid_modules(), "module", &mut msg);
+                msg.add_invalid(module, valid_modules().iter(), "module");
             },
 
             Self::DeserializeModule(err) => {
@@ -355,13 +354,11 @@ impl Error {
                     },
 
                     UnknownField { variant: field, expected } => {
-                        msg::invalid_str(field, expected, "field", &mut msg);
+                        msg.add_invalid(field, expected.iter(), "field");
                     },
 
                     UnknownVariant { field: variant, expected } => {
-                        msg::invalid_str(
-                            variant, expected, "variant", &mut msg,
-                        );
+                        msg.add_invalid(variant, expected.iter(), "variant");
                     },
                 }
             },
@@ -399,140 +396,4 @@ where
     let mut msg = WarningMsg::new();
     msg.add("couldn't deserialize object: ").add(err.to_string());
     msg
-}
-
-mod msg {
-    use super::*;
-
-    /// TODO: docs
-    pub(super) fn invalid_str(
-        invalid: &str,
-        valid: &[impl AsRef<str> + Copy],
-        what: &str,
-        msg: &mut WarningMsg,
-    ) {
-        match InvalidStrMsgKind::new(invalid, valid) {
-            InvalidStrMsgKind::ListAll => list_all(invalid, what, valid, msg),
-
-            InvalidStrMsgKind::SuggestClosest { idx } => {
-                suggest_closest(invalid, what, valid[idx], msg)
-            },
-        }
-    }
-
-    /// TODO: docs
-    enum InvalidStrMsgKind {
-        /// TODO: docs
-        ListAll,
-
-        /// TODO: docs
-        SuggestClosest { idx: usize },
-    }
-
-    impl InvalidStrMsgKind {
-        #[inline]
-        fn new<T, V>(invalid: &str, valid: V) -> Self
-        where
-            V: IntoIterator<Item = T>,
-            V::IntoIter: ExactSizeIterator,
-            T: AsRef<str>,
-        {
-            let valid = valid.into_iter();
-
-            if valid.len() == 0 {
-                return Self::ListAll;
-            }
-
-            let mut min_distance = usize::MAX;
-            let mut idx_closest = 0;
-
-            for (idx, valid) in valid.enumerate() {
-                let distance =
-                    strsim::damerau_levenshtein(invalid, valid.as_ref());
-
-                if distance < min_distance {
-                    min_distance = distance;
-                    idx_closest = idx;
-                }
-            }
-
-            let should_suggest_closest = match invalid.len() {
-                // These ranges and cutoffs are arbitrary.
-                3 => min_distance <= 1,
-                4..=6 => min_distance <= 2,
-                7..=10 => min_distance <= 3,
-                _ => false,
-            };
-
-            if should_suggest_closest {
-                Self::SuggestClosest { idx: idx_closest }
-            } else {
-                Self::ListAll
-            }
-        }
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn list_all(
-        invalid: &str,
-        invalid_what: &str,
-        valid: &[impl AsRef<str>],
-        msg: &mut WarningMsg,
-    ) {
-        msg.add("invalid ")
-            .add(invalid_what)
-            .add(" ")
-            .add(invalid.highlight());
-
-        match valid {
-            [] => {},
-
-            [one] => {
-                msg.add(", the only valid ")
-                    .add(invalid_what)
-                    .add(" is ")
-                    .add(one.as_ref().highlight());
-            },
-
-            modules => {
-                msg.add(", the valid ").add(invalid_what).add("s are ");
-
-                for (idx, valid) in valid.iter().enumerate() {
-                    msg.add(valid.as_ref().highlight());
-
-                    let is_last = idx + 1 == modules.len();
-
-                    if is_last {
-                        break;
-                    }
-
-                    let is_second_to_last = idx + 2 == modules.len();
-
-                    if is_second_to_last {
-                        msg.add(" and ");
-                    } else {
-                        msg.add(", ");
-                    }
-                }
-            },
-        }
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn suggest_closest(
-        invalid: &str,
-        invalid_what: &str,
-        closest: impl AsRef<str>,
-        msg: &mut WarningMsg,
-    ) {
-        msg.add("invalid ")
-            .add(invalid_what)
-            .add(" ")
-            .add(invalid.highlight())
-            .add(", did you mean ")
-            .add(closest.as_ref().highlight())
-            .add("?");
-    }
 }
