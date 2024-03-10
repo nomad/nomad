@@ -1,8 +1,9 @@
 use nvim::Dictionary;
 
 use crate::command::Command;
+use crate::config::Config;
 use crate::prelude::*;
-use crate::{config, log, runtime};
+use crate::{log, runtime};
 
 /// TODO: docs
 pub struct Nomad {
@@ -11,6 +12,9 @@ pub struct Nomad {
 
     /// TODO: docs
     command: Command,
+
+    /// TODO: docs
+    config: Config,
 }
 
 impl Default for Nomad {
@@ -24,11 +28,11 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn api(self) -> Dictionary {
-        let Self { mut api, command } = self;
+        let Self { mut api, command, config } = self;
 
         command.create();
 
-        api.insert(config::CONFIG_NAME.as_str(), config::config());
+        api.insert(Config::NAME.as_str(), config.into_function());
 
         api
     }
@@ -47,31 +51,31 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     fn new_default() -> Self {
-        Self { api: Dictionary::default(), command: Command::default() }
+        Self {
+            api: Dictionary::default(),
+            command: Command::default(),
+            config: Config::default(),
+        }
     }
 
     /// TODO: docs
     #[inline]
     pub fn with_module<M: Module>(mut self) -> Self {
-        let (get_config, set_config) =
-            runtime::new_input(M::Config::default());
+        let (config, set_config) = new_input(M::Config::default());
 
-        let api = M::init(get_config);
+        let Api { commands, functions, module } = M::init(config);
 
-        // TODO: docs
-        config::with_module::<M>(set_config);
-
-        let Api { commands, functions, module } = api;
+        // Register the module's config.
+        self.config.add_module::<M>(set_config);
 
         // Add the module's commands as sub-commands of the `Nomad` command.
         self.command.add_module::<M>(commands);
 
         // Add the module's API to the global API.
-        let module_api = functions.into_dict();
-        self.api.insert(M::NAME.as_str(), module_api);
+        self.api.insert(M::NAME.as_str(), functions.into_dict());
 
         // Spawn a new task that loads the module asynchronously.
-        runtime::spawn(async move {
+        spawn(async move {
             module.run().await;
         })
         .detach();
