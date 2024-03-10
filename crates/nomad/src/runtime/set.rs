@@ -1,4 +1,4 @@
-use super::SetCtx;
+use super::ctx;
 
 /// TODO: docs
 pub struct Set<T> {
@@ -14,22 +14,27 @@ impl<T> Clone for Set<T> {
 
 impl<T> Set<T> {
     #[inline]
-    pub(crate) fn new(inner: pond::Set<T>) -> Self {
+    pub(super) fn inner(&self) -> &pond::Set<T> {
+        &self.inner
+    }
+
+    #[inline]
+    pub(super) fn new(inner: pond::Set<T>) -> Self {
         Self { inner }
     }
 
     /// TODO: docs
     #[inline]
-    pub fn update<F>(&self, update_with: F, ctx: &mut SetCtx)
-    where
-        F: FnOnce(&mut T),
-    {
-        self.inner.update(update_with, ctx.as_engine_mut())
+    pub fn set(&self, new_value: T) {
+        ctx::set(self, new_value)
     }
 
     /// TODO: docs
     #[inline]
-    pub fn set(&self, new_value: T, ctx: &mut SetCtx) {
-        self.inner.set(new_value, ctx.as_engine_mut())
+    pub fn update<F>(&self, update_with: F)
+    where
+        F: FnOnce(&mut T),
+    {
+        ctx::update(self, update_with)
     }
 }

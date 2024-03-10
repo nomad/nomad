@@ -1,107 +1,115 @@
-use alloc::rc::Rc;
-use core::cell::RefCell;
+use core::cell::{OnceCell, UnsafeCell};
 use core::mem;
-use core::ops::Deref;
 
 use pond::Engine;
 
 use super::{Get, Set};
 
+thread_local! {
+    static CTX: Ctx = const { Ctx::new() };
+}
+
 /// TODO: docs
-#[derive(Clone, Default)]
-pub(crate) struct Ctx {
-    ctx: Rc<RefCell<CtxInner>>,
+#[inline]
+pub fn input<T>(input: T) -> (Get<T>, Set<T>) {
+    CTX.with(|ctx| ctx.inner().input(input))
+}
+
+/// TODO: docs
+#[inline]
+pub(crate) fn init() {
+    CTX.with(Ctx::init);
+}
+
+/// TODO: docs
+#[inline]
+pub(super) fn get<T>(get: &Get<T>) -> &T {
+    CTX.with(|ctx| ctx.inner().get(get))
+}
+
+/// TODO: docs
+#[inline]
+pub(super) fn set<T>(set: &Set<T>, new_value: T) {
+    CTX.with(|ctx| ctx.inner().set(set, new_value));
+}
+
+/// TODO: docs
+#[inline]
+pub(super) fn update<T, F>(set: &Set<T>, update_with: F)
+where
+    F: FnOnce(&mut T),
+{
+    CTX.with(|ctx| ctx.inner().update(set, update_with));
+}
+
+/// TODO: docs
+struct Ctx {
+    inner: OnceCell<CtxInner>,
 }
 
 impl Ctx {
     /// TODO: docs
     #[inline]
-    pub(crate) fn with_init<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&InitCtx) -> R,
-    {
-        let ctx = self.ctx.borrow();
-        f(ctx.as_init())
+    fn inner(&self) -> &CtxInner {
+        match self.inner.get() {
+            Some(inner) => inner,
+            None => panic!("tried to access the Ctx from another thread"),
+        }
+    }
+
+    #[inline]
+    fn init(&self) {
+        if self.inner.set(CtxInner::default()).is_err() {
+            panic!("tried to initialize the Ctx more than once")
+        }
     }
 
     /// TODO: docs
-    #[inline]
-    pub(crate) fn with_set<'this, F, R>(&'this self, f: F) -> R
-    where
-        F: FnOnce(&mut SetCtx) -> R,
-        R: 'this,
-    {
-        let mut ctx = self.ctx.borrow_mut();
-        f(ctx.as_set())
+    const fn new() -> Self {
+        Self { inner: OnceCell::new() }
     }
 }
 
-/// TODO: docs
 #[derive(Default)]
-pub(crate) struct CtxInner {
-    engine: Engine,
+struct CtxInner {
+    engine: UnsafeCell<Engine>,
 }
 
 impl CtxInner {
     /// TODO: docs
     #[inline]
-    pub fn as_init(&self) -> &InitCtx {
-        // SAFETY: `InitCtx` and `Ctx` have the same layout.
-        unsafe { mem::transmute(self) }
+    fn engine(&self) -> &Engine {
+        self.engine_mut()
     }
 
     /// TODO: docs
-    #[inline]
-    pub fn as_set(&mut self) -> &mut SetCtx {
-        // SAFETY: `SetCtx` and `Ctx` have the same layout.
-        unsafe { mem::transmute(self) }
+    #[allow(clippy::mut_from_ref)]
+    fn engine_mut(&self) -> &mut Engine {
+        unsafe { &mut *(self.engine.get()) }
     }
-}
 
-/// TODO: docs
-pub struct InitCtx {
-    ctx: CtxInner,
-}
-
-impl InitCtx {
-    /// TODO: docs
     #[inline]
-    pub fn new_input<T>(&self, input: T) -> (Get<T>, Set<T>) {
-        let (get, set) = self.ctx.engine.var(input);
+    fn get<'get, T>(&self, get: &'get Get<T>) -> &'get T {
+        let out = get.inner().get(self.engine());
+        unsafe { mem::transmute::<&T, &'get T>(out) }
+    }
+
+    #[inline]
+    fn input<T>(&self, value: T) -> (Get<T>, Set<T>) {
+        let (get, set) = self.engine().var(value);
         (Get::new(get), Set::new(set))
     }
-}
 
-/// TODO: docs
-pub struct GetCtx {
-    ctx: CtxInner,
-}
-
-impl GetCtx {
     #[inline]
-    pub(super) fn as_engine(&self) -> &Engine {
-        &self.ctx.engine
+    fn set<T>(&self, set: &Set<T>, new_value: T) {
+        set.inner().set(new_value, self.engine_mut());
     }
-}
-
-/// TODO: docs
-pub struct SetCtx {
-    ctx: CtxInner,
-}
-
-impl SetCtx {
-    #[inline]
-    pub(super) fn as_engine_mut(&mut self) -> &mut Engine {
-        &mut self.ctx.engine
-    }
-}
-
-impl Deref for SetCtx {
-    type Target = GetCtx;
 
     #[inline]
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: `SetCtx` and `GetCtx` have the same layout.
-        unsafe { mem::transmute(&self.ctx) }
+    fn update<T, F>(&self, set: &Set<T>, update_with: F)
+    where
+        F: FnOnce(&mut T),
+    {
+        set.inner().update(update_with, self.engine_mut());
     }
 }

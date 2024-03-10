@@ -1,4 +1,4 @@
-use super::GetCtx;
+use super::ctx;
 
 /// TODO: docs
 pub struct Get<T> {
@@ -15,12 +15,18 @@ impl<T> Clone for Get<T> {
 impl<T> Get<T> {
     /// TODO: docs
     #[inline]
-    pub fn get<'a>(&'a self, ctx: &'a GetCtx) -> &'a T {
-        self.inner.get(ctx.as_engine())
+    pub fn get(&self) -> &T {
+        ctx::get(self)
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub(super) fn inner(&self) -> &pond::Get<T> {
+        &self.inner
     }
 
     #[inline]
-    pub(crate) fn new(inner: pond::Get<T>) -> Self {
+    pub(super) fn new(inner: pond::Get<T>) -> Self {
         Self { inner }
     }
 }

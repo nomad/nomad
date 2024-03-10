@@ -7,8 +7,8 @@ mod join_handle;
 mod set;
 mod sleep;
 
-pub(crate) use ctx::Ctx;
-pub use ctx::{GetCtx, InitCtx, SetCtx};
+pub(crate) use ctx::init;
+pub use ctx::input;
 pub use executor::spawn;
 pub use get::Get;
 pub use join_handle::JoinHandle;

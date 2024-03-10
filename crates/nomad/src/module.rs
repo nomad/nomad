@@ -17,13 +17,10 @@ pub trait Module: 'static + Sized {
     type Config: Default + DeserializeOwned;
 
     /// TODO: docs
-    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Api<Self>;
+    fn init(config: Get<Self::Config>) -> Api<Self>;
 
     /// TODO: docs
-    fn run(
-        &self,
-        // ctx: &mut SetCtx,
-    ) -> impl Future<Output = impl MaybeResult<()>>;
+    fn run(&self) -> impl Future<Output = impl MaybeResult<()>>;
 }
 
 /// TODO: docs

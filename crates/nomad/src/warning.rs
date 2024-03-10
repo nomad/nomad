@@ -142,6 +142,13 @@ impl WarningMsg {
     }
 }
 
+impl From<core::convert::Infallible> for WarningMsg {
+    #[inline]
+    fn from(_: core::convert::Infallible) -> Self {
+        unreachable!("Infallible can't be constructed")
+    }
+}
+
 impl From<&str> for Chunk {
     #[inline]
     fn from(text: &str) -> Self {

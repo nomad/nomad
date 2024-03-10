@@ -11,9 +11,6 @@ pub struct Nomad {
 
     /// TODO: docs
     command: Command,
-
-    /// TODO: docs
-    ctx: Ctx,
 }
 
 impl Default for Nomad {
@@ -27,9 +24,9 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn api(self) -> Dictionary {
-        let Self { mut api, command, ctx } = self;
+        let Self { mut api, command } = self;
 
-        command.create(ctx);
+        command.create();
 
         api.insert(config::CONFIG_NAME.as_str(), config::config());
 
@@ -40,6 +37,7 @@ impl Nomad {
     #[inline]
     pub fn new() -> Self {
         log::init();
+        runtime::init();
 
         log::info!("======== Starting Nomad ========");
 
@@ -49,26 +47,18 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     fn new_default() -> Self {
-        Self {
-            api: Dictionary::default(),
-            command: Command::default(),
-            ctx: Ctx::default(),
-        }
+        Self { api: Dictionary::default(), command: Command::default() }
     }
 
     /// TODO: docs
     #[inline]
     pub fn with_module<M: Module>(mut self) -> Self {
-        // Create a new input for the module's config and initialize the
-        // module.
-        let (api, set_config) = self.ctx.with_init(|init_ctx| {
-            let (get, set) = init_ctx.new_input(M::Config::default());
-            let api = M::init(get, init_ctx);
-            (api, set)
-        });
+        let (get_config, set_config) = runtime::input(M::Config::default());
+
+        let api = M::init(get_config);
 
         // TODO: docs
-        config::with_module::<M>(set_config, self.ctx.clone());
+        config::with_module::<M>(set_config);
 
         let Api { commands, functions, module } = api;
 
@@ -76,14 +66,12 @@ impl Nomad {
         self.command.add_module::<M>(commands);
 
         // Add the module's API to the global API.
-        let module_api = functions.into_dict(self.ctx.clone());
+        let module_api = functions.into_dict();
         self.api.insert(M::NAME.as_str(), module_api);
-
-        let ctx = self.ctx.clone();
 
         // Spawn a new task that loads the module asynchronously.
         runtime::spawn(async move {
-            let _ = ctx.with_set(|_set_ctx| module.run()).await;
+            module.run().await;
         })
         .detach();
 

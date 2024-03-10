@@ -49,35 +49,17 @@ impl<M: Module> Api<M> {
     }
 }
 
-type Function = Box<dyn Fn(Object, &mut SetCtx) -> Result<Object, Infallible>>;
-
 /// TODO: docs
 #[derive(Default)]
 pub(crate) struct Functions {
-    functions: Vec<(ActionName, Function)>,
+    functions: nvim::Dictionary,
 }
 
 impl Functions {
     /// TODO: docs
     #[inline]
-    pub(crate) fn into_dict(self, ctx: Ctx) -> nvim::Dictionary {
-        let mut dict = nvim::Dictionary::new();
-
-        let functions =
-            self.functions.into_iter().map(move |(name, function)| {
-                let ctx = ctx.clone();
-                let function =
-                    nvim::Function::from_fn(move |object: Object| {
-                        ctx.with_set(|set_ctx| function(object, set_ctx))
-                    });
-                (name, function)
-            });
-
-        for (name, function) in functions {
-            dict.insert(name.as_str(), function);
-        }
-
-        dict
+    pub(crate) fn into_dict(self) -> nvim::Dictionary {
+        self.functions
     }
 
     /// TODO: docs
@@ -87,36 +69,29 @@ impl Functions {
         fn inner<M: Module, A: Action<M>>(
             a: &A,
             obj: Object,
-            ctx: &mut SetCtx,
         ) -> Result<Object, WarningMsg> {
             let arg = deserialize::<A::Args>(obj)?;
-            let ret = a.execute(arg, ctx).into_result().map_err(Into::into)?;
+            let ret = a.execute(arg).into_result().map_err(Into::into)?;
             serialize(&ret).map_err(Into::into)
         }
 
-        let function = Box::new(move |args: Object, ctx: &mut SetCtx| {
-            match inner(&action, args, ctx) {
-                Ok(obj) => Ok(obj),
+        let function =
+            nvim::Function::from_fn::<_, Infallible>(move |args: Object| {
+                match inner(&action, args) {
+                    Ok(obj) => Ok(obj),
 
-                Err(err) => {
-                    Warning::new()
-                        .module(M::NAME)
-                        .action(A::NAME)
-                        .msg(err)
-                        .print();
+                    Err(err) => {
+                        Warning::new()
+                            .module(M::NAME)
+                            .action(A::NAME)
+                            .msg(err)
+                            .print();
 
-                    Ok(Object::nil())
-                },
-            }
-        });
+                        Ok(Object::nil())
+                    },
+                }
+            });
 
-        self.functions.push((A::NAME, function));
-    }
-}
-
-impl From<Infallible> for WarningMsg {
-    #[inline]
-    fn from(_: Infallible) -> Self {
-        unreachable!("Infallible can't be constructed")
+        self.functions.insert(A::NAME.as_str(), function);
     }
 }

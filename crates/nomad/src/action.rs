@@ -5,7 +5,7 @@ use core::hash::{Hash, Hasher};
 pub use macros::action_name;
 use serde::{de::DeserializeOwned, ser::Serialize};
 
-use crate::prelude::{MaybeResult, Module, SetCtx};
+use crate::prelude::{MaybeResult, Module};
 
 /// TODO: docs
 pub trait Action<M: Module>: 'static {
@@ -19,11 +19,7 @@ pub trait Action<M: Module>: 'static {
     type Return: Serialize;
 
     /// TODO: docs
-    fn execute(
-        &self,
-        args: Self::Args,
-        ctx: &mut SetCtx,
-    ) -> impl MaybeResult<Self::Return>;
+    fn execute(&self, args: Self::Args) -> impl MaybeResult<Self::Return>;
 }
 
 /// TODO: docs

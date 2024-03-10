@@ -23,17 +23,17 @@ impl Command {
     }
 
     #[inline]
-    pub(crate) fn create(self, ctx: Ctx) {
+    pub(crate) fn create(self) {
         let opts = opts::CreateCommandOpts::builder()
             .nargs(types::CommandNArgs::OneOrMore)
             .build();
 
-        api::create_user_command(Self::NAME, self.into_func(ctx), &opts)
+        api::create_user_command(Self::NAME, self.into_func(), &opts)
             .expect("all the arguments are valid");
     }
 
     #[inline]
-    fn into_func(self, ctx: Ctx) -> Function<types::CommandArgs, ()> {
+    fn into_func(self) -> Function<types::CommandArgs, ()> {
         let Self { map } = self;
 
         Function::from_fn(move |args: types::CommandArgs| {
@@ -59,7 +59,7 @@ impl Command {
             };
 
             match commands.get(action_name) {
-                Ok(command) => ctx.with_set(|ctx| command.execute(args, ctx)),
+                Ok(command) => command.execute(args),
 
                 Err(err) => Warning::new()
                     .module(commands.module_name)
@@ -153,15 +153,15 @@ impl From<UnknownAction<'_, '_>> for WarningMsg {
 
 struct ModuleCommand {
     #[allow(clippy::type_complexity)]
-    action: Box<dyn Fn(CommandArgs, &mut SetCtx) -> Result<(), WarningMsg>>,
+    action: Box<dyn Fn(CommandArgs) -> Result<(), WarningMsg>>,
     action_name: ActionName,
     module_name: ModuleName,
 }
 
 impl ModuleCommand {
     #[inline]
-    fn execute(&self, args: CommandArgs, ctx: &mut SetCtx) {
-        if let Err(warning_msg) = (self.action)(args, ctx) {
+    fn execute(&self, args: CommandArgs) {
+        if let Err(warning_msg) = (self.action)(args) {
             Warning::new()
                 .module(self.module_name)
                 .action(self.action_name)
@@ -178,9 +178,9 @@ impl ModuleCommand {
         A::Args: TryFrom<CommandArgs>,
         <A::Args as TryFrom<CommandArgs>>::Error: Into<WarningMsg>,
     {
-        let action = move |args, ctx: &mut _| {
+        let action = move |args| {
             A::Args::try_from(args).map_err(Into::into).and_then(|args| {
-                action.execute(args, ctx).into_result().map_err(Into::into)
+                action.execute(args).into_result().map_err(Into::into)
             })
         };
 

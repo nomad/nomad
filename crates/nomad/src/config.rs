@@ -68,12 +68,12 @@ fn warning(msg: WarningMsg) -> Warning {
 
 /// TODO: docs
 #[inline]
-pub(crate) fn with_module<M>(set_config: Set<M::Config>, ctx: Ctx)
+pub(crate) fn with_module<M>(set_config: Set<M::Config>)
 where
     M: Module,
 {
     DESERIALIZERS.with(|deserializers| {
-        let deserializer = ConfigDeserializer::new::<M>(set_config, ctx);
+        let deserializer = ConfigDeserializer::new::<M>(set_config);
         deserializers.insert(M::NAME.id(), deserializer)
     });
 }
@@ -128,13 +128,13 @@ impl ConfigDeserializer {
 
     /// TODO: docs
     #[inline]
-    fn new<M: Module>(set_config: Set<M::Config>, ctx: Ctx) -> Self {
+    fn new<M: Module>(set_config: Set<M::Config>) -> Self {
         let deserializer = move |config: Object| {
             let config = deserialize(config).map_err(|mut err| {
                 err.set_module_name(M::NAME);
                 err
             })?;
-            ctx.with_set(|set_ctx| set_config.set(config, set_ctx));
+            set_config.set(config);
             Ok(())
         };
 

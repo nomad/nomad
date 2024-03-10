@@ -21,8 +21,8 @@ impl Module for Collab {
     type Config = CollabConfig;
 
     #[inline]
-    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Api<Self> {
-        let (counter, set_counter) = ctx.new_input(0u64);
+    fn init(config: Get<Self::Config>) -> Api<Self> {
+        let (counter, set_counter) = input(0u64);
 
         let increment = Increment { set_counter };
 
@@ -36,10 +36,7 @@ impl Module for Collab {
     }
 
     #[inline]
-    async fn run(
-        &self,
-        // _ctx: &mut SetCtx,
-    ) -> impl MaybeResult<()> {
+    async fn run(&self) -> impl MaybeResult<()> {
         let count = 0;
         nvim::print!("{}'s count is {count}", Self::NAME);
         sleep(Duration::from_secs(1)).await;
@@ -59,8 +56,8 @@ impl Action<Collab> for Print {
     type Return = ();
 
     #[inline]
-    fn execute(&self, _args: (), ctx: &mut SetCtx) {
-        nvim::print!("Collab counter is now {:?}", self.counter.get(ctx))
+    fn execute(&self, _args: ()) {
+        nvim::print!("Collab counter is now {:?}", self.counter.get())
     }
 }
 
@@ -77,7 +74,7 @@ impl Action<Collab> for Increment {
     type Return = ();
 
     #[inline]
-    fn execute(&self, _args: (), ctx: &mut SetCtx) {
-        self.set_counter.update(|counter| *counter += 1, ctx)
+    fn execute(&self, _args: ()) {
+        self.set_counter.update(|counter| *counter += 1)
     }
 }
