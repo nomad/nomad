@@ -6,7 +6,6 @@ use nvim::api::{self, opts, types};
 use nvim::Function;
 
 use crate::prelude::*;
-use crate::warning::ChunkExt;
 
 /// TODO: docs
 #[derive(Default)]

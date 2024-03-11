@@ -42,7 +42,7 @@ impl LocalExecutor {
 
     /// TODO: docs
     #[inline]
-    fn spawn<F: Future>(&self, future: F) -> JoinHandle<F::Output>
+    fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
@@ -102,7 +102,7 @@ impl LocalExecutorInner {
 
     /// TODO: docs
     #[inline]
-    fn spawn<F: Future>(&self, future: F) -> JoinHandle<F::Output>
+    fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,

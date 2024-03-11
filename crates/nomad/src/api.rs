@@ -2,7 +2,7 @@
 
 use core::convert::Infallible;
 
-use nvim::{self, Object};
+use nvim::Object;
 
 use crate::command::{CommandArgs, ModuleCommands};
 use crate::prelude::*;
