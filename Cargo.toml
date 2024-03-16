@@ -25,6 +25,7 @@ module_inception = "allow"
 multiple_crate_versions = "deny"
 needless_collect = "deny"
 same_name_method = "deny"
+too_many_arguments = "deny"
 too_many_lines = "deny"
 unwrap_used = "deny"
 
