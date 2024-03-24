@@ -2,15 +2,15 @@ use core::time::Duration;
 
 use nomad::prelude::*;
 
-use crate::CollabConfig;
+use crate::Config;
 
 /// TODO: docs.
 pub struct Collab {
-    _config: Get<CollabConfig>,
+    _config: Get<Config>,
 }
 
 impl Collab {
-    fn new(config: Get<CollabConfig>) -> Self {
+    fn new(config: Get<Config>) -> Self {
         Self { _config: config }
     }
 }
@@ -18,7 +18,7 @@ impl Collab {
 impl Module for Collab {
     const NAME: ModuleName = module_name!("collab");
 
-    type Config = CollabConfig;
+    type Config = Config;
 
     fn init(config: Get<Self::Config>) -> Api<Self> {
         let (counter, set_counter) = new_input(0u64);
