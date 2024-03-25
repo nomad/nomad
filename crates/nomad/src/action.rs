@@ -6,7 +6,7 @@ pub use macros::action_name;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::prelude::{MaybeResult, Module};
+use crate::prelude::{MaybeFuture, MaybeResult, Module};
 
 /// TODO: docs
 pub trait Action<M: Module>: 'static {
@@ -20,7 +20,10 @@ pub trait Action<M: Module>: 'static {
     type Return: Serialize;
 
     /// TODO: docs
-    fn execute(&self, args: Self::Args) -> impl MaybeResult<Self::Return>;
+    fn execute(
+        &self,
+        args: Self::Args,
+    ) -> impl MaybeFuture<Output = impl MaybeResult<Self::Return>>;
 }
 
 /// TODO: docs

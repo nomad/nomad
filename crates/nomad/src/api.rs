@@ -66,12 +66,13 @@ impl Functions {
     fn add<M: Module, A: Action<M>>(&mut self, action: A) {
         #[inline(always)]
         fn inner<M: Module, A: Action<M>>(
-            a: &A,
+            _a: &A,
             obj: Object,
         ) -> Result<Object, WarningMsg> {
-            let args = deserialize::<A::Args>(obj, "args")?;
-            let ret = a.execute(args).into_result().map_err(Into::into)?;
-            serialize(&ret, "result").map_err(Into::into)
+            let _args = deserialize::<A::Args>(obj, "args")?;
+            todo!();
+            // let ret = a.execute(args).into_result().map_err(Into::into)?;
+            // serialize(&ret, "result").map_err(Into::into)
         }
 
         let function = move |args: Object| match inner(&action, args) {

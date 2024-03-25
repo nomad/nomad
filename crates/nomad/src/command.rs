@@ -178,9 +178,12 @@ impl ModuleCommand {
         <A::Args as TryFrom<CommandArgs>>::Error: Into<WarningMsg>,
     {
         let action = move |args| {
-            A::Args::try_from(args).map_err(Into::into).and_then(|args| {
-                action.execute(args).into_result().map_err(Into::into)
-            })
+            let _a =
+                A::Args::try_from(args).map_err(Into::into).and_then(|args| {
+                    action.execute(args).into_result().map_err(Into::into)
+                });
+
+            todo!();
         };
 
         Self {

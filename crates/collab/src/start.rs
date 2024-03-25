@@ -40,13 +40,11 @@ impl Action<Collab> for Start {
 
     type Return = ();
 
-    fn execute(&self, _: ()) {
-        let this = self.clone();
-
-        spawn(async move {
-            let _ = this.async_execute().await;
-        })
-        .detach();
+    fn execute(
+        &self,
+        _: (),
+    ) -> impl MaybeFuture<Output = Result<(), StartError>> {
+        MaybeFutureEnum::from(self.async_execute())
     }
 }
 

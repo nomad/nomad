@@ -1,8 +1,9 @@
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, LitStr};
+use syn::{parse_macro_input, DeriveInput, LitStr};
 
 mod action_name;
 mod module_name;
+mod ready;
 
 /// A proc macro that turns a string literal into an `ActionName`.
 ///
@@ -56,4 +57,11 @@ pub fn module_name(input: TokenStream) -> TokenStream {
         Ok(token_stream) => token_stream.into(),
         Err(err) => err.to_compile_error().into(),
     }
+}
+
+/// TODO: docs
+#[proc_macro_derive(Ready)]
+pub fn ready(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    ready::ready(input).into()
 }
