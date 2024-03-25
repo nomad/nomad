@@ -141,6 +141,30 @@ pub enum DnsNameError {
 mod tests {
     use super::*;
 
+    impl PartialEq for ServerAddrError {
+        #[inline]
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (Self::EmptyAddresses, Self::EmptyAddresses) => true,
+                (Self::InvalidUrl(this), Self::InvalidUrl(other)) => {
+                    this.kind() == other.kind()
+                },
+                _ => false,
+            }
+        }
+    }
+
+    impl PartialEq for DnsNameError {
+        #[inline]
+        fn eq(&self, other: &Self) -> bool {
+            matches!(
+                (self, other),
+                (Self::AbsentHost, Self::AbsentHost)
+                    | (Self::InvalidHost(_), Self::InvalidHost(_))
+            )
+        }
+    }
+
     /// Tests that the default `CollabConfig` can be created without panicking.
     #[test]
     fn collab_config_default() {
@@ -151,6 +175,21 @@ mod tests {
     /// resolved to a valid `SocketAddr`.
     #[test]
     fn collab_config_resolve_server_addr() {
-        let _addr = Config::default().server_addr().unwrap();
+        assert_eq!(Config::default().server_addr().map(|_| ()), Ok(()));
+    }
+
+    /// Tests that the server DNS name of the default `CollabConfig` can be
+    /// resolved to a valid `DnsName`.
+    #[test]
+    fn collab_config_resolve_server_dns_name() {
+        assert_eq!(Config::default().server_dns_name().map(|_| ()), Ok(()));
+    }
+
+    /// Tests that a session can be started using the connector created from
+    /// the default `CollabConfig`.
+    #[async_std::test]
+    async fn collab_config_connector_start() {
+        let connector = Config::default().connector().unwrap();
+        assert_eq!(connector.start().await.map(|_| ()), Ok(()));
     }
 }
