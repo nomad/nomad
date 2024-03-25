@@ -1,42 +1,46 @@
 //! TODO: docs
 
 use core::future::Future;
-use core::pin::Pin;
 
 /// TODO: docs
-pub trait MaybeFuture<'a> {
+pub trait MaybeFuture {
     /// TODO: docs
     type Output;
 
     /// TODO: docs
-    fn into_enum(self) -> MaybeFutureEnum<'a, Self::Output>;
+    type Future;
+
+    /// TODO: docs
+    fn into_enum(self) -> MaybeFutureEnum<Self::Future, Self::Output>;
 }
 
 /// TODO: docs
-pub enum MaybeFutureEnum<'a, T> {
+pub enum MaybeFutureEnum<F, T> {
     /// TODO: docs
     Ready(T),
 
     /// TODO: docs
-    Future(Pin<Box<dyn Future<Output = T> + 'a>>),
+    Future(F),
 }
 
-impl<'a, T> MaybeFuture<'a> for MaybeFutureEnum<'a, T> {
+impl<F, T> MaybeFuture for MaybeFutureEnum<F, T> {
+    type Future = F;
+
     type Output = T;
 
     #[inline]
-    fn into_enum(self) -> MaybeFutureEnum<'a, T> {
+    fn into_enum(self) -> MaybeFutureEnum<F, T> {
         self
     }
 }
 
-impl<'a, F, T> From<F> for MaybeFutureEnum<'a, T>
+impl<F, T> From<F> for MaybeFutureEnum<F, T>
 where
-    F: Future<Output = T> + 'a,
+    F: Future<Output = T>,
 {
     #[inline]
     fn from(future: F) -> Self {
-        MaybeFutureEnum::Future(Box::pin(future))
+        MaybeFutureEnum::Future(future)
     }
 }
 
@@ -49,22 +53,26 @@ mod impls {
     #[macro_export]
     macro_rules! ready {
         ($ty:ty) => {
-            impl<'a> MaybeFuture<'a> for $ty {
+            impl MaybeFuture for $ty {
                 type Output = Self;
 
+                type Future = ::core::future::Ready<Self>;
+
                 #[inline]
-                fn into_enum(self) -> MaybeFutureEnum<'a, Self> {
+                fn into_enum(self) -> MaybeFutureEnum<Self::Future, Self> {
                     MaybeFutureEnum::Ready(self)
                 }
             }
         };
 
         ($($gen:ident),*; $ty:ty) => {
-            impl<'a, $($gen),*> MaybeFuture<'a> for $ty {
+            impl<$($gen),*> MaybeFuture for $ty {
                 type Output = Self;
 
+                type Future = ::core::future::Ready<Self>;
+
                 #[inline]
-                fn into_enum(self) -> MaybeFutureEnum<'a, Self> {
+                fn into_enum(self) -> MaybeFutureEnum<Self::Future, Self> {
                     MaybeFutureEnum::Ready(self)
                 }
             }
