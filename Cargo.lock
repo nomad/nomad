@@ -843,6 +843,7 @@ dependencies = [
  "home",
  "macros",
  "nvim-oxi",
+ "pin-project",
  "pin-project-lite",
  "pond",
  "serde",
