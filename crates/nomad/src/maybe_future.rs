@@ -8,14 +8,14 @@ pub trait MaybeFuture {
     type Output;
 
     /// TODO: docs
-    type Future;
+    type Future: Future<Output = Self::Output>;
 
     /// TODO: docs
     fn into_enum(self) -> MaybeFutureEnum<Self::Future, Self::Output>;
 }
 
 /// TODO: docs
-pub enum MaybeFutureEnum<F, T> {
+pub enum MaybeFutureEnum<F: Future<Output = T>, T> {
     /// TODO: docs
     Ready(T),
 
@@ -23,7 +23,7 @@ pub enum MaybeFutureEnum<F, T> {
     Future(F),
 }
 
-impl<F, T> MaybeFuture for MaybeFutureEnum<F, T> {
+impl<F: Future<Output = T>, T> MaybeFuture for MaybeFutureEnum<F, T> {
     type Future = F;
 
     type Output = T;

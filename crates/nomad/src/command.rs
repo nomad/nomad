@@ -1,6 +1,7 @@
 use core::convert::Infallible;
 use std::collections::hash_map::Values;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use nvim::api::{self, opts, types};
 use nvim::Function;
@@ -151,22 +152,14 @@ impl From<UnknownAction<'_, '_>> for WarningMsg {
 }
 
 struct ModuleCommand {
-    #[allow(clippy::type_complexity)]
-    action: Box<dyn Fn(CommandArgs) -> Result<(), WarningMsg>>,
+    action: Box<dyn Fn(CommandArgs)>,
     action_name: ActionName,
-    module_name: ModuleName,
 }
 
 impl ModuleCommand {
     #[inline]
     fn execute(&self, args: CommandArgs) {
-        if let Err(warning_msg) = (self.action)(args) {
-            Warning::new()
-                .module(self.module_name)
-                .action(self.action_name)
-                .msg(warning_msg)
-                .print();
-        }
+        (self.action)(args);
     }
 
     #[inline]
@@ -177,20 +170,38 @@ impl ModuleCommand {
         A::Args: TryFrom<CommandArgs>,
         <A::Args as TryFrom<CommandArgs>>::Error: Into<WarningMsg>,
     {
-        let action = move |args| {
-            let _a =
-                A::Args::try_from(args).map_err(Into::into).and_then(|args| {
-                    action.execute(args).into_result().map_err(Into::into)
-                });
+        let action = Rc::new(action);
 
-            todo!();
+        let action = move |args| {
+            let action = Rc::clone(&action);
+
+            let future = async move {
+                let res = match A::Args::try_from(args) {
+                    Ok(args) => {
+                        let res = match action.execute(args).into_enum() {
+                            MaybeFutureEnum::Ready(res) => res,
+                            MaybeFutureEnum::Future(future) => future.await,
+                        };
+
+                        res.into_result().map_err(Into::into)
+                    },
+
+                    Err(err) => Err(err.into()),
+                };
+
+                if let Err(err) = res {
+                    Warning::new()
+                        .module(M::NAME)
+                        .action(A::NAME)
+                        .msg(err)
+                        .print();
+                }
+            };
+
+            spawn(future).detach();
         };
 
-        Self {
-            action: Box::new(action),
-            action_name: A::NAME,
-            module_name: M::NAME,
-        }
+        Self { action: Box::new(action), action_name: A::NAME }
     }
 }
 
