@@ -3,8 +3,6 @@
 use core::hash::{Hash, Hasher};
 
 pub use macros::action_name;
-use serde::de::DeserializeOwned;
-use serde::ser::Serialize;
 
 use crate::prelude::{MaybeFuture, MaybeResult, Module};
 
@@ -14,10 +12,13 @@ pub trait Action<M: Module>: 'static {
     const NAME: ActionName;
 
     /// TODO: docs
-    type Args: DeserializeOwned;
+    type Args;
 
     /// TODO: docs
-    type Return: Serialize;
+    //
+    // NOTE: this can be removed entirely once we have RTN
+    // (https://github.com/rust-lang/rust/issues/109417).
+    type Return;
 
     /// TODO: docs
     fn execute(

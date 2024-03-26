@@ -50,7 +50,6 @@ impls::ready!(T, E; Result<T, E>);
 
 mod impls {
     /// ..
-    #[macro_export]
     macro_rules! ready {
         ($ty:ty) => {
             impl MaybeFuture for $ty {

@@ -3,6 +3,8 @@
 use core::convert::Infallible;
 
 use nvim::Object;
+use serde::de::DeserializeOwned;
+use serde::ser::Serialize;
 
 use crate::prelude::*;
 use crate::serde::{deserialize, serialize};
@@ -42,6 +44,8 @@ impl<M: Module> Api<M> {
     pub fn with_function<A>(mut self, action: A) -> Self
     where
         A: Action<M>,
+        A::Args: DeserializeOwned,
+        A::Return: Serialize,
     {
         self.functions.add(action);
         self
@@ -63,12 +67,20 @@ impl Functions {
 
     /// TODO: docs
     #[inline]
-    fn add<M: Module, A: Action<M>>(&mut self, action: A) {
+    fn add<M: Module, A: Action<M>>(&mut self, action: A)
+    where
+        A::Args: DeserializeOwned,
+        A::Return: Serialize,
+    {
         #[inline(always)]
         fn inner<M: Module, A: Action<M>>(
             _a: &A,
             obj: Object,
-        ) -> Result<Object, WarningMsg> {
+        ) -> Result<Object, WarningMsg>
+        where
+            A::Args: DeserializeOwned,
+            A::Return: Serialize,
+        {
             let _args = deserialize::<A::Args>(obj, "args")?;
             todo!();
             // let ret = a.execute(args).into_result().map_err(Into::into)?;
