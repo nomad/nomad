@@ -13,7 +13,9 @@ neovim-nightly = ["nvim/neovim-nightly"]
 
 [dependencies]
 async-task = "4.7"
+cola = "0.4"
 concurrent-queue = "2.4"
+crop = "0.4"
 flume = "0.11"
 futures = { workspace = true }
 home = "0.5"

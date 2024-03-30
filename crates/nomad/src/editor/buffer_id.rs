@@ -1,5 +1,5 @@
 /// TODO: docs
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BufferId(nvim::BufHandle);
 
 impl From<&nvim::api::Buffer> for BufferId {
