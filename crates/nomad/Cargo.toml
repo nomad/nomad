@@ -14,6 +14,7 @@ neovim-nightly = ["nvim/neovim-nightly"]
 [dependencies]
 async-task = "4.7"
 concurrent-queue = "2.4"
+flume = "0.11"
 futures = { workspace = true }
 home = "0.5"
 macros = { path = "./macros" }
