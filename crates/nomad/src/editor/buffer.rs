@@ -4,7 +4,7 @@ use cola::Replica;
 use crop::Rope;
 use flume::Sender;
 
-use super::BufferId;
+use super::{BufferId, EditorId};
 use crate::streams::{Deletion, Edit, Edits, Insertion};
 
 /// TODO: docs
@@ -18,6 +18,18 @@ impl Buffer {
     /// TODO: docs
     #[inline]
     pub fn edits(&self) -> Edits {
+        self.edits_inner(None)
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn edits_filtered(&self, filter_out: EditorId) -> Edits {
+        self.edits_inner(Some(filter_out))
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn edits_inner(&self, filter_out: Option<EditorId>) -> Edits {
         todo!();
     }
 
