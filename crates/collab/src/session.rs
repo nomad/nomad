@@ -1,4 +1,5 @@
-use nomad::prelude::Get;
+use futures::{select as race, FutureExt, StreamExt};
+use nomad::prelude::*;
 
 use crate::config::ConnectorError;
 use crate::{Config, SessionId};
@@ -9,7 +10,7 @@ pub(crate) struct Session {
     id: SessionId,
 
     /// TODO: docs
-    _receiver: collab::Receiver,
+    receiver: collab::Receiver,
 
     /// TODO: docs
     _sender: collab::Sender,
@@ -22,15 +23,30 @@ impl Session {
         self.id
     }
 
+    pub async fn run(&mut self) {
+        let buf_id: BufferId = todo!();
+
+        let editor_id = EditorId::generate();
+
+        let mut edits = Buffer::new(buf_id).await.edits_filtered(editor_id);
+
+        loop {
+            race! {
+                maybe_edit = edits.next().fuse() => {
+                    let Some(edit) = maybe_edit else { return };
+                }
+                maybe_msg = self.receiver.recv().fuse() => {
+                    let Ok(msg) = maybe_msg else { return };
+                },
+            }
+        }
+    }
+
     pub async fn start(config: Get<Config>) -> Result<Self, StartError> {
         let (sender, receiver, session_id) =
             config.get().connector()?.start().await?;
 
-        Ok(Self {
-            id: session_id.into(),
-            _receiver: receiver,
-            _sender: sender,
-        })
+        Ok(Self { id: session_id.into(), receiver, _sender: sender })
     }
 }
 
