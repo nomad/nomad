@@ -1,7 +1,6 @@
 use alloc::collections::VecDeque;
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use core::convert::Infallible;
 use core::iter;
 use core::ops::Range;
 
@@ -29,6 +28,44 @@ pub struct Buffer {
 }
 
 impl Buffer {
+    /// TODO: docs
+    #[track_caller]
+    #[inline]
+    pub fn apply_local_deletion(&mut self, delete_range: Range<Anchor>) {
+        let mut buffer = self.inner.borrow_mut();
+        let maybe_deletion = buffer.apply_local_deletion(delete_range);
+        if let Some(deletion) = maybe_deletion {
+            self.applied_queue.push_back(AppliedEdit::Deletion(deletion));
+        }
+    }
+
+    /// TODO: docs
+    #[track_caller]
+    #[inline]
+    pub fn apply_local_insertion(&mut self, insert_at: Anchor, text: String) {
+        let mut buffer = self.inner.borrow_mut();
+        let insertion = buffer.apply_local_insertion(insert_at, text);
+        self.applied_queue.push_back(AppliedEdit::Insertion(insertion));
+    }
+
+    /// TODO: docs
+    #[track_caller]
+    #[inline]
+    pub fn apply_remote_deletion(&mut self, deletion: RemoteDeletion) {
+        let mut buffer = self.inner.borrow_mut();
+        buffer.apply_remote_deletion(&deletion);
+        self.applied_queue.push_back(AppliedEdit::Deletion(deletion.into()));
+    }
+
+    /// TODO: docs
+    #[track_caller]
+    #[inline]
+    pub fn apply_remote_insertion(&mut self, insertion: RemoteInsertion) {
+        let mut buffer = self.inner.borrow_mut();
+        buffer.apply_remote_insertion(&insertion);
+        self.applied_queue.push_back(AppliedEdit::Insertion(insertion.into()));
+    }
+
     /// TODO: docs
     #[inline]
     pub fn edits(&self) -> Edits {
@@ -475,6 +512,11 @@ impl AppliedEditQueue {
     }
 
     #[inline]
+    fn push_back(&self, edit: AppliedEdit) {
+        self.inner.borrow_mut().push_back(edit);
+    }
+
+    #[inline]
     fn with_first<F, R>(&self, _fun: F) -> R
     where
         F: FnOnce(Option<&AppliedEdit>) -> R,
@@ -484,7 +526,7 @@ impl AppliedEditQueue {
 }
 
 /// TODO: docs
-struct RemoteInsertion {
+pub struct RemoteInsertion {
     inner: cola::Insertion,
     text: String,
 }
@@ -497,7 +539,7 @@ impl From<RemoteInsertion> for AppliedInsertion {
 }
 
 /// TODO: docs
-struct RemoteDeletion {
+pub struct RemoteDeletion {
     inner: cola::Deletion,
 }
 
