@@ -528,11 +528,13 @@ impl AppliedEditQueue {
     }
 
     #[inline]
-    fn with_first<F, R>(&self, _fun: F) -> R
+    fn with_first<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(Option<&AppliedEdit>) -> R,
     {
-        todo!();
+        let inner = self.inner.borrow();
+        let first = inner.front();
+        fun(first)
     }
 }
 
