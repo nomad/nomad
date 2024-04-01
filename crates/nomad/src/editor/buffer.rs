@@ -571,6 +571,14 @@ pub struct RemoteInsertion {
     text: String,
 }
 
+impl RemoteInsertion {
+    /// TODO: docs
+    #[inline]
+    pub fn new(inner: cola::Insertion, text: String) -> Self {
+        Self { inner, text }
+    }
+}
+
 impl From<RemoteInsertion> for AppliedInsertion {
     #[inline]
     fn from(insertion: RemoteInsertion) -> Self {
@@ -581,6 +589,14 @@ impl From<RemoteInsertion> for AppliedInsertion {
 /// TODO: docs
 pub struct RemoteDeletion {
     inner: cola::Deletion,
+}
+
+impl RemoteDeletion {
+    /// TODO: docs
+    #[inline]
+    pub fn new(inner: cola::Deletion) -> Self {
+        Self { inner }
+    }
 }
 
 impl From<RemoteDeletion> for AppliedDeletion {

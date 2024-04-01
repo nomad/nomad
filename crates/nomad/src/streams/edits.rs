@@ -56,8 +56,11 @@ impl AppliedEdit {
 /// TODO: docs
 #[derive(Debug, Clone)]
 pub struct AppliedInsertion {
-    inner: cola::Insertion,
-    text: String,
+    /// TODO: docs
+    pub inner: cola::Insertion,
+
+    /// TODO: docs
+    pub text: String,
 }
 
 impl AppliedInsertion {
@@ -80,7 +83,8 @@ impl AppliedInsertion {
 /// TODO: docs
 #[derive(Debug, Clone)]
 pub struct AppliedDeletion {
-    inner: cola::Deletion,
+    /// TODO: docs
+    pub inner: cola::Deletion,
 }
 
 impl AppliedDeletion {
