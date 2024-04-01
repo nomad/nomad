@@ -94,7 +94,7 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub async fn new(id: BufferId) -> Self {
+    pub fn new(id: BufferId) -> Self {
         let (sender, receiver) = async_broadcast::broadcast(32);
 
         let this = Self {
