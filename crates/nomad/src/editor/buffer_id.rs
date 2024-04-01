@@ -2,6 +2,14 @@
 #[derive(Debug, Clone, Copy)]
 pub struct BufferId(nvim::BufHandle);
 
+impl BufferId {
+    /// TODO: docs
+    #[inline]
+    pub fn current() -> Self {
+        (&nvim::api::Buffer::current()).into()
+    }
+}
+
 impl From<&nvim::api::Buffer> for BufferId {
     #[inline]
     fn from(buf: &nvim::api::Buffer) -> Self {

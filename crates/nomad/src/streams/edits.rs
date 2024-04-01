@@ -5,6 +5,8 @@ use async_broadcast::Receiver;
 use futures::Stream;
 use pin_project_lite::pin_project;
 
+use crate::editor::EditorId;
+
 pin_project! {
     /// A [`Stream`] that yields the [`Edit`]s that are applied to a
     /// [`Buffer`](crate::editor::Buffer).
@@ -41,6 +43,14 @@ pub enum AppliedEdit {
 
     /// TODO: docs
     Deletion(AppliedDeletion),
+}
+
+impl AppliedEdit {
+    /// TODO: docs
+    #[inline]
+    pub fn created_by(&self) -> EditorId {
+        todo!();
+    }
 }
 
 /// TODO: docs
