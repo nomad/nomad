@@ -117,6 +117,11 @@ impl Buffer {
         let sender = self.sender.clone();
 
         move |change| {
+            // This should never happen, but check just in case.
+            if change.is_no_op() {
+                return;
+            }
+
             let mut buffer = buffer.borrow_mut();
 
             let caused_by_applied = applied_queue.with_first(|applied| {
@@ -181,6 +186,8 @@ impl BufferInner {
         &mut self,
         change: ByteChange,
     ) -> (Option<AppliedDeletion>, Option<AppliedInsertion>) {
+        debug_assert!(!change.is_no_op());
+
         let byte_range = change.byte_range();
 
         self.text.replace(byte_range.clone(), &change.replacement);
@@ -577,6 +584,11 @@ impl ByteChange {
     #[inline]
     fn byte_range(&self) -> Range<usize> {
         self.start..self.end
+    }
+
+    #[inline]
+    fn is_no_op(&self) -> bool {
+        self.start == self.end && self.replacement.is_empty()
     }
 }
 
