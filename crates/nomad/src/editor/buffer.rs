@@ -9,7 +9,7 @@ use cola::{Anchor, Replica};
 use crop::{Rope, RopeBuilder};
 use nvim::api::{self, opts, Buffer as NvimBuffer};
 
-use super::{BufferId, EditorId};
+use super::{BufferId, BufferSnapshot, EditorId};
 use crate::runtime::spawn;
 use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
 
@@ -166,6 +166,12 @@ impl Buffer {
                 }
             }
         }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn snapshot(&self) -> BufferSnapshot {
+        todo!();
     }
 }
 
