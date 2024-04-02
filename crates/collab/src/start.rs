@@ -33,9 +33,9 @@ impl Action<Collab> for Start {
             return Err(StartError::ExistingSession(session_id));
         }
 
-        let buffer = Buffer::from_id(BufferId::current());
+        let mut session = Session::start(self.config.clone()).await?;
 
-        let mut session = Session::start(self.config.clone(), buffer).await?;
+        nvim::print!("Session started with ID {}", session.id());
 
         self.set_state.set(SessionState::Active(session.id()));
 

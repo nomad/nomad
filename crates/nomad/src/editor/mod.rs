@@ -12,5 +12,5 @@ pub use buffer::{Buffer, RemoteDeletion, RemoteInsertion};
 use buffer::{ByteChange, ByteOffset, Point};
 pub use buffer_id::BufferId;
 pub use buffer_snapshot::BufferSnapshot;
-use buffer_state::BufferState;
+use buffer_state::{BufferState, Edit, LocalDeletion, LocalInsertion};
 pub use editor_id::EditorId;

@@ -111,19 +111,14 @@ impl Session {
     }
 
     /// TODO: docs
-    pub async fn start(
-        config: Get<Config>,
-        buffer: Buffer,
-    ) -> Result<Self, StartError> {
-        let (sender, receiver, session_id) = config
-            .get()
-            .connector()?
-            .peer_id(collab::messages::PeerId::new_random())
-            .start()
-            .await?;
+    pub async fn start(config: Get<Config>) -> Result<Self, StartError> {
+        let peer_id = collab::messages::PeerId::new_random();
+
+        let (sender, receiver, session_id) =
+            config.get().connector()?.peer_id(peer_id).start().await?;
 
         Ok(Self {
-            buffer,
+            buffer: Buffer::from_id(peer_id.as_u64(), BufferId::current()),
             editor_id: EditorId::generate(),
             receiver,
             sender,

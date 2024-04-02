@@ -3,10 +3,10 @@ use core::cell::RefCell;
 use core::ops::Range;
 
 use cola::{Anchor, Deletion, Insertion, Replica};
-use crop::{Rope, RopeBuilder};
-use nvim::api::{self, opts, Buffer as NvimBuffer};
+use crop::Rope;
 
 use crate::editor::{
+    BufferSnapshot,
     ByteChange,
     ByteOffset,
     Point,
@@ -19,14 +19,43 @@ use crate::streams::{AppliedDeletion, AppliedInsertion};
 #[derive(Clone)]
 pub(crate) struct BufferState {
     /// TODO: docs
-    bound_to: Option<NvimBuffer>,
-
-    /// TODO: docs
     inner: Rc<RefCell<BufferInner>>,
 }
 
+impl BufferState {
+    #[inline]
+    pub fn edit<E>(&self, edit: E) -> E::Diff
+    where
+        E: Edit,
+    {
+        self.with_mut(|inner| inner.edit(edit))
+    }
+
+    #[inline]
+    pub fn new(text: impl Into<Rope>, replica: Replica) -> Self {
+        Self { inner: Rc::new(RefCell::new(BufferInner::new(text, replica))) }
+    }
+
+    #[inline]
+    pub fn snapshot(&self) -> BufferSnapshot {
+        self.with(|inner| inner.snapshot())
+    }
+
+    #[inline]
+    fn with<R>(&self, f: impl FnOnce(&BufferInner) -> R) -> R {
+        let inner = self.inner.borrow();
+        f(&inner)
+    }
+
+    #[inline]
+    fn with_mut<R>(&self, f: impl FnOnce(&mut BufferInner) -> R) -> R {
+        let mut inner = self.inner.borrow_mut();
+        f(&mut inner)
+    }
+}
+
 /// TODO: docs
-struct BufferInner {
+pub(super) struct BufferInner {
     /// TODO: docs
     replica: Replica,
 
@@ -74,7 +103,7 @@ impl BufferInner {
         &mut self,
         deletion: &Deletion,
     ) -> Vec<Range<ByteOffset>> {
-        let byte_ranges = self.replica.integrate_deletion(&deletion);
+        let byte_ranges = self.replica.integrate_deletion(deletion);
         byte_ranges.iter().rev().for_each(|r| self.text.delete(r.clone()));
         byte_ranges
     }
@@ -89,6 +118,19 @@ impl BufferInner {
         let offset = self.replica.integrate_insertion(insertion)?;
         self.text.insert(offset, text);
         Some(offset)
+    }
+
+    #[inline]
+    fn new(text: impl Into<Rope>, replica: Replica) -> Self {
+        let text = text.into();
+
+        assert_eq!(
+            text.byte_len(),
+            replica.len(),
+            "text and replica out of sync"
+        );
+
+        Self { replica, text }
     }
 
     /// Transforms the 1-dimensional byte offset into a 2-dimensional
@@ -106,10 +148,19 @@ impl BufferInner {
     pub fn resolve_anchor(&self, anchor: &Anchor) -> Option<ByteOffset> {
         self.replica.resolve_anchor(*anchor)
     }
+
+    /// TODO: docs
+    #[inline]
+    pub fn snapshot(&self) -> BufferSnapshot {
+        BufferSnapshot::new(
+            self.replica.fork(self.replica.id()),
+            self.text.clone(),
+        )
+    }
 }
 
 /// TODO: docs
-pub trait Edit {
+pub(super) trait Edit {
     /// TODO: docs
     type Diff;
 
@@ -144,7 +195,14 @@ pub struct LocalDeletion {
     range: Range<Anchor>,
 }
 
-impl Edit for LocalDeletion {
+impl LocalDeletion {
+    #[inline]
+    pub fn new(range: Range<Anchor>) -> Self {
+        Self { range }
+    }
+}
+
+impl Edit for &LocalDeletion {
     type Diff = Option<(AppliedDeletion, Range<Point>)>;
 
     fn apply(self, buf: &mut BufferInner) -> Self::Diff {
@@ -152,12 +210,12 @@ impl Edit for LocalDeletion {
 
         let end_anchor = &self.range.end;
 
-        let Some(start_offset) = buf.resolve_anchor(&start_anchor) else {
-            panic_couldnt_resolve_anchor(&start_anchor);
+        let Some(start_offset) = buf.resolve_anchor(start_anchor) else {
+            panic_couldnt_resolve_anchor(start_anchor);
         };
 
-        let Some(end_offset) = buf.resolve_anchor(&end_anchor) else {
-            panic_couldnt_resolve_anchor(&end_anchor);
+        let Some(end_offset) = buf.resolve_anchor(end_anchor) else {
+            panic_couldnt_resolve_anchor(end_anchor);
         };
 
         if start_offset == end_offset {
@@ -178,6 +236,13 @@ impl Edit for LocalDeletion {
 pub struct LocalInsertion {
     insert_at: Anchor,
     text: String,
+}
+
+impl LocalInsertion {
+    #[inline]
+    pub fn new(insert_at: Anchor, text: String) -> Self {
+        Self { insert_at, text }
+    }
 }
 
 impl Edit for LocalInsertion {

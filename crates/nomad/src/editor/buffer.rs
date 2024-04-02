@@ -5,19 +5,20 @@ use core::iter;
 use core::ops::Range;
 
 use async_broadcast::{InactiveReceiver, Sender};
-use cola::{Anchor, Replica};
+use cola::{Anchor, Replica, ReplicaId};
 use crop::{Rope, RopeBuilder};
 use nvim::api::{self, opts, Buffer as NvimBuffer};
 
-use super::{BufferId, BufferSnapshot, EditorId};
-use crate::runtime::spawn;
-use crate::streams::{
-    AppliedDeletion,
-    AppliedEdit,
-    AppliedEditKind,
-    AppliedInsertion,
-    Edits,
+use super::{
+    BufferId,
+    BufferSnapshot,
+    BufferState,
+    EditorId,
+    LocalDeletion,
+    LocalInsertion,
 };
+use crate::runtime::spawn;
+use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
 
 /// TODO: docs
 pub struct Buffer {
@@ -25,36 +26,35 @@ pub struct Buffer {
     applied_queue: AppliedEditQueue,
 
     /// TODO: docs
-    id: BufferId,
-
-    /// TODO: docs
-    inner: Rc<RefCell<BufferInner>>,
+    nvim: NvimBuffer,
 
     /// TODO: docs
     receiver: InactiveReceiver<AppliedEdit>,
 
     /// TODO: docs
     sender: Sender<AppliedEdit>,
+
+    /// TODO: docs
+    state: BufferState,
 }
 
 impl Buffer {
     /// TODO: docs
-    #[track_caller]
     #[inline]
     pub fn apply_local_deletion(
         &mut self,
         delete_range: Range<Anchor>,
         id: EditorId,
     ) {
-        let mut buffer = self.inner.borrow_mut();
-        let maybe_deletion = buffer.apply_local_deletion(delete_range);
-        if let Some(deletion) = maybe_deletion {
+        let deletion = LocalDeletion::new(delete_range);
+        let maybe_deletion = self.state.edit(&deletion);
+        if let Some((deletion, range)) = maybe_deletion {
             self.applied_queue.push_back(AppliedEdit::deletion(deletion, id));
+            nvim_delete(&mut self.nvim, range);
         }
     }
 
     /// TODO: docs
-    #[track_caller]
     #[inline]
     pub fn apply_local_insertion(
         &mut self,
@@ -62,35 +62,38 @@ impl Buffer {
         text: String,
         id: EditorId,
     ) {
-        let mut buffer = self.inner.borrow_mut();
-        let insertion = buffer.apply_local_insertion(insert_at, text);
+        let also_text = text.clone();
+        let insertion = LocalInsertion::new(insert_at, text);
+        let (insertion, point) = self.state.edit(insertion);
         self.applied_queue.push_back(AppliedEdit::insertion(insertion, id));
+        nvim_insert(&mut self.nvim, point, &also_text);
     }
 
     /// TODO: docs
-    #[track_caller]
     #[inline]
     pub fn apply_remote_deletion(
         &mut self,
         deletion: RemoteDeletion,
         id: EditorId,
     ) {
-        let mut buffer = self.inner.borrow_mut();
-        buffer.apply_remote_deletion(&deletion);
+        let point_ranges = self.state.edit(&deletion);
         self.applied_queue.push_back(AppliedEdit::deletion(deletion, id));
+        for range in point_ranges.into_iter().rev() {
+            nvim_delete(&mut self.nvim, range);
+        }
     }
 
     /// TODO: docs
-    #[track_caller]
     #[inline]
     pub fn apply_remote_insertion(
         &mut self,
         insertion: RemoteInsertion,
         id: EditorId,
     ) {
-        let mut buffer = self.inner.borrow_mut();
-        buffer.apply_remote_insertion(&insertion);
+        let Some(point) = self.state.edit(&insertion) else { return };
+        let text = insertion.text().to_owned();
         self.applied_queue.push_back(AppliedEdit::insertion(insertion, id));
+        nvim_insert(&mut self.nvim, point, &text);
     }
 
     /// TODO: docs
@@ -106,17 +109,18 @@ impl Buffer {
             .build();
 
         // This can fail if the buffer has been unloaded.
-        let _ = NvimBuffer::from(self.id).attach(false, &opts);
+        let _ = self.nvim.attach(false, &opts);
     }
 
     /// TODO: docs
     #[inline]
     pub fn create(text: &str, replica: Replica) -> Self {
-        let inner = BufferInner::create(text, replica);
-        let Ok(()) = api::Window::current().set_buf(&inner.nvim) else {
+        let state = BufferState::new(text, replica);
+        let buf = api::Buffer::current();
+        let Ok(()) = api::Window::current().set_buf(&buf) else {
             unreachable!()
         };
-        Self::new(inner)
+        Self::new(state, buf)
     }
 
     /// TODO: docs
@@ -126,19 +130,26 @@ impl Buffer {
     }
 
     /// TODO: docs
+    ///
+    /// # Panics
+    ///
+    /// todo.
     #[inline]
-    pub fn from_id(id: BufferId) -> Self {
-        Self::new(BufferInner::from_id(id))
+    pub fn from_id(replica_id: ReplicaId, buffer_id: BufferId) -> Self {
+        let buf = NvimBuffer::from(buffer_id);
+        let text = rope_from_buf(&buf).expect("buffer must exist");
+        let replica = Replica::new(replica_id, text.byte_len());
+        Self::new(BufferState::new(text, replica), buffer_id.into())
     }
 
     #[inline]
-    fn new(inner: BufferInner) -> Self {
+    fn new(state: BufferState, bound_to: NvimBuffer) -> Self {
         let (sender, receiver) = async_broadcast::broadcast(32);
 
         let this = Self {
             applied_queue: AppliedEditQueue::new(),
-            id: (&inner.nvim).into(),
-            inner: Rc::new(RefCell::new(inner)),
+            nvim: bound_to,
+            state,
             receiver: receiver.deactivate(),
             sender,
         };
@@ -151,33 +162,19 @@ impl Buffer {
     #[inline]
     fn on_bytes(&self) -> impl Fn(ByteChange) + 'static {
         let applied_queue = self.applied_queue.clone();
-        let buffer = self.inner.clone();
+        let buffer = self.state.clone();
         let sender = self.sender.clone();
 
         move |change| {
-            // This should never happen, but check just in case.
-            if change.is_no_op() {
-                return;
-            }
-
-            let mut buffer = buffer.borrow_mut();
-
-            let caused_by_applied = applied_queue.with_first(|applied| {
-                let Some(applied) = applied else { return false };
-                buffer.applied_caused_change(applied, &change)
-            });
-
             // If the change was caused by an edit we already applied we
-            // mustn't apply it again. We instead pop the applied edit from
-            // the queue.
-            if caused_by_applied {
-                let edit = applied_queue.pop_front().expect("just checked");
+            // mustn't apply it again.
+            if let Some(edit) = applied_queue.pop_front() {
                 broadcast_edit(&sender, edit);
             }
             // The change was either caused by the user or by another plugin,
             // so we apply it to our buffer to keep it in sync.
             else {
-                let (del, ins) = buffer.apply_byte_change(change);
+                let (del, ins) = buffer.edit(change);
 
                 let id = EditorId::unknown();
 
@@ -197,12 +194,7 @@ impl Buffer {
     /// TODO: docs
     #[inline]
     pub fn snapshot(&self) -> BufferSnapshot {
-        let inner = self.inner.borrow();
-
-        BufferSnapshot::new(
-            inner.crdt.fork(inner.crdt.id()),
-            inner.text.clone(),
-        )
+        self.state.snapshot()
     }
 }
 
@@ -221,311 +213,27 @@ fn broadcast_edit(sender: &Sender<AppliedEdit>, edit: AppliedEdit) {
 }
 
 /// TODO: docs
-struct BufferInner {
-    /// TODO: docs
-    crdt: Replica,
-
-    /// TODO: docs
-    nvim: NvimBuffer,
-
-    /// TODO: docs
-    text: Rope,
+#[inline]
+fn nvim_delete(buf: &mut NvimBuffer, range: Range<Point>) {
+    // This can fail if the buffer has been unloaded.
+    let _ = buf.set_text(
+        range.start.row..range.end.row,
+        range.start.col,
+        range.end.col,
+        iter::empty::<nvim::String>(),
+    );
 }
 
-impl BufferInner {
-    /// TODO: docs
-    #[inline]
-    fn apply_byte_change(
-        &mut self,
-        change: ByteChange,
-    ) -> (Option<AppliedDeletion>, Option<AppliedInsertion>) {
-        debug_assert!(!change.is_no_op());
-
-        let byte_range = change.byte_range();
-
-        self.text.replace(byte_range.clone(), &change.replacement);
-
-        let mut deletion = None;
-
-        let mut insertion = None;
-
-        if !byte_range.is_empty() {
-            let del = self.crdt.deleted(byte_range.clone());
-            deletion = Some(AppliedDeletion::new(del));
-        }
-
-        let text_len = change.replacement.len();
-
-        if text_len > 0 {
-            let ins = self.crdt.inserted(byte_range.start, text_len);
-            insertion = Some(AppliedInsertion::new(ins, change.replacement));
-        }
-
-        (deletion, insertion)
-    }
-
-    /// TODO: docs
-    ///
-    /// # Panics
-    ///
-    /// Panics if either the start or end anchor cannot be resolved to a byte
-    /// offset in the buffer.
-    #[track_caller]
-    #[inline]
-    fn apply_local_deletion(
-        &mut self,
-        delete_range: Range<Anchor>,
-    ) -> Option<AppliedDeletion> {
-        let Some(start_offset) = self.crdt.resolve_anchor(delete_range.start)
-        else {
-            panic_couldnt_resolve_anchor(&delete_range.start);
-        };
-
-        let Some(end_offset) = self.crdt.resolve_anchor(delete_range.end)
-        else {
-            panic_couldnt_resolve_anchor(&delete_range.end);
-        };
-
-        if start_offset == end_offset {
-            return None;
-        }
-
-        assert!(start_offset < end_offset);
-
-        let delete_range = start_offset..end_offset;
-
-        self.nvim_delete(delete_range.clone());
-
-        self.text.delete(delete_range.clone());
-
-        let deletion = self.crdt.deleted(delete_range);
-
-        Some(AppliedDeletion::new(deletion))
-    }
-
-    /// TODO: docs
-    ///
-    /// # Panics
-    ///
-    /// Panics if the anchor cannot be resolved to a byte offset in the buffer.
-    #[track_caller]
-    #[inline]
-    fn apply_local_insertion(
-        &mut self,
-        insert_at: Anchor,
-        text: String,
-    ) -> AppliedInsertion {
-        let Some(byte_offset) = self.crdt.resolve_anchor(insert_at) else {
-            panic_couldnt_resolve_anchor(&insert_at);
-        };
-
-        self.nvim_insert(byte_offset, &text);
-
-        self.text.insert(byte_offset, &text);
-
-        let insertion = self.crdt.inserted(byte_offset, text.len());
-
-        AppliedInsertion::new(insertion, text)
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn apply_remote_deletion(&mut self, deletion: &RemoteDeletion) {
-        let delete_ranges = self.crdt.integrate_deletion(&deletion.inner);
-
-        for range in delete_ranges.into_iter().rev() {
-            self.nvim_delete(range.clone());
-            self.text.delete(range);
-        }
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn apply_remote_insertion(&mut self, insertion: &RemoteInsertion) {
-        let Some(byte_offset) =
-            self.crdt.integrate_insertion(&insertion.inner)
-        else {
-            return;
-        };
-
-        self.nvim_insert(byte_offset, &insertion.text);
-        self.text.insert(byte_offset, &insertion.text);
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn applied_caused_change(
-        &self,
-        applied: &AppliedEdit,
-        change: &ByteChange,
-    ) -> bool {
-        let byte_range = change.byte_range();
-
-        match (byte_range.is_empty(), change.replacement.is_empty()) {
-            // Insertion
-            (true, false) => {
-                let AppliedEditKind::Insertion(insertion) = &applied.kind()
-                else {
-                    return false;
-                };
-
-                self.applied_insertion_caused_change(
-                    insertion,
-                    byte_range.start,
-                    &change.replacement,
-                )
-            },
-
-            // Deletion
-            (false, true) => {
-                let AppliedEditKind::Deletion(deletion) = &applied.kind()
-                else {
-                    return false;
-                };
-
-                self.applied_deletion_caused_change(deletion, byte_range)
-            },
-
-            // Replacement or no-op
-            _ => false,
-        }
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn applied_deletion_caused_change(
-        &self,
-        deletion: &AppliedDeletion,
-        byte_range: Range<ByteOffset>,
-    ) -> bool {
-        #[inline(never)]
-        fn unreachable_applied() -> ! {
-            unreachable!(
-                "the deletion was applied, so its start and end anchors can \
-                 be resolved"
-            );
-        }
-
-        let Some(deletion_start) = self.crdt.resolve_anchor(deletion.start())
-        else {
-            unreachable_applied();
-        };
-
-        if deletion_start != byte_range.start {
-            return false;
-        }
-
-        // TODO: compare deletion's length to byte range's.
-
-        true
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn applied_insertion_caused_change(
-        &self,
-        insertion: &AppliedInsertion,
-        byte_offset: ByteOffset,
-        text: &str,
-    ) -> bool {
-        #[inline(never)]
-        fn unreachable_applied() -> ! {
-            unreachable!(
-                "the insertion was applied, so its anchor can be resolved"
-            );
-        }
-
-        if insertion.text().len() != text.len() {
-            return false;
-        }
-
-        let Some(insertion_offset) =
-            self.crdt.resolve_anchor(insertion.anchor())
-        else {
-            unreachable_applied();
-        };
-
-        if insertion_offset != byte_offset {
-            return false;
-        }
-
-        let compare_until_threshold = 16;
-
-        // If we get here we know that both the anchor and the text length
-        // match, so it's very likely that the text is the same.
-        //
-        // Still, for texts up to a length threshold we actually perform the
-        // comparison just to be sure.
-        if text.len() < compare_until_threshold {
-            insertion.text() == text
-        }
-        // For larger texts we only compare the first `threshold` bytes because
-        // comparing the whole texts gets too expensive considering this blocks
-        // after every edit.
-        else {
-            insertion.text().as_bytes()[..compare_until_threshold]
-                == text.as_bytes()[..compare_until_threshold]
-        }
-    }
-
-    #[inline]
-    fn create(text: &str, crdt: Replica) -> Self {
-        let Ok(mut buf) = api::create_buf(true, false) else { unreachable!() };
-
-        let Ok(()) = buf.set_lines(.., true, text.lines()) else {
-            unreachable!()
-        };
-
-        Self { crdt, nvim: buf, text: Rope::from(text) }
-    }
-
-    #[inline]
-    fn from_id(id: BufferId) -> Self {
-        let nvim = id.into();
-        let text = rope_from_buf(&nvim).expect("buffer must exist");
-        let crdt = Replica::new(1, text.byte_len());
-        Self { crdt, nvim, text }
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn nvim_delete(&mut self, delete_range: Range<ByteOffset>) {
-        let start_point = self.point_of_offset(delete_range.start);
-
-        let end_point = self.point_of_offset(delete_range.end);
-
-        // This can fail if the buffer has been unloaded.
-        let _ = self.nvim.set_text(
-            start_point.row..end_point.row,
-            start_point.col,
-            end_point.col,
-            iter::empty::<nvim::String>(),
-        );
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn nvim_insert(&mut self, insert_at: ByteOffset, text: &str) {
-        let point = self.point_of_offset(insert_at);
-
-        // This can fail if the buffer has been unloaded.
-        let _ = self.nvim.set_text(
-            point.row..point.row,
-            point.col,
-            point.col,
-            iter::once(text),
-        );
-    }
-
-    /// Transforms the 1-dimensional byte offset into a 2-dimensional
-    /// [`Point`].
-    #[inline]
-    fn point_of_offset(&self, byte_offset: ByteOffset) -> Point {
-        let row = self.text.line_of_byte(byte_offset);
-        let row_offset = self.text.byte_of_line(row);
-        let col = byte_offset - row_offset;
-        Point { row, col }
-    }
+/// TODO: docs
+#[inline]
+fn nvim_insert(buf: &mut NvimBuffer, insert_at: Point, text: &str) {
+    // This can fail if the buffer has been unloaded.
+    let _ = buf.set_text(
+        insert_at.row..insert_at.row,
+        insert_at.col,
+        insert_at.col,
+        text.lines(),
+    );
 }
 
 /// TODO: docs
@@ -562,19 +270,14 @@ fn rope_from_buf(buf: &NvimBuffer) -> Result<Rope, nvim::api::Error> {
     Ok(builder.build())
 }
 
-#[inline(never)]
-fn panic_couldnt_resolve_anchor(anchor: &Anchor) -> ! {
-    panic!("{anchor:?} couldn't be resolved");
-}
-
 /// TODO: docs
 #[derive(Debug, PartialEq, Eq)]
-struct Point {
+pub struct Point {
     /// TODO: docs
-    row: usize,
+    pub row: usize,
 
     /// TODO: docs
-    col: ByteOffset,
+    pub col: ByteOffset,
 }
 
 #[derive(Clone)]
@@ -597,16 +300,6 @@ impl AppliedEditQueue {
     fn push_back(&self, edit: AppliedEdit) {
         self.inner.borrow_mut().push_back(edit);
     }
-
-    #[inline]
-    fn with_first<F, R>(&self, fun: F) -> R
-    where
-        F: FnOnce(Option<&AppliedEdit>) -> R,
-    {
-        let inner = self.inner.borrow();
-        let first = inner.front();
-        fun(first)
-    }
 }
 
 /// TODO: docs
@@ -618,8 +311,20 @@ pub struct RemoteInsertion {
 impl RemoteInsertion {
     /// TODO: docs
     #[inline]
+    pub fn inner(&self) -> &cola::Insertion {
+        &self.inner
+    }
+
+    /// TODO: docs
+    #[inline]
     pub fn new(inner: cola::Insertion, text: String) -> Self {
         Self { inner, text }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn text(&self) -> &str {
+        &self.text
     }
 }
 
@@ -638,6 +343,12 @@ pub struct RemoteDeletion {
 impl RemoteDeletion {
     /// TODO: docs
     #[inline]
+    pub fn inner(&self) -> &cola::Deletion {
+        &self.inner
+    }
+
+    /// TODO: docs
+    #[inline]
     pub fn new(inner: cola::Deletion) -> Self {
         Self { inner }
     }
@@ -650,24 +361,29 @@ impl From<RemoteDeletion> for AppliedDeletion {
     }
 }
 
-type ByteOffset = usize;
+pub type ByteOffset = usize;
 
 /// TODO: docs
-struct ByteChange {
-    start: ByteOffset,
-    end: ByteOffset,
-    replacement: String,
+pub struct ByteChange {
+    pub start: ByteOffset,
+    pub end: ByteOffset,
+    pub replacement: String,
 }
 
 impl ByteChange {
     #[inline]
-    fn byte_range(&self) -> Range<usize> {
+    pub fn byte_range(&self) -> Range<usize> {
         self.start..self.end
     }
 
     #[inline]
-    fn is_no_op(&self) -> bool {
-        self.start == self.end && self.replacement.is_empty()
+    pub fn into_text(self) -> String {
+        self.replacement
+    }
+
+    #[inline]
+    pub fn text(&self) -> &str {
+        &self.replacement
     }
 }
 
