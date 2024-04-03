@@ -55,22 +55,13 @@ impl BufferState {
 }
 
 /// TODO: docs
+#[derive(Clone)]
 pub(super) struct BufferInner {
     /// TODO: docs
     replica: Replica,
 
     /// TODO: docs
     text: Rope,
-}
-
-impl Clone for BufferInner {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            replica: self.replica.fork(self.replica.id()),
-            text: self.text.clone(),
-        }
-    }
 }
 
 impl BufferInner {
@@ -152,10 +143,7 @@ impl BufferInner {
     /// TODO: docs
     #[inline]
     pub fn snapshot(&self) -> BufferSnapshot {
-        BufferSnapshot::new(
-            self.replica.fork(self.replica.id()),
-            self.text.clone(),
-        )
+        BufferSnapshot::new(self.replica.clone(), self.text.clone())
     }
 }
 
