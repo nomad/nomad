@@ -34,18 +34,21 @@ impl<T> Shared<T> {
     }
 
     /// TODO: docs
+    #[track_caller]
     #[inline]
     pub fn replace(&self, new_value: T) -> T {
         self.with_mut(|this| core::mem::replace(this, new_value))
     }
 
     /// TODO: docs
+    #[track_caller]
     #[inline]
     pub fn set(&self, new_value: T) {
         self.with_mut(|this| *this = new_value);
     }
 
     /// TODO: docs
+    #[track_caller]
     #[inline]
     pub fn take(&self) -> T
     where
@@ -56,6 +59,7 @@ impl<T> Shared<T> {
 
     /// Tries to call a closure with a shared reference to the value, returning
     /// an error if the value is already exclusively borrowed.
+    #[track_caller]
     #[inline]
     pub fn try_with<R>(
         &self,
@@ -66,6 +70,7 @@ impl<T> Shared<T> {
 
     /// Tries to call a closure with an exclusive reference to the value,
     /// returning an error if the value is already borrowed.
+    #[track_caller]
     #[inline]
     pub fn try_with_mut<R>(
         &self,
@@ -78,6 +83,7 @@ impl<T> Shared<T> {
     /// value is already exclusively borrowed.
     ///
     /// Check out [`try_with`](Self::try_with) for a non-panicking alternative.
+    #[track_caller]
     #[inline]
     pub fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
         self.inner.with(fun)
@@ -88,6 +94,7 @@ impl<T> Shared<T> {
     ///
     /// Check out [`try_with_mut`](Self::try_with_mut) for a non-panicking
     /// alternative.
+    #[track_caller]
     #[inline]
     pub fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
         self.inner.with_mut(fun)
@@ -284,5 +291,108 @@ impl ExclusiveBorrow {
             #[cfg(debug_assertions)]
             location: Location::caller(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests that `Shared::with()` can be called inside the body of an outer
+    /// `Shared::with()`.
+    #[test]
+    fn shared_with_nested() {
+        let shared = Shared::new(0);
+
+        shared.with(|_value| {
+            shared.with(|_also_value| {});
+        });
+    }
+
+    /// Tests that `Shared::with()` and `Shared::with_mut()` can both be called
+    /// if neither is called inside the body of the other.
+    #[test]
+    fn shared_with_and_with_mut_alternating() {
+        let shared = Shared::new(0);
+
+        for idx in 0..10 {
+            if idx % 2 == 0 {
+                shared.with(|_value| {});
+            } else {
+                shared.with_mut(|_value| {});
+            }
+        }
+    }
+
+    /// Tests that calling `Shared::try_with_mut()` inside the body of an outer
+    /// `Shared::with()` returns an error.
+    #[test]
+    fn shared_try_with_mut_inside_with() {
+        let shared = Shared::new(0);
+
+        shared.with(|_value| {
+            let res = shared.try_with_mut(|_also_value| {});
+            assert!(res.is_err());
+        });
+    }
+
+    /// Tests that calling `Shared::try_with()` inside the body of an outer
+    /// `Shared::with_mut()` returns an error.
+    #[test]
+    fn shared_try_with_inside_with_mut() {
+        let shared = Shared::new(0);
+
+        shared.with_mut(|_value| {
+            let res = shared.try_with(|_also_value| {});
+            assert!(res.is_err());
+        });
+    }
+
+    /// Tests that calling `Shared::try_with_mut()` inside the body of an outer
+    /// `Shared::with_mut()` returns an error.
+    #[test]
+    fn shared_try_with_mut_inside_with_mut() {
+        let shared = Shared::new(0);
+
+        shared.with_mut(|_value| {
+            let res = shared.try_with_mut(|_also_value| {});
+            assert!(res.is_err());
+        });
+    }
+
+    /// Tests that calling `Shared::with_mut()` inside the body of an outer
+    /// `Shared::with()` panics.
+    #[should_panic]
+    #[test]
+    fn shared_with_mut_inside_with() {
+        let shared = Shared::new(0);
+
+        shared.with(|_value| {
+            shared.with_mut(|_also_value| {});
+        });
+    }
+
+    /// Tests that calling `Shared::with()` inside the body of an outer
+    /// `Shared::with_mut()` panics.
+    #[should_panic]
+    #[test]
+    fn shared_with_inside_with_mut() {
+        let shared = Shared::new(0);
+
+        shared.with_mut(|_value| {
+            shared.with(|_also_value| {});
+        });
+    }
+
+    /// Tests that calling `Shared::with_mut()` inside the body of an outer
+    /// `Shared::with_mut()` panics.
+    #[should_panic]
+    #[test]
+    fn shared_with_mut_inside_with_mut() {
+        let shared = Shared::new(0);
+
+        shared.with_mut(|_value| {
+            shared.with_mut(|_also_value| {});
+        });
     }
 }
