@@ -106,6 +106,15 @@ impl<T> WithCell<T> {
     }
 }
 
+impl<T: Copy> WithCell<T> {
+    #[inline]
+    fn get(&self) -> T {
+        // SAFETY: we don't care if the value is already borrowed because we
+        // immediately return a copy of it.
+        unsafe { *self.value.get() }
+    }
+}
+
 /// TODO: docs
 #[derive(Debug)]
 pub struct BorrowError {
