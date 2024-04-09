@@ -18,10 +18,40 @@ impl<T> Clone for Shared<T> {
 }
 
 impl<T> Shared<T> {
+    /// Returns a copy of the value.
+    #[inline]
+    pub fn get(&self) -> T
+    where
+        T: Copy,
+    {
+        self.inner.get()
+    }
+
     /// Constructs a new `Shared<T>`.
     #[inline]
     pub fn new(value: T) -> Self {
         Self { inner: Rc::new(WithCell::new(value)) }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn replace(&self, new_value: T) -> T {
+        self.with_mut(|this| core::mem::replace(this, new_value))
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn set(&self, new_value: T) {
+        self.with_mut(|this| *this = new_value);
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn take(&self) -> T
+    where
+        T: Default,
+    {
+        self.replace(T::default())
     }
 
     /// Tries to call a closure with a shared reference to the value, returning
@@ -64,14 +94,6 @@ impl<T> Shared<T> {
     }
 }
 
-impl<T: Copy> Shared<T> {
-    /// Returns a copy of the value.
-    #[inline]
-    pub fn get(&self) -> T {
-        self.inner.get()
-    }
-}
-
 #[derive(Default)]
 struct WithCell<T> {
     borrow: Cell<Borrow>,
@@ -79,6 +101,16 @@ struct WithCell<T> {
 }
 
 impl<T> WithCell<T> {
+    #[inline]
+    fn get(&self) -> T
+    where
+        T: Copy,
+    {
+        // SAFETY: we don't care if the value is already borrowed because we
+        // immediately return a copy of it.
+        unsafe { *self.value.get() }
+    }
+
     #[inline]
     fn new(value: T) -> Self {
         Self { borrow: Cell::new(Borrow::None), value: UnsafeCell::new(value) }
@@ -150,15 +182,6 @@ impl<T> WithCell<T> {
             Ok(result) => result,
             Err(err) => panic!("{err}"),
         }
-    }
-}
-
-impl<T: Copy> WithCell<T> {
-    #[inline]
-    fn get(&self) -> T {
-        // SAFETY: we don't care if the value is already borrowed because we
-        // immediately return a copy of it.
-        unsafe { *self.value.get() }
     }
 }
 
