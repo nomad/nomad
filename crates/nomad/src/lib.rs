@@ -14,6 +14,7 @@ pub mod maybe_future;
 pub mod maybe_result;
 pub mod module;
 mod nomad;
+mod nvim_buffer;
 pub mod runtime;
 mod serde;
 pub mod shared;
@@ -42,3 +43,5 @@ pub mod prelude {
     pub use crate::warning::*;
     pub use crate::Nomad;
 }
+
+pub use nvim_buffer::NvimBuffer;

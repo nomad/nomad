@@ -15,6 +15,7 @@ clipboard = { path = "./crates/clipboard" }
 futures = "0.3"
 nomad = { path = "./crates/nomad" }
 serde = "1.0"
+smol_str = "0.2"
 thiserror = "1.0"
 tracing = "0.1"
 

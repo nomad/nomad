@@ -29,6 +29,7 @@ pin-project-lite = "0.2"
 pond = { git = "ssh://git@github.com/nomad/pond.git" }
 serde = { workspace = true }
 serde_path_to_error = "0.1"
+smol_str = { workspace = true }
 strsim = "0.11"
 time = { version = "0.3", features = ["macros"] }
 tracing = "0.1"
