@@ -116,10 +116,17 @@ impl Buffer {
     #[inline]
     pub fn create(text: &str, replica: Replica) -> Self {
         let state = BufferState::new(text, replica);
-        let buf = api::Buffer::current();
+
+        let Ok(mut buf) = api::create_buf(true, false) else { unreachable!() };
+
+        let Ok(()) = buf.set_lines(.., true, text.lines()) else {
+            unreachable!()
+        };
+
         let Ok(()) = api::Window::current().set_buf(&buf) else {
             unreachable!()
         };
+
         Self::new(state, buf)
     }
 
