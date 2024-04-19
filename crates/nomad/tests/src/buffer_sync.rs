@@ -1,7 +1,8 @@
 use core::ops::Range;
 
-use nomad::test::{Generate, Generator, MeanLen, ReplacementCtx};
-use nomad::{ByteOffset, NvimBuffer, Replacement, Shared};
+use crop::Rope;
+use nomad::test::{Generator, MeanLen, ReplacementCtx};
+use nomad::{ByteOffset, IntoCtx, NvimBuffer, Point, Replacement, Shared};
 
 #[nomad::test]
 fn nomad_buffer_sync_fuzz_0(gen: &mut Generator) {
@@ -28,27 +29,29 @@ fn nomad_buffer_sync_fuzz_3(gen: &mut Generator) {
 fn buffer_sync(num_edits: usize, gen: &mut Generator) {
     let mut buffer = NvimBuffer::create();
 
-    let string = Shared::new(String::new());
+    let rope = Shared::new(Rope::new());
 
     {
-        let string = string.clone();
+        let rope = rope.clone();
 
         buffer.on_edit(move |edit| {
             let range: Range<usize> = edit.start().into()..edit.end().into();
-            string.with_mut(|s| s.replace_range(range, edit.replacement()));
+            rope.with_mut(|r| r.replace(range, edit.replacement()));
         });
     }
 
     for _ in 0..num_edits {
-        let replacement: Replacement<ByteOffset> = string.with(|s| {
-            let ctx = ReplacementCtx::new(s.as_ref(), MeanLen(3), MeanLen(5));
-            gen.generate(ctx)
+        let replacement = rope.with(|r| {
+            let ctx = ReplacementCtx::new(r.as_ref(), MeanLen(3), MeanLen(5));
+            let rep: Replacement<ByteOffset> = gen.generate(ctx);
+            let point_range = rep.range().into_ctx(r);
+            Replacement::<Point<_>>::new(point_range, rep.replacement())
         });
 
         buffer.edit(replacement);
     }
 
-    string.with(|s| {
-        assert_eq!(&buffer.get::<_, ByteOffset>(..).unwrap(), s);
+    rope.with(|r| {
+        assert_eq!(&buffer.get(..).unwrap(), r);
     });
 }

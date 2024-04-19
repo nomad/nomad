@@ -7,4 +7,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+crop = "0.4"
 nomad = { path = "..", features = ["tests"] }
