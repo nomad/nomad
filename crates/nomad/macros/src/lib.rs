@@ -5,6 +5,7 @@ mod action_name;
 mod async_action;
 mod module_name;
 mod ready;
+mod test;
 
 /// A proc macro that turns a string literal into an `ActionName`.
 ///
@@ -76,4 +77,10 @@ pub fn module_name(input: TokenStream) -> TokenStream {
 pub fn ready(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     ready::ready(input).into()
+}
+
+/// TODO: docs
+#[proc_macro_attribute]
+pub fn test(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    test::test(attrs, input)
 }

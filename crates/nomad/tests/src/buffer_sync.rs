@@ -1,7 +1,7 @@
 use core::ops::Range;
 
 use crop::Rope;
-use nomad::test::{Generator, MeanLen, ReplacementCtx};
+use nomad::tests::{Generator, MeanLen, ReplacementCtx};
 use nomad::{ByteOffset, IntoCtx, NvimBuffer, Point, Replacement, Shared};
 
 #[nomad::test]

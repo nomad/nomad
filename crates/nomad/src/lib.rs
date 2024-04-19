@@ -24,7 +24,7 @@ pub mod runtime;
 mod serde;
 pub mod shared;
 pub mod streams;
-pub mod test;
+pub mod tests;
 pub mod warning;
 
 pub use nomad::Nomad;
@@ -53,6 +53,7 @@ pub mod prelude {
 pub use byte_offset::ByteOffset;
 pub use edit::Edit;
 pub use from_ctx::{FromCtx, IntoCtx};
+pub use macros::test;
 pub use nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};
 pub use point::Point;
 pub use replacement::Replacement;
