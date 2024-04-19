@@ -2,7 +2,7 @@ use core::ops::{Bound, Range, RangeBounds};
 
 use nvim::api::{self, opts};
 
-use crate::{ByteOffset, Edit, FromCtx, IntoCtx, Point, Replacement, Shared};
+use crate::{ByteOffset, Edit, Point, Replacement, Shared};
 
 type OnEdit = Box<dyn FnMut(&Replacement<ByteOffset>) + 'static>;
 
@@ -43,42 +43,37 @@ impl NvimBuffer {
 
     /// TODO: docs.
     #[inline]
-    fn end_point(&self) -> Point<ByteOffset> {
-        todo!();
+    fn end_point(&self) -> Result<Point<ByteOffset>, api::Error> {
+        let num_lines = self.inner.line_count()?;
+
+        let last_line_len = self.inner.get_offset(num_lines)?
+            - self.inner.get_offset(num_lines.saturating_sub(1))?;
+
+        Ok(Point::new(num_lines, ByteOffset::new(last_line_len)))
     }
 
     /// TODO: docs.
     #[inline]
-    pub fn get<R, O>(&self, range: R) -> Result<String, api::Error>
+    pub fn get<R>(&self, range: R) -> Result<String, api::Error>
     where
-        R: RangeBounds<O>,
-        O: IntoCtx<Point<ByteOffset>, Self> + Copy,
+        R: RangeBounds<Point<ByteOffset>>,
     {
         let start = match range.start_bound() {
-            Bound::Included(&start) => start.into_ctx(self),
-            Bound::Excluded(&start) => start.into_ctx(self),
+            Bound::Included(&start) => start,
+            Bound::Excluded(&start) => start,
             Bound::Unbounded => Point::default(),
         };
 
         let end = match range.end_bound() {
-            Bound::Included(&end) => end.into_ctx(self),
-            Bound::Excluded(&end) => end.into_ctx(self),
-            Bound::Unbounded => self.end_point(),
+            Bound::Included(&end) => end,
+            Bound::Excluded(&end) => end,
+            Bound::Unbounded => self.end_point()?,
         };
 
-        self.get_point_range(start..end)
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn get_point_range(
-        &self,
-        range: Range<Point<ByteOffset>>,
-    ) -> Result<String, api::Error> {
         let mut lines = self.inner.get_text(
-            range.start.line()..range.end.line(),
-            range.start.offset().into(),
-            range.end.offset().into(),
+            start.line()..end.line(),
+            start.offset().into(),
+            end.offset().into(),
             &Default::default(),
         )?;
 
@@ -131,17 +126,9 @@ impl NvimBuffer {
         Ok(Self { inner: buffer, on_edit_callbacks })
     }
 
-    #[inline]
-    fn point_of_offset(
-        &self,
-        offset: ByteOffset,
-    ) -> Result<Point<ByteOffset>, api::Error> {
-        todo!();
-    }
-
     /// TODO: docs
     #[inline]
-    fn replace_point_range(
+    fn replace(
         &mut self,
         range: Range<Point<ByteOffset>>,
         replacement: impl Iterator<Item = nvim::String>,
@@ -155,40 +142,22 @@ impl NvimBuffer {
     }
 }
 
-impl<Offset> Edit<NvimBuffer> for &Replacement<Offset>
-where
-    Offset: IntoCtx<Point<ByteOffset>, NvimBuffer> + Copy,
-{
+impl Edit<NvimBuffer> for &Replacement<Point<ByteOffset>> {
     type Diff = ();
 
     #[inline]
     fn apply(self, buf: &mut NvimBuffer) -> Self::Diff {
-        let start = self.start().into_ctx(buf);
-        let end = self.end().into_ctx(buf);
         let replacement = core::iter::once(self.replacement().into());
-        let _ = buf.replace_point_range(start..end, replacement);
+        let _ = buf.replace(self.range(), replacement);
     }
 }
 
-impl<Offset> Edit<NvimBuffer> for Replacement<Offset>
-where
-    Offset: IntoCtx<Point<ByteOffset>, NvimBuffer> + Copy,
-{
+impl Edit<NvimBuffer> for Replacement<Point<ByteOffset>> {
     type Diff = ();
 
     #[inline]
     fn apply(self, buf: &mut NvimBuffer) -> Self::Diff {
         (&self).apply(buf)
-    }
-}
-
-impl FromCtx<ByteOffset, NvimBuffer> for Point<ByteOffset> {
-    #[inline]
-    fn from_ctx(offset: ByteOffset, buf: &NvimBuffer) -> Self {
-        match buf.point_of_offset(offset) {
-            Ok(point) => point,
-            Err(err) => panic!("couldn't convert offset to point: {err}"),
-        }
     }
 }
 

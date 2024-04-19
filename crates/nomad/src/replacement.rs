@@ -48,6 +48,12 @@ impl<Offset: Copy> Replacement<Offset> {
         Self::insertion(Default::default(), "")
     }
 
+    /// The deleted range.
+    #[inline]
+    pub fn range(&self) -> Range<Offset> {
+        self.start..self.end
+    }
+
     /// The text the range is replaced with.
     #[inline]
     pub fn replacement(&self) -> &str {
