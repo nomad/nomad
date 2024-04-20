@@ -6,7 +6,12 @@ use super::error;
 
 /// Initializes the panic hook.
 pub(super) fn init() {
-    panic::set_hook(Box::new(|info| error!("{}", PanicMsg::from(info))));
+    let prev_hook = panic::take_hook();
+
+    panic::set_hook(Box::new(move |info| {
+        prev_hook(info);
+        error!("{}", PanicMsg::from(info))
+    }));
 }
 
 struct PanicMsg<'a> {
