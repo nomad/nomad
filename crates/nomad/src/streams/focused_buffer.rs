@@ -8,7 +8,8 @@ use nvim::api::opts::CreateAutocmdOpts;
 use nvim::api::types::AutocmdCallbackArgs;
 use pin_project_lite::pin_project;
 
-use crate::editor::{AutocmdId, BufferId};
+use crate::editor::BufferId;
+use crate::AutocmdId;
 
 pin_project! {
     /// A [`Stream`] that yields the [`BufferId`] of the currently focused

@@ -9,16 +9,10 @@ use cola::{Anchor, Replica, ReplicaId};
 use crop::{Rope, RopeBuilder};
 use nvim::api::{self, opts, Buffer as NvimBuffer};
 
-use super::{
-    BufferId,
-    BufferSnapshot,
-    BufferState,
-    EditorId,
-    LocalDeletion,
-    LocalInsertion,
-};
+use super::{BufferId, BufferState, LocalDeletion, LocalInsertion};
 use crate::runtime::spawn;
 use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
+use crate::{BufferSnapshot, EditorId};
 
 /// TODO: docs
 pub struct Buffer {

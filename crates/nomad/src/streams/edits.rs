@@ -5,7 +5,7 @@ use async_broadcast::Receiver;
 use futures::Stream;
 use pin_project_lite::pin_project;
 
-use crate::editor::EditorId;
+use crate::EditorId;
 
 pin_project! {
     /// A [`Stream`] that yields the [`Edit`]s that are applied to a

@@ -6,7 +6,6 @@ use cola::{Anchor, Deletion, Insertion, Replica};
 use crop::Rope;
 
 use crate::editor::{
-    BufferSnapshot,
     ByteChange,
     ByteOffset,
     Point,
@@ -14,6 +13,7 @@ use crate::editor::{
     RemoteInsertion,
 };
 use crate::streams::{AppliedDeletion, AppliedInsertion};
+use crate::BufferSnapshot;
 
 /// TODO: docs
 #[derive(Clone)]

@@ -9,11 +9,14 @@ pub use nvim;
 
 pub mod action;
 pub mod api;
+mod autocmd_id;
+mod buffer_snapshot;
 mod byte_offset;
 mod command;
 mod config;
 mod edit;
 pub mod editor;
+mod editor_id;
 mod from_ctx;
 pub mod log;
 pub mod maybe_future;
@@ -27,6 +30,7 @@ pub mod runtime;
 mod serde;
 pub mod shared;
 pub mod streams;
+#[cfg(feature = "tests")]
 pub mod tests;
 pub mod warning;
 
@@ -53,8 +57,11 @@ pub mod prelude {
     pub use crate::Nomad;
 }
 
+pub(crate) use autocmd_id::AutocmdId;
+pub use buffer_snapshot::BufferSnapshot;
 pub use byte_offset::ByteOffset;
 pub use edit::Edit;
+pub use editor_id::EditorId;
 pub use from_ctx::{FromCtx, IntoCtx};
 pub use macros::test;
 pub use nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};
