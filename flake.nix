@@ -32,6 +32,7 @@
           pkgs.mkShell {
             buildInputs = with pkgs; [
             ] ++ lib.optional stdenv.isDarwin [
+              # Not sure who needs these
               darwin.apple_sdk.frameworks.AppKit
               libiconv
             ];
