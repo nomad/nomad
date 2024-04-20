@@ -14,27 +14,35 @@ neovim-nightly = ["nvim/neovim-nightly"]
 tests = ["nvim/test", "rand", "rand_chacha", "rand_distr"]
 
 [dependencies]
-async-broadcast = "0.7"
-async-task = "4.7"
-cola = "0.4"
-concurrent-queue = "2.4"
-crop = "0.4"
-flume = "0.11"
-futures = { workspace = true }
+cola = { workspace = true }
+crop = { workspace = true }
 home = "0.5"
 macros = { path = "./macros" }
 nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi", features = ["libuv"] }
+pond = { git = "ssh://git@github.com/nomad/pond.git" }
+smol_str = { workspace = true }
+
+# Async executor
+async-task = "4.7"
+concurrent-queue = "2.4"
+
+# Futures
+async-broadcast = "0.7"
+flume = "0.11"
+futures = { workspace = true }
 pin-project = "1.1"
 pin-project-lite = "0.2"
-pond = { git = "ssh://git@github.com/nomad/pond.git" }
-serde = { workspace = true }
-serde_path_to_error = "0.1"
-smol_str = { workspace = true }
-strsim = "0.11"
+
+# Logging
 time = { version = "0.3", features = ["macros"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["time"] }
+
+# Rust <-> Lua interop
+serde = { workspace = true }
+serde_path_to_error = "0.1"
+strsim = "0.11"
 
 # Tests
 rand = { version = "0.8", optional = true }

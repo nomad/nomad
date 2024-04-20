@@ -9,7 +9,7 @@ publish.workspace = true
 [dependencies]
 async-net = { workspace = true }
 clipboard = { workspace = true }
-cola = "0.4"
+cola = { workspace = true }
 collab = { git = "ssh://git@github.com/nomad/collab.git" }
 futures = { workspace = true }
 nomad = { workspace = true }
