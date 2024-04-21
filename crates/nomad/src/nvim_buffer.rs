@@ -81,15 +81,24 @@ impl NvimBuffer {
         edit.apply(self)
     }
 
-    /// TODO: docs.
+    /// Returns the [`Point`] at the end of the buffer.
     #[inline]
     fn end_point(&self) -> Result<Point<ByteOffset>, api::Error> {
         let num_lines = self.inner.line_count()?;
 
-        let last_line_len = self.inner.get_offset(num_lines)?
-            - self.inner.get_offset(num_lines.saturating_sub(1))?;
+        if num_lines == 0 {
+            return Ok(Point::default());
+        }
 
-        Ok(Point::new(num_lines, ByteOffset::new(last_line_len)))
+        let last_line_len = self.inner.get_offset(num_lines)?
+            // Calling `get_offset()` with the number of lines always seem to
+            // include the trailing newline, even when `eol` is turned off.
+            - 1
+            - self.inner.get_offset(num_lines - 1)?;
+
+        let point = Point::new(num_lines - 1, ByteOffset::new(last_line_len));
+
+        Ok(point)
     }
 
     /// TODO: docs.

@@ -49,9 +49,9 @@ fn buffer_sync(num_edits: usize, gen: &mut Generator) {
         });
 
         buffer.edit(replacement);
-    }
 
-    rope.with(|r| {
-        assert_eq!(&buffer.get(..).unwrap(), r);
-    });
+        rope.with(|r| {
+            assert_eq!(&buffer.get(..).unwrap(), r);
+        });
+    }
 }
