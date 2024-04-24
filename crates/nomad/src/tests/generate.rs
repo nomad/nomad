@@ -110,6 +110,14 @@ impl<Buffer, RangeLen, TextLen> ReplacementCtx<Buffer, RangeLen, TextLen> {
     ) -> Self {
         Self { string, range_len, text_len }
     }
+
+    /// TODO: docs
+    pub fn generate<T>(self, generator: &mut Generator) -> T
+    where
+        T: Generate<Self>,
+    {
+        T::generate(generator, self)
+    }
 }
 
 impl<Buf, RangeLen, TextLen> Generate<ReplacementCtx<Buf, RangeLen, TextLen>>

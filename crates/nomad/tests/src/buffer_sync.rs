@@ -2,7 +2,7 @@ use core::ops::Range;
 
 use crop::Rope;
 use nomad::tests::{Generator, MeanLen, ReplacementCtx};
-use nomad::{ByteOffset, IntoCtx, NvimBuffer, Point, Replacement, Shared};
+use nomad::{ByteOffset, IntoCtx, NvimBuffer, Replacement, Shared};
 
 #[nomad::test]
 fn nomad_buffer_sync_fuzz_0(gen: &mut Generator) {
@@ -36,16 +36,15 @@ fn buffer_sync(num_edits: usize, gen: &mut Generator) {
 
         buffer.on_edit(move |edit| {
             let range: Range<usize> = edit.start().into()..edit.end().into();
-            rope.with_mut(|r| r.replace(range, edit.replacement()));
+            rope.with_mut(|r| r.replace(range, edit.text()));
         });
     }
 
     for _ in 0..num_edits {
         let replacement = rope.with(|r| {
-            let ctx = ReplacementCtx::new(r, MeanLen(3), MeanLen(5));
-            let rep: Replacement<ByteOffset> = gen.generate(ctx);
-            let point_range = rep.range().into_ctx(r);
-            Replacement::<Point<_>>::new(point_range, rep.replacement())
+            ReplacementCtx::new(r, MeanLen(3), MeanLen(5))
+                .generate::<Replacement<_>>(gen)
+                .map_range(|range| range.into_ctx(r))
         });
 
         buffer.edit(replacement);
