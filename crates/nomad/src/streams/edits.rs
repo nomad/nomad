@@ -9,7 +9,7 @@ use crate::EditorId;
 
 pin_project! {
     /// A [`Stream`] that yields the [`Edit`]s that are applied to a
-    /// [`Buffer`](crate::editor::Buffer).
+    /// [`Buffer`](crate::Buffer).
     pub struct Edits {
         #[pin]
         inner: Receiver<AppliedEdit>,
@@ -35,7 +35,7 @@ impl Stream for Edits {
     }
 }
 
-/// A single edit to a [`Buffer`].
+/// A single edit to a `Buffer`.
 #[derive(Debug, Clone)]
 pub struct AppliedEdit {
     kind: AppliedEditKind,
@@ -80,7 +80,7 @@ impl AppliedEdit {
     }
 }
 
-/// A single edit to a [`Buffer`].
+/// A single edit to a `Buffer`.
 #[derive(Debug, Clone)]
 pub enum AppliedEditKind {
     /// TODO: docs

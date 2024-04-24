@@ -11,12 +11,12 @@ pub mod action;
 pub mod api;
 mod apply;
 mod autocmd_id;
+mod buffer;
 mod buffer_snapshot;
 mod byte_offset;
 mod command;
 mod config;
 mod edit;
-pub mod editor;
 mod editor_id;
 mod from_ctx;
 pub mod log;
@@ -46,7 +46,6 @@ pub mod prelude {
     pub use crate::action::*;
     pub use crate::api::*;
     pub use crate::command::*;
-    pub use crate::editor::*;
     pub use crate::log::*;
     pub use crate::maybe_future::*;
     pub use crate::maybe_result::*;
@@ -60,6 +59,7 @@ pub mod prelude {
 
 pub use apply::Apply;
 pub(crate) use autocmd_id::AutocmdId;
+pub use buffer::Buffer;
 pub use buffer_snapshot::BufferSnapshot;
 pub use byte_offset::ByteOffset;
 pub use edit::Edit;

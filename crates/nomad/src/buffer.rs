@@ -8,7 +8,6 @@ use cola::{Anchor, Replica, ReplicaId};
 use crop::Rope;
 use nvim::api;
 
-use super::BufferState;
 use crate::runtime::spawn;
 use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
 use crate::{
@@ -19,12 +18,16 @@ use crate::{
     IntoCtx,
     NvimBuffer,
     Replacement,
+    Shared,
 };
 
 /// TODO: docs
 pub struct Buffer {
     /// TODO: docs
     applied_queue: AppliedEditQueue,
+
+    /// TODO: docs
+    inner: Shared<BufferInner>,
 
     /// TODO: docs
     nvim: NvimBuffer,
@@ -34,9 +37,6 @@ pub struct Buffer {
 
     /// TODO: docs
     sender: Sender<AppliedEdit>,
-
-    /// TODO: docs
-    state: BufferState,
 }
 
 impl Buffer {
@@ -49,7 +49,7 @@ impl Buffer {
     /// TODO: docs
     #[inline]
     pub fn create(text: &str, replica: Replica) -> Self {
-        let state = BufferState::new(text, replica);
+        let inner = BufferInner::new(text, replica);
 
         let mut buf = NvimBuffer::create();
 
@@ -61,7 +61,7 @@ impl Buffer {
             unreachable!()
         };
 
-        Self::new(state, buf)
+        Self::new(inner, buf)
     }
 
     /// TODO: docs
@@ -92,17 +92,17 @@ impl Buffer {
     pub fn from_id(replica_id: ReplicaId, buffer: NvimBuffer) -> Self {
         let text = Rope::try_from(&buffer).expect("");
         let replica = Replica::new(replica_id, text.byte_len());
-        Self::new(BufferState::new(text, replica), buffer)
+        Self::new(BufferInner::new(text, replica), buffer)
     }
 
     #[inline]
-    fn new(state: BufferState, bound_to: NvimBuffer) -> Self {
+    fn new(inner: BufferInner, bound_to: NvimBuffer) -> Self {
         let (sender, receiver) = async_broadcast::broadcast(32);
 
         let this = Self {
             applied_queue: AppliedEditQueue::new(),
+            inner: Shared::new(inner),
             nvim: bound_to,
-            state,
             receiver: receiver.deactivate(),
             sender,
         };
@@ -115,7 +115,7 @@ impl Buffer {
     #[inline]
     fn on_edit(&self) -> impl Fn(&Replacement<ByteOffset>) + 'static {
         let applied_queue = self.applied_queue.clone();
-        let buffer = self.state.clone();
+        let inner = self.inner.clone();
         let sender = self.sender.clone();
 
         move |replacement| {
@@ -127,7 +127,8 @@ impl Buffer {
             // The change was either caused by the user or by another plugin,
             // so we apply it to our buffer to keep it in sync.
             else {
-                let (del, ins) = buffer.edit(replacement);
+                let (del, ins) =
+                    inner.with_mut(|inner| inner.edit(replacement));
 
                 let id = EditorId::unknown();
 
@@ -147,7 +148,7 @@ impl Buffer {
     /// TODO: docs
     #[inline]
     pub fn snapshot(&self) -> BufferSnapshot {
-        self.state.snapshot()
+        self.inner.with(BufferInner::snapshot)
     }
 }
 
@@ -187,15 +188,120 @@ impl AppliedEditQueue {
     }
 }
 
+/// TODO: docs
+#[derive(Clone)]
+pub(super) struct BufferInner {
+    /// TODO: docs
+    replica: Replica,
+
+    /// TODO: docs
+    text: Rope,
+}
+
+impl BufferInner {
+    /// TODO: docs
+    #[inline]
+    pub fn delete(&mut self, range: Range<ByteOffset>) -> cola::Deletion {
+        let range: Range<usize> = range.start.into()..range.end.into();
+        self.text.delete(range.clone());
+        self.replica.deleted(range)
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn edit<E>(&mut self, edit: E) -> <Self as Apply<E>>::Diff
+    where
+        Self: Apply<E>,
+    {
+        self.apply(edit)
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn insert(
+        &mut self,
+        offset: ByteOffset,
+        text: &str,
+    ) -> cola::Insertion {
+        self.text.insert(offset.into(), text);
+        self.replica.inserted(offset.into(), text.len())
+    }
+
+    #[inline]
+    fn new(text: impl Into<Rope>, replica: Replica) -> Self {
+        let text = text.into();
+
+        assert_eq!(
+            text.byte_len(),
+            replica.len(),
+            "text and replica out of sync"
+        );
+
+        Self { replica, text }
+    }
+
+    /// Returns an exclusive reference to the buffer's [`Replica`].
+    #[inline]
+    pub(crate) fn replica_mut(&mut self) -> &mut Replica {
+        &mut self.replica
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn resolve_anchor(&self, anchor: &Anchor) -> Option<ByteOffset> {
+        self.replica.resolve_anchor(*anchor).map(ByteOffset::new)
+    }
+
+    /// Returns a shared reference to the buffer's [`Rope`].
+    #[inline]
+    pub(crate) fn rope(&self) -> &Rope {
+        &self.text
+    }
+
+    /// Returns an exclusive reference to the buffer's [`Rope`].
+    #[inline]
+    pub(crate) fn rope_mut(&mut self) -> &mut Rope {
+        &mut self.text
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn snapshot(&self) -> BufferSnapshot {
+        BufferSnapshot::new(self.replica.clone(), self.text.clone())
+    }
+}
+
+impl Apply<&Replacement<ByteOffset>> for BufferInner {
+    type Diff = (Option<AppliedDeletion>, Option<AppliedInsertion>);
+
+    #[inline]
+    fn apply(&mut self, repl: &Replacement<ByteOffset>) -> Self::Diff {
+        let mut applied_del = None;
+        let mut applied_ins = None;
+
+        if !repl.range().is_empty() {
+            let del = self.delete(repl.range());
+            applied_del = Some(AppliedDeletion::new(del));
+        }
+
+        if !repl.text().is_empty() {
+            let ins = self.insert(repl.range().start, repl.text());
+            applied_ins =
+                Some(AppliedInsertion::new(ins, repl.text().to_owned()));
+        }
+
+        (applied_del, applied_ins)
+    }
+}
 impl Apply<Replacement<ByteOffset>> for Buffer {
     type Diff = ();
 
     #[inline]
     fn apply(&mut self, repl: Replacement<ByteOffset>) -> Self::Diff {
         let point_range =
-            self.state.with(|inner| repl.range().into_ctx(inner.rope()));
+            self.inner.with(|inner| repl.range().into_ctx(inner.rope()));
 
-        self.state.with_mut(|inner| {
+        self.inner.with_mut(|inner| {
             let range = repl.range().start.into()..repl.range().end.into();
             inner.rope_mut().replace(range.clone(), repl.text());
             inner.replica_mut().deleted(range.clone());
@@ -213,7 +319,7 @@ impl Apply<Replacement<Anchor>> for Buffer {
     fn apply(&mut self, repl: Replacement<Anchor>) -> Self::Diff {
         let anchor_range = repl.range();
 
-        let (start, end) = self.state.with(|inner| {
+        let (start, end) = self.inner.with(|inner| {
             let start = inner.resolve_anchor(&anchor_range.start);
             let end = inner.resolve_anchor(&anchor_range.end);
             (start, end)
@@ -233,7 +339,7 @@ impl<T: AsRef<str>> Apply<(&cola::Insertion, T)> for Buffer {
         &mut self,
         (insertion, text): (&cola::Insertion, T),
     ) -> Self::Diff {
-        let maybe_point = self.state.with_mut(|inner| {
+        let maybe_point = self.inner.with_mut(|inner| {
             let offset = inner.replica_mut().integrate_insertion(insertion)?;
             inner.rope_mut().insert(offset, text.as_ref());
             Some(ByteOffset::new(offset).into_ctx(inner.rope()))
@@ -250,7 +356,7 @@ impl Apply<&cola::Deletion> for Buffer {
 
     #[inline]
     fn apply(&mut self, deletion: &cola::Deletion) -> Self::Diff {
-        let byte_ranges = self.state.with_mut(|inner| {
+        let byte_ranges = self.inner.with_mut(|inner| {
             inner.replica_mut().integrate_deletion(deletion)
         });
 
@@ -261,7 +367,7 @@ impl Apply<&cola::Deletion> for Buffer {
                 ByteOffset::from(range.start)..ByteOffset::from(range.end)
             })
             .map(|range| {
-                self.state.with(|inner| range.into_ctx(inner.rope()))
+                self.inner.with(|inner| range.into_ctx(inner.rope()))
             });
 
         for point_range in point_ranges.rev() {
@@ -269,7 +375,7 @@ impl Apply<&cola::Deletion> for Buffer {
         }
 
         for byte_range in byte_ranges.into_iter().rev() {
-            self.state.with_mut(|inner| inner.rope_mut().delete(byte_range));
+            self.inner.with_mut(|inner| inner.rope_mut().delete(byte_range));
         }
     }
 }
