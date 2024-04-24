@@ -1,4 +1,4 @@
-use collab::messages::{
+use collab_client::messages::{
     Deletion as CollabDeletion,
     File,
     Insertion as CollabInsertion,
@@ -13,12 +13,18 @@ use nomad::streams::{
     AppliedEditKind,
     AppliedInsertion,
 };
-use nomad::BufferSnapshot;
+use nomad::{BufferSnapshot, Edit};
 
 /// Exactly the same as the [`Into`] trait, but it lets us convert `T -> U`
 /// even when neither `T` nor `U` are defined in this crate.
 pub(crate) trait Convert<T> {
     fn convert(self) -> T;
+}
+
+impl Convert<OutboundMessage> for Edit {
+    fn convert(self) -> OutboundMessage {
+        todo!();
+    }
 }
 
 impl Convert<OutboundMessage> for AppliedEdit {

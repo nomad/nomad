@@ -1,7 +1,7 @@
 use core::future::ready;
 
 use cola::Replica;
-use collab::messages::{FileKind, InboundMessage};
+use collab_client::messages::{FileKind, InboundMessage};
 use futures::{pin_mut, select as race, FutureExt, StreamExt};
 use nomad::prelude::*;
 use nomad::*;
@@ -18,10 +18,10 @@ pub(crate) struct Session {
     editor_id: EditorId,
 
     /// TODO: docs
-    receiver: collab::Receiver,
+    receiver: collab_client::Receiver,
 
     /// TODO: docs
-    sender: collab::Sender,
+    sender: collab_client::Sender,
 
     /// TODO: docs
     session_id: SessionId,
@@ -39,7 +39,7 @@ impl Session {
         config: &Get<Config>,
         session_id: SessionId,
     ) -> Result<Self, JoinError> {
-        let peer_id = collab::messages::PeerId::new_random();
+        let peer_id = collab_client::messages::PeerId::new_random();
 
         let (sender, receiver, session) = config
             .get()
@@ -113,7 +113,7 @@ impl Session {
 
     /// TODO: docs
     pub async fn start(config: &Get<Config>) -> Result<Self, StartError> {
-        let peer_id = collab::messages::PeerId::new_random();
+        let peer_id = collab_client::messages::PeerId::new_random();
 
         let (sender, receiver, session_id) =
             config.get().connector()?.peer_id(peer_id).start().await?;
@@ -131,7 +131,7 @@ impl Session {
 #[derive(Debug, thiserror::Error)]
 pub enum JoinError {
     #[error(transparent)]
-    Connection(#[from] collab::Error),
+    Connection(#[from] collab_client::Error),
 
     #[error(transparent)]
     Connector(#[from] ConnectorError),
@@ -140,7 +140,7 @@ pub enum JoinError {
 #[derive(Debug, thiserror::Error)]
 pub enum StartError {
     #[error(transparent)]
-    Connection(#[from] collab::Error),
+    Connection(#[from] collab_client::Error),
 
     #[error(transparent)]
     Connector(#[from] ConnectorError),
@@ -149,5 +149,5 @@ pub enum StartError {
 #[derive(Debug, thiserror::Error)]
 pub enum RunError {
     #[error(transparent)]
-    Collab(#[from] collab::Error),
+    Collab(#[from] collab_client::Error),
 }

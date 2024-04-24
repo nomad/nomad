@@ -10,7 +10,7 @@ publish.workspace = true
 async-net = { workspace = true }
 clipboard = { workspace = true }
 cola = { workspace = true }
-collab = { git = "ssh://git@github.com/nomad/collab.git" }
+collab-client = { git = "ssh://git@github.com/nomad/collab.git", package = "collab" }
 futures = { workspace = true }
 nomad = { workspace = true }
 serde = { workspace = true }

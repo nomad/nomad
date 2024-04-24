@@ -1,9 +1,9 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use collab::rustls_pki_types::{self, DnsName};
-use collab::typestate::Optionals;
-use collab::{rustls, Connector};
+use collab_client::rustls_pki_types::{self, DnsName};
+use collab_client::typestate::Optionals;
+use collab_client::{rustls, Connector};
 use nomad::prelude::WarningMsg;
 use serde::Deserialize;
 use url::Url;

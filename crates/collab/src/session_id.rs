@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
-use collab::messages::SessionId as CollabSessionId;
+use collab_client::messages::SessionId as CollabSessionId;
 use nomad::prelude::{CommandArgs, WarningMsg};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
@@ -54,7 +54,7 @@ pub enum SessionIdFromArgsError {
 
     /// The command arguments contained an invalid session ID.
     #[error(transparent)]
-    InvalidArg(#[from] collab::SessionIdFromStrError),
+    InvalidArg(#[from] collab_client::SessionIdFromStrError),
 
     /// The command arguments contained more than one argument.
     #[error("expected a session ID")]
