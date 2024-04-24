@@ -348,33 +348,15 @@ impl<T: AsRef<str>> Apply<(&cola::Insertion, T)> for Buffer {
         &mut self,
         (insertion, text): (&cola::Insertion, T),
     ) -> Self::Diff {
-        let offset = self.state.with_mut(|inner| {
-            inner.replica_mut().integrate_insertion(insertion)
+        let maybe_point = self.state.with_mut(|inner| {
+            let offset = inner.replica_mut().integrate_insertion(insertion)?;
+            inner.rope_mut().insert(offset, text.as_ref());
+            Some(ByteOffset::new(offset).into_ctx(inner.rope()))
         });
 
-        if let Some(offset) = offset {
-            self.state.with_mut(|inner| {
-                inner.rope_mut().insert(offset, text.as_ref());
-            });
-
-            let point = self
-                .state
-                .with(|inner| ByteOffset::new(offset).into_ctx(inner.rope()));
-
+        if let Some(point) = maybe_point {
             self.nvim.edit(Replacement::insertion(point, text.as_ref()));
         }
-    }
-}
-
-impl<T: AsRef<str>> Apply<(cola::Insertion, T)> for Buffer {
-    type Diff = ();
-
-    #[inline]
-    fn apply(
-        &mut self,
-        (insertion, text): (cola::Insertion, T),
-    ) -> Self::Diff {
-        self.apply((&insertion, text))
     }
 }
 
@@ -404,14 +386,5 @@ impl Apply<&cola::Deletion> for Buffer {
         for byte_range in byte_ranges.into_iter().rev() {
             self.state.with_mut(|inner| inner.rope_mut().delete(byte_range));
         }
-    }
-}
-
-impl Apply<cola::Deletion> for Buffer {
-    type Diff = ();
-
-    #[inline]
-    fn apply(&mut self, deletion: cola::Deletion) -> Self::Diff {
-        self.apply(&deletion)
     }
 }
