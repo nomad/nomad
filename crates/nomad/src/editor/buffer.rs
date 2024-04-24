@@ -1,21 +1,24 @@
 use alloc::collections::VecDeque;
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use core::iter;
 use core::ops::Range;
 
 use async_broadcast::{InactiveReceiver, Sender};
 use cola::{Anchor, Replica, ReplicaId};
-use crop::{Rope, RopeBuilder};
-use nvim::api::{self, opts};
+use crop::Rope;
+use nvim::api;
 
 use super::{BufferState, LocalDeletion, LocalInsertion};
 use crate::runtime::spawn;
 use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
 use crate::{
+    Apply,
     BufferSnapshot,
     ByteOffset,
+    Edit,
     EditorId,
+    FromCtx,
+    IntoCtx,
     NvimBuffer,
     Point,
     Replacement,
@@ -119,6 +122,15 @@ impl Buffer {
         };
 
         Self::new(state, buf)
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn edit<E>(&mut self, edit: E, editor_id: EditorId) -> E::Diff
+    where
+        E: Edit<Self>,
+    {
+        todo!();
     }
 
     /// TODO: docs
@@ -287,5 +299,34 @@ impl From<RemoteDeletion> for AppliedDeletion {
     #[inline]
     fn from(deletion: RemoteDeletion) -> Self {
         AppliedDeletion::new(deletion.inner)
+    }
+}
+
+impl Apply<&cola::Deletion> for Buffer {
+    type Diff = ();
+
+    #[inline]
+    fn apply(&mut self, deletion: &cola::Deletion) -> Self::Diff {
+        let byte_ranges = self.state.with_mut(|inner| {
+            inner.replica_mut().integrate_deletion(deletion)
+        });
+
+        let point_ranges = byte_ranges
+            .iter()
+            .cloned()
+            .map(|range| {
+                ByteOffset::from(range.start)..ByteOffset::from(range.end)
+            })
+            .map(|range| {
+                self.state.with(|inner| range.into_ctx(inner.rope()))
+            });
+
+        for point_range in point_ranges.rev() {
+            self.nvim.edit(Replacement::deletion(point_range));
+        }
+
+        for byte_range in byte_ranges.into_iter().rev() {
+            self.state.with_mut(|inner| inner.rope_mut().delete(byte_range));
+        }
     }
 }

@@ -36,13 +36,16 @@ impl BufferState {
     }
 
     #[inline]
-    fn with<R>(&self, f: impl FnOnce(&BufferInner) -> R) -> R {
+    pub(crate) fn with<R>(&self, f: impl FnOnce(&BufferInner) -> R) -> R {
         let inner = self.inner.borrow();
         f(&inner)
     }
 
     #[inline]
-    fn with_mut<R>(&self, f: impl FnOnce(&mut BufferInner) -> R) -> R {
+    pub(crate) fn with_mut<R>(
+        &self,
+        f: impl FnOnce(&mut BufferInner) -> R,
+    ) -> R {
         let mut inner = self.inner.borrow_mut();
         f(&mut inner)
     }
@@ -132,10 +135,28 @@ impl BufferInner {
         Point::new(row, col)
     }
 
+    /// Returns an exclusive reference to the buffer's [`Replica`].
+    #[inline]
+    pub(crate) fn replica_mut(&mut self) -> &mut Replica {
+        &mut self.replica
+    }
+
     /// TODO: docs
     #[inline]
     pub fn resolve_anchor(&self, anchor: &Anchor) -> Option<ByteOffset> {
         self.replica.resolve_anchor(*anchor).map(ByteOffset::new)
+    }
+
+    /// Returns a shared reference to the buffer's [`Rope`].
+    #[inline]
+    pub(crate) fn rope(&self) -> &Rope {
+        &self.text
+    }
+
+    /// Returns an exclusive reference to the buffer's [`Rope`].
+    #[inline]
+    pub(crate) fn rope_mut(&mut self) -> &mut Rope {
+        &mut self.text
     }
 
     /// TODO: docs
