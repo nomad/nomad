@@ -50,15 +50,6 @@ impl<Offset: Copy> Replacement<Offset> {
         }
     }
 
-    /// TODO: docs.
-    #[inline]
-    pub fn no_op() -> Self
-    where
-        Offset: Default,
-    {
-        Self::insertion(Default::default(), "")
-    }
-
     /// The deleted range.
     #[inline]
     pub fn range(&self) -> Range<Offset> {

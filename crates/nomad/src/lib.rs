@@ -14,6 +14,7 @@ mod autocmd_id;
 mod buffer;
 mod buffer_snapshot;
 mod byte_offset;
+mod cola_replacement;
 mod command;
 mod config;
 mod edit;
