@@ -12,7 +12,7 @@ use crate::{
     Apply,
     BufferSnapshot,
     ByteOffset,
-    ColaReplacement,
+    CrdtReplacement,
     Edit,
     EditorId,
     IntoCtx,
@@ -112,7 +112,7 @@ impl Buffer {
         move |replacement| {
             if should_broadcast.get().should_broadcast() {
                 let edit = inner
-                    .with_mut(|inner| inner.edit(replacement.clone()))
+                    .with_mut(|inner| inner.apply(replacement.clone()))
                     .with_editor(EditorId::unknown());
 
                 broadcaster.broadcast(edit);
@@ -184,15 +184,14 @@ impl Apply<Replacement<ByteOffset>> for Buffer {
 
     #[inline]
     fn apply(&mut self, replacement: Replacement<ByteOffset>) -> Self::Diff {
-        let point_range = self
-            .inner
-            .with(|inner| replacement.range().into_ctx(inner.rope()));
+        let point_range =
+            self.inner.with(|inner| replacement.range().into_ctx(&inner.text));
 
         self.broadcast_status.set(BroadcastStatus::DontBroadcast);
         self.nvim.edit(replacement.clone().map_range(|_| point_range));
         self.broadcast_status.set(BroadcastStatus::Broadcast);
 
-        self.inner.with_mut(|inner| inner.edit(replacement))
+        self.inner.with_mut(|inner| inner.apply(replacement))
     }
 }
 
@@ -228,14 +227,14 @@ impl<T: AsRef<str>> Apply<(cola::Insertion, T)> for Buffer {
         let text = text.as_ref();
 
         let Some(offset) = self.inner.with_mut(|inner| {
-            let off = inner.replica_mut().integrate_insertion(&insertion)?;
-            inner.rope_mut().insert(off, text);
+            let off = inner.replica.integrate_insertion(&insertion)?;
+            inner.text.insert(off, text);
             Some(ByteOffset::new(off))
         }) else {
             return Edit::no_op();
         };
 
-        let point = self.inner.with(|inner| offset.into_ctx(inner.rope()));
+        let point = self.inner.with(|inner| offset.into_ctx(&inner.text));
 
         self.broadcast_status.set(BroadcastStatus::DontBroadcast);
         self.nvim.edit(Replacement::insertion(point, text));
@@ -250,13 +249,13 @@ impl Apply<cola::Deletion> for Buffer {
 
     #[inline]
     fn apply(&mut self, deletion: cola::Deletion) -> Self::Diff {
-        let byte_ranges = self.inner.with_mut(|inner| {
-            inner.replica_mut().integrate_deletion(&deletion)
-        });
+        let byte_ranges = self
+            .inner
+            .with_mut(|inner| inner.replica.integrate_deletion(&deletion));
 
         let point_ranges =
             byte_ranges.iter().cloned().map(utils::into_byte_range).map(
-                |range| self.inner.with(|inner| range.into_ctx(inner.rope())),
+                |range| self.inner.with(|inner| range.into_ctx(&inner.text)),
             );
 
         self.broadcast_status.set(BroadcastStatus::DontBroadcast);
@@ -268,7 +267,7 @@ impl Apply<cola::Deletion> for Buffer {
         self.broadcast_status.set(BroadcastStatus::Broadcast);
 
         for byte_range in byte_ranges.iter().cloned().rev() {
-            self.inner.with_mut(|inner| inner.rope_mut().delete(byte_range));
+            self.inner.with_mut(|inner| inner.text.delete(byte_range));
         }
 
         Edit::remote_deletion(
@@ -280,7 +279,7 @@ impl Apply<cola::Deletion> for Buffer {
 
 /// TODO: docs
 #[derive(Clone)]
-pub(super) struct BufferInner {
+struct BufferInner {
     /// TODO: docs
     replica: Replica,
 
@@ -289,30 +288,15 @@ pub(super) struct BufferInner {
 }
 
 impl BufferInner {
-    /// TODO: docs
     #[inline]
-    pub fn delete(&mut self, range: Range<ByteOffset>) -> cola::Deletion {
+    fn delete(&mut self, range: Range<ByteOffset>) -> cola::Deletion {
         let range: Range<usize> = range.start.into()..range.end.into();
         self.text.delete(range.clone());
         self.replica.deleted(range)
     }
 
-    /// TODO: docs
     #[inline]
-    pub fn edit<E>(&mut self, edit: E) -> <Self as Apply<E>>::Diff
-    where
-        Self: Apply<E>,
-    {
-        self.apply(edit)
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn insert(
-        &mut self,
-        offset: ByteOffset,
-        text: &str,
-    ) -> cola::Insertion {
+    fn insert(&mut self, offset: ByteOffset, text: &str) -> cola::Insertion {
         self.text.insert(offset.into(), text);
         self.replica.inserted(offset.into(), text.len())
     }
@@ -330,33 +314,13 @@ impl BufferInner {
         Self { replica, text }
     }
 
-    /// Returns an exclusive reference to the buffer's [`Replica`].
     #[inline]
-    pub(crate) fn replica_mut(&mut self) -> &mut Replica {
-        &mut self.replica
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn resolve_anchor(&self, anchor: &Anchor) -> Option<ByteOffset> {
+    fn resolve_anchor(&self, anchor: &Anchor) -> Option<ByteOffset> {
         self.replica.resolve_anchor(*anchor).map(ByteOffset::new)
     }
 
-    /// Returns a shared reference to the buffer's [`Rope`].
     #[inline]
-    pub(crate) fn rope(&self) -> &Rope {
-        &self.text
-    }
-
-    /// Returns an exclusive reference to the buffer's [`Rope`].
-    #[inline]
-    pub(crate) fn rope_mut(&mut self) -> &mut Rope {
-        &mut self.text
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn snapshot(&self) -> BufferSnapshot {
+    fn snapshot(&self) -> BufferSnapshot {
         BufferSnapshot::new(self.replica.clone(), self.text.clone())
     }
 }
@@ -366,7 +330,7 @@ impl Apply<Replacement<ByteOffset>> for BufferInner {
 
     #[inline]
     fn apply(&mut self, repl: Replacement<ByteOffset>) -> Self::Diff {
-        let mut crdt = ColaReplacement::new_no_op();
+        let mut crdt = CrdtReplacement::new_no_op();
 
         if !repl.range().is_empty() {
             crdt.with_deletion(self.delete(repl.range()));

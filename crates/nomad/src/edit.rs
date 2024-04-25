@@ -4,13 +4,13 @@ use cola::{Deletion, Insertion};
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
-use crate::{ByteOffset, ColaReplacement, EditorId, Replacement};
+use crate::{ByteOffset, CrdtReplacement, EditorId, Replacement};
 
 /// TODO: docs
 #[derive(Debug, Clone)]
 pub struct Edit {
     applied_by: EditorId,
-    cola_replacement: ColaReplacement,
+    crdt_replacement: CrdtReplacement,
     replacements: SmallVec<[Replacement<ByteOffset>; 1]>,
 }
 
@@ -23,19 +23,19 @@ impl Edit {
 
     /// TODO: docs
     #[inline]
-    pub fn cola_replacement(&self) -> &ColaReplacement {
-        &self.cola_replacement
+    pub fn crdt_replacement(&self) -> &CrdtReplacement {
+        &self.crdt_replacement
     }
 
     /// TODO: docs
     #[inline]
     pub(crate) fn local(
         text: Replacement<ByteOffset>,
-        crdt: ColaReplacement,
+        crdt: CrdtReplacement,
     ) -> Self {
         Self {
             applied_by: EditorId::unknown(),
-            cola_replacement: crdt,
+            crdt_replacement: crdt,
             replacements: SmallVec::from_elem(text, 1),
         }
     }
@@ -45,7 +45,7 @@ impl Edit {
     pub(crate) fn no_op() -> Self {
         Self {
             applied_by: EditorId::unknown(),
-            cola_replacement: ColaReplacement::new_no_op(),
+            crdt_replacement: CrdtReplacement::new_no_op(),
             replacements: SmallVec::new(),
         }
     }
@@ -61,7 +61,7 @@ impl Edit {
 
         Self {
             applied_by: EditorId::unknown(),
-            cola_replacement: ColaReplacement::new_insertion(crdt),
+            crdt_replacement: CrdtReplacement::new_insertion(crdt),
             replacements: SmallVec::from_elem(replacement, 1),
         }
     }
@@ -77,7 +77,7 @@ impl Edit {
 
         Self {
             applied_by: EditorId::unknown(),
-            cola_replacement: ColaReplacement::new_deletion(crdt),
+            crdt_replacement: CrdtReplacement::new_deletion(crdt),
             replacements,
         }
     }

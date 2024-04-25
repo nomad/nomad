@@ -2,12 +2,12 @@ use cola::{Deletion, Insertion};
 
 /// TODO: docs
 #[derive(Clone, Debug)]
-pub struct ColaReplacement {
+pub struct CrdtReplacement {
     deletion: Option<Deletion>,
     insertion: Option<Insertion>,
 }
 
-impl ColaReplacement {
+impl CrdtReplacement {
     /// TODO: docs
     #[inline]
     pub fn deletion(&self) -> Option<&Deletion> {
@@ -20,19 +20,19 @@ impl ColaReplacement {
         self.insertion.as_ref()
     }
 
-    /// Creates a new deletion-only [`ColaReplacement`].
+    /// Creates a new deletion-only [`CrdtReplacement`].
     #[inline]
     pub(crate) fn new_deletion(deletion: Deletion) -> Self {
         Self { deletion: Some(deletion), insertion: None }
     }
 
-    /// Creates a new insertion-only [`ColaReplacement`].
+    /// Creates a new insertion-only [`CrdtReplacement`].
     #[inline]
     pub(crate) fn new_insertion(insertion: Insertion) -> Self {
         Self { deletion: None, insertion: Some(insertion) }
     }
 
-    /// Creates a new [`ColaReplacement`] representing a no-op.
+    /// Creates a new [`CrdtReplacement`] representing a no-op.
     #[inline]
     pub(crate) fn new_no_op() -> Self {
         Self { deletion: None, insertion: None }
