@@ -34,6 +34,7 @@ pub mod shared;
 pub mod streams;
 #[cfg(feature = "tests")]
 pub mod tests;
+mod utils;
 pub mod warning;
 
 pub use nomad::Nomad;

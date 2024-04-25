@@ -20,23 +20,13 @@ impl ColaReplacement {
         self.insertion.as_ref()
     }
 
-    /// TODO: docs
-    #[inline]
-    pub(crate) fn new(deletion: Deletion, insertion: Insertion) -> Self {
-        Self { deletion: Some(deletion), insertion: Some(insertion) }
-    }
-
     /// Creates a new deletion-only [`ColaReplacement`].
-    ///
-    /// This is just a convenience method over [`ColaReplacement::new`].
     #[inline]
     pub(crate) fn new_deletion(deletion: Deletion) -> Self {
         Self { deletion: Some(deletion), insertion: None }
     }
 
     /// Creates a new insertion-only [`ColaReplacement`].
-    ///
-    /// This is just a convenience method over [`ColaReplacement::new`].
     #[inline]
     pub(crate) fn new_insertion(insertion: Insertion) -> Self {
         Self { deletion: None, insertion: Some(insertion) }
@@ -46,5 +36,21 @@ impl ColaReplacement {
     #[inline]
     pub(crate) fn new_no_op() -> Self {
         Self { deletion: None, insertion: None }
+    }
+
+    /// Sets the deletion part of this replacement.
+    ///
+    /// Note that this will overwrite any previously-set deletion.
+    #[inline]
+    pub(crate) fn with_deletion(&mut self, deletion: Deletion) {
+        self.deletion = Some(deletion);
+    }
+
+    /// Sets the insertion part of this replacement.
+    ///
+    /// Note that this will overwrite any previously-set insertion.
+    #[inline]
+    pub(crate) fn with_insertion(&mut self, insertion: Insertion) {
+        self.insertion = Some(insertion);
     }
 }
