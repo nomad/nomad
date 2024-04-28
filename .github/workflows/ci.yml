@@ -16,33 +16,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set PAT to access private repos
+        env:
+          PAT: ${{ secrets.NOIB3_PAT }}
+        run: |
+          git config --global --replace-all "url.https://noib3:$PAT@github.com.insteadOf" ssh://git@github.com
+          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" git@github.com
+          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" https://github.com
       - uses: dtolnay/rust-toolchain@nightly
-      - name: Access nomad/collab
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.COLLAB_SSH_PRIVATE_KEY }}
-      - name: Access nomad/pond
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.POND_SSH_PRIVATE_KEY }}
-      - run: cargo test --no-fail-fast
+      - run: cargo test --release --no-fail-fast
 
   clippy:
     name: clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set PAT to access private repos
+        env:
+          PAT: ${{ secrets.NOIB3_PAT }}
+        run: |
+          git config --global --replace-all "url.https://noib3:$PAT@github.com.insteadOf" ssh://git@github.com
+          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" git@github.com
+          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" https://github.com
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
-      - name: Access nomad/collab
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.COLLAB_SSH_PRIVATE_KEY }}
-      - name: Access nomad/pond
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.POND_SSH_PRIVATE_KEY }}
       - run: cargo clippy --all-targets -- -D warnings
 
   docs:
@@ -50,15 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set PAT to access private repos
+        env:
+          PAT: ${{ secrets.NOIB3_PAT }}
+        run: |
+          git config --global --replace-all "url.https://noib3:$PAT@github.com.insteadOf" ssh://git@github.com
+          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" git@github.com
+          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" https://github.com
       - uses: dtolnay/rust-toolchain@nightly
-      - name: Access nomad/collab
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.COLLAB_SSH_PRIVATE_KEY }}
-      - name: Access nomad/pond
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.POND_SSH_PRIVATE_KEY }}
       - run: RUSTDOCFLAGS="--cfg docsrs" cargo doc #--all-features
 
   format:
