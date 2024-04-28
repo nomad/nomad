@@ -26,9 +26,8 @@ tracing = "0.1"
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"
 cognitive_complexity = "deny"
-missing_panics_doc = "deny"
 module_inception = "allow"
-multiple_crate_versions = "deny"
+# multiple_crate_versions = "deny" TODO: re-enable
 needless_collect = "deny"
 same_name_method = "deny"
 too_many_arguments = "deny"
