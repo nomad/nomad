@@ -102,7 +102,7 @@ pub struct ReplacementCtx<Buffer, RangeLen, TextLen> {
 }
 
 impl<Buffer, RangeLen, TextLen> ReplacementCtx<Buffer, RangeLen, TextLen> {
-    /// Creates a new [`EditCtx`].
+    /// Creates a new [`ReplacementCtx`].
     pub fn new(
         string: Buffer,
         range_len: RangeLen,

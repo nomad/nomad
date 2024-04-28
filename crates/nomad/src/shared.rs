@@ -2,6 +2,7 @@
 
 use alloc::rc::Rc;
 use core::cell::{Cell, UnsafeCell};
+#[cfg(debug_assertions)]
 use core::panic::Location;
 
 /// TODO: docs
@@ -202,20 +203,20 @@ pub struct BorrowError {
 
 impl BorrowError {
     #[inline]
-    fn new_exclusive(borrow: ExclusiveBorrow) -> Self {
+    fn new_exclusive(_borrow: ExclusiveBorrow) -> Self {
         Self {
             is_exclusive: true,
             #[cfg(debug_assertions)]
-            location: borrow.location,
+            location: _borrow.location,
         }
     }
 
     #[inline]
-    fn new_shared(borrow: SharedBorrow) -> Self {
+    fn new_shared(_borrow: SharedBorrow) -> Self {
         Self {
             is_exclusive: false,
             #[cfg(debug_assertions)]
-            location: borrow.location,
+            location: _borrow.location,
         }
     }
 }
