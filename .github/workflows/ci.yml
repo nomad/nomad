@@ -37,7 +37,7 @@ jobs:
             neovim: true
             version: ${{ matrix.neovim }}
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo test ${{ matrix.features }} --no-fail-fast
+      - run: CI=true cargo test ${{ matrix.features }} --no-fail-fast
 
   clippy:
     name: clippy

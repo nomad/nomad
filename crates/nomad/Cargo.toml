@@ -10,7 +10,6 @@ publish = false
 default = ["neovim-0-9"]
 neovim-0-9 = ["nvim/neovim-0-9"]
 neovim-nightly = ["nvim/neovim-nightly"]
-
 tests = ["nvim/test", "rand", "rand_chacha", "rand_distr"]
 
 [dependencies]

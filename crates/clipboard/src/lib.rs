@@ -80,6 +80,10 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(
+        all(target_os = "linux", feature = "__ci"),
+        ignore = "fails on headless X11"
+    )]
     fn clipboard_set_get_cycle() {
         for idx in 0..10 {
             set(idx).unwrap();
