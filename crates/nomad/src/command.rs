@@ -247,12 +247,6 @@ impl CommandArgs {
 
     /// TODO: docs
     #[inline]
-    pub fn into_iter(self) -> impl Iterator<Item = String> {
-        self.args.into_iter().skip(self.consumed)
-    }
-
-    /// TODO: docs
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -276,6 +270,16 @@ impl CommandArgs {
             .get(self.consumed)
             .map(String::as_str)
             .inspect(|_| self.consumed += 1)
+    }
+}
+
+impl IntoIterator for CommandArgs {
+    type Item = String;
+    type IntoIter = std::iter::Skip<std::vec::IntoIter<Self::Item>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.args.into_iter().skip(self.consumed)
     }
 }
 

@@ -76,7 +76,12 @@ impl BuildingGuard {
     }
 
     fn lock(&self) -> Result<(), TestError> {
-        fs::create_dir_all(&self.lock_file_path.parent().unwrap())?;
+        let parent = self
+            .lock_file_path
+            .parent()
+            .expect("lock file is inside a directory");
+
+        fs::create_dir_all(parent)?;
         fs::write(&self.lock_file_path, "").map_err(Into::into)
     }
 
@@ -85,7 +90,7 @@ impl BuildingGuard {
     }
 
     fn unlock(&self) -> Result<(), TestError> {
-        fs::remove_file(&self.lock_file_path).unwrap();
+        fs::remove_file(&self.lock_file_path)?;
         Ok(())
     }
 }
