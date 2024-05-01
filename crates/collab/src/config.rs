@@ -185,7 +185,7 @@ mod tests {
 
     /// Tests that a session can be started using the connector created from
     /// the default `CollabConfig`.
-    #[async_std::test]
+    #[macro_rules_attribute::apply(smol_macros::test!)]
     async fn collab_config_connector_start() {
         let connector = Config::default().connector().unwrap();
         assert_eq!(connector.start().await.map(|_| ()), Ok(()));
