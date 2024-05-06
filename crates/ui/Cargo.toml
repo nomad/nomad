@@ -11,6 +11,7 @@ default = ["neovim-nightly"]
 neovim-nightly = ["nvim/neovim-nightly"]
 
 [dependencies]
+compact_str = "0.7"
 nvim = { workspace = true }
 
 [lints]
