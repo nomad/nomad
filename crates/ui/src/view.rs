@@ -1,7 +1,7 @@
 use api::types::*;
 use nvim::api;
 
-use crate::{Render, Scene};
+use crate::{Bound, Cells, Render, RequestedBound, Scene};
 
 /// TODO: docs.
 pub(crate) struct View {
@@ -13,6 +13,9 @@ pub(crate) struct View {
 
     /// TODO: docs.
     scene: Scene,
+
+    /// TODO: docs.
+    size: Bound<Cells>,
 
     /// TODO: docs.
     window: api::Window,
@@ -39,5 +42,32 @@ impl View {
         // Self { buffer, window }
 
         todo!();
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub(crate) fn render(&mut self, available_size: Bound<Cells>) {
+        let requested_size = self.root.layout();
+
+        let size = match requested_size {
+            RequestedBound::Explicit(size) => size.intersect(available_size),
+            RequestedBound::Available => available_size,
+        };
+
+        self.scene.resize(size);
+
+        let scene_fragment = self.scene.as_fragment();
+
+        self.root.paint(scene_fragment);
+
+        self.scene.diff().apply(self);
+
+        self.size = size;
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub(crate) fn size(&self) -> Bound<Cells> {
+        self.size
     }
 }

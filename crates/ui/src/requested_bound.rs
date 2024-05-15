@@ -3,7 +3,7 @@ use crate::{Bound, Metric};
 /// TODO: docs.
 pub enum RequestedBound<T: Metric> {
     /// TODO: docs.
-    Exact(Bound<T>),
+    Explicit(Bound<T>),
 
     /// TODO: docs.
     Available,
@@ -13,7 +13,7 @@ impl<T: Metric> RequestedBound<T> {
     /// Creates a new empty `RequestedBound`.
     #[inline]
     pub fn empty() -> Self {
-        Self::Exact(Bound::empty())
+        Self::Explicit(Bound::empty())
     }
 
     /// Maps a `RequestedBound<T>` to a `RequestedBound<U>` by applying the
@@ -26,7 +26,7 @@ impl<T: Metric> RequestedBound<T> {
         U: Metric,
     {
         match self {
-            Self::Exact(bound) => RequestedBound::Exact(f(bound)),
+            Self::Explicit(bound) => RequestedBound::Explicit(f(bound)),
             Self::Available => RequestedBound::Available,
         }
     }

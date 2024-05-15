@@ -17,6 +17,15 @@ impl<T: Metric> Bound<T> {
         Self { height: T::zero(), width: T::zero() }
     }
 
+    /// TODO: docs
+    #[inline]
+    pub fn intersect(self, other: Self) -> Self {
+        Self {
+            height: self.height.min(other.height),
+            width: self.width.min(other.width),
+        }
+    }
+
     /// Creates a new empty `Bound`.
     #[inline]
     pub fn new<H, W>(height: H, width: W) -> Self

@@ -21,7 +21,7 @@ impl Render for Text {
         // TODO: is it worth counting graphemes instead of characters?
         // TODO: support soft wrapping.
         let bound = Bound::new(1u32, chars::count(&self.inner) as u32);
-        RequestedBound::Exact(bound)
+        RequestedBound::Explicit(bound)
     }
 
     #[inline]

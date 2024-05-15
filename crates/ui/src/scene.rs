@@ -1,4 +1,4 @@
-use crate::{SceneFragment, View};
+use crate::{Bound, Cells, SceneFragment, View};
 
 /// TODO: docs
 pub(crate) struct Scene {}
@@ -15,6 +15,12 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn diff(&self) -> SceneDiff {
+        todo!();
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub(crate) fn resize(&mut self, new_size: Bound<Cells>) {
         todo!();
     }
 }
