@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::{Render, View};
+use crate::{Bound, Cells, Render, View};
 
 /// TODO: docs
 pub struct Popover {
@@ -8,10 +8,7 @@ pub struct Popover {
     anchor: PopoverAnchor,
 
     /// TODO: docs
-    root: Box<dyn Render + 'static>,
-
-    /// TODO: docs
-    window: View,
+    view: View,
 }
 
 impl Popover {
@@ -23,13 +20,43 @@ impl Popover {
 
     #[inline]
     fn uninit() -> Self {
-        Self {
-            anchor: PopoverAnchor::Editor,
-            root: Box::new(()),
-            window: View::new_hidden(),
-        }
+        Self { anchor: PopoverAnchor::Editor, view: View::new_hidden() }
     }
 }
+
+// the first time a popover is opened, we:
+//
+// - get the available size we have;
+// - ask the root render its layout. together with the total size this will
+// determine the size of the popover;
+// - set the size of the scene to that size;
+// - paint the root render into the scene;
+// - paint the entire scene into the view;
+//
+// once that's done, we'll only re-render if:
+//
+// - the anchor changes;
+// - the position of the anchor changes;
+// - the size of the terminal changes;
+//
+// or if:
+//
+// - a reactive used when rendering changes.
+//
+// If we change for one of the first 3 reasons, may be able to just reposition
+// the view without re-rendering it. to determine this:
+//
+// - get the new available size;
+// - if it's the same, we're done;
+// - if the last time we rendered the requested bound was:
+//   * Available -> we re-render from scratch;
+//   * Explicit with bound > current size -> we re-render from scratch;
+//   * Explicit with bound <= current size -> we just reposition the view;
+//
+// If we change because a reactive changed, we do re-layout and re-paint,
+// incrementally. The `Scene` will then tell us how to change the view while
+// doing the least amount of work possible. This means we shouldn't re-render
+// everything if the size or layout changes.
 
 /// TODO: docs
 pub enum PopoverAnchor {
@@ -38,6 +65,15 @@ pub enum PopoverAnchor {
 
     /// TODO: docs
     Editor,
+}
+
+impl PopoverAnchor {
+    /// Returns the maximum size a popover can have when anchored to this
+    /// anchor.
+    #[inline]
+    fn max_size(&self) -> Bound<Cells> {
+        todo!();
+    }
 }
 
 /// TODO: docs
@@ -53,8 +89,9 @@ impl PopoverBuilder<RootRender> {
     where
         R: Render + 'static,
     {
-        self.popover.root = Box::new(root);
-        PopoverBuilder { popover: self.popover, _state: PhantomData }
+        // self.popover.root = Box::new(root);
+        // PopoverBuilder { popover: self.popover, _state: PhantomData }
+        todo!();
     }
 }
 

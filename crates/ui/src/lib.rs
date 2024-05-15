@@ -9,6 +9,7 @@ mod popover;
 mod react;
 pub mod render;
 mod requested_bound;
+mod scene;
 mod scene_fragment;
 mod view;
 
@@ -21,5 +22,6 @@ pub use popover::{Popover, PopoverAnchor, PopoverBuilder};
 pub use react::React;
 pub use render::{IntoRender, Render};
 pub use requested_bound::RequestedBound;
+pub(crate) use scene::Scene;
 pub use scene_fragment::{Cutout, SceneFragment};
 use view::View;

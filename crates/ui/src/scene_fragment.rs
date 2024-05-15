@@ -51,6 +51,6 @@ pub trait Cutout {
     /// TODO: docs.
     fn cutout(
         self,
-        fragment: SceneFragment<'_>,
-    ) -> (SceneFragment<'_>, Self::Cutout<'_>);
+        fragment: SceneFragment,
+    ) -> (SceneFragment, Self::Cutout<'_>);
 }

@@ -1,10 +1,18 @@
 use api::types::*;
 use nvim::api;
 
+use crate::{Render, Scene};
+
 /// TODO: docs.
 pub(crate) struct View {
     /// TODO: docs.
     buffer: api::Buffer,
+
+    /// TODO: docs.
+    root: Box<dyn Render + 'static>,
+
+    /// TODO: docs.
+    scene: Scene,
 
     /// TODO: docs.
     window: api::Window,
@@ -25,9 +33,11 @@ impl View {
             .hide(true)
             .build();
 
-        let window = api::open_win(&buffer, false, &config)
+        let _window = api::open_win(&buffer, false, &config)
             .expect("the config is valid");
 
-        Self { buffer, window }
+        // Self { buffer, window }
+
+        todo!();
     }
 }
