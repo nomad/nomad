@@ -19,6 +19,12 @@ impl<T: Metric> Bound<T> {
 
     /// TODO: docs
     #[inline]
+    pub fn height(&self) -> T {
+        self.height
+    }
+
+    /// TODO: docs
+    #[inline]
     pub fn intersect(self, other: Self) -> Self {
         Self {
             height: self.height.min(other.height),
@@ -40,6 +46,12 @@ impl<T: Metric> Bound<T> {
         W: Into<T>,
     {
         Self { height: height.into(), width: width.into() }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn width(&self) -> T {
+        self.width
     }
 }
 

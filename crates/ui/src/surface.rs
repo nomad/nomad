@@ -3,7 +3,7 @@ use core::ops::{Range, RangeBounds};
 use api::types::*;
 use nvim::api;
 
-use crate::{Highlight, HighlightName};
+use crate::{Bound, Cells, Highlight};
 
 pub(crate) type ByteOffset = usize;
 
@@ -119,6 +119,17 @@ impl Surface {
             range.end.offset,
             lines,
         );
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn resize_window(&mut self, new_size: Bound<Cells>) {
+        let config = WindowConfig::builder()
+            .height(new_size.height().into())
+            .width(new_size.width().into())
+            .build();
+
+        let _ = self.window.set_config(&config);
     }
 }
 
