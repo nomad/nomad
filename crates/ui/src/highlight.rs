@@ -51,6 +51,7 @@ pub trait Highlight: Sized {
 }
 
 /// TODO: docs
+#[derive(Copy, Clone)]
 pub struct HighlightName {
     str: &'static str,
 }
