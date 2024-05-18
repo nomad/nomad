@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use core::cmp::Ordering;
 
 use compact_str::CompactString;
 
@@ -88,6 +89,40 @@ impl SceneLine {
 
     /// TODO: docs.
     #[inline]
+    fn run_at_offset(&self, offset: Cells, bias: Bias) -> (&SceneRun, Cells) {
+        let mut run_offset = Cells::default();
+        let mut runs = self.runs.iter();
+
+        loop {
+            let Some(mut run) = runs.next() else {
+                panic!("offset out of bounds");
+            };
+
+            match (run_offset + run.width()).cmp(&offset) {
+                Ordering::Less => {
+                    run_offset += run.width();
+                },
+
+                Ordering::Equal => {
+                    if bias == Bias::Right {
+                        if let Some(next_run) = runs.next() {
+                            run_offset += run.width();
+                            run = next_run;
+                        }
+                    }
+
+                    return (run, run_offset);
+                },
+
+                Ordering::Greater => {
+                    return (run, run_offset);
+                },
+            }
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
     fn truncate(&mut self, _len: Cells) {
         todo!();
     }
@@ -99,6 +134,12 @@ impl SceneLine {
         // or by storing the runs in a Btree.
         self.runs.iter().map(SceneRun::width).sum()
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Bias {
+    Left,
+    Right,
 }
 
 /// TODO: docs
