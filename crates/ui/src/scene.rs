@@ -3,8 +3,15 @@ use compact_str::CompactString;
 use crate::{Bound, Cells, SceneFragment, Surface};
 
 /// TODO: docs
+#[derive(Debug, Default)]
 pub(crate) struct Scene {
+    /// TODO: docs.
     lines: Vec<SceneLine>,
+
+    /// TODO: docs.
+    width: Cells,
+
+    /// TODO: docs.
     diff: DiffTracker,
 }
 
@@ -37,7 +44,7 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn new() -> Self {
-        todo!()
+        Self::default()
     }
 
     /// TODO: docs
@@ -57,11 +64,12 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn width(&self) -> Cells {
-        todo!();
+        self.width
     }
 }
 
 /// TODO: docs
+#[derive(Debug)]
 struct SceneLine {
     runs: Vec<SceneRun>,
 }
@@ -87,6 +95,7 @@ impl SceneLine {
 }
 
 /// TODO: docs
+#[derive(Debug)]
 struct SceneRun {
     /// TODO: docs.
     text: CompactString,
@@ -238,6 +247,7 @@ impl TruncateLinesOp {
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
         scene.lines.iter_mut().for_each(|line| line.truncate(cells));
+        scene.width = cells;
     }
 }
 
@@ -344,6 +354,7 @@ impl ExtendLinesOp {
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
         scene.lines.iter_mut().for_each(|line| line.extend(cells));
+        scene.width = cells;
     }
 }
 
