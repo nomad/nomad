@@ -1,3 +1,5 @@
+use alloc::borrow::Cow;
+
 use compact_str::CompactString;
 
 use crate::{Bound, Cells, SceneFragment, Surface};
@@ -116,7 +118,31 @@ impl SceneRun {
         Self::Empty { width }
     }
 
-    /// TODO: docs.
+    /// Returns the text of the `SceneRun`.
+    #[inline]
+    fn text(&self) -> Cow<str> {
+        /// The sole purpose of this constant is to avoid allocating when the
+        /// text is empty.
+        const SPACES: &str = r#"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "#;
+
+        match self {
+            Self::Empty { width } => {
+                let len = u32::from(*width) as usize;
+                if len > SPACES.len() {
+                    Cow::Owned(" ".repeat(len))
+                } else {
+                    Cow::Borrowed(&SPACES[..len])
+                }
+            },
+
+            Self::Text { text } => Cow::Borrowed(text.as_str()),
+        }
+    }
+
+    /// Returns the width of the `SceneRun`.
+    ///
+    /// This is equal to the number of terminal cells used to render the run's
+    /// [`text`](Self::text).
     #[inline]
     fn width(&self) -> Cells {
         match self {
