@@ -24,6 +24,7 @@ pub use cells::Cells;
 pub use color::Color;
 pub use component::Component;
 pub use expand_rect::ExpandRect;
+pub(crate) use highlight::HighlightGroup;
 pub use highlight::{Highlight, HighlightName};
 use memoize::Memoize;
 pub use metric::Metric;

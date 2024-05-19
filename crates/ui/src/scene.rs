@@ -8,7 +8,7 @@ use compact_str::CompactString;
 use crate::{
     Bound,
     Cells,
-    Highlight,
+    HighlightGroup,
     Memoize,
     Metric,
     Point,
@@ -736,27 +736,22 @@ impl Iterator for HlHunks<'_> {
 
 /// TODO: docs.
 #[derive(Debug)]
-struct HlHunk {}
+struct HlHunk {
+    hl_group: HighlightGroup,
+}
 
 /// TODO: docs.
 impl HlHunk {
     /// TODO: docs
     #[inline]
     fn apply_to(self, surface: &mut Surface) {
-        surface.highlight_text(self.point_range(), &self.hl());
+        surface.highlight_text(self.point_range(), &self.hl_group);
     }
 
     /// TODO: docs
     #[inline]
     fn point_range(&self) -> Range<Point> {
         todo!();
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn hl(&self) -> impl Highlight {
-        todo!();
-        crate::highlight::Normal
     }
 }
 
