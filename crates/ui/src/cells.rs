@@ -15,6 +15,18 @@ impl Cells {
     pub fn measure(text: &str) -> Self {
         Self(chars::count(text) as u32)
     }
+
+    /// Splits the given string slice into two slices, with the left one
+    /// measuring `self` cells.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` is greater than the number of cells in the given text.
+    #[inline]
+    pub fn split(self, text: &str) -> (&str, &str) {
+        let byte_offset = chars::to_byte_idx(text, self.0 as usize);
+        text.split_at(byte_offset)
+    }
 }
 
 impl From<u32> for Cells {

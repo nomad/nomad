@@ -421,67 +421,84 @@ impl ReplaceHunk {
 /// A `ResizeOp` is a collection of operations that resize a `Scene`.
 #[derive(Debug, Copy, Clone, Default)]
 struct ResizeOp {
-    old_size: Bound<Cells>,
-    shrink: ShrinkOp,
-    expand: ExpandOp,
+    vertical: Option<VerticalOp>,
+    horizontal: Option<HorizontalOp>,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum VerticalOp {
+    Shrink(VerticalShrinkOp),
+    Expand(VerticalExpandOp),
+}
+
+#[derive(Debug, Copy, Clone)]
+enum HorizontalOp {
+    Shrink(HorizontalShrinkOp),
+    Expand(HorizontalExpandOp),
+}
+
+impl HorizontalOp {
+    #[inline]
+    fn apply_to(self, scene: &mut Scene) {
+        match self {
+            Self::Shrink(truncate) => truncate.apply_to(scene),
+            Self::Expand(extend) => extend.apply_to(scene),
+        }
+    }
 }
 
 impl ResizeOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
-        self.shrink.apply_to(scene);
-        self.expand.apply_to(scene);
-    }
+        match self.vertical {
+            Some(VerticalOp::Shrink(delete)) => {
+                delete.apply_to(scene);
+                self.horizontal.inspect(|op| op.apply_to(scene));
+            },
 
-    #[inline]
-    fn new(old_size: Bound<Cells>, new_size: Bound<Cells>) -> Self {
-        let shrink = ShrinkOp::new(old_size, new_size);
-        let expand = ExpandOp::new(old_size, new_size);
-        Self { old_size, shrink, expand }
-    }
-}
+            Some(VerticalOp::Expand(insert)) => {
+                self.horizontal.inspect(|op| op.apply_to(scene));
+                insert.apply_to(scene);
+            },
 
-/// A `ShrinkOp` shrinks a [`Scene`] by deleting lines and/or truncating lines.
-#[derive(Debug, Copy, Clone, Default)]
-struct ShrinkOp {
-    delete_lines: Option<DeleteLinesOp>,
-    truncate_lines: Option<TruncateLinesOp>,
-}
-
-impl ShrinkOp {
-    #[inline]
-    fn apply_to(self, scene: &mut Scene) {
-        if let Some(delete_lines) = self.delete_lines {
-            delete_lines.apply_to(scene);
-        }
-
-        if let Some(truncate_lines) = self.truncate_lines {
-            truncate_lines.apply_to(scene);
+            None => {
+                self.horizontal.inspect(|op| op.apply_to(scene));
+            },
         }
     }
 
     #[inline]
     fn new(old_size: Bound<Cells>, new_size: Bound<Cells>) -> Self {
-        let delete_lines = if new_size.height() < old_size.height() {
-            Some(DeleteLinesOp((old_size.height() - new_size.height()).into()))
-        } else {
-            None
+        let vertical = match old_size.height().cmp(&new_size.height()) {
+            Ordering::Less => Some(VerticalOp::Expand(VerticalExpandOp(
+                (new_size.height() - old_size.height()).into(),
+            ))),
+            Ordering::Greater => Some(VerticalOp::Shrink(VerticalShrinkOp(
+                (old_size.height() - new_size.height()).into(),
+            ))),
+            Ordering::Equal => None,
         };
 
-        let truncate_lines = if new_size.width() < old_size.width() {
-            Some(TruncateLinesOp((old_size.width() - new_size.width()).into()))
-        } else {
-            None
+        let horizontal = match old_size.width().cmp(&new_size.width()) {
+            Ordering::Less => Some(HorizontalOp::Expand(HorizontalExpandOp(
+                (new_size.width() - old_size.width()).into(),
+            ))),
+            Ordering::Greater => {
+                Some(HorizontalOp::Shrink(HorizontalShrinkOp(
+                    (old_size.width() - new_size.width()).into(),
+                )))
+            },
+            Ordering::Equal => None,
         };
 
-        Self { delete_lines, truncate_lines }
+        Self { vertical, horizontal }
     }
 }
 
-/// A `DeleteLinesOp(n)` shrinks a [`Scene`] vertically by keeping its first
+/// A `VerticalShrinkOp(n)` shrinks a [`Scene`] vertically by keeping its first
 /// `n` lines and deleting the rest.
 ///
-/// For example, a `DeleteLinesOp(1)` would transform the following scene:
+/// For example, a `VerticalShrinkOp(1)` would transform the following scene:
 ///
 /// ```txt
 /// ┌──────────────┐
@@ -499,11 +516,11 @@ impl ShrinkOp {
 /// └──────────────┘
 /// ```
 ///
-/// A `DeleteLinesOp(0)` deletes all the lines of a `Scene`.
+/// A `VerticalShrinkOp(0)` deletes all the lines of a `Scene`.
 #[derive(Debug, Clone, Copy)]
-struct DeleteLinesOp(u32);
+struct VerticalShrinkOp(u32);
 
-impl DeleteLinesOp {
+impl VerticalShrinkOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let num_lines = self.0 as usize;
@@ -512,10 +529,10 @@ impl DeleteLinesOp {
     }
 }
 
-/// A `TruncateLinesOp(n)` shrinks a [`Scene`] horizontally by keeping the
+/// A `HorizontalShrinkOp(n)` shrinks a [`Scene`] horizontally by keeping the
 /// first `n` cells of every line and deleting the rest.
 ///
-/// For example, a `TruncateLinesOp(10)` would transform the following scene:
+/// For example, a `HorizontalShrinkOp(10)` would transform the following scene:
 ///
 /// ```txt
 /// ┌──────────────┐
@@ -535,11 +552,11 @@ impl DeleteLinesOp {
 /// └──────────┘
 /// ```
 ///
-/// A `TruncateLinesOp(0)` deletes all the cells of a `Scene`.
+/// A `HorizontalShrinkOp(0)` deletes all the cells of a `Scene`.
 #[derive(Debug, Clone, Copy)]
-struct TruncateLinesOp(u32);
+struct HorizontalShrinkOp(u32);
 
-impl TruncateLinesOp {
+impl HorizontalShrinkOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
@@ -553,47 +570,10 @@ impl TruncateLinesOp {
     }
 }
 
-/// An `ExpandOp` expands a `Scene` by inserting lines and/or extending lines.
-#[derive(Debug, Clone, Copy, Default)]
-struct ExpandOp {
-    extend_lines: Option<ExtendLinesOp>,
-    insert_lines: Option<InsertLinesOp>,
-}
-
-impl ExpandOp {
-    #[inline]
-    fn apply_to(self, _scene: &mut Scene) {
-        if let Some(extend_lines) = self.extend_lines {
-            extend_lines.apply_to(_scene);
-        }
-
-        if let Some(insert_lines) = self.insert_lines {
-            insert_lines.apply_to(_scene);
-        }
-    }
-
-    #[inline]
-    fn new(old_size: Bound<Cells>, new_size: Bound<Cells>) -> Self {
-        let extend_lines = if new_size.width() > old_size.width() {
-            Some(ExtendLinesOp((new_size.width() - old_size.width()).into()))
-        } else {
-            None
-        };
-
-        let insert_lines = if new_size.height() > old_size.height() {
-            Some(InsertLinesOp((new_size.height() - old_size.height()).into()))
-        } else {
-            None
-        };
-
-        Self { extend_lines, insert_lines }
-    }
-}
-
-/// An `InsertLinesOp(n)` expands a [`Scene`] vertically by appending lines
+/// A `VerticalExpandOp(n)` expands a [`Scene`] vertically by appending lines
 /// until its height reaches `n` cells.
 ///
-/// For example, an `InsertLinesOp(5)` would transform the following scene:
+/// For example, an `VerticalExpandOp(5)` would transform the following scene:
 ///
 /// ```txt
 /// ┌──────────────┐
@@ -615,9 +595,9 @@ impl ExpandOp {
 /// └──────────────┘
 /// ```
 #[derive(Debug, Clone, Copy)]
-struct InsertLinesOp(u32);
+struct VerticalExpandOp(u32);
 
-impl InsertLinesOp {
+impl VerticalExpandOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let len = self.0 as usize;
@@ -635,10 +615,11 @@ impl InsertLinesOp {
     }
 }
 
-/// An `ExtendLinesOp(n)` expands a [`Scene`] horizontally by extending every
-/// line until its width reaches `n` cells.
+/// A `HorizontalExpandOp(n)` expands a [`Scene`] horizontally by extending
+/// every line until its width reaches `n` cells.
 ///
-/// For example, an `ExtendLinesOp(18)` would transform the following scene:
+/// For example, an `HorizontalExpandOp(18)` would transform the following
+/// scene:
 ///
 /// ```txt
 /// ┌──────────────┐
@@ -658,9 +639,9 @@ impl InsertLinesOp {
 /// └──────────────────┘
 /// ```
 #[derive(Debug, Clone, Copy)]
-struct ExtendLinesOp(u32);
+struct HorizontalExpandOp(u32);
 
-impl ExtendLinesOp {
+impl HorizontalExpandOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
