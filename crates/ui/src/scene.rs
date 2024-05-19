@@ -5,7 +5,16 @@ use core::ops::Range;
 
 use compact_str::CompactString;
 
-use crate::{Bound, Cells, Highlight, Metric, Point, SceneFragment, Surface};
+use crate::{
+    Bound,
+    Cells,
+    Highlight,
+    Memoize,
+    Metric,
+    Point,
+    SceneFragment,
+    Surface,
+};
 
 /// TODO: docs
 #[derive(Debug, Default)]
@@ -14,10 +23,11 @@ pub(crate) struct Scene {
     surface: SceneSurface,
 
     /// TODO: docs.
-    diff: DiffTracker,
+    diff_tracker: DiffTracker,
 }
 
 impl Scene {
+    /// Applies the [`ResizeOp`] to this scene.
     #[inline]
     fn apply(&mut self, resize_op: ResizeOp) {
         resize_op.apply_to(self);
@@ -36,16 +46,16 @@ impl Scene {
     pub(crate) fn diff(&mut self) -> SceneDiff<'_> {
         SceneDiff {
             surface: &self.surface,
-            deleted: self.diff.deleted.take(),
-            inserted: self.diff.inserted.take(),
-            truncated: self.diff.truncated.drain(..),
-            extended: self.diff.extended.drain(..),
-            replaced: self.diff.replaced.drain(..),
-            _paint: self.diff.paint.drain(..),
+            deleted: self.diff_tracker.deleted.take(),
+            inserted: self.diff_tracker.inserted.take(),
+            truncated: self.diff_tracker.truncated.drain(..),
+            extended: self.diff_tracker.extended.drain(..),
+            replaced: self.diff_tracker.replaced.drain(..),
+            _paint: self.diff_tracker.paint.drain(..),
         }
     }
 
-    /// TODO: docs
+    /// Returns the height of the scene in terminal [`Cells`].
     #[inline]
     pub(crate) fn height(&self) -> Cells {
         self.surface.height()
@@ -63,13 +73,13 @@ impl Scene {
         self.apply(ResizeOp::new(self.size(), new_size));
     }
 
-    /// TODO: docs
+    /// Returns the size of the scene in terminal [`Cells`].
     #[inline]
     pub(crate) fn size(&self) -> Bound<Cells> {
         Bound::new(self.height(), self.width())
     }
 
-    /// TODO: docs
+    /// Returns the width of the scene in terminal [`Cells`].
     #[inline]
     pub(crate) fn width(&self) -> Cells {
         self.surface.width()
@@ -87,6 +97,16 @@ impl SceneSurface {
     #[inline]
     fn height(&self) -> Cells {
         (self.lines.len() as u32).into()
+    }
+
+    #[inline]
+    fn lines(&self) -> impl Iterator<Item = &SceneLine> + '_ {
+        self.lines.iter()
+    }
+
+    #[inline]
+    fn lines_mut(&mut self) -> impl Iterator<Item = &mut SceneLine> + '_ {
+        self.lines.iter_mut()
     }
 
     #[inline]
@@ -114,7 +134,11 @@ struct SceneLine {
 }
 
 impl SceneLine {
-    /// TODO: docs.
+    /// Returns the length of the line, in bytes.
+    ///
+    /// Note that this will be greater than the number of terminal cells used
+    /// to render the line if it contains multi-byte characters. Consider using
+    /// the [`width`](Self::width) method for that.
     #[inline]
     fn byte_len(&self) -> usize {
         // FIXME: this is O(n). We could do it in O(1) by either memoizing it
@@ -122,7 +146,8 @@ impl SceneLine {
         self.runs.iter().map(SceneRun::byte_len).sum()
     }
 
-    /// TODO: docs.
+    /// Extends this line to the given width by appending an empty
+    /// [`SceneRun`].
     #[inline]
     fn extend(&mut self, to_width: Cells) {
         if to_width > self.width() {
@@ -137,7 +162,11 @@ impl SceneLine {
         Self { runs: vec![SceneRun::new_empty(width)] }
     }
 
-    /// TODO: docs.
+    /// Returns the index of the [`SceneRun`] at the given offset, along with
+    /// the [`Cells`] offset of the run in this line.
+    ///
+    /// The [`Bias`] parameter is used to determine which run to return when
+    /// the given offset falls between two runs.
     #[inline]
     fn run_at(&self, offset: Cells, bias: Bias) -> (usize, Cells) {
         let mut run_offset = Cells::zero();
@@ -171,7 +200,8 @@ impl SceneLine {
         }
     }
 
-    /// TODO: docs.
+    /// Truncates this line to the given width by dropping the runs that exceed
+    /// the width.
     #[inline]
     fn truncate(&mut self, to_width: Cells) {
         let (run_idx, run_offset) = self.run_at(to_width, Bias::Right);
@@ -184,7 +214,11 @@ impl SceneLine {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the width of the line in terminal [`Cells`].
+    ///
+    /// Note that this will be less than the number of bytes in the line if it
+    /// contains multi-byte characters. Consider using the
+    /// [`byte_len`](Self::byte_len) to get the number of bytes.
     #[inline]
     fn width(&self) -> Cells {
         // FIXME: this is O(n). We could do it in O(1) by either memoizing it
@@ -201,60 +235,99 @@ enum Bias {
 
 /// TODO: docs
 #[derive(Debug)]
-enum SceneRun {
-    /// TODO: docs.
-    Empty { width: Cells },
-
-    /// TODO: docs.
-    Text { text: CompactString },
+struct SceneRun {
+    text: RunText,
 }
 
 impl SceneRun {
     /// TODO: docs.
     #[inline]
     fn byte_len(&self) -> usize {
+        self.text.byte_len()
+    }
+
+    /// Creates a new empty `SceneRun` with the given width.
+    #[inline]
+    fn new_empty(width: Cells) -> Self {
+        Self { text: RunText::new_empty(width) }
+    }
+
+    /// Returns the text of the `SceneRun`.
+    #[inline]
+    fn text(&self) -> Cow<str> {
+        self.text.as_str()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn truncate(&mut self, to_width: Cells) {
+        self.text.truncate(to_width);
+    }
+
+    /// Returns the width of the run in terminal [`Cells`].
+    ///
+    /// This is equal to the number of terminal cells used to render the run's
+    /// [`text`](Self::text).
+    #[inline]
+    fn width(&self) -> Cells {
+        self.text.width()
+    }
+}
+
+/// TODO: docs
+#[derive(Debug)]
+enum RunText {
+    Spaces { width: Cells },
+    Text { text: CompactString, width: Memoize<Cells> },
+}
+
+impl RunText {
+    #[inline]
+    fn as_str(&self) -> Cow<str> {
         match self {
-            Self::Empty { width } => u32::from(*width) as usize,
-            Self::Text { text } => text.len(),
+            Self::Spaces { width } => spaces(*width),
+            Self::Text { text, .. } => Cow::Borrowed(text.as_str()),
+        }
+    }
+
+    /// Returns the length of the text, in bytes.
+    #[inline]
+    fn byte_len(&self) -> usize {
+        match self {
+            Self::Spaces { width } => u32::from(*width) as usize,
+            Self::Text { text, .. } => text.len(),
         }
     }
 
     /// Creates a new empty `SceneRun` with the given width.
     #[inline]
     fn new_empty(width: Cells) -> Self {
-        Self::Empty { width }
-    }
-
-    /// Returns the text of the `SceneRun`.
-    #[inline]
-    fn text(&self) -> Cow<str> {
-        match self {
-            Self::Empty { width } => spaces(*width),
-            Self::Text { text } => Cow::Borrowed(text.as_str()),
-        }
+        Self::Spaces { width }
     }
 
     /// TODO: docs.
     #[inline]
     fn truncate(&mut self, to_width: Cells) {
         match self {
-            Self::Empty { width } => *width = to_width,
+            Self::Spaces { width } => *width = to_width,
 
-            Self::Text { text } => {
-                todo!("convert cells to byte_offset");
+            Self::Text { text, width } => {
+                let (left, _) = to_width.split(text.as_str());
+                text.truncate(left.len());
+                // Reset the memoized width, if any.
+                let _ = width.take();
             },
         }
     }
 
-    /// Returns the width of the `SceneRun`.
-    ///
-    /// This is equal to the number of terminal cells used to render the run's
-    /// [`text`](Self::text).
+    /// Returns the width of the text in terminal [`Cells`].
     #[inline]
     fn width(&self) -> Cells {
         match self {
-            Self::Empty { width } => *width,
-            Self::Text { text } => Cells::measure(text.as_str()),
+            Self::Spaces { width } => *width,
+            Self::Text { text, width } => {
+                *width.get(|| Cells::measure(text.as_str()))
+            },
         }
     }
 }
@@ -354,11 +427,6 @@ struct ResizeOp {
 }
 
 impl ResizeOp {
-    /// Applies the resize operations to a `Scene`.
-    ///
-    /// The [`size`](Scene::size) of the given scene is guaranteed to return
-    /// `new_size` after this method is called, where `new_size` is the new
-    /// size passed to [`ResizeOp::new`].
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         self.shrink.apply_to(scene);
@@ -439,7 +507,7 @@ impl DeleteLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let num_lines = self.0 as usize;
-        scene.diff.deleted = Some(DeleteHunk::new(num_lines));
+        scene.diff_tracker.deleted = Some(DeleteHunk::new(num_lines));
         scene.surface.lines.truncate(num_lines);
     }
 }
@@ -476,11 +544,11 @@ impl TruncateLinesOp {
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
 
-        for (idx, line) in scene.surface.lines.iter_mut().enumerate() {
+        for (idx, line) in scene.surface.lines_mut().enumerate() {
             let start = Point::new(idx, line.byte_len());
             line.truncate(cells);
             let end = Point::new(idx, line.byte_len());
-            scene.diff.truncated.push(TruncateHunk::new(start..end));
+            scene.diff_tracker.truncated.push(TruncateHunk::new(start..end));
         }
     }
 }
@@ -556,7 +624,7 @@ impl InsertLinesOp {
 
         let num_inserted = len - scene.surface.lines.len();
 
-        scene.diff.inserted = Some(InsertHunk::new(
+        scene.diff_tracker.inserted = Some(InsertHunk::new(
             scene.surface.lines.len(),
             num_inserted,
             scene.width(),
@@ -598,14 +666,14 @@ impl ExtendLinesOp {
         let cells = Cells::from(self.0);
 
         let insert_hunks =
-            scene.surface.lines.iter().enumerate().map(|(idx, line)| {
+            scene.surface.lines().enumerate().map(|(idx, line)| {
                 let point = Point::new(idx, line.byte_len());
                 ExtendHunk::new(point, cells)
             });
 
-        scene.diff.extended.extend(insert_hunks);
+        scene.diff_tracker.extended.extend(insert_hunks);
 
-        scene.surface.lines.iter_mut().for_each(|line| line.extend(cells));
+        scene.surface.lines_mut().for_each(|line| line.extend(cells));
     }
 }
 
