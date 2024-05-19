@@ -38,7 +38,7 @@ impl Scene {
     /// [`Render`](crate::Render) implementation.
     #[inline]
     pub(crate) fn as_fragment(&mut self) -> SceneFragment<'_> {
-        todo!()
+        SceneFragment::new(self)
     }
 
     /// TODO: docs
