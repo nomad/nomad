@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::vec::Drain;
 use core::cmp::Ordering;
+use core::mem;
 use core::ops::Range;
 
 use compact_str::CompactString;
@@ -63,6 +64,8 @@ impl Scene {
         SceneLineBorrow {
             line: self.surface.line_mut(line_idx),
             diff_tracker: &mut self.diff_tracker,
+            line_idx,
+            offset: Cells::zero(),
         }
     }
 
@@ -210,6 +213,60 @@ impl SceneLine {
         }
     }
 
+    /// TODO: docs.
+    #[inline]
+    fn splice_empty_run(&mut self, range: Range<Cells>) -> usize {
+        let new_run = SceneRun::new_empty(range.end - range.start);
+
+        let (start_idx, start_offset) = self.run_at(range.start, Bias::Right);
+
+        let (end_idx, end_offset) = self.run_at(range.end, Bias::Left);
+
+        if start_idx == end_idx {
+            let run = &mut self.runs[start_idx];
+
+            let mut new_run_idx = start_idx;
+
+            if let Some(mut right) = run.split(range.start - start_offset) {
+                new_run_idx += 1;
+                self.runs.insert(new_run_idx, new_run);
+
+                if let Some(next) = right.split(range.end - range.start) {
+                    self.runs.insert(new_run_idx + 1, next);
+                }
+            } else if let Some(next) = run.split(range.end - start_offset) {
+                let _ = mem::replace(&mut self.runs[start_idx], new_run);
+                self.runs.insert(start_idx + 1, next);
+            } else {
+                let _ = mem::replace(&mut self.runs[start_idx], new_run);
+            }
+
+            return new_run_idx;
+        }
+
+        let mut start_splice_idx = start_idx;
+
+        if start_offset < range.start {
+            self.runs[start_idx].truncate(range.start - start_offset);
+            start_splice_idx += 1;
+        }
+
+        let mut end_splice_idx = end_idx;
+
+        let end_run = &mut self.runs[end_idx];
+
+        if let Some(split) =
+            end_run.split(end_offset + end_run.width() - range.end)
+        {
+            let _ = mem::replace(end_run, split);
+            end_splice_idx += 1;
+        }
+
+        self.runs.splice(start_splice_idx..end_splice_idx, [new_run]);
+
+        start_splice_idx
+    }
+
     /// Truncates this line to the given width by dropping the runs that exceed
     /// the width.
     #[inline]
@@ -260,6 +317,12 @@ impl SceneRun {
     #[inline]
     fn new_empty(width: Cells) -> Self {
         Self { text: RunText::new_empty(width) }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn split(&mut self, at: Cells) -> Option<Self> {
+        self.text.split(at).map(|text| Self { text })
     }
 
     /// Returns the text of the `SceneRun`.
@@ -313,6 +376,12 @@ impl RunText {
     #[inline]
     fn new_empty(width: Cells) -> Self {
         Self::Spaces { width }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn split(&mut self, _at: Cells) -> Option<Self> {
+        todo!();
     }
 
     /// TODO: docs.
@@ -678,6 +747,8 @@ impl HorizontalExpandOp {
 pub(crate) struct SceneLineBorrow<'scene> {
     line: &'scene mut SceneLine,
     diff_tracker: &'scene mut DiffTracker,
+    line_idx: usize,
+    offset: Cells,
 }
 
 impl<'scene> SceneLineBorrow<'scene> {
@@ -693,7 +764,7 @@ impl<'scene> SceneLineBorrow<'scene> {
     /// TODO: docs
     #[inline]
     pub fn width(&self) -> Cells {
-        self.line.width()
+        self.line.width() - self.offset
     }
 }
 
@@ -701,6 +772,8 @@ impl<'scene> SceneLineBorrow<'scene> {
 pub(crate) struct SceneRunBorrow<'scene> {
     run: &'scene mut SceneRun,
     diff_tracker: &'scene mut DiffTracker,
+    line_idx: usize,
+    offset: Cells,
 }
 
 impl<'scene> SceneRunBorrow<'scene> {

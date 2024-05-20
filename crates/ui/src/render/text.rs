@@ -26,19 +26,17 @@ impl Render for Text {
 
     #[inline]
     fn paint(&self, mut fragment: SceneFragment) {
-        let Some(mut run) =
-            fragment.lines().next().map(|line| line.into_run())
-        else {
+        let Some(line) = fragment.lines().next() else {
             return;
         };
 
         let mut text = &*self.inner;
 
-        if run.width() < self.width {
-            (text, _) = run.width().split(text);
+        if line.width() < self.width {
+            (text, _) = line.width().split(text);
         }
 
-        run.set_text(text);
+        line.into_run().set_text(text);
     }
 }
 
