@@ -215,54 +215,42 @@ impl SceneLine {
 
     /// TODO: docs.
     #[inline]
-    fn splice_empty_run(&mut self, range: Range<Cells>) -> usize {
-        let new_run = SceneRun::new_empty(range.end - range.start);
-
+    fn splice<Runs>(&mut self, range: Range<Cells>, runs: Runs)
+    where
+        Runs: IntoIterator<Item = SceneRun>,
+    {
         let (start_idx, start_offset) = self.run_at(range.start, Bias::Right);
 
         let (end_idx, end_offset) = self.run_at(range.end, Bias::Left);
 
         if start_idx == end_idx {
             let run = &mut self.runs[start_idx];
-
-            let mut new_run_idx = start_idx;
-
-            if let Some(mut right) = run.split(range.start - start_offset) {
-                new_run_idx += 1;
-                self.runs.insert(new_run_idx, new_run);
-
-                if let Some(next) = right.split(range.end - range.start) {
-                    self.runs.insert(new_run_idx + 1, next);
-                }
-            } else if let Some(next) = run.split(range.end - start_offset) {
-                let _ = mem::replace(&mut self.runs[start_idx], new_run);
-                self.runs.insert(start_idx + 1, next);
-            } else {
-                let _ = mem::replace(&mut self.runs[start_idx], new_run);
-            }
-
-            return new_run_idx;
+            let remainder = run.split(range.end - start_offset);
+            let _ = run.split(range.start - start_offset);
+            let splice_start = start_idx;
+            let splice_end = start_idx + run.width().is_zero() as usize;
+            let runs = runs.into_iter().chain(remainder);
+            self.runs.splice(splice_start..splice_end, runs);
+            return;
         }
 
-        let mut start_splice_idx = start_idx;
+        let start_run = &mut self.runs[start_idx];
 
-        if start_offset < range.start {
-            self.runs[start_idx].truncate(range.start - start_offset);
-            start_splice_idx += 1;
-        }
+        let start_remainder = start_run.split(range.start - start_offset);
 
-        let mut end_splice_idx = end_idx;
+        let splice_start = start_idx + start_remainder.is_some() as usize;
 
         let end_run = &mut self.runs[end_idx];
 
-        if let Some(split) = end_run.split(range.end - end_offset) {
-            let _ = mem::replace(end_run, split);
-            end_splice_idx -= 1;
-        }
+        let end_remainder = end_run
+            .split(range.end - end_offset)
+            .map(|split| mem::replace(end_run, split));
 
-        self.runs.splice(start_splice_idx..=end_splice_idx, [new_run]);
+        let splice_end = end_idx - end_remainder.is_none() as usize;
 
-        start_splice_idx
+        let runs = runs.into_iter().chain(end_remainder);
+
+        self.runs.splice(splice_start..splice_end, runs);
     }
 
     /// Truncates this line to the given width by dropping the runs that exceed

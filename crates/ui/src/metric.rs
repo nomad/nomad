@@ -14,6 +14,12 @@ pub trait Metric:
 {
     /// TODO: docs
     fn zero() -> Self;
+
+    /// TODO: docs
+    #[inline]
+    fn is_zero(self) -> bool {
+        self == Self::zero()
+    }
 }
 
 impl Metric for usize {
