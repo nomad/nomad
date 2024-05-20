@@ -366,8 +366,32 @@ impl RunText {
 
     /// TODO: docs.
     #[inline]
-    fn split(&mut self, _at: Cells) -> Option<Self> {
-        todo!();
+    fn split(&mut self, split_at: Cells) -> Option<Self> {
+        if split_at == self.width() {
+            return None;
+        }
+
+        match self {
+            Self::Spaces { width } => {
+                let remainder = *width - split_at;
+                *width = split_at;
+                Some(Self::Spaces { width: remainder })
+            },
+
+            Self::Text { text, width } => {
+                let (left, right) = split_at.split(text.as_str());
+
+                let split = Some(Self::Text {
+                    text: CompactString::from(right),
+                    width: Memoize::new(),
+                });
+
+                text.truncate(left.len());
+                let _ = width.take();
+
+                split
+            },
+        }
     }
 
     /// TODO: docs.
@@ -379,7 +403,6 @@ impl RunText {
             Self::Text { text, width } => {
                 let (left, _) = to_width.split(text.as_str());
                 text.truncate(left.len());
-                // Reset the memoized width, if any.
                 let _ = width.take();
             },
         }
