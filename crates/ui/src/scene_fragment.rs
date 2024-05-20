@@ -4,7 +4,8 @@ use core::marker::PhantomData;
 use core::panic::Location;
 use core::ptr::NonNull;
 
-use crate::{Bound, Cells, Point, Scene};
+use crate::scene::{SceneLineBorrow, SceneRunBorrow};
+use crate::{Bound, Cells, HighlightGroup, Point, Scene};
 
 /// TODO: docs.
 pub struct SceneFragment<'scene> {
@@ -145,6 +146,54 @@ impl Drop for FragmentLines<'_, '_> {
     #[inline]
     fn drop(&mut self) {
         self.fragment.borrow.set(Borrow::NotBorrowed);
+    }
+}
+
+/// TODO: docs
+pub struct FragmentLine<'scene> {
+    /// TODO: docs
+    inner: SceneLineBorrow<'scene>,
+}
+
+impl<'scene> FragmentLine<'scene> {
+    #[inline]
+    fn new(inner: SceneLineBorrow<'scene>) -> Self {
+        Self { inner }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn split_run(
+        self,
+        split_at: Cells,
+    ) -> (FragmentRun<'scene>, Option<Self>) {
+        let (run, inner) = self.inner.split_run(split_at);
+        (FragmentRun::new(run), inner.map(FragmentLine::new))
+    }
+}
+
+/// TODO: docs
+pub struct FragmentRun<'scene> {
+    /// TODO: docs
+    inner: SceneRunBorrow<'scene>,
+}
+
+impl<'scene> FragmentRun<'scene> {
+    #[inline]
+    fn new(inner: SceneRunBorrow<'scene>) -> Self {
+        Self { inner }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn set_highlight(&mut self, hl_group: &HighlightGroup) {
+        self.inner.set_highlight(hl_group);
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn set_text(&mut self, text: &str) {
+        self.inner.set_text(text);
     }
 }
 

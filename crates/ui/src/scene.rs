@@ -683,7 +683,7 @@ pub(crate) struct SceneLineBorrow<'scene> {
 impl<'scene> SceneLineBorrow<'scene> {
     /// TODO: docs
     #[inline]
-    pub(crate) fn split(
+    pub(crate) fn split_run(
         self,
         split_at: Cells,
     ) -> (SceneRunBorrow<'scene>, Option<Self>) {
