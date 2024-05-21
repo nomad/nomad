@@ -12,6 +12,12 @@ pub struct Cells(u32);
 impl Cells {
     /// TODO: docs
     #[inline]
+    pub fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    /// TODO: docs
+    #[inline]
     pub fn measure(text: &str) -> Self {
         Self(chars::count(text) as u32)
     }

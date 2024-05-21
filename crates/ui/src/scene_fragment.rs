@@ -1,6 +1,7 @@
 use alloc::rc::Rc;
 use core::cell::Cell;
 use core::marker::PhantomData;
+use core::ops::Range;
 use core::panic::Location;
 use core::ptr::NonNull;
 
@@ -56,7 +57,7 @@ impl<'scene> SceneFragment<'scene> {
     /// TODO: docs
     #[track_caller]
     #[inline]
-    pub fn lines(&mut self) -> FragmentLines<'_, 'scene> {
+    pub fn lines(&mut self) -> FragmentLines<'_> {
         FragmentLines::new(self)
     }
 
@@ -124,26 +125,51 @@ impl<'scene> SceneFragment<'scene> {
 }
 
 /// TODO: docs.
-pub struct FragmentLines<'a, 'scene> {
-    fragment: &'a mut SceneFragment<'scene>,
+pub struct FragmentLines<'fragment> {
+    scene: &'fragment mut Scene,
+    borrow: Rc<Cell<Borrow>>,
+
+    /// The index range of the scene lines that this iterator will yield.
+    line_idxs: Range<usize>,
+
+    /// The horizontal cell offset of the fragment within the scene.
+    cell_offset: Cells,
+
+    /// The width of the [`SceneFragment`] this iterator was created from.
+    fragment_width: Cells,
 }
 
-impl<'a, 'scene> FragmentLines<'a, 'scene> {
+impl<'fragment> FragmentLines<'fragment> {
     #[track_caller]
     #[inline]
-    fn new(fragment: &'a mut SceneFragment<'scene>) -> Self {
+    fn new(fragment: &'fragment mut SceneFragment<'_>) -> Self {
         if let Borrow::Borrowed(at) = fragment.borrow.get() {
             panic!("fragment already borrowed at {at}")
         }
 
+        // SAFETY: we just checked that the fragment is not borrowed.
+        let scene = unsafe { fragment.ptr.as_mut() };
+
         fragment.borrow.set(Borrow::Borrowed(Location::caller()));
 
-        Self { fragment }
+        let line_idxs = {
+            let start = fragment.origin.y().as_usize();
+            let height = fragment.size.height().as_usize();
+            start..start + height
+        };
+
+        Self {
+            scene,
+            line_idxs,
+            borrow: fragment.borrow.clone(),
+            cell_offset: fragment.origin.x(),
+            fragment_width: fragment.size.width(),
+        }
     }
 }
 
-impl<'a> Iterator for FragmentLines<'a, '_> {
-    type Item = FragmentLine<'a>;
+impl<'fragment> Iterator for FragmentLines<'fragment> {
+    type Item = FragmentLine<'fragment>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -151,28 +177,28 @@ impl<'a> Iterator for FragmentLines<'a, '_> {
     }
 }
 
-impl Drop for FragmentLines<'_, '_> {
+impl Drop for FragmentLines<'_> {
     #[inline]
     fn drop(&mut self) {
-        self.fragment.borrow.set(Borrow::NotBorrowed);
+        self.borrow.set(Borrow::NotBorrowed);
     }
 }
 
 /// TODO: docs
-pub struct FragmentLine<'scene> {
+pub struct FragmentLine<'fragment> {
     /// TODO: docs
-    inner: SceneLineBorrow<'scene>,
+    inner: SceneLineBorrow<'fragment>,
 }
 
-impl<'scene> FragmentLine<'scene> {
+impl<'fragment> FragmentLine<'fragment> {
     /// TODO: docs
     #[inline]
-    pub fn into_run(self) -> FragmentRun<'scene> {
+    pub fn into_run(self) -> FragmentRun<'fragment> {
         FragmentRun::new(self.inner.into_run())
     }
 
     #[inline]
-    fn new(inner: SceneLineBorrow<'scene>) -> Self {
+    fn new(inner: SceneLineBorrow<'fragment>) -> Self {
         Self { inner }
     }
 
