@@ -1,8 +1,10 @@
 use alloc::borrow::Cow;
 use alloc::vec::Drain;
 use core::cmp::Ordering;
+use core::marker::PhantomData;
 use core::mem;
 use core::ops::Range;
+use core::ptr::NonNull;
 
 use compact_str::CompactString;
 
@@ -61,12 +63,7 @@ impl Scene {
     /// Panics if the index is out of bounds.
     #[inline]
     pub(crate) fn line_mut(&mut self, line_idx: usize) -> SceneLineBorrow<'_> {
-        SceneLineBorrow {
-            line: self.surface.line_mut(line_idx),
-            diff_tracker: &mut self.diff_tracker,
-            line_idx,
-            offset: Cells::zero(),
-        }
+        SceneLineBorrow::new(self, line_idx)
     }
 
     /// TODO: docs
@@ -486,7 +483,12 @@ struct DiffTracker {
     /// TODO: docs.
     horizontal_expand: Vec<HorizontalExpandHunk>,
 
-    /// TODO: docs
+    /// TODO: docs.
+    ///
+    /// It's crucial that the hunks are applied to the [`Surface`] in the exact
+    /// order in which they are stored in the vector, as the byte range in each
+    /// hunk is relative to the state of the scene once all the previous hunks
+    /// have been applied.
     replaced: Vec<ReplaceHunk>,
 
     /// TODO: docs
@@ -807,103 +809,171 @@ impl HorizontalExpandOp {
 }
 
 /// TODO: docs
+#[derive(Clone, Copy)]
 pub(crate) struct SceneLineBorrow<'scene> {
-    line: &'scene mut SceneLine,
-    diff_tracker: &'scene mut DiffTracker,
-    line_idx: usize,
-    offset: Cells,
+    run: SceneRunBorrow<'scene>,
 }
 
 impl<'scene> SceneLineBorrow<'scene> {
     /// TODO: docs
     #[inline]
     pub(crate) fn into_run(self) -> SceneRunBorrow<'scene> {
-        let cell_range = self.offset..self.line.width();
-
-        let byte_range = self.line.to_byte_range(cell_range.clone());
-
-        let point_range = Point::new(self.line_idx, byte_range.start)
-            ..Point::new(self.line_idx, byte_range.end);
-
-        let hunk = ReplaceHunk::new(point_range, (self.line_idx, self.offset));
-
-        self.diff_tracker.replaced.push(hunk);
-
-        let run_idx = self.line.splice(
-            cell_range,
-            [SceneRun::new_empty(self.line.width() - self.offset)],
-        );
-
-        SceneRunBorrow { run: &mut self.line.runs[run_idx] }
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub(crate) fn split_run(
-        &mut self,
-        split_at: Cells,
-    ) -> Option<SceneRunBorrow<'_>> {
-        debug_assert!(split_at <= self.width());
-
-        if self.offset == self.line.width() {
-            return None;
-        }
-
-        self.offset += split_at;
-
-        let cell_range = self.offset..self.offset + split_at;
-
-        let byte_range = self.line.to_byte_range(cell_range.clone());
-
-        let point_range = Point::new(self.line_idx, byte_range.start)
-            ..Point::new(self.line_idx, byte_range.end);
-
-        let hunk = ReplaceHunk::new(point_range, (self.line_idx, self.offset));
-
-        self.diff_tracker.replaced.push(hunk);
-
-        let run_idx =
-            self.line.splice(cell_range, [SceneRun::new_empty(split_at)]);
-
-        Some(SceneRunBorrow { run: &mut self.line.runs[run_idx] })
+        self.run
     }
 
     #[inline]
-    pub(crate) fn split(self, _split_at: Cells) -> (Self, Self) {
-        todo!();
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub(crate) fn width(&self) -> Cells {
-        self.line.width() - self.offset
+    fn new(scene: &'scene mut Scene, line_idx: usize) -> Self {
+        Self { run: SceneRunBorrow::new(scene, line_idx) }
     }
 }
 
 /// TODO: docs
+#[derive(Clone, Copy)]
 pub(crate) struct SceneRunBorrow<'scene> {
-    run: &'scene mut SceneRun,
+    /// TODO: docs.
+    diff_tracker: NonNull<DiffTracker>,
+
+    /// Used to track whether calling the [`set_text`](Self::set_text) method
+    /// should push a new hunk to the diff tracker.
+    ///
+    /// It does the first time it's called, and doesn't do it on subsequent
+    /// calls.
+    has_set_text: HasSetText,
+
+    /// The line this run is a part of.
+    line: NonNull<SceneLine>,
+
+    /// The index of the line this run is a part of.
+    line_idx: usize,
+
+    /// The offset in the line where this run starts.
+    offset: Cells,
+
+    /// The width of the run.
+    width: Cells,
+
+    _lifetime: PhantomData<&'scene SceneLine>,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum HasSetText {
+    No,
+    Yes { run_idx: usize },
 }
 
 impl<'scene> SceneRunBorrow<'scene> {
-    /// TODO: docs.
+    /// Returns a mutable reference to the [`DiffTracker`].
+    ///
+    /// Note that this method is not part of this type's public API and should
+    /// only be used internally by other methods.
     #[inline]
-    pub(crate) fn set_text(&mut self, text: &str) {
-        debug_assert_eq!(Cells::measure(text), self.width());
-        self.run.set_text(text);
+    fn diff_tracker_mut(&mut self) -> &mut DiffTracker {
+        // SAFETY: this type doesn't give references, so there can't be
+        // multiple mutable aliases.
+        unsafe { self.diff_tracker.as_mut() }
+    }
+
+    /// Returns a mutable reference to this run's [`SceneLine`].
+    ///
+    /// Note that this method is not part of this type's public API and should
+    /// only be used internally by other methods.
+    #[inline]
+    fn line_mut(&mut self) -> &mut SceneLine {
+        // SAFETY: this type doesn't give references, so there can't be
+        // multiple mutable aliases.
+        unsafe { self.line.as_mut() }
+    }
+
+    #[inline]
+    fn new(scene: &'scene mut Scene, line_idx: usize) -> Self {
+        let line = scene.surface.line_mut(line_idx);
+        let width = line.width();
+        Self {
+            diff_tracker: NonNull::from(&mut scene.diff_tracker),
+            has_set_text: HasSetText::No,
+            line: NonNull::from(line),
+            line_idx,
+            offset: Cells::zero(),
+            width,
+            _lifetime: PhantomData,
+        }
     }
 
     /// TODO: docs.
     #[inline]
     pub(crate) fn set_hl_group(&mut self, _hl_group: &HighlightGroup) {
         todo!();
-        // self.run.set_hl_group(hl_group);
     }
 
-    /// TODO: docs
+    /// TODO: docs.
     #[inline]
-    pub fn width(&self) -> Cells {
-        self.run.width()
+    pub(crate) fn set_text(&mut self, text: &str) {
+        debug_assert_eq!(Cells::measure(text), self.width());
+
+        // This check is needed because `split()` allows the offset to be
+        // both zero and equal to the run's width, which in both cases causes
+        // one of the two returned runs to be empty.
+        if self.width() == Cells::zero() {
+            return;
+        }
+
+        let run_idx = match self.has_set_text {
+            HasSetText::Yes { run_idx } => run_idx,
+            HasSetText::No => {
+                let cell_range = self.offset..self.offset + self.width();
+
+                let point_range = {
+                    let byte_range =
+                        self.line_mut().to_byte_range(cell_range.clone());
+                    Point::new(self.line_idx, byte_range.start)
+                        ..Point::new(self.line_idx, byte_range.end)
+                };
+
+                let hunk = ReplaceHunk::new(
+                    point_range,
+                    (self.line_idx, self.offset),
+                );
+
+                self.diff_tracker_mut().replaced.push(hunk);
+
+                let run_width = self.width();
+
+                let run_idx = self
+                    .line_mut()
+                    .splice(cell_range, [SceneRun::new_empty(run_width)]);
+
+                self.has_set_text = HasSetText::Yes { run_idx };
+
+                run_idx
+            },
+        };
+
+        self.line_mut().runs[run_idx].set_text(text);
+    }
+
+    /// Splits the run at the given offset.
+    #[inline]
+    pub(crate) fn split(self, split_at: Cells) -> (Self, Self) {
+        debug_assert!(split_at <= self.width);
+
+        let mut left = self;
+        let mut right = self;
+
+        left.has_set_text = HasSetText::No;
+        right.has_set_text = HasSetText::No;
+
+        right.offset += split_at;
+
+        left.width = split_at;
+        right.width -= split_at;
+
+        (left, right)
+    }
+
+    /// Returns the run's width.
+    #[inline]
+    pub(crate) fn width(&self) -> Cells {
+        self.width
     }
 }
 

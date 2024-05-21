@@ -5,8 +5,8 @@ use core::ops::Range;
 use core::panic::Location;
 use core::ptr::NonNull;
 
-use crate::scene::{SceneLineBorrow, SceneRunBorrow};
-use crate::{Bound, Cells, HighlightGroup, Metric, Point, Scene};
+use crate::scene::SceneRunBorrow;
+use crate::{Bound, Cells, HighlightGroup, Point, Scene};
 
 /// TODO: docs.
 pub struct SceneFragment<'scene> {
@@ -178,14 +178,15 @@ impl<'fragment> Iterator for FragmentLines<'fragment> {
         // SAFETY: TODO.
         let scene = unsafe { self.scene_ptr.as_mut() };
 
-        let (_, line) = scene.line_mut(line_idx).split(self.cell_offset);
-        let (line, _) = line.split(self.fragment_width);
+        let run = scene
+            .line_mut(line_idx)
+            .into_run()
+            .split(self.cell_offset)
+            .1
+            .split(self.fragment_width)
+            .0;
 
-        Some(FragmentLine {
-            inner: line,
-            offset: Cells::zero(),
-            fragment_width: self.fragment_width,
-        })
+        Some(FragmentLine { run: FragmentRun { inner: run } })
     }
 }
 
@@ -198,34 +199,32 @@ impl Drop for FragmentLines<'_> {
 
 /// TODO: docs
 pub struct FragmentLine<'fragment> {
-    inner: SceneLineBorrow<'fragment>,
-    offset: Cells,
-    fragment_width: Cells,
+    run: FragmentRun<'fragment>,
 }
 
 impl<'fragment> FragmentLine<'fragment> {
     /// TODO: docs
     #[inline]
     pub fn into_run(self) -> FragmentRun<'fragment> {
-        FragmentRun::new(self.inner.into_run())
+        self.run
     }
 
     /// TODO: docs
     #[inline]
-    pub fn split_run(&mut self, split_at: Cells) -> Option<FragmentRun<'_>> {
-        assert!(split_at <= self.width());
+    pub fn set_hl_group(&mut self, hl_group: &HighlightGroup) {
+        self.run.set_hl_group(hl_group);
+    }
 
-        if split_at == self.width() {
-            None
-        } else {
-            self.inner.split_run(split_at).map(FragmentRun::new)
-        }
+    /// TODO: docs
+    #[inline]
+    pub fn set_text(&mut self, text: &str) {
+        self.run.set_text(text);
     }
 
     /// TODO: docs
     #[inline]
     pub fn width(&self) -> Cells {
-        self.fragment_width - self.offset
+        self.run.width()
     }
 }
 
@@ -236,14 +235,9 @@ pub struct FragmentRun<'scene> {
 }
 
 impl<'scene> FragmentRun<'scene> {
-    #[inline]
-    fn new(inner: SceneRunBorrow<'scene>) -> Self {
-        Self { inner }
-    }
-
     /// TODO: docs
     #[inline]
-    pub fn set_highlight(&mut self, hl_group: &HighlightGroup) {
+    pub fn set_hl_group(&mut self, hl_group: &HighlightGroup) {
         self.inner.set_hl_group(hl_group);
     }
 
@@ -251,6 +245,13 @@ impl<'scene> FragmentRun<'scene> {
     #[inline]
     pub fn set_text(&mut self, text: &str) {
         self.inner.set_text(text);
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn split(self, split_at: Cells) -> (Self, Self) {
+        let (left, right) = self.inner.split(split_at);
+        (Self { inner: left }, Self { inner: right })
     }
 
     /// TODO: docs
