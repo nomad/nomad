@@ -509,16 +509,12 @@ impl VerticalResizeHunk {
     fn apply_to(self, surface: &mut Surface) {
         match self {
             Self::Shrink { delete_from_line_idx } => {
-                surface.replace_lines(
-                    delete_from_line_idx..,
-                    core::iter::empty::<&str>(),
-                );
+                surface.delete_lines(delete_from_line_idx..);
             },
 
             Self::Expand { num_lines_start, num_inserted, lines_width } => {
-                let line_range = num_lines_start..num_lines_start;
                 let lines = (0..num_inserted).map(|_| spaces(lines_width));
-                surface.replace_lines(line_range, lines);
+                surface.insert_lines(num_lines_start, lines);
             },
         }
     }
