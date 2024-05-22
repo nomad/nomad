@@ -931,8 +931,8 @@ impl<'scene> SceneRunBorrow<'scene> {
                 let point_range = {
                     let byte_range =
                         self.line_mut().to_byte_range(cell_range.clone());
-                    Point::new(self.line_idx, byte_range.start)
-                        ..Point::new(self.line_idx, byte_range.end)
+                    Point::new(byte_range.start, self.line_idx)
+                        ..Point::new(byte_range.end, self.line_idx)
                 };
 
                 let hunk = ReplaceHunk::new(
