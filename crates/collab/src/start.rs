@@ -1,6 +1,6 @@
 use nomad::prelude::*;
 
-use crate::{Activity, Collab, Config, Context, Session, SessionId};
+use crate::{Activity, Collab, Config, Session, SessionId};
 
 /// TODO: docs
 #[derive(Clone)]
@@ -10,8 +10,11 @@ pub(crate) struct Start {
 }
 
 impl Start {
-    pub(crate) fn new(ctx: &Context) -> Self {
-        Self { activity: ctx.activity.clone(), config: ctx.config.clone() }
+    pub(crate) fn new(collab: &Collab) -> Self {
+        Self {
+            activity: collab.activity.clone(),
+            config: collab.config.clone(),
+        }
     }
 }
 
