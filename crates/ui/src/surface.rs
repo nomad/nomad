@@ -114,7 +114,7 @@ impl Surface {
 
     /// TODO: docs
     #[inline]
-    pub(crate) fn lines(&self) -> impl ExactSizeIterator<Item = String> {
+    pub(crate) fn _lines(&self) -> impl ExactSizeIterator<Item = String> {
         self.lines_inner()
             .take((!self.is_empty() as usize) * self.line_count())
     }

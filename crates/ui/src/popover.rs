@@ -8,7 +8,7 @@ pub struct Popover {
     _anchor: PopoverAnchor,
 
     /// TODO: docs
-    view: View,
+    _view: View,
 }
 
 impl Popover {
@@ -89,7 +89,7 @@ impl PopoverBuilder<Done> {
     pub fn open(self) -> Popover {
         let available_size = self.anchor.max_size();
         let view = View::open(self.root, available_size);
-        Popover { _anchor: self.anchor, view }
+        Popover { _anchor: self.anchor, _view: view }
     }
 }
 
