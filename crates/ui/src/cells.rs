@@ -1,3 +1,4 @@
+use core::fmt;
 use core::iter::Sum;
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 
@@ -11,8 +12,8 @@ pub struct Cells(u32);
 
 // Custom impl to make sure the output is always `Cells(..)` even when
 // formatting with `{:#?}`.
-impl core::fmt::Debug for Cells {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for Cells {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Cells({})", self.0)
     }
 }
@@ -27,6 +28,18 @@ impl Cells {
     /// TODO: docs
     #[inline]
     pub fn measure(text: &str) -> Self {
+        // TODO: understand the problem better and the differences between
+        // these before deciding what to do.
+        //
+        // https://github.com/unicode-rs/unicode-width
+        // https://github.com/pascalkuthe/grapheme-width-rs
+        // https://github.com/ridiculousfish/widecharwidth/
+        // https://docs.rs/termwiz/latest/termwiz/cell/fn.grapheme_column_width.html
+        //
+        // Also see:
+        // https://www.unicode.org/reports/tr11/
+        // https://github.com/wez/wezterm/issues/4223
+        // https://mitchellh.com/writing/grapheme-clusters-in-terminals
         Self(chars::count(text) as u32)
     }
 
