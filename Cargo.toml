@@ -38,10 +38,10 @@ too_many_lines = "deny"
 unwrap_used = "deny"
 
 [workspace.lints.rust]
-future_incompatible = "deny"
+future_incompatible = { level = "deny", priority = -1 }
 missing_docs = "deny"
-nonstandard_style = "deny"
-refining_impl_trait = "allow"
+nonstandard_style = { level = "deny", priority = -1 }
+refining_impl_trait = { level = "allow", priority = -1 }
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
