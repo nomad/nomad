@@ -1,6 +1,9 @@
 use crate::{Cells, ExpandRect, Render, RequestedBound, SceneFragment};
 
-/// TODO: docs
+/// A component that adds a margin around its inner component.
+///
+/// This struct is created by the [`margin`](crate::Component::margin) method
+/// on [`Component`](crate::Component). See its documentation for more.
 pub struct Margin<R> {
     inner: R,
     expand: ExpandRect<Cells>,
