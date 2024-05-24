@@ -1,0 +1,12 @@
+[package]
+name = "nvimx"
+version = "0.0.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
+
+[lints]
+workspace = true
