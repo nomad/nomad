@@ -1,5 +1,5 @@
-use nvim::api::opts::SetHighlightOpts;
-use nvim::api::{self};
+use nvim_oxi::api::opts::SetHighlightOpts;
+use nvim_oxi::api::{self};
 
 use crate::Color;
 

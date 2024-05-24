@@ -43,13 +43,15 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["executor", "neovim-nightly"]
+default = ["neovim-nightly"]
 executor = ["dep:nvimx-executor"]
+ui = ["dep:nvimx-ui"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
-nvimx-executor = { path = "./nvimx-executor", optional = true }
 nvim-oxi = { workspace = true }
+nvimx-executor = { path = "./nvimx-executor", optional = true }
+nvimx-ui = { path = "./nvimx-ui", optional = true }
 
 [lints]
 workspace = true

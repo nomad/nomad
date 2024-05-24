@@ -2,9 +2,9 @@
 //!
 //! TODO: docs
 
+pub use macros;
 #[doc(hidden)]
 pub use nvim;
-pub use {macros, ui};
 
 pub mod action;
 pub mod api;

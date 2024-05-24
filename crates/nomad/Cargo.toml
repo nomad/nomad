@@ -20,7 +20,6 @@ nvim = { workspace = true, features = ["libuv"] }
 pond = { git = "ssh://git@github.com/nomad/pond.git" }
 smallvec = { workspace = true }
 smol_str = { workspace = true }
-ui = { path = "../ui" }
 
 # Async executor
 async-task = "4.7"

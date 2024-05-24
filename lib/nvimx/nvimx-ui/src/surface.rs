@@ -1,7 +1,7 @@
 use core::ops::{Range, RangeBounds};
 
 use api::types::*;
-use nvim::api;
+use nvim_oxi::api;
 
 use crate::{Bound, Cells, HighlightGroup, Point};
 
@@ -159,7 +159,7 @@ impl Surface {
         let _ = self.buffer.set_lines(
             line_range,
             true,
-            core::iter::empty::<nvim::String>(),
+            core::iter::empty::<nvim_oxi::String>(),
         );
     }
 
@@ -168,7 +168,7 @@ impl Surface {
     pub(crate) fn insert_lines(
         &mut self,
         line_offset: usize,
-        mut lines: impl Iterator<Item = impl Into<nvim::String>>,
+        mut lines: impl Iterator<Item = impl Into<nvim_oxi::String>>,
     ) {
         // If the buffer is empty, the first line is used to replace the empty
         // line.
@@ -188,7 +188,7 @@ impl Surface {
         &mut self,
         line_idx: usize,
         byte_range: Range<ByteOffset>,
-        text: impl Into<nvim::String>,
+        text: impl Into<nvim_oxi::String>,
     ) {
         let _ = self.buffer.set_text(
             line_idx..line_idx,

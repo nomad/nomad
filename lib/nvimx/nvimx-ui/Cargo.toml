@@ -1,23 +1,23 @@
 [package]
-name = "ui"
+name = "nvimx-ui"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish.workspace = true
 
 [features]
 default = ["neovim-nightly"]
-neovim-nightly = ["nvim/neovim-nightly"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
+nvim-oxi = { workspace = true }
+
 compact_str = "0.7"
-nvim = { workspace = true }
 str_indices = "0.4"
 
 [dev-dependencies]
-quickcheck = { workspace = true }
-quickcheck_macros = { workspace = true }
+quickcheck = "1"
+quickcheck_macros = "1"
 
 [lints]
 workspace = true

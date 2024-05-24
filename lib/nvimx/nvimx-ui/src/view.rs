@@ -24,6 +24,10 @@ impl View {
         this
     }
 
+    pub(crate) fn lines(&self) -> Vec<String> {
+        self.surface._lines().collect()
+    }
+
     #[inline]
     fn new(
         root: Box<dyn Render + 'static>,
@@ -47,7 +51,11 @@ impl View {
 
         self.root.paint(self.scene.as_fragment());
 
-        self.scene.diff().apply_to(&mut self.surface);
+        let diff = self.scene.diff();
+
+        nvim_oxi::print!("diff: {diff:#?}");
+
+        diff.apply_to(&mut self.surface);
 
         match (self.surface.is_hidden(), size.is_empty()) {
             (true, false) => self.surface.show(),
