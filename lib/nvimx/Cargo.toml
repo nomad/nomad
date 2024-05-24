@@ -5,8 +5,17 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = ["executor", "neovim-nightly"]
+executor = ["dep:async-task", "dep:concurrent-queue"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
 [dependencies]
-nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
+
+# Executor
+async-task = { version = "4.7", optional = true }
+concurrent-queue = { version = "2.4", optional = true }
 
 [lints]
 workspace = true
