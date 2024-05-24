@@ -1,8 +1,8 @@
 use std::ops::Range;
 
 use crop::Rope;
+use nomad::prelude::{IntoWith, NvimBuffer, Replacement, Shared};
 use nomad::tests::{Generator, MeanLen, ReplacementCtx};
-use nomad::{IntoWith, NvimBuffer, Replacement, Shared};
 
 #[nomad::test]
 fn nomad_buffer_sync_fuzz_0(gen: &mut Generator) {

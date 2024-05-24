@@ -4,7 +4,7 @@
 
 #[doc(hidden)]
 pub use nvim;
-pub use ui;
+pub use {macros, ui};
 
 pub mod action;
 pub mod api;
@@ -31,49 +31,53 @@ mod point;
 mod replacement;
 pub mod runtime;
 mod serde;
-pub mod shared;
+mod shared;
 pub mod streams;
 #[cfg(feature = "tests")]
 pub mod tests;
 mod utils;
 pub mod warning;
 
-pub use nomad::Nomad;
-
 pub mod prelude {
     //! TODO: docs
 
-    pub use macros::{async_action, Ready};
+    pub use macros::*;
+    #[doc(hidden)]
     pub use nvim;
     pub use ui::*;
 
     pub use crate::action::*;
     pub use crate::api::*;
+    pub use crate::apply::Apply;
+    pub use crate::buffer::Buffer;
+    pub use crate::buffer_id::BufferId;
+    pub use crate::buffer_snapshot::BufferSnapshot;
+    pub use crate::byte_offset::ByteOffset;
     pub use crate::command_args::*;
+    pub use crate::crdt_replacement::CrdtReplacement;
+    pub use crate::edit::Edit;
+    pub use crate::editor_id::EditorId;
+    pub use crate::from_with::{FromWith, IntoWith};
     pub use crate::log::*;
     pub use crate::maybe_future::*;
     pub use crate::maybe_result::*;
     pub use crate::module::*;
+    pub use crate::nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};
+    pub use crate::point::Point;
+    pub use crate::replacement::Replacement;
     pub use crate::runtime::*;
-    pub use crate::shared::*;
+    pub use crate::shared::Shared;
     pub use crate::streams::*;
     pub use crate::warning::*;
     pub use crate::Nomad;
 }
 
-pub use apply::Apply;
 pub(crate) use autocmd_id::AutocmdId;
-pub use buffer::Buffer;
-pub use buffer_id::BufferId;
-pub use buffer_snapshot::BufferSnapshot;
-pub use byte_offset::ByteOffset;
 pub(crate) use command::{Command, ModuleCommands};
-pub use crdt_replacement::CrdtReplacement;
-pub use edit::Edit;
-pub use editor_id::EditorId;
-pub use from_with::{FromWith, IntoWith};
+pub(crate) use config::Config;
+#[cfg(feature = "tests")]
 pub use macros::test;
-pub use nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};
-pub use point::Point;
-pub use replacement::Replacement;
-pub use shared::Shared;
+pub(crate) use prelude::*;
+pub(crate) use serde::{deserialize, serialize, DeserializeError};
+
+pub use crate::nomad::Nomad;

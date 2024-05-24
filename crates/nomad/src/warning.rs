@@ -1,6 +1,6 @@
 //! TODO: docs
 
-use crate::prelude::{ActionName, ModuleName};
+use crate::{ActionName, ModuleName};
 
 /// TODO: docs
 #[derive(Default)]

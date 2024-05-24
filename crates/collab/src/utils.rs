@@ -6,7 +6,7 @@ use collab_client::messages::{
     Project,
     Session,
 };
-use nomad::{BufferSnapshot, Edit};
+use nomad::prelude::{BufferSnapshot, Edit};
 
 /// Exactly the same as the [`Into`] trait, but it lets us convert `T -> U`
 /// even when neither `T` nor `U` are defined in this crate.

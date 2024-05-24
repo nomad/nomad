@@ -7,7 +7,21 @@ use std::rc::Rc;
 use nvim::api::{self, opts, types};
 use nvim::Function;
 
-use crate::prelude::*;
+use crate::{
+    Action,
+    ActionId,
+    ActionName,
+    ChunkExt,
+    CommandArgs,
+    MaybeFuture,
+    MaybeFutureEnum,
+    MaybeResult,
+    Module,
+    ModuleId,
+    ModuleName,
+    Warning,
+    WarningMsg,
+};
 
 /// TODO: docs
 #[derive(Default)]
@@ -186,7 +200,7 @@ impl ModuleCommand {
                 }
             };
 
-            spawn(future).detach();
+            crate::spawn(future).detach();
         };
 
         Self { action: Box::new(action), action_name: A::NAME }

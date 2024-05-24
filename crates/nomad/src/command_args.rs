@@ -1,6 +1,6 @@
 use nvim::api::types;
 
-use crate::prelude::{ChunkExt, WarningMsg};
+use crate::{ChunkExt, WarningMsg};
 
 /// TODO: docs
 pub struct CommandArgs {

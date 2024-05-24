@@ -1,12 +1,12 @@
 //! TODO: docs
 
-use core::future::Future;
-use core::hash::{Hash, Hasher};
+use std::fmt;
+use std::future::Future;
+use std::hash::{Hash, Hasher};
 
-pub use macros::module_name;
 use serde::de::DeserializeOwned;
 
-use crate::prelude::*;
+use crate::{Api, Get, MaybeResult};
 
 /// TODO: docs
 pub trait Module: 'static + Sized {
@@ -29,16 +29,15 @@ pub struct ModuleName {
     name: &'static str,
 }
 
-impl core::fmt::Debug for ModuleName {
-    #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for ModuleName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("ModuleName").field(&self.name).finish()
     }
 }
 
-impl core::fmt::Display for ModuleName {
+impl fmt::Display for ModuleName {
     #[inline]
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(self.name)
     }
 }

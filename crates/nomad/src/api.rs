@@ -9,9 +9,18 @@ use nvim::Object;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::prelude::*;
-use crate::serde::{deserialize, serialize};
-use crate::ModuleCommands;
+use crate::{
+    runtime,
+    Action,
+    CommandArgs,
+    MaybeFuture,
+    MaybeFutureEnum,
+    MaybeResult,
+    Module,
+    ModuleCommands,
+    Warning,
+    WarningMsg,
+};
 
 /// TODO: docs
 pub struct Api<M: Module> {
@@ -97,7 +106,7 @@ where
     A::Args: DeserializeOwned,
     A::Return: Serialize,
 {
-    let mut task = spawn(async_exec_action(action, args));
+    let mut task = runtime::spawn(async_exec_action(action, args));
 
     let Some(syncness) = (&mut task).now_or_never() else {
         // The action is async and it's not done yet.
@@ -108,7 +117,7 @@ where
     let res = match syncness {
         ActionSyncness::Sync(future_res) => match future_res {
             Ok(action_ret) => {
-                serialize(&action_ret, "result").map_err(Into::into)
+                crate::serialize(&action_ret, "result").map_err(Into::into)
             },
 
             Err(ExecuteActionError::Borrow) => {
@@ -155,7 +164,7 @@ where
     A::Args: DeserializeOwned,
     A::Return: Serialize,
 {
-    let args = match deserialize::<A::Args>(args, "args") {
+    let args = match crate::deserialize::<A::Args>(args, "args") {
         Ok(args) => args,
         Err(de_err) => {
             return ActionSyncness::Sync(Err(ExecuteActionError::Deserialize(

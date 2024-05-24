@@ -5,8 +5,7 @@ use nvim::Object;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::prelude::{ModuleName, WarningMsg};
-use crate::warning::ChunkExt;
+use crate::{ChunkExt, ModuleName, WarningMsg};
 
 /// TODO: docs
 pub(crate) fn deserialize<T: DeserializeOwned>(

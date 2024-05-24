@@ -1,10 +1,8 @@
 //! TODO: docs
 
-use core::hash::{Hash, Hasher};
+use std::hash::{Hash, Hasher};
 
-pub use macros::action_name;
-
-use crate::prelude::{MaybeFuture, MaybeResult, Module};
+use crate::{MaybeFuture, MaybeResult, Module};
 
 /// TODO: docs
 pub trait Action<M: Module>: 'static {

@@ -3,8 +3,7 @@ use core::future::ready;
 use cola::Replica;
 use collab_client::messages::{FileKind, InboundMessage};
 use futures::{pin_mut, select as race, FutureExt, StreamExt};
-use nomad::prelude::*;
-use nomad::*;
+use nomad::prelude::{Buffer, EditorId, Get, NvimBuffer};
 
 use crate::config::ConnectorError;
 use crate::{Config, Convert, SessionId};

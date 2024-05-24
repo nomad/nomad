@@ -1,6 +1,6 @@
 //! TODO: docs
 
-use crate::warning::WarningMsg;
+use crate::WarningMsg;
 
 /// TODO: docs
 pub trait MaybeResult<T> {

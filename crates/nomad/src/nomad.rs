@@ -1,8 +1,6 @@
 use nvim::Dictionary;
 
-use crate::config::Config;
-use crate::prelude::*;
-use crate::{log, runtime, Command};
+use crate::{log, runtime, Api, Command, Config, Module};
 
 /// TODO: docs
 pub struct Nomad {
@@ -60,7 +58,7 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn with_module<M: Module>(mut self) -> Self {
-        let (config, set_config) = new_input(M::Config::default());
+        let (config, set_config) = runtime::new_input(M::Config::default());
 
         let Api { commands, functions, module } = M::init(config);
 
@@ -74,7 +72,7 @@ impl Nomad {
         self.api.insert(M::NAME.as_str(), functions.into_dict());
 
         // Spawn a new task that loads the module asynchronously.
-        spawn(async move {
+        crate::spawn(async move {
             module.run().await;
         })
         .detach();

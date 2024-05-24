@@ -5,8 +5,6 @@ use cola::{Anchor, Replica, ReplicaId};
 use crop::Rope;
 use nvim::api;
 
-use crate::runtime::spawn;
-use crate::streams::Edits;
 use crate::{
     utils,
     Apply,
@@ -15,6 +13,7 @@ use crate::{
     CrdtReplacement,
     Edit,
     EditorId,
+    Edits,
     IntoWith,
     NvimBuffer,
     Replacement,
@@ -140,7 +139,7 @@ impl EditBroadcaster {
         if self.receiver.receiver_count() > 0 {
             let sender = self.sender.clone();
 
-            spawn(async move {
+            crate::spawn(async move {
                 if sender.receiver_count() > 0 {
                     let _ = sender.broadcast_direct(edit).await;
                 }
