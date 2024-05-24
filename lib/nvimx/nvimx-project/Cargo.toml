@@ -4,14 +4,13 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish.workspace = true
 
 [features]
 default = ["neovim-nightly"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
-nvim-oxi = { workspace = true, features = ["libuv"] }
+nvim-oxi = { workspace = true }
 
 [lints]
 workspace = true

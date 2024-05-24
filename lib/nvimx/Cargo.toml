@@ -8,7 +8,6 @@ version = "0.0.0"
 edition = "2021"
 authors = ["Nomad <hello@nomad.foo>"]
 license = "MIT"
-publish = false
 
 [workspace.dependencies]
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
@@ -45,6 +44,7 @@ license.workspace = true
 [features]
 default = ["neovim-nightly"]
 executor = ["dep:nvimx-executor"]
+macros = ["dep:nvimx-macros"]
 project = ["dep:nvimx-project"]
 ui = ["dep:nvimx-ui"]
 
@@ -58,6 +58,7 @@ neovim-nightly = [
 [dependencies]
 nvim-oxi = { workspace = true }
 nvimx-executor = { path = "./nvimx-executor", optional = true }
+nvimx-macros = { path = "./nvimx-macros", optional = true }
 nvimx-project = { path = "./nvimx-project", optional = true }
 nvimx-ui = { path = "./nvimx-ui", optional = true }
 
