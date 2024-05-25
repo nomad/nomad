@@ -44,8 +44,9 @@ license.workspace = true
 [features]
 default = ["neovim-nightly"]
 executor = ["dep:nvimx-executor"]
-macros = ["dep:nvimx-macros"]
+macros = ["dep:nvimx-macros", "nvimx-tests/test_macro"]
 project = ["dep:nvimx-project"]
+tests = ["dep:nvimx-tests"]
 ui = ["dep:nvimx-ui"]
 
 neovim-nightly = [
@@ -60,6 +61,7 @@ nvim-oxi = { workspace = true }
 nvimx-executor = { path = "./nvimx-executor", optional = true }
 nvimx-macros = { path = "./nvimx-macros", optional = true }
 nvimx-project = { path = "./nvimx-project", optional = true }
+nvimx-tests = { path = "./nvimx-tests", optional = true }
 nvimx-ui = { path = "./nvimx-ui", optional = true }
 
 [lints]

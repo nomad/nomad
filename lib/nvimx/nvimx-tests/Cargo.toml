@@ -1,0 +1,17 @@
+[package]
+name = "nvimx-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = ["neovim-nightly"]
+test_macro = []
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
+[dependencies]
+nvim-oxi = { workspace = true }
+
+[lints]
+workspace = true
