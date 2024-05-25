@@ -13,6 +13,12 @@ license = "MIT"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
 thiserror = "1.0"
 
+nvimx-executor = { path = "./nvimx-executor" }
+nvimx-macros = { path = "./nvimx-macros" }
+nvimx-project = { path = "./nvimx-project" }
+nvimx-tests = { path = "./nvimx-tests" }
+nvimx-ui = { path = "./nvimx-ui" }
+
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"
 cognitive_complexity = "deny"
@@ -58,11 +64,11 @@ neovim-nightly = [
 
 [dependencies]
 nvim-oxi = { workspace = true }
-nvimx-executor = { path = "./nvimx-executor", optional = true }
-nvimx-macros = { path = "./nvimx-macros", optional = true }
-nvimx-project = { path = "./nvimx-project", optional = true }
-nvimx-tests = { path = "./nvimx-tests", optional = true }
-nvimx-ui = { path = "./nvimx-ui", optional = true }
+nvimx-executor = { workspace = true, optional = true }
+nvimx-macros = { workspace = true, optional = true }
+nvimx-project = { workspace = true, optional = true }
+nvimx-tests = { workspace = true, optional = true }
+nvimx-ui = { workspace = true, optional = true }
 
 [lints]
 workspace = true

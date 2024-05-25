@@ -7,11 +7,13 @@ license.workspace = true
 
 [features]
 default = ["neovim-nightly"]
-test_macro = ["nvim-oxi/test-terminator"]
+test_macro = ["nvim-oxi/test-terminator", "dep:nvimx-executor"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
 nvim-oxi = { workspace = true }
+
+nvimx-executor = { workspace = true, optional = true }
 
 [lints]
 workspace = true
