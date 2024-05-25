@@ -5,7 +5,36 @@ use std::{env, fmt, fs};
 
 use crate::{TestError, TestResult};
 
-/// TODO: docs
+/// Builds the crate before running the tests.
+///
+/// One problem with testing Neovim plugins written in Rust is that the user
+/// has to remember to run `cargo build` after every change to make sure the
+/// generated dynamic library that Neovim loads actually contains the latest
+/// version of the test's body.
+///
+/// A way to solve this is to put all the tests in a separate `cdylib` crate
+/// with a `build.rs` script that builds the crate. Cargo will then take care
+/// of automatically calling that script anytime the crate or any of its
+/// dependencies change.
+///
+/// This is exactly what this function does. It's meant to be used as the body
+/// of a build script, like so:
+///
+/// ```ignore
+/// fn main() {
+///    nvimx::tests::build();
+/// }
+/// ```
+///
+/// With that in place, you can run your tests with `cargo test` as you
+/// normally would, without having to run `cargo build` first.
+///
+/// Note that the tests **must** be annotated with `#[nvimx::test]` when using
+/// this setup. Using `#[nvim_oxi::test]` will not work.
+///
+/// # Panics
+///
+/// Panics if called outside of a `build.rs` script.
 pub fn build() {
     match BuildingGuard::new().guard(build_crate) {
         Ok(Ok(())) | Err(BuildGuardError::AlreadyBuilding) => Ok(()),
@@ -25,16 +54,19 @@ fn build_crate() -> TestResult {
         // See https://github.com/rust-lang/cargo/issues/6412.
         .args(["--target-dir", target_dir().display().to_string().as_ref()])
         .arg("--features")
-        .arg(NvimVersion::detect()?.as_feature().to_string())
+        .arg(NvimVersion::from_env()?.as_feature().to_string())
         .status()
         .map(|_| ())
         .map_err(Into::into)
 }
 
-/// TODO: docs
+/// Returns the subdirectory of the crate's `/target` directory used as the
+/// test crate's target directory.
 pub(crate) fn target_dir() -> PathBuf {
     crate_target_dir()
         .join("nvimx-tests")
+        // We namespace this by package name because there may be multiple test
+        // crates in the same workspace.
         .join(env::var("CARGO_PKG_NAME").expect("set when building"))
 }
 
@@ -74,6 +106,14 @@ impl BuildProfile {
     }
 }
 
+/// A guard that ensures we don't try to build the crate recursively.
+///
+/// The [`build`] function is called inside a `build.rs`, and internally it
+/// calls `cargo build`, which would execute the `build.rs` script, and so on.
+///
+/// To avoid that we create a lock file in the target directory on the first
+/// execution, skip the build if it exists, and remove it once the build
+/// completes.
 struct BuildingGuard {
     lock_file_path: PathBuf,
 }
@@ -138,13 +178,20 @@ struct NvimVersion {
 }
 
 impl NvimVersion {
-    /// TODO: docs
+    /// Returns the name of the feature corresponding to this version.
+    ///
+    /// Note that this forces the user to:
+    ///
+    /// a) explicitly add a feature in their `Cargo.toml` corresponding to the
+    ///    their Neovim version, even if they don't want to run their tests
+    ///    against multiple versions;
+    ///
+    /// b) use the `neovim-*` scheme when naming the feature.
     fn as_feature(&self) -> impl fmt::Display {
         NvimVersionFeature(*self)
     }
 
-    /// TODO: docs
-    fn detect() -> Result<Self, TestError> {
+    fn from_env() -> Result<Self, TestError> {
         let stdout = Command::new("nvim").arg("--version").output()?.stdout;
         let stdout = String::from_utf8_lossy(&stdout);
         Self::from_stdout(&stdout)
