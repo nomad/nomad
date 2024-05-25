@@ -5,6 +5,9 @@ use std::{env, fmt, fs};
 
 use crate::{TestError, TestResult};
 
+/// The name of the file used to store the current [`BuildProfile`].
+const PROFILE_FILE_NAME: &str = "build_profile";
+
 /// Builds the crate before running the tests.
 ///
 /// One problem with testing Neovim plugins written in Rust is that the user
@@ -48,17 +51,22 @@ pub fn build() {
 }
 
 fn build_crate() -> TestResult {
+    let profile = BuildProfile::from_env();
+
     Command::new("cargo")
         .arg("build")
-        .args(BuildProfile::from_env().is_release().then_some("--release"))
+        .args(profile.is_release().then_some("--release"))
         // We have to use a different target directory or we'll get a deadlock.
         // See https://github.com/rust-lang/cargo/issues/6412.
         .args(["--target-dir", target_dir().display().to_string().as_ref()])
         .arg("--features")
         .arg(NvimVersion::from_env()?.as_feature().to_string())
         .status()
-        .map(|_| ())
-        .map_err(Into::into)
+        .map(|_| ())?;
+
+    fs::write(target_dir().join(PROFILE_FILE_NAME), profile.as_str())?;
+
+    Ok(())
 }
 
 /// Returns the subdirectory of the crate's `/target` directory used as the
@@ -92,13 +100,26 @@ impl BuildProfile {
         }
     }
 
-    pub(crate) fn from_env() -> Self {
-        let profile = env::var("PROFILE").expect("$PROFILE env var not set");
+    /// Returns the profile used the last time the crate was built.
+    pub(crate) fn current() -> Self {
+        let profile_path = target_dir().join(PROFILE_FILE_NAME);
 
-        match profile.as_str() {
+        fs::read_to_string(profile_path)
+            .map(|profile| Self::from_str(profile.trim()))
+            .unwrap_or_else(|err| panic!("{err}"))
+    }
+
+    pub(crate) fn from_env() -> Self {
+        env::var("PROFILE")
+            .map(|profile| Self::from_str(&profile))
+            .expect("$PROFILE env var not set")
+    }
+
+    fn from_str(s: &str) -> Self {
+        match s {
             "debug" => Self::Debug,
             "release" => Self::Release,
-            _ => unreachable!("unknown profile {profile:?}"),
+            _ => panic!("unknown profile {s:?}"),
         }
     }
 

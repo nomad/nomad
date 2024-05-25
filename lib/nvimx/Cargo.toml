@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["nvimx-*"]
-default-members = ["nvimx-*"]
+members = ["nvimx-*", "nvimx-*/tests"]
+default-members = ["nvimx-*", "nvimx-*/tests"]
 
 [workspace.package]
 version = "0.0.0"

@@ -39,7 +39,7 @@ mod library_path {
         );
 
         build::target_dir()
-            .join(build::BuildProfile::from_env().as_str())
+            .join(build::BuildProfile::current().as_str())
             .join(library_name)
     }
 }
