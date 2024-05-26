@@ -1,19 +1,47 @@
 use core::str::FromStr;
 
-use api::opts::OptionOpts;
+use api::opts::{BufAttachOpts, OnBytesArgs, OptionOpts};
 use nvim_oxi::api::{self, Buffer};
-use nvimx_common::Apply;
+use nvimx_common::{Apply, ByteOffset, Replacement, Shared};
 
 /// TODO: docs.
 pub struct TextBuffer {
     /// TODO: docs.
-    _attach_status: AttachStatus,
+    attach_status: AttachStatus,
 
     /// TODO: docs.
-    _inner: Buffer,
+    inner: Buffer,
 }
 
 impl TextBuffer {
+    /// Attaches to the buffer if not already attached, and returns a mutable
+    /// reference to the [`AttachState`].
+    #[inline]
+    fn attach(&mut self) -> &mut Shared<AttachState> {
+        if let AttachStatus::Attached(state) = &mut self.attach_status {
+            return state;
+        }
+
+        let state = Shared::default();
+
+        let on_edit = {
+            let state = state.clone();
+            move |args: OnBytesArgs| {
+                let replacement = Replacement::from(args);
+                state.with_mut(|state| state.on_edit(replacement));
+                Ok(false)
+            }
+        };
+
+        let opts = BufAttachOpts::builder().on_bytes(on_edit).build();
+
+        self.inner.attach(false, &opts).map_err(|err| todo!());
+
+        self.attach_status = AttachStatus::Attached(state);
+
+        return self.attach();
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn current() -> Result<Self, NotTextBufferError> {
@@ -33,6 +61,10 @@ impl TextBuffer {
     where
         Self: Apply<E>,
     {
+        if let AttachStatus::Attached(state) = &self.attach_status {
+            state.with_mut(|state| state.edit_side = EditSide::Ours);
+        }
+
         self.apply(edit)
     }
 
@@ -44,13 +76,33 @@ impl TextBuffer {
     #[inline]
     fn new(inner: Buffer) -> Self {
         debug_assert!(inner.buftype().is_text());
-        Self { _attach_status: AttachStatus::NotAttached, _inner: inner }
+        Self { attach_status: AttachStatus::NotAttached, inner }
     }
 }
 
 enum AttachStatus {
-    Attached,
+    Attached(Shared<AttachState>),
     NotAttached,
+}
+
+#[derive(Default)]
+struct AttachState {
+    /// Whether the edit was performed by calling [`Buffer::edit`].
+    edit_side: EditSide,
+
+    /// Callbacks registered to be called when the buffer is edited.
+    on_edit_callbacks: Vec<Box<dyn FnMut(&Replacement<ByteOffset>)>>,
+}
+
+/// TODO: docs.
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
+pub enum EditSide {
+    /// TODO: docs.
+    Ours,
+
+    /// TODO: docs.
+    #[default]
+    Theirs,
 }
 
 trait BufferExt {
