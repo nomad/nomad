@@ -4,7 +4,7 @@ use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf, Fs};
 use collab_messaging::{Outbound, PeerId, Recipients};
 use collab_project::{Integrate, Project, Synchronize};
 use collab_server::{JoinRequest, SessionId};
-use futures_util::StreamExt;
+use futures_util::{select, FutureExt, StreamExt};
 use nohash::IntSet as NoHashSet;
 use nomad2::{Context, Editor};
 use nomad_server::client::{Joined, Receiver, Sender};
@@ -71,7 +71,32 @@ impl<E: Editor> Session<E> {
     }
 
     pub(crate) async fn run(self) -> Result<(), SessionError> {
-        todo!();
+        loop {
+            select! {
+                cursor = self.cursor_sub.next().fuse() => {
+                    let cursor = cursor.expect("never ends");
+                    self.sync_cursor_moved(cursor).await?;
+                },
+
+                edit = self.edits_subs.next().fuse() => {
+                    let edit = edit.expect("never ends");
+                    self.sync_local_edit(edit).await?;
+                },
+
+                focus = self.focus_subs.next().fuse() => {
+                    let focus = focus.expect("never ends");
+                    self.sync_window_focus(focus).await?;
+                },
+
+                maybe_msg = self.receiver.next().fuse() => {
+                    match maybe_msg {
+                        Some(Ok(msg)) => self.integrate_message(msg).await?,
+                        Some(Err(err)) => return Err(err.into()),
+                        None => todo!(),
+                    };
+                }
+            }
+        }
     }
 
     pub(crate) async fn start(
@@ -109,6 +134,13 @@ impl<E: Editor> Session<E> {
         let project = Project::from_fs(peer_id, ctx.fs()).await?;
 
         Ok(Self::new(config, ctx, joined, project, project_root))
+    }
+
+    async fn integrate_message(
+        &mut self,
+        message: Message,
+    ) -> Result<(), SessionError> {
+        todo!();
     }
 
     fn peer_id(&self) -> PeerId {
