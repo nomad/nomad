@@ -12,3 +12,4 @@ pub use context::Context;
 pub use editor::Editor;
 pub use module::Module;
 pub use module_name::ModuleName;
+pub use nomad_macros::module_name;
