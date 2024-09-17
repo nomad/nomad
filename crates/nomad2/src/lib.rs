@@ -3,6 +3,7 @@
 mod api;
 mod context;
 mod editor;
+mod event;
 mod module;
 mod module_name;
 
