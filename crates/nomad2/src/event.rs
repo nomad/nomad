@@ -1,20 +1,21 @@
-use crate::{Context, Editor};
+use crate::{Context, Editor, Emitter};
 
 /// TODO: docs.
 pub trait Event<E: Editor>: 'static + Ord {
     /// TODO: docs.
-    type Args;
+    type Payload;
 
-    /// TODO: docs.
-    type SubscribeRes;
+    /// The result of subscribing to this event. This can be used to pass state
+    /// from `subscribe` to `unsubscribe`.
+    type SubscribeCtx;
 
     /// TODO: docs.
     fn subscribe(
         &self,
-        emitter: Emitter<Self::Args>,
+        emitter: Emitter<Self::Payload>,
         ctx: &Context<E>,
-    ) -> Self::SubscribeRes;
+    ) -> Self::SubscribeCtx;
 
     /// TODO: docs.
-    fn cleanup(&self, sub_res: Self::SubscribeRes, ctx: &Context<E>);
+    fn unsubscribe(&self, subscribe_ctx: Self::SubscribeCtx, ctx: &Context<E>);
 }

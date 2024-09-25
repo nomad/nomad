@@ -12,7 +12,7 @@ pub struct Subscription<T: Event<E>, E: Editor> {
 }
 
 impl<T: Event<E>, E: Editor> Stream for Subscription<T, E> {
-    type Item = T::Args;
+    type Item = T::Payload;
 
     #[inline]
     fn poll_next(
