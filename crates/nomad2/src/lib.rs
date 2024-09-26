@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+extern crate alloc;
+
 mod api;
 mod context;
 mod editor;

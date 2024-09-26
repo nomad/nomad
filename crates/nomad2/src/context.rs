@@ -2,6 +2,7 @@ use core::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::event::AnyEvent;
 use crate::subscription::{self, AnyReceiver, InactiveReceiver};
 use crate::{Editor, Event, Subscription};
 
@@ -19,17 +20,15 @@ impl<E: Editor> Context<E> {
     {
         let ctx = self.clone();
         self.with_inner(move |inner| match inner.get_sub_receiver(&event) {
-            Some((rx, event)) => Subscription::new(
-                Arc::clone(event),
-                rx.clone().reactivate(),
-                ctx,
-            ),
+            Some((rx, event)) => {
+                Subscription::new(event.clone(), rx.clone().reactivate(), ctx)
+            },
             None => {
                 let (emitter, rx) = subscription::channel();
                 let sub_ctx = event.subscribe(emitter, &ctx);
-                let event: Arc<dyn Any> = Arc::new(event);
+                let event = AnyEvent::new(event);
                 let state = SubscriptionState {
-                    event: Arc::clone(&event),
+                    event: event.clone(),
                     rx: rx.clone().deactivate().into_any(),
                     sub_ctx: Box::new(sub_ctx),
                 };
@@ -40,13 +39,23 @@ impl<E: Editor> Context<E> {
     }
 
     /// TODO: docs.
+    #[inline]
+    pub fn with_editor<F: FnOnce(&mut E) -> R, R>(&self, f: F) -> R {
+        self.with_inner(|inner| f(&mut inner.editor))
+    }
+
+    /// TODO: docs.
     pub(crate) fn remove_subscription<T: Event<E>>(
         &self,
         event: &T,
     ) -> Option<SubscriptionState> {
         self.with_inner(|inner| {
             let vec = inner.subscriptions.get_mut(&TypeId::of::<T>())?;
-            let idx: usize = todo!();
+            let idx = vec
+                .binary_search_by(|sub| {
+                    sub.event.downcast_ref::<T, E>().cmp(event)
+                })
+                .ok()?;
             Some(vec.remove(idx))
         })
     }
@@ -76,27 +85,17 @@ struct ContextInner<E> {
 impl<E: Editor> ContextInner<E> {
     /// Returns the receiver for the givent event, or `None` if there aren't
     /// any active [`Subscription`]s for it.
+    #[allow(clippy::type_complexity)]
     #[inline]
     fn get_sub_receiver<T: Event<E>>(
         &self,
         event: &T,
-    ) -> Option<(&InactiveReceiver<T::Payload>, &Arc<dyn Any>)> {
+    ) -> Option<(&InactiveReceiver<T::Payload>, &AnyEvent)> {
         let vec = self.subscriptions.get(&TypeId::of::<T>())?;
 
         let idx = vec
-            .binary_search_by(|subscription| {
-                // SAFETY: todo.
-                //
-                // TODO: use `downcast_ref_unchecked` once it's stable.
-                let probe = unsafe {
-                    subscription
-                        .event
-                        .as_ref()
-                        .downcast_ref::<T>()
-                        .unwrap_unchecked()
-                };
-
-                probe.cmp(event)
+            .binary_search_by(|sub| {
+                sub.event.downcast_ref::<T, E>().cmp(event)
             })
             .ok()?;
 
@@ -114,21 +113,10 @@ impl<E: Editor> ContextInner<E> {
         state: SubscriptionState,
     ) {
         let vec = self.subscriptions.entry(TypeId::of::<T>()).or_default();
-        let event = state.event.downcast_ref::<T>().expect("up to caller");
+        let event = state.event.downcast_ref::<T, E>();
 
-        let Err(idx) = vec.binary_search_by(|subscription| {
-            // SAFETY: todo.
-            //
-            // TODO: use `downcast_ref_unchecked` once it's stable.
-            let probe = unsafe {
-                subscription
-                    .event
-                    .as_ref()
-                    .downcast_ref::<T>()
-                    .unwrap_unchecked()
-            };
-
-            probe.cmp(event)
+        let Err(idx) = vec.binary_search_by(|sub| {
+            sub.event.downcast_ref::<T, E>().cmp(event)
         }) else {
             panic!("event already has a subscription");
         };
@@ -139,7 +127,7 @@ impl<E: Editor> ContextInner<E> {
 
 pub(crate) struct SubscriptionState {
     /// .
-    pub(crate) event: Arc<dyn Any>,
+    pub(crate) event: AnyEvent,
 
     /// A type-erased, inactive receiver for payloads of a given event.
     pub(crate) rx: AnyReceiver,
