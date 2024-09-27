@@ -1,5 +1,6 @@
 use collab_server::SessionId;
 use futures_util::{select, FutureExt, StreamExt};
+use nomad2::neovim::Neovim;
 use nomad2::{
     module_name,
     Api,
@@ -8,7 +9,6 @@ use nomad2::{
     Event,
     Module,
     ModuleName,
-    Neovim,
     Subscription,
 };
 

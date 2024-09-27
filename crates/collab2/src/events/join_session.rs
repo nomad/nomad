@@ -1,5 +1,6 @@
 use collab_server::SessionId;
-use nomad2::{Context, Emitter, Event, Neovim};
+use nomad2::neovim::Neovim;
+use nomad2::{Context, Emitter, Event};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct JoinSession;
