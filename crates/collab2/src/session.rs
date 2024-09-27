@@ -6,7 +6,7 @@ use collab_project::{Integrate, Project, Synchronize};
 use collab_server::{JoinRequest, SessionId};
 use futures_util::{select, FutureExt, StreamExt};
 use nohash::IntSet as NoHashSet;
-use nomad2::{Context, Editor};
+use nomad2::{Context, Editor, JoinHandle, Spawner};
 use nomad_server::client::{Joined, Receiver, Sender};
 use nomad_server::{Io, Message};
 use root_finder::markers::Git;

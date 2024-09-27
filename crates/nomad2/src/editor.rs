@@ -1,9 +1,12 @@
 use collab_fs::Fs;
 
-use crate::Spawner;
+use crate::{Module, Spawner};
 
 /// TODO: docs.
 pub trait Editor: 'static {
+    /// TODO: docs.
+    type ModuleApi<M: Module<Self>>;
+
     /// TODO: docs.
     type Fs: Fs;
 

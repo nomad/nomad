@@ -2,7 +2,7 @@ use core::future::Future;
 
 use serde::de::DeserializeOwned;
 
-use crate::{Api, Context, Editor, ModuleName};
+use crate::{Context, Editor, ModuleName};
 
 /// TODO: docs.
 pub trait Module<E: Editor>: Sized {
@@ -13,7 +13,7 @@ pub trait Module<E: Editor>: Sized {
     type Config: Default + DeserializeOwned;
 
     /// TODO: docs.
-    fn init(ctx: &Context<E>) -> Api<Self, E>;
+    fn api(ctx: &Context<E>) -> E::ModuleApi<Self>;
 
     /// TODO: docs.
     fn run(&mut self, ctx: &Context<E>) -> impl Future<Output = ()>;
