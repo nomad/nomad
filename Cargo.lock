@@ -954,6 +954,7 @@ name = "nomad2"
 version = "0.1.0"
 dependencies = [
  "async-task",
+ "collab-fs",
  "concurrent-queue",
  "futures-util",
  "nomad-macros",

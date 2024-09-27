@@ -14,6 +14,12 @@ pub struct Context<E> {
 impl<E: Editor> Context<E> {
     /// TODO: docs.
     #[inline]
+    pub fn fs(&self) -> E::Fs {
+        self.with_editor(|editor| editor.fs())
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn spawner(&self) -> E::Spawner {
         self.with_editor(|editor| editor.spawner())
     }

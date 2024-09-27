@@ -1,3 +1,5 @@
+use collab_fs::OsFs;
+
 use super::NeovimSpawner;
 use crate::Editor;
 
@@ -6,7 +8,13 @@ use crate::Editor;
 pub struct Neovim {}
 
 impl Editor for Neovim {
+    type Fs = OsFs;
     type Spawner = NeovimSpawner;
+
+    #[inline]
+    fn fs(&self) -> Self::Fs {
+        OsFs::new()
+    }
 
     #[inline]
     fn spawner(&self) -> Self::Spawner {
