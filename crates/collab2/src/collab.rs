@@ -1,5 +1,3 @@
-use core::future::Future;
-
 use collab_server::SessionId;
 use futures_util::{select, FutureExt, StreamExt};
 use nomad2::{
@@ -14,11 +12,11 @@ use nomad2::{
     Subscription,
 };
 
-use crate::actions::{JoinSession, StartSession};
+use crate::events::{JoinSession, StartSession};
 use crate::{Config, Session};
 
 /// TODO: docs.
-pub struct Collab<E> {
+pub struct Collab<E: Editor> {
     ctx: Context<E>,
     config: Config,
     join_sub: Subscription<JoinSession, E>,
@@ -85,7 +83,7 @@ where
 }
 
 impl Module<Neovim> for Collab<Neovim> {
-    const NAME: Self::NAME;
+    const NAME: ModuleName = Self::NAME;
 
     type Config = Config;
 

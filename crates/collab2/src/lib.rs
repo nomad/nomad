@@ -2,6 +2,7 @@
 
 mod collab;
 mod config;
+mod events;
 mod session;
 mod session_error;
 
