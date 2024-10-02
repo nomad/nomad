@@ -3,6 +3,7 @@
 mod collab;
 mod config;
 mod events;
+mod neovim_collab;
 mod session;
 mod session_error;
 
