@@ -1,6 +1,6 @@
 use core::ops::AddAssign;
-use core::ptr::NonNull;
 
+use nvim_oxi::lua::ffi::State as LuaState;
 use nvim_oxi::{
     lua,
     Dictionary as NvimDictionary,
@@ -41,10 +41,7 @@ impl AddAssign<ModuleApi> for Api {
 }
 
 impl lua::Pushable for Api {
-    unsafe fn push(
-        self,
-        state: NonNull<lua::State>,
-    ) -> Result<i32, lua::Error> {
+    unsafe fn push(mut self, state: *mut LuaState) -> Result<i32, lua::Error> {
         let setup = NvimFunction::from_fn(|obj| setup(obj));
         self.dict.insert(SETUP_FN_NAME, setup);
         self.dict.push(state)
@@ -54,10 +51,7 @@ impl lua::Pushable for Api {
 fn setup(_obj: NvimObject) {}
 
 impl lua::Pushable for Nomad<Neovim> {
-    unsafe fn push(
-        mut self,
-        state: NonNull<lua::State>,
-    ) -> Result<i32, lua::Error> {
+    unsafe fn push(mut self, state: *mut LuaState) -> Result<i32, lua::Error> {
         self.start_modules();
         self.into_api().push(state)
     }
