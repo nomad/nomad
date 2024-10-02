@@ -4,8 +4,9 @@ use std::io;
 
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf, Fs};
 use collab_messaging::{Outbound, PeerId, Recipients};
-use collab_project::{FileId, Integrate, Project, Synchronize};
-use collab_server::{JoinRequest, SessionId};
+use collab_project::file::FileId;
+use collab_project::{Integrate, Project, Synchronize};
+use collab_server::JoinRequest;
 use futures_util::stream::select_all;
 use futures_util::{select, FutureExt, StreamExt};
 use nohash::IntSet as NoHashSet;
@@ -23,7 +24,7 @@ use crate::events::{
     Selection,
     SelectionEvent,
 };
-use crate::{CollabEditor, Config};
+use crate::{CollabEditor, Config, SessionId};
 
 pub(crate) struct Session<E: CollabEditor> {
     /// TODO: docs.
@@ -148,7 +149,7 @@ impl<E: CollabEditor> Session<E> {
         Self {
             config,
             ctx,
-            id: join_response.session_id,
+            id: SessionId(join_response.session_id),
             peers,
             project,
             project_root,
@@ -170,29 +171,41 @@ impl<E: CollabEditor> Session<E> {
         todo!();
     }
 
-    pub(crate) async fn run(self) -> Result<(), RunSessionError> {
+    pub(crate) async fn run(mut self) -> Result<(), RunSessionError> {
         loop {
-            let cursors = select_all(self.subs_cursors.values_mut());
-            let edits = select_all(self.subs_edits.values_mut());
-            let selections = select_all(self.subs_selections.values_mut());
+            let mut cursors = select_all(self.subs_cursors.values_mut());
+            let mut edits = select_all(self.subs_edits.values_mut());
+            let mut selections = select_all(self.subs_selections.values_mut());
 
             select! {
                 cursor = cursors.next().fuse() => {
                     let cursor = cursor.expect("never ends");
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
                     self.sync_cursor_moved(cursor).await?;
                 },
 
                 edit = edits.next().fuse() => {
                     let edit = edit.expect("never ends");
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
                     self.sync_local_edit(edit).await?;
                 },
 
                 selection = selections.next().fuse() => {
                     let selection = selection.expect("never ends");
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
                     self.sync_selection_changed(selection).await?;
                 },
 
                 maybe_msg = self.receiver.next().fuse() => {
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
                     match maybe_msg {
                         Some(Ok(msg)) => self.integrate_message(msg).await?,
                         Some(Err(err)) => return Err(err.into()),

@@ -1,4 +1,3 @@
-use collab_server::SessionId;
 use futures_util::{select, FutureExt, Stream, StreamExt};
 use nomad2::{
     module_name,
@@ -13,7 +12,7 @@ use nomad2::{
     Subscription,
 };
 
-use crate::{CollabEditor, Config, Session};
+use crate::{CollabEditor, Config, Session, SessionId};
 
 /// TODO: docs.
 pub(crate) struct Collab<E: CollabEditor> {

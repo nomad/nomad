@@ -1,4 +1,3 @@
-use collab_server::SessionId;
 use futures_util::stream::Select;
 use futures_util::{Stream, StreamExt};
 use nomad2::neovim::{
@@ -21,6 +20,7 @@ use crate::events::{
     SelectionEvent,
     StartSession,
 };
+use crate::SessionId;
 
 pub(crate) trait CollabEditor: Editor {
     type JoinStream: Stream<Item = SessionId> + Unpin;

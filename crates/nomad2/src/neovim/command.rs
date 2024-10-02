@@ -49,6 +49,24 @@ pub struct CommandArgs {}
 impl CommandArgs {
     /// TODO: docs.
     #[inline]
+    pub fn as_slice(&self) -> &[String] {
+        todo!();
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn len(&self) -> usize {
+        todo!();
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn pop_front(&mut self) -> Option<String> {
         todo!();
     }
@@ -148,5 +166,17 @@ impl CommandArgsError {
         commands: &Commands,
     ) -> Self {
         todo!();
+    }
+}
+
+impl TryFrom<CommandArgs> for () {
+    type Error = CommandArgsError;
+
+    fn try_from(args: CommandArgs) -> Result<Self, Self::Error> {
+        if args.is_empty() {
+            Ok(())
+        } else {
+            todo!();
+        }
     }
 }

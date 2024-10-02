@@ -1,7 +1,6 @@
-use collab_server::SessionId;
 use nomad2::neovim::{self, Neovim};
 
-use crate::NeovimCollab;
+use crate::{NeovimCollab, SessionId};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct JoinSession;
