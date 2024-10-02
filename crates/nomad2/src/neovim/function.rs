@@ -18,11 +18,13 @@ pub fn function<T: Function>(
         module_name: T::Module::NAME.as_str(),
         function_name: T::NAME,
         function_buf: buf.clone(),
-        inner: PhantomData,
+        ty: PhantomData,
     };
     let sub = ctx.subscribe(event);
-    let inner = buf.with_mut(Option::take).expect("just set when subscribing");
-    let handle = FunctionHandle { name: T::NAME, inner };
+    let handle = FunctionHandle {
+        name: T::NAME,
+        inner: buf.with_mut(Option::take).expect("just set when subscribing"),
+    };
     (handle, sub)
 }
 
@@ -49,7 +51,7 @@ pub struct FunctionEvent<T> {
     module_name: &'static str,
     function_name: &'static str,
     function_buf: Shared<Option<NvimFunction<NvimObject, ()>>>,
-    inner: PhantomData<T>,
+    ty: PhantomData<T>,
 }
 
 impl<T: Function> Event<Neovim> for FunctionEvent<T> {

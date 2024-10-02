@@ -1,6 +1,6 @@
 use nvim_oxi::Dictionary as NvimDictionary;
 
-use super::{FunctionHandle, Neovim};
+use super::{CommandHandle, FunctionHandle, Neovim};
 use crate::Module;
 
 /// TODO: docs.
@@ -14,6 +14,14 @@ impl ModuleApi {
     #[inline]
     pub fn new<M: Module<Neovim>>() -> Self {
         Self { name: M::NAME.as_str(), dict: NvimDictionary::default() }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn with_command(mut self, command: CommandHandle) -> Self {
+        todo!();
+        // self.dict.insert(command.name, command.inner);
+        // self
     }
 
     /// TODO: docs.
