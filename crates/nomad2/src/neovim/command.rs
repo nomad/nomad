@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared, Subscription};
 
-type OnExecute = Box<dyn Fn(CommandArgs) + 'static>;
+pub(super) type OnExecute = Box<dyn Fn(CommandArgs) + 'static>;
 
 /// TODO: docs.
 pub fn command<T: Command>(
@@ -21,6 +21,7 @@ pub fn command<T: Command>(
     let sub = ctx.subscribe(event);
     let handle = CommandHandle {
         name: T::NAME,
+        module_name: T::Module::NAME.as_str(),
         on_execute: buf
             .with_mut(Option::take)
             .expect("just set when subscribing"),
@@ -46,6 +47,7 @@ pub struct CommandArgs {}
 /// TODO: docs.
 pub struct CommandHandle {
     pub(super) name: &'static str,
+    pub(super) module_name: &'static str,
     pub(super) on_execute: OnExecute,
 }
 

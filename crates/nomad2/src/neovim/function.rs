@@ -23,6 +23,7 @@ pub fn function<T: Function>(
     let sub = ctx.subscribe(event);
     let handle = FunctionHandle {
         name: T::NAME,
+        module_name: T::Module::NAME.as_str(),
         inner: buf.with_mut(Option::take).expect("just set when subscribing"),
     };
     (handle, sub)
@@ -43,6 +44,7 @@ pub trait Function: 'static {
 /// TODO: docs.
 pub struct FunctionHandle {
     pub(super) name: &'static str,
+    pub(super) module_name: &'static str,
     pub(super) inner: NvimFunction<NvimObject, ()>,
 }
 

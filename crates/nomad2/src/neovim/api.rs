@@ -37,7 +37,7 @@ impl AddAssign<ModuleApi> for Api {
             );
         }
 
-        self.dict.insert(module_api.name, module_api.dict);
+        self.dict.insert(module_api.name, module_api.inner);
     }
 }
 
