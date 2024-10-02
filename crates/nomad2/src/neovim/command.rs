@@ -1,11 +1,13 @@
 use core::cmp::Ordering;
-use core::error::Error;
 use core::marker::PhantomData;
 
+use super::api::Commands;
+use super::module_api::ModuleCommands;
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared, Subscription};
 
-pub(super) type OnExecute = Box<dyn Fn(CommandArgs) + 'static>;
+pub(super) type OnExecute =
+    Box<dyn Fn(CommandArgs) -> Result<(), CommandArgsError> + 'static>;
 
 /// TODO: docs.
 pub fn command<T: Command>(
@@ -44,6 +46,21 @@ pub trait Command: 'static {
 /// TODO: docs.
 pub struct CommandArgs {}
 
+impl CommandArgs {
+    /// TODO: docs.
+    #[inline]
+    pub fn pop_front(&mut self) -> Option<String> {
+        todo!();
+    }
+}
+
+impl From<nvim_oxi::api::types::CommandArgs> for CommandArgs {
+    #[inline]
+    fn from(_: nvim_oxi::api::types::CommandArgs) -> Self {
+        todo!();
+    }
+}
+
 /// TODO: docs.
 pub struct CommandHandle {
     pub(super) name: &'static str,
@@ -66,12 +83,9 @@ impl<T: Command> Event<Neovim> for CommandEvent<T> {
     #[inline]
     fn subscribe(&mut self, emitter: Emitter<T::Args>, _: &Context<Neovim>) {
         let on_execute = Box::new(move |args| {
-            match T::Args::try_from(args).map_err(Into::into) {
-                Ok(payload) => emitter.send(payload),
-                Err(err) => {
-                    todo!();
-                },
-            };
+            let args = T::Args::try_from(args).map_err(Into::into)?;
+            emitter.send(args);
+            Ok(())
         });
 
         self.on_execute_buf.with_mut(|buf| {
@@ -79,9 +93,6 @@ impl<T: Command> Event<Neovim> for CommandEvent<T> {
         });
     }
 }
-
-/// TODO: docs.
-pub struct CommandArgsError {}
 
 impl<T> PartialEq for CommandEvent<T> {
     #[inline]
@@ -106,5 +117,36 @@ impl<T> Ord for CommandEvent<T> {
             Ordering::Equal => self.command_name.cmp(other.command_name),
             ord => ord,
         }
+    }
+}
+
+/// TODO: docs.
+pub struct CommandArgsError {}
+
+impl CommandArgsError {
+    #[inline]
+    pub(super) fn missing_command(commands: &ModuleCommands) -> Self {
+        todo!();
+    }
+
+    #[inline]
+    pub(super) fn missing_module(commands: &Commands) -> Self {
+        todo!();
+    }
+
+    #[inline]
+    pub(super) fn unknown_command(
+        module_name: &str,
+        command: &ModuleCommands,
+    ) -> Self {
+        todo!();
+    }
+
+    #[inline]
+    pub(super) fn unknown_module(
+        module_name: &str,
+        command: &Commands,
+    ) -> Self {
+        todo!();
     }
 }

@@ -11,7 +11,7 @@ use nvim_oxi::{
 };
 
 use super::module_api::ModuleCommands;
-use super::{ModuleApi, Neovim};
+use super::{CommandArgs, CommandArgsError, ModuleApi, Neovim};
 use crate::Nomad;
 
 /// TODO: docs.
@@ -53,9 +53,9 @@ impl AddAssign<ModuleApi> for Api {
 fn setup(_obj: NvimObject) {}
 
 #[derive(Default)]
-struct Commands {
+pub(super) struct Commands {
     /// Map from module name to the commands for that module.
-    map: HashMap<&'static str, ModuleCommands>,
+    pub(super) map: HashMap<&'static str, ModuleCommands>,
 }
 
 impl Commands {
@@ -72,8 +72,48 @@ impl Commands {
         .expect("all the arguments are valid");
     }
 
-    fn on_execute(self) -> Box<dyn Fn(api::types::CommandArgs) + 'static> {
-        todo!();
+    fn on_execute(self) -> impl Fn(api::types::CommandArgs) + 'static {
+        move |args| {
+            if let Err(err) = self.on_execute_inner(args) {
+                todo!();
+            }
+        }
+    }
+
+    fn on_execute_inner(
+        &self,
+        args: api::types::CommandArgs,
+    ) -> Result<(), CommandArgsError> {
+        let mut args = CommandArgs::from(args);
+
+        let module_name = args
+            .pop_front()
+            .ok_or_else(|| CommandArgsError::missing_module(self))?;
+
+        let module_commands =
+            self.map.get(&module_name.as_str()).ok_or_else(|| {
+                CommandArgsError::unknown_module(&module_name, self)
+            })?;
+
+        let Some(command_name) = args.pop_front() else {
+            return (if let Some(default) = module_commands.default_command() {
+                default(args)
+            } else {
+                Err(CommandArgsError::missing_command(module_commands))
+            });
+        };
+
+        let command = module_commands
+            .map
+            .get(&command_name.as_str())
+            .ok_or_else(|| {
+                CommandArgsError::unknown_command(
+                    &command_name,
+                    module_commands,
+                )
+            })?;
+
+        command(args)
     }
 }
 

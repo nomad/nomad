@@ -66,6 +66,10 @@ pub(super) struct ModuleCommands {
 }
 
 impl ModuleCommands {
+    pub(super) fn default_command(&self) -> Option<&OnExecute> {
+        todo!();
+    }
+
     fn new(module_name: &'static str) -> Self {
         Self { module_name, map: HashMap::new() }
     }
