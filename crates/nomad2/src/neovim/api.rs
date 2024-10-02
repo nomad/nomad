@@ -15,7 +15,7 @@ use super::{CommandArgs, CommandArgsError, ModuleApi, Neovim};
 use crate::Nomad;
 
 /// TODO: docs.
-const MAD_CMD_NAME: &str = "Mad";
+const NOMAD_CMD_NAME: &str = "Mad";
 
 /// TODO: docs.
 const SETUP_FN_NAME: &str = "setup";
@@ -64,12 +64,8 @@ impl Commands {
             .nargs(api::types::CommandNArgs::Any)
             .build();
 
-        api::create_user_command(
-            MAD_CMD_NAME,
-            nvim_oxi::Function::from_fn(self.on_execute()),
-            &opts,
-        )
-        .expect("all the arguments are valid");
+        api::create_user_command(NOMAD_CMD_NAME, self.on_execute(), &opts)
+            .expect("all the arguments are valid");
     }
 
     fn on_execute(self) -> impl Fn(api::types::CommandArgs) + 'static {

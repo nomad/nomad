@@ -136,8 +136,8 @@ impl CommandArgsError {
 
     #[inline]
     pub(super) fn unknown_command(
-        module_name: &str,
-        command: &ModuleCommands,
+        command_name: &str,
+        commands: &ModuleCommands,
     ) -> Self {
         todo!();
     }
@@ -145,7 +145,7 @@ impl CommandArgsError {
     #[inline]
     pub(super) fn unknown_module(
         module_name: &str,
-        command: &Commands,
+        commands: &Commands,
     ) -> Self {
         todo!();
     }
