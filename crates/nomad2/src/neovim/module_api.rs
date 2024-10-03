@@ -35,7 +35,7 @@ pub struct ModuleApi {
 
 impl ModuleApi {
     /// TODO: docs.
-    #[inline]
+    #[track_caller]
     pub fn with_command(mut self, command: CommandHandle) -> Self {
         self.commands.add_command(command);
         self
@@ -43,7 +43,13 @@ impl ModuleApi {
 
     /// TODO: docs.
     #[track_caller]
-    #[inline]
+    pub fn with_default_command(mut self, command: CommandHandle) -> Self {
+        self.commands.add_default_command(command);
+        self
+    }
+
+    /// TODO: docs.
+    #[track_caller]
     pub fn with_function(mut self, function: FunctionHandle) -> Self {
         if self.name != function.module_name {
             panic!(
@@ -70,6 +76,9 @@ pub(super) struct ModuleCommands {
     /// The name of the module these commands belong to.
     pub(super) module_name: &'static str,
 
+    /// The command to run when no command is specified.
+    pub(super) default_command: Option<OnExecute>,
+
     /// Map from command name to the function to run when the command is
     /// executed.
     pub(super) map: HashMap<&'static str, OnExecute>,
@@ -77,15 +86,9 @@ pub(super) struct ModuleCommands {
 
 impl ModuleCommands {
     pub(super) fn default_command(&self) -> Option<&OnExecute> {
-        todo!();
+        self.default_command.as_ref()
     }
 
-    fn new(module_name: &'static str) -> Self {
-        Self { module_name, map: HashMap::new() }
-    }
-}
-
-impl ModuleCommands {
     #[track_caller]
     fn add_command(&mut self, command: CommandHandle) {
         if self.module_name != command.module_name {
@@ -105,5 +108,29 @@ impl ModuleCommands {
         }
 
         self.map.insert(command.name, command.on_execute);
+    }
+
+    #[track_caller]
+    fn add_default_command(&mut self, command: CommandHandle) {
+        if self.module_name != command.module_name {
+            panic!(
+                "trying to register a command for module '{}' in the API for \
+                 module '{}'",
+                command.module_name, self.module_name
+            );
+        }
+
+        if self.default_command.is_some() {
+            panic!(
+                "a default command has already been set for module '{}'",
+                self.module_name
+            );
+        }
+
+        self.default_command = Some(command.on_execute);
+    }
+
+    fn new(module_name: &'static str) -> Self {
+        Self { module_name, default_command: None, map: HashMap::new() }
     }
 }

@@ -1,7 +1,7 @@
 use collab_fs::OsFs;
 
 use super::{Api, ModuleApi, NeovimSpawner};
-use crate::{Editor, Module};
+use crate::Editor;
 
 /// TODO: docs.
 #[derive(Default)]

@@ -5,6 +5,12 @@ use nvim_oxi::serde::Deserializer as NvimDeserializer;
 use nvim_oxi::{Function as NvimFunction, Object as NvimObject};
 use serde::de::{Deserialize, DeserializeOwned};
 
+use super::diagnostic::{
+    DiagnosticMessage,
+    DiagnosticSource,
+    HighlightGroup,
+    Level,
+};
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared, Subscription};
 
@@ -65,8 +71,14 @@ impl<T: Function> Event<Neovim> for FunctionEvent<T> {
         let nvim_fun = NvimFunction::<NvimObject, ()>::from_fn(move |obj| {
             match T::Args::deserialize(NvimDeserializer::new(obj)) {
                 Ok(payload) => emitter.send(payload),
-                Err(_err) => {
-                    todo!();
+                Err(err) => {
+                    let mut source = DiagnosticSource::new();
+                    source
+                        .push_segment(T::Module::NAME.as_str())
+                        .push_segment(T::NAME);
+                    let mut message = DiagnosticMessage::new();
+                    message.push_str(err.to_string());
+                    message.emit(Level::Error, source);
                 },
             };
         });
