@@ -2,6 +2,7 @@
 
 mod api;
 mod command;
+mod config;
 mod executor;
 mod function;
 mod join_handle;
@@ -18,8 +19,9 @@ pub use command::{
     CommandEvent,
     CommandHandle,
 };
+pub use config::ConfigEvent;
 pub use function::{function, Function, FunctionEvent, FunctionHandle};
 pub use join_handle::NeovimJoinHandle;
-pub use module_api::ModuleApi;
+pub use module_api::{module_api, ModuleApi};
 pub use neovim::Neovim;
 pub use spawner::NeovimSpawner;

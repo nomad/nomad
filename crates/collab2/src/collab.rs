@@ -18,6 +18,7 @@ use crate::{CollabEditor, Config, Session, SessionId};
 pub(crate) struct Collab<E: CollabEditor> {
     pub(crate) ctx: Context<E>,
     pub(crate) config: Config,
+    pub(crate) config_stream: E::ConfigStream,
     pub(crate) join_stream: E::JoinStream,
     pub(crate) start_stream: E::StartStream,
 }

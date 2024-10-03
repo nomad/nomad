@@ -1,29 +1,39 @@
 use std::collections::HashMap;
 
-use nvim_oxi::Dictionary as NvimDictionary;
+use nvim_oxi::{Dictionary as NvimDictionary, Object as NvimObject};
 
 use super::command::OnExecute;
+use super::config::{ConfigEvent, OnConfigChange};
 use super::{CommandHandle, FunctionHandle, Neovim};
-use crate::Module;
+use crate::{Context, Module, Shared, Subscription};
+
+/// TODO: docs.
+pub fn module_api<M: Module<Neovim>>(
+    ctx: &Context<Neovim>,
+) -> (ModuleApi, Subscription<ConfigEvent<M>, Neovim>) {
+    let mut buf = Shared::new(None);
+    let event = ConfigEvent::<M>::new(buf.clone());
+    let sub = ctx.subscribe(event);
+    let api = ModuleApi {
+        name: M::NAME.as_str(),
+        commands: ModuleCommands::new(M::NAME.as_str()),
+        on_config_change: buf
+            .with_mut(Option::take)
+            .expect("just set when subscribing"),
+        inner: NvimDictionary::default(),
+    };
+    (api, sub)
+}
 
 /// TODO: docs.
 pub struct ModuleApi {
     pub(super) name: &'static str,
     pub(super) commands: ModuleCommands,
     pub(super) inner: NvimDictionary,
+    pub(super) on_config_change: OnConfigChange,
 }
 
 impl ModuleApi {
-    /// TODO: docs.
-    #[inline]
-    pub fn new<M: Module<Neovim>>() -> Self {
-        Self {
-            name: M::NAME.as_str(),
-            commands: ModuleCommands::new(M::NAME.as_str()),
-            inner: NvimDictionary::default(),
-        }
-    }
-
     /// TODO: docs.
     #[inline]
     pub fn with_command(mut self, command: CommandHandle) -> Self {
