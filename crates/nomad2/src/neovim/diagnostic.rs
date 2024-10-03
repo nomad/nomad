@@ -101,16 +101,16 @@ impl DiagnosticMessage {
         self
     }
 
-    pub(super) fn push_str(&mut self, s: &str) -> &mut Self {
-        self.push_chunk(s, None)
+    pub(super) fn push_str<T: AsRef<str>>(&mut self, s: T) -> &mut Self {
+        self.push_chunk(s.as_ref(), None)
     }
 
-    pub(super) fn push_str_highlighted(
+    pub(super) fn push_str_highlighted<T: AsRef<str>>(
         &mut self,
-        s: &str,
+        s: T,
         hl: HighlightGroup,
     ) -> &mut Self {
-        self.push_chunk(s, Some(hl))
+        self.push_chunk(s.as_ref(), Some(hl))
     }
 
     fn push_chunk(

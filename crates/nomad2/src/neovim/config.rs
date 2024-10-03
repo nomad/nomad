@@ -11,6 +11,12 @@ use nvim_oxi::{
 };
 use serde::de::DeserializeOwned;
 
+use super::diagnostic::{
+    DiagnosticMessage,
+    DiagnosticSource,
+    HighlightGroup,
+    Level,
+};
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared};
 
@@ -60,7 +66,7 @@ impl<T: Module<Neovim>> Event<Neovim> for ConfigEvent<T> {
     fn subscribe(
         &mut self,
         emitter: Emitter<Self::Payload>,
-        ctx: &Context<Neovim>,
+        _: &Context<Neovim>,
     ) {
         let on_config_change = Box::new(move |obj| {
             let config = obj_to_config::<T::Config>(obj)?;
@@ -76,7 +82,7 @@ impl<T: Module<Neovim>> Event<Neovim> for ConfigEvent<T> {
 
 pub(super) struct Setup {
     on_config_change: HashMap<&'static str, OnConfigChange>,
-    module_names: &'static [&'static str],
+    module_names: Vec<&'static str>,
 }
 
 impl Setup {
@@ -85,7 +91,7 @@ impl Setup {
     pub(super) fn into_fn(self) -> impl Fn(NvimObject) {
         move |obj| {
             if let Err(err) = self.on_config_change(obj) {
-                todo!();
+                err.emit()
             }
         }
     }
@@ -93,13 +99,14 @@ impl Setup {
     pub(super) fn new(
         on_config_change: HashMap<&'static str, OnConfigChange>,
     ) -> Self {
-        let mut names = on_config_change.keys().copied().collect::<Vec<_>>();
+        let mut module_names =
+            on_config_change.keys().copied().collect::<Vec<_>>();
 
         // Sort the module names alphabetically to have a nicer message when
         // including the list of valid modules in a warning.
-        names.sort_unstable();
+        module_names.sort_unstable();
 
-        Self { on_config_change, module_names: &*(names.leak()) }
+        Self { on_config_change, module_names }
     }
 
     fn on_config_change(
@@ -112,7 +119,7 @@ impl Setup {
                 unsafe { obj.into_dict_unchecked() }
             },
             other => {
-                return Err(DeserializeConfigError::object_not_dict(other))
+                return Err(DeserializeConfigError::config_not_dict(other))
             },
         };
 
@@ -125,7 +132,7 @@ impl Setup {
                 self.on_config_change.get(&module_name).ok_or_else(|| {
                     DeserializeConfigError::unknown_module(
                         module_name,
-                        self.module_names,
+                        &self.module_names,
                     )
                 })?;
 
@@ -134,7 +141,7 @@ impl Setup {
 
         for (module_name, module_config) in dict {
             if let Err(err) = handle(module_name, module_config) {
-                todo!();
+                err.emit()
             }
         }
 
@@ -150,21 +157,56 @@ fn obj_to_config<T: DeserializeOwned>(
 
 /// Error returned when a subset of the Lua object given to the `setup()`
 /// function cannot be deserialized into the expected type.
-pub(super) struct DeserializeConfigError {}
+pub(super) struct DeserializeConfigError {
+    source: DiagnosticSource,
+    msg: DiagnosticMessage,
+}
 
 impl DeserializeConfigError {
+    fn emit(self) {
+        self.msg.emit(Level::Error, self.source);
+    }
+
     fn non_unicode_module_name(module_name: &NvimString) -> Self {
-        todo!();
+        let mut source = DiagnosticSource::new();
+        source.push_segment(Setup::NAME);
+
+        let mut msg = DiagnosticMessage::new();
+        let module_name = module_name.to_string_lossy();
+        msg.push_str("module name '")
+            .push_str_highlighted(module_name, HighlightGroup::special())
+            .push_str("' is not a valid Unicode string");
+
+        Self { source, msg }
     }
 
-    fn object_not_dict(kind: NvimObjectKind) -> Self {
-        todo!();
+    fn config_not_dict(kind: NvimObjectKind) -> Self {
+        let mut source = DiagnosticSource::new();
+        source.push_segment(Setup::NAME);
+
+        let mut msg = DiagnosticMessage::new();
+        msg.push_str("expected a dictionary, got a ")
+            .push_str_highlighted(kind.as_static(), HighlightGroup::special())
+            .push_str(" instead");
+
+        Self { source, msg }
     }
 
-    fn unknown_module(
-        module_name: &str,
-        valid_module_names: &'static [&'static str],
-    ) -> Self {
-        todo!();
+    fn unknown_module(module_name: &str, valid_module_names: &[&str]) -> Self {
+        debug_assert!(!valid_module_names.is_empty());
+
+        let mut source = DiagnosticSource::new();
+        source.push_segment(Setup::NAME);
+
+        let mut msg = DiagnosticMessage::new();
+        msg.push_str("unknown module '")
+            .push_str_highlighted(module_name, HighlightGroup::special())
+            .push_str("', the valid modules are ")
+            .push_comma_separated(
+                valid_module_names,
+                HighlightGroup::special(),
+            );
+
+        Self { source, msg }
     }
 }
