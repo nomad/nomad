@@ -961,6 +961,7 @@ dependencies = [
  "nvim-oxi",
  "pin-project-lite",
  "serde",
+ "serde_path_to_error",
  "smol_str",
 ]
 

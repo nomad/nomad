@@ -9,6 +9,7 @@ mod function;
 mod join_handle;
 mod module_api;
 mod neovim;
+mod serde;
 mod spawner;
 
 pub use api::Api;

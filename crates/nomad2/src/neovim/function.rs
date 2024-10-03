@@ -1,16 +1,11 @@
 use core::cmp::Ordering;
 use core::marker::PhantomData;
 
-use nvim_oxi::serde::Deserializer as NvimDeserializer;
 use nvim_oxi::{Function as NvimFunction, Object as NvimObject};
-use serde::de::{Deserialize, DeserializeOwned};
+use serde::de::DeserializeOwned;
 
-use super::diagnostic::{
-    DiagnosticMessage,
-    DiagnosticSource,
-    HighlightGroup,
-    Level,
-};
+use super::diagnostic::{DiagnosticSource, Level};
+use super::serde::deserialize;
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared, Subscription};
 
@@ -69,16 +64,14 @@ impl<T: Function> Event<Neovim> for FunctionEvent<T> {
     #[inline]
     fn subscribe(&mut self, emitter: Emitter<T::Args>, _: &Context<Neovim>) {
         let nvim_fun = NvimFunction::<NvimObject, ()>::from_fn(move |obj| {
-            match T::Args::deserialize(NvimDeserializer::new(obj)) {
+            match deserialize::<T::Args>(obj) {
                 Ok(payload) => emitter.send(payload),
                 Err(err) => {
                     let mut source = DiagnosticSource::new();
                     source
                         .push_segment(T::Module::NAME.as_str())
                         .push_segment(T::NAME);
-                    let mut message = DiagnosticMessage::new();
-                    message.push_str(err.to_string());
-                    message.emit(Level::Error, source);
+                    err.into_msg().emit(Level::Error, source);
                 },
             };
         });

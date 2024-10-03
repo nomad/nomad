@@ -18,6 +18,7 @@ async-task = "4.7"
 concurrent-queue = "2.4"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv", "neovim-0-10" ] }
 pin-project-lite = "0.2"
+serde_path_to_error = "0.1"
 
 
 [lints]

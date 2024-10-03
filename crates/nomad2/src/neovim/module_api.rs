@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use nvim_oxi::{Dictionary as NvimDictionary, Object as NvimObject};
+use nvim_oxi::Dictionary as NvimDictionary;
 
 use super::command::OnExecute;
 use super::config::{ConfigEvent, OnConfigChange};
@@ -11,7 +11,7 @@ use crate::{Context, Module, Shared, Subscription};
 pub fn module_api<M: Module<Neovim>>(
     ctx: &Context<Neovim>,
 ) -> (ModuleApi, Subscription<ConfigEvent<M>, Neovim>) {
-    let mut buf = Shared::new(None);
+    let buf = Shared::new(None);
     let event = ConfigEvent::<M>::new(buf.clone());
     let sub = ctx.subscribe(event);
     let api = ModuleApi {

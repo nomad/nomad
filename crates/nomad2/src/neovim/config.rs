@@ -17,6 +17,7 @@ use super::diagnostic::{
     HighlightGroup,
     Level,
 };
+use super::serde::deserialize;
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared};
 
@@ -69,7 +70,13 @@ impl<T: Module<Neovim>> Event<Neovim> for ConfigEvent<T> {
         _: &Context<Neovim>,
     ) {
         let on_config_change = Box::new(move |obj| {
-            let config = obj_to_config::<T::Config>(obj)?;
+            let config = deserialize::<T::Config>(obj).map_err(|err| {
+                let mut source = DiagnosticSource::new();
+                source
+                    .push_segment(Setup::NAME)
+                    .push_segment(T::NAME.as_str());
+                DeserializeConfigError::new(source, err.into_msg())
+            })?;
             emitter.send(config);
             Ok(())
         });
@@ -149,12 +156,6 @@ impl Setup {
     }
 }
 
-fn obj_to_config<T: DeserializeOwned>(
-    obj: NvimObject,
-) -> Result<T, DeserializeConfigError> {
-    todo!();
-}
-
 /// Error returned when a subset of the Lua object given to the `setup()`
 /// function cannot be deserialized into the expected type.
 pub(super) struct DeserializeConfigError {
@@ -165,6 +166,10 @@ pub(super) struct DeserializeConfigError {
 impl DeserializeConfigError {
     fn emit(self) {
         self.msg.emit(Level::Error, self.source);
+    }
+
+    fn new(source: DiagnosticSource, msg: DiagnosticMessage) -> Self {
+        Self { source, msg }
     }
 
     fn non_unicode_module_name(module_name: &NvimString) -> Self {

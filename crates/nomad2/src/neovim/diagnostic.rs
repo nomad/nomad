@@ -79,6 +79,19 @@ impl DiagnosticMessage {
         emit(level, source, self);
     }
 
+    pub(super) fn push_dot_separated<T, I>(
+        &mut self,
+        iter: I,
+        hl: HighlightGroup,
+    ) -> &mut Self
+    where
+        T: AsRef<str>,
+        I: IntoIterator<Item = T>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        self.push_separated(iter, hl, ".")
+    }
+
     pub(super) fn push_comma_separated<T, I>(
         &mut self,
         iter: I,
@@ -89,16 +102,7 @@ impl DiagnosticMessage {
         I: IntoIterator<Item = T>,
         I::IntoIter: ExactSizeIterator,
     {
-        let iter = iter.into_iter();
-        let len = iter.len();
-        for (idx, text) in iter.enumerate() {
-            self.push_str_highlighted(text.as_ref(), hl.clone());
-            let is_last = idx + 1 == len;
-            if !is_last {
-                self.push_str(", ");
-            }
-        }
-        self
+        self.push_separated(iter, hl, ", ")
     }
 
     pub(super) fn push_str<T: AsRef<str>>(&mut self, s: T) -> &mut Self {
@@ -119,6 +123,29 @@ impl DiagnosticMessage {
         hl: Option<HighlightGroup>,
     ) -> &mut Self {
         self.chunks.push((NvimString::from(s), hl));
+        self
+    }
+
+    fn push_separated<T, I>(
+        &mut self,
+        iter: I,
+        hl: HighlightGroup,
+        separator: &str,
+    ) -> &mut Self
+    where
+        T: AsRef<str>,
+        I: IntoIterator<Item = T>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let iter = iter.into_iter();
+        let len = iter.len();
+        for (idx, text) in iter.enumerate() {
+            self.push_str_highlighted(text.as_ref(), hl.clone());
+            let is_last = idx + 1 == len;
+            if !is_last {
+                self.push_str(separator);
+            }
+        }
         self
     }
 }
