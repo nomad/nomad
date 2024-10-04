@@ -221,7 +221,26 @@ impl fmt::Debug for Buffer {
 
 impl BufferId {
     pub(super) fn is_of_text_buffer(&self) -> bool {
-        todo!();
+        let opts = api::opts::OptionOpts::builder()
+            .buffer(self.inner.clone())
+            .build();
+
+        self.inner.is_loaded()
+        // Checks that the buftype is empty. This filters out help and terminal
+        // buffers, the quickfix list, etc.
+        && api::get_option_value::<String>("buftype", &opts)
+                .ok()
+                .map(|buftype| buftype.is_empty())
+                .unwrap_or(false)
+        // Checks that the buffer contents are UTF-8 encoded, which filters
+        // out buffers containing binary data.
+        && api::get_option_value::<String>("fileencoding", &opts)
+                .ok()
+                .map(|mut encoding| {
+                    encoding.make_ascii_lowercase();
+                    encoding == "utf-8"
+                })
+                .unwrap_or(false)
     }
 
     pub(super) fn new(inner: NvimBuffer) -> Self {
