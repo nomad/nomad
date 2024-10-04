@@ -26,7 +26,7 @@ pub trait Buffer<E: Editor + ?Sized> {
     fn path(&self) -> Option<Cow<'_, AbsUtf8Path>>;
 
     /// TODO: docs.
-    fn set_text<R, T>(&mut self, replaced_range: R, new_text: T) -> Text
+    fn set_text<R, T>(&mut self, replaced_range: R, new_text: T)
     where
         R: RangeBounds<ByteOffset>,
         T: AsRef<str>;

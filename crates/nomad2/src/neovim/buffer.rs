@@ -1,6 +1,6 @@
 use alloc::borrow::Cow;
 use core::cmp::Ordering;
-use core::ops::RangeBounds;
+use core::ops::{Range, RangeBounds};
 
 use collab_fs::AbsUtf8Path;
 use nvim_oxi::api::Buffer as NvimBuffer;
@@ -13,9 +13,51 @@ pub struct Buffer {
     id: BufferId,
 }
 
+/// TODO: docs.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct BufferId {
+    inner: NvimBuffer,
+}
+
+/// The 2D equivalent of a `ByteOffset`.
+struct Point {
+    /// The index of the line in the buffer.
+    line_idx: usize,
+
+    /// The byte offset in the line.
+    byte_offset: ByteOffset,
+}
+
 impl Buffer {
     pub(super) fn new(id: BufferId) -> Self {
         Self { id }
+    }
+
+    fn get_text_in_point_range(&self, point_range: Range<Point>) -> Text {
+        todo!()
+    }
+
+    fn point_of_byte_offset(&self, byte_offset: ByteOffset) -> Point {
+        todo!()
+    }
+
+    fn point_of_eof(&self) -> Point {
+        todo!()
+    }
+
+    fn point_range_of_byte_range<R>(&self, byte_range: R) -> Range<Point>
+    where
+        R: RangeBounds<ByteOffset>,
+    {
+        todo!()
+    }
+
+    fn replace_text_in_point_range(
+        &self,
+        point_range: Range<Point>,
+        replacement: &str,
+    ) {
+        todo!()
     }
 }
 
@@ -30,30 +72,26 @@ impl crate::Buffer<Neovim> for Buffer {
     where
         R: RangeBounds<ByteOffset>,
     {
-        todo!()
+        let point_range = self.point_range_of_byte_range(byte_range);
+        self.get_text_in_point_range(point_range)
     }
 
     fn id(&self) -> Self::Id {
-        todo!()
+        self.id.clone()
     }
 
     fn path(&self) -> Option<Cow<'_, AbsUtf8Path>> {
         todo!()
     }
 
-    fn set_text<R, T>(&mut self, replaced_range: R, new_text: T) -> Text
+    fn set_text<R, T>(&mut self, replaced_range: R, new_text: T)
     where
         R: RangeBounds<ByteOffset>,
         T: AsRef<str>,
     {
-        todo!()
+        let point_range = self.point_range_of_byte_range(replaced_range);
+        self.replace_text_in_point_range(point_range, new_text.as_ref());
     }
-}
-
-/// TODO: docs.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct BufferId {
-    inner: NvimBuffer,
 }
 
 impl BufferId {
@@ -75,5 +113,11 @@ impl PartialOrd for BufferId {
 impl Ord for BufferId {
     fn cmp(&self, other: &Self) -> Ordering {
         self.inner.handle().cmp(&other.inner.handle())
+    }
+}
+
+impl Point {
+    fn zero() -> Self {
+        Self { line_idx: 0, byte_offset: ByteOffset::new(0) }
     }
 }
