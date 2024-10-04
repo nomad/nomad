@@ -20,6 +20,9 @@ pub trait Buffer<E: Editor + ?Sized> {
         R: RangeBounds<ByteOffset>;
 
     /// TODO: docs.
+    fn id(&self) -> Self::Id;
+
+    /// TODO: docs.
     fn path(&self) -> Option<Cow<'_, AbsUtf8Path>>;
 
     /// TODO: docs.
