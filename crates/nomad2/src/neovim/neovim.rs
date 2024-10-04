@@ -49,7 +49,7 @@ impl Editor for Neovim {
         }
         #[cfg(not(target_family = "unix"))]
         {
-            todo!("")
+            unimplemented!()
         }
     }
 }
