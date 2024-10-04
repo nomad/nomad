@@ -14,7 +14,7 @@ mod serde;
 mod spawner;
 
 pub use api::Api;
-pub use buffer::{Buffer, BufferId};
+pub use buffer::{Buffer, BufferId, EditEvent};
 pub use command::{
     command,
     Command,

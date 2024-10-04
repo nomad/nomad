@@ -8,7 +8,7 @@ use futures_util::stream::{pending, Pending};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
 use super::Neovim;
-use crate::{ByteOffset, Context, Edit, Text};
+use crate::{ByteOffset, Context, Edit, Emitter, Event, Subscription, Text};
 
 /// TODO: docs.
 pub struct Buffer {
@@ -19,6 +19,12 @@ pub struct Buffer {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BufferId {
     inner: NvimBuffer,
+}
+
+/// TODO: docs.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub struct EditEvent {
+    id: BufferId,
 }
 
 /// The 2D equivalent of a `ByteOffset`.
@@ -176,11 +182,11 @@ impl Buffer {
 }
 
 impl crate::Buffer<Neovim> for Buffer {
-    type EditStream = Pending<Edit>;
+    type EditStream = Subscription<EditEvent, Neovim>;
     type Id = BufferId;
 
-    fn edit_stream(&mut self, _: &Context<Neovim>) -> Self::EditStream {
-        pending()
+    fn edit_stream(&mut self, ctx: &Context<Neovim>) -> Self::EditStream {
+        ctx.subscribe(EditEvent { id: self.id.clone() })
     }
 
     fn get_text<R>(&self, byte_range: R) -> Text
@@ -262,6 +268,27 @@ impl PartialOrd for BufferId {
 impl Ord for BufferId {
     fn cmp(&self, other: &Self) -> Ordering {
         self.inner.handle().cmp(&other.inner.handle())
+    }
+}
+
+impl Event<Neovim> for EditEvent {
+    type Payload = Edit;
+    type SubscribeCtx = BufferId;
+
+    fn subscribe(
+        &mut self,
+        emitter: Emitter<Self::Payload>,
+        _: &Context<Neovim>,
+    ) -> Self::SubscribeCtx {
+        todo!()
+    }
+
+    fn unsubscribe(
+        &mut self,
+        sub_ctx: Self::SubscribeCtx,
+        _: &Context<Neovim>,
+    ) {
+        todo!();
     }
 }
 
