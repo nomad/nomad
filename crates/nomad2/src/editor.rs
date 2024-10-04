@@ -2,7 +2,7 @@ use core::ops::AddAssign;
 
 use collab_fs::{AbsUtf8PathBuf, Fs};
 
-use crate::Spawner;
+use crate::{Buffer, Spawner};
 
 /// TODO: docs.
 pub trait Editor: 'static {
@@ -10,13 +10,19 @@ pub trait Editor: 'static {
     type Api: Default + AddAssign<Self::ModuleApi>;
 
     /// TODO: docs.
-    type ModuleApi;
+    // type Buffer<'ed>: Buffer<Self>;
 
     /// TODO: docs.
     type Fs: Fs;
 
     /// TODO: docs.
+    type ModuleApi;
+
+    /// TODO: docs.
     type Spawner: Spawner;
+
+    /// TODO: docs.
+    // fn current_buffer(&self) -> Option<Self::Buffer<'_>>;
 
     /// TODO: docs.
     fn fs(&self) -> Self::Fs;

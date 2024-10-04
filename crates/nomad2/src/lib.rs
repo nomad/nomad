@@ -2,6 +2,8 @@
 
 extern crate alloc;
 
+mod buffer;
+mod byte_offset;
 mod context;
 mod editor;
 mod event;
@@ -13,7 +15,10 @@ mod nomad;
 mod shared;
 mod spawner;
 mod subscription;
+mod text;
 
+pub use buffer::Buffer;
+pub use byte_offset::ByteOffset;
 pub use context::Context;
 pub use editor::Editor;
 pub use event::Event;
@@ -24,3 +29,4 @@ pub use nomad_macros::module_name;
 pub use shared::Shared;
 pub use spawner::{JoinHandle, Spawner};
 pub use subscription::{Emitter, Subscription};
+pub use text::Text;
