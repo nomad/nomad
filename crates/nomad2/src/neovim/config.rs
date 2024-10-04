@@ -9,7 +9,6 @@ use nvim_oxi::{
     ObjectKind as NvimObjectKind,
     String as NvimString,
 };
-use serde::de::DeserializeOwned;
 
 use super::diagnostic::{
     DiagnosticMessage,

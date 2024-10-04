@@ -37,11 +37,3 @@ impl Hunk {
         Self { deleted_range, inserted_text: inserted_text.into() }
     }
 }
-
-#[cfg(feature = "neovim")]
-impl From<nvim_oxi::api::opts::OnBytesArgs> for Hunk {
-    #[inline]
-    fn from(_args: nvim_oxi::api::opts::OnBytesArgs) -> Self {
-        todo!();
-    }
-}

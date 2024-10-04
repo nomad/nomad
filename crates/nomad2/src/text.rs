@@ -7,6 +7,11 @@ pub struct Text {
 }
 
 impl Text {
+    /// TODO: docs.
+    pub fn as_str(&self) -> &str {
+        self.inner.as_str()
+    }
+
     /// Creates a new empty `Text`.
     pub fn new() -> Self {
         Self::default()

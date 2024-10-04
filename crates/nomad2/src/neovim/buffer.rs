@@ -37,6 +37,7 @@ pub struct EditEvent {
 }
 
 /// The 2D equivalent of a `ByteOffset`.
+#[derive(PartialEq)]
 struct Point {
     /// The index of the line in the buffer.
     line_idx: usize,
@@ -324,5 +325,50 @@ impl Event<Neovim> for EditEvent {
 impl Point {
     fn zero() -> Self {
         Self { line_idx: 0, byte_offset: ByteOffset::new(0) }
+    }
+}
+
+impl From<api::opts::OnBytesArgs> for Hunk {
+    #[inline]
+    fn from(
+        (
+            _bytes,
+            buf,
+            _changedtick,
+            start_row,
+            start_col,
+            start_offset,
+            _old_end_row,
+            _old_end_col,
+            old_end_len,
+            new_end_row,
+            new_end_col,
+            _new_end_len,
+        ): nvim_oxi::api::opts::OnBytesArgs,
+    ) -> Self {
+        let buf = BufferId::new(buf);
+
+        let start = Point {
+            line_idx: start_row,
+            byte_offset: ByteOffset::new(start_offset),
+        };
+
+        let end = Point {
+            line_idx: start_row + new_end_row,
+            byte_offset: (start_col * (new_end_row == 0) as usize
+                + new_end_col)
+                .into(),
+        };
+
+        let replacement = if start == end {
+            Text::new()
+        } else {
+            buf.get_text_in_point_range(start..end)
+        };
+
+        let deleted_range =
+            start_offset.into()..(start_offset + old_end_len).into();
+
+        Hunk::new(deleted_range, replacement.as_str())
     }
 }
