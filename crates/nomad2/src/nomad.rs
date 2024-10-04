@@ -12,13 +12,11 @@ pub struct Nomad<E: Editor> {
 
 impl<E: Editor> Nomad<E> {
     /// TODO: docs.
-    #[inline]
     pub fn into_api(self) -> E::Api {
         self.api
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn new(editor: E) -> Self {
         crate::log::init(&editor.log_dir());
         Self {
@@ -29,7 +27,6 @@ impl<E: Editor> Nomad<E> {
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn start_modules(&mut self) {
         for fut in self.run.drain(..) {
             self.ctx.spawner().spawn(fut).detach();
@@ -38,7 +35,6 @@ impl<E: Editor> Nomad<E> {
 
     /// TODO: docs.
     #[track_caller]
-    #[inline]
     pub fn with_module<M: Module<E>>(mut self) -> Self {
         let (mut module, module_api) = M::init(&self.ctx);
         self.api += module_api;

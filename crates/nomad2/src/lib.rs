@@ -2,7 +2,6 @@
 
 extern crate alloc;
 
-mod api;
 mod context;
 mod editor;
 mod event;
@@ -15,7 +14,6 @@ mod shared;
 mod spawner;
 mod subscription;
 
-pub use api::Api;
 pub use context::Context;
 pub use editor::Editor;
 pub use event::Event;

@@ -13,7 +13,6 @@ thread_local! {
 }
 
 /// TODO: doc
-#[inline]
 pub(super) fn spawn<F>(future: F) -> NeovimJoinHandle<F::Output>
 where
     F: Future + 'static,
@@ -30,7 +29,6 @@ struct LocalExecutor {
 
 impl LocalExecutor {
     /// TODO: docs
-    #[inline]
     fn inner(&self) -> &LocalExecutorInner {
         self.inner.get_or_init(LocalExecutorInner::new)
     }
@@ -41,7 +39,6 @@ impl LocalExecutor {
     }
 
     /// TODO: docs
-    #[inline]
     fn spawn<F>(&self, future: F) -> NeovimJoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -62,7 +59,6 @@ struct LocalExecutorInner {
 
 impl LocalExecutorInner {
     /// TODO: docs
-    #[inline]
     fn new() -> Self {
         let state = Arc::new(LocalExecutorState::new());
 
@@ -84,7 +80,6 @@ impl LocalExecutorInner {
     }
 
     /// TODO: docs
-    #[inline]
     fn schedule(&self) -> impl Fn(Runnable<()>) + Send + Sync + 'static {
         let async_handle = self.async_handle.clone();
 
@@ -98,7 +93,6 @@ impl LocalExecutorInner {
     }
 
     /// TODO: docs
-    #[inline]
     fn spawn<F>(&self, future: F) -> NeovimJoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -127,13 +121,11 @@ struct LocalExecutorState {
 
 impl LocalExecutorState {
     /// TODO: docs
-    #[inline]
     fn new() -> Self {
         Self { woken_queue: TaskQueue::new() }
     }
 
     /// TODO: docs
-    #[inline]
     fn tick_all(&self) {
         for _ in 0..self.woken_queue.len() {
             self.woken_queue.pop_front().expect("checked queue length").poll();
@@ -148,19 +140,16 @@ struct TaskQueue {
 
 impl TaskQueue {
     /// TODO: docs
-    #[inline]
     fn len(&self) -> usize {
         self.queue.len()
     }
 
     /// TODO: docs
-    #[inline]
     fn new() -> Self {
         Self { queue: ConcurrentQueue::unbounded() }
     }
 
     /// TODO: docs
-    #[inline]
     fn pop_front(&self) -> Option<Task> {
         match self.queue.pop() {
             Ok(task) => Some(task),
@@ -170,7 +159,6 @@ impl TaskQueue {
     }
 
     /// TODO: docs
-    #[inline]
     fn push_back(&self, task: Task) {
         match self.queue.push(task) {
             Ok(()) => {},
@@ -186,12 +174,10 @@ struct Task {
 }
 
 impl Task {
-    #[inline(always)]
     fn new(runnable: Runnable<()>) -> Self {
         Self { runnable }
     }
 
-    #[inline(always)]
     fn poll(self) {
         self.runnable.run();
     }

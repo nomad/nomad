@@ -10,7 +10,6 @@ use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared, Subscription};
 
 /// TODO: docs.
-#[inline]
 pub fn function<T: Function>(
     ctx: &Context<Neovim>,
 ) -> (FunctionHandle, Subscription<FunctionEvent<T>, Neovim>) {
@@ -61,7 +60,6 @@ impl<T: Function> Event<Neovim> for FunctionEvent<T> {
     type Payload = T::Args;
     type SubscribeCtx = ();
 
-    #[inline]
     fn subscribe(&mut self, emitter: Emitter<T::Args>, _: &Context<Neovim>) {
         let nvim_fun = NvimFunction::<NvimObject, ()>::from_fn(move |obj| {
             match deserialize::<T::Args>(obj) {
@@ -83,7 +81,6 @@ impl<T: Function> Event<Neovim> for FunctionEvent<T> {
 }
 
 impl<T> PartialEq for FunctionEvent<T> {
-    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
@@ -92,7 +89,6 @@ impl<T> PartialEq for FunctionEvent<T> {
 impl<T> Eq for FunctionEvent<T> {}
 
 impl<T> PartialOrd for FunctionEvent<T> {
-    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }

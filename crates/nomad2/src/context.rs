@@ -13,19 +13,16 @@ pub struct Context<E> {
 
 impl<E: Editor> Context<E> {
     /// TODO: docs.
-    #[inline]
     pub fn fs(&self) -> E::Fs {
         self.with_editor(|editor| editor.fs())
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn spawner(&self) -> E::Spawner {
         self.with_editor(|editor| editor.spawner())
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn subscribe<T>(&self, mut event: T) -> Subscription<T, E>
     where
         T: Event<E>,
@@ -51,12 +48,10 @@ impl<E: Editor> Context<E> {
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn with_editor<F: FnOnce(&mut E) -> R, R>(&self, f: F) -> R {
         self.with_inner(|inner| f(&mut inner.editor))
     }
 
-    #[inline]
     pub(crate) fn new(editor: E) -> Self {
         Self { inner: Arc::new(Mutex::new(ContextInner::new(editor))) }
     }
@@ -77,7 +72,6 @@ impl<E: Editor> Context<E> {
         })
     }
 
-    #[inline]
     fn with_inner<R, F: FnOnce(&mut ContextInner<E>) -> R>(&self, f: F) -> R {
         let mut inner = self.inner.lock().expect("thread panicked");
         f(&mut *inner)
@@ -85,7 +79,6 @@ impl<E: Editor> Context<E> {
 }
 
 impl<E> Clone for Context<E> {
-    #[inline]
     fn clone(&self) -> Self {
         Self { inner: Arc::clone(&self.inner) }
     }
@@ -103,7 +96,6 @@ impl<E: Editor> ContextInner<E> {
     /// Returns the receiver for the givent event, or `None` if there aren't
     /// any active [`Subscription`]s for it.
     #[allow(clippy::type_complexity)]
-    #[inline]
     fn get_sub_receiver<T: Event<E>>(
         &self,
         event: &T,
@@ -124,7 +116,6 @@ impl<E: Editor> ContextInner<E> {
 
     /// TODO: docs.
     #[allow(clippy::too_many_arguments)]
-    #[inline]
     fn insert_subscription_state<T: Event<E>>(
         &mut self,
         state: SubscriptionState,
@@ -141,7 +132,6 @@ impl<E: Editor> ContextInner<E> {
         vec.insert(idx, state);
     }
 
-    #[inline]
     fn new(editor: E) -> Self {
         Self { editor, subscriptions: HashMap::new() }
     }

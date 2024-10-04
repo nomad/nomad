@@ -14,7 +14,6 @@ impl ModuleName {
     }
 
     /// TODO: docs
-    #[inline]
     pub(crate) const fn as_str(&self) -> &'static str {
         self.name
     }
@@ -27,14 +26,12 @@ impl fmt::Debug for ModuleName {
 }
 
 impl fmt::Display for ModuleName {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(self.name)
     }
 }
 
 impl AsRef<str> for ModuleName {
-    #[inline]
     fn as_ref(&self) -> &str {
         self.name
     }

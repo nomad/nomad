@@ -13,17 +13,14 @@ impl Editor for Neovim {
     type ModuleApi = ModuleApi;
     type Spawner = NeovimSpawner;
 
-    #[inline]
     fn fs(&self) -> Self::Fs {
         OsFs::new()
     }
 
-    #[inline]
     fn spawner(&self) -> Self::Spawner {
         NeovimSpawner
     }
 
-    #[inline]
     fn log_dir(&self) -> AbsUtf8PathBuf {
         #[cfg(target_family = "unix")]
         {

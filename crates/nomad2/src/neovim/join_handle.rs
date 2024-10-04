@@ -16,7 +16,6 @@ pin_project! {
 }
 
 impl<T> NeovimJoinHandle<T> {
-    #[inline]
     pub(crate) fn new(task: Task<T>) -> NeovimJoinHandle<T> {
         NeovimJoinHandle { task }
     }
@@ -25,14 +24,12 @@ impl<T> NeovimJoinHandle<T> {
 impl<T> Future for NeovimJoinHandle<T> {
     type Output = T;
 
-    #[inline]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<T> {
         self.project().task.poll(ctx)
     }
 }
 
 impl<T> JoinHandle<T> for NeovimJoinHandle<T> {
-    #[inline]
     fn detach(self) {
         self.task.detach()
     }

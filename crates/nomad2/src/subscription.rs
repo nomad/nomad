@@ -22,7 +22,6 @@ pub struct Subscription<T: Event<E>, E: Editor> {
 
 impl<T: Event<E>, E: Editor> Subscription<T, E> {
     /// TODO: docs.
-    #[inline]
     pub async fn recv(&mut self) -> &T::Payload {
         self.rx.recv().await
     }
@@ -42,7 +41,6 @@ where
 {
     type Item = T::Payload;
 
-    #[inline]
     fn poll_next(
         self: Pin<&mut Self>,
         _ctx: &mut core::task::Context,
@@ -52,7 +50,6 @@ where
 }
 
 impl<T: Event<E>, E: Editor> Drop for Subscription<T, E> {
-    #[inline]
     fn drop(&mut self) {
         // The `Context` owns another instance of the event, so if the ref
         // count reaches 2, it means this is the last subscription.
@@ -82,7 +79,6 @@ pub struct Emitter<T> {
 
 impl<T> Emitter<T> {
     /// TODO: docs.
-    #[inline]
     pub fn send(&self, _: T) {
         todo!();
     }
@@ -104,7 +100,6 @@ impl<T> Receiver<T> {
 }
 
 impl<T> Clone for Receiver<T> {
-    #[inline]
     fn clone(&self) -> Self {
         todo!();
     }
@@ -125,7 +120,6 @@ impl<T> InactiveReceiver<T> {
 }
 
 impl<T> Clone for InactiveReceiver<T> {
-    #[inline]
     fn clone(&self) -> Self {
         todo!();
     }

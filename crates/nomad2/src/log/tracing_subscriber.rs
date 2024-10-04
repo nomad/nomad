@@ -63,12 +63,10 @@ impl NomadTracingSubscriber {
 }
 
 impl tracing::Subscriber for NomadTracingSubscriber {
-    #[inline]
     fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
         self.subscriber.enabled(metadata)
     }
 
-    #[inline]
     fn new_span(
         &self,
         span: &tracing::span::Attributes<'_>,
@@ -76,7 +74,6 @@ impl tracing::Subscriber for NomadTracingSubscriber {
         self.subscriber.new_span(span)
     }
 
-    #[inline]
     fn record(
         &self,
         span: &tracing::span::Id,
@@ -85,7 +82,6 @@ impl tracing::Subscriber for NomadTracingSubscriber {
         self.subscriber.record(span, values)
     }
 
-    #[inline]
     fn record_follows_from(
         &self,
         span: &tracing::span::Id,
@@ -94,27 +90,22 @@ impl tracing::Subscriber for NomadTracingSubscriber {
         self.subscriber.record_follows_from(span, follows)
     }
 
-    #[inline]
     fn event(&self, event: &tracing::Event<'_>) {
         self.subscriber.event(event)
     }
 
-    #[inline]
     fn enter(&self, span: &tracing::span::Id) {
         self.subscriber.enter(span)
     }
 
-    #[inline]
     fn exit(&self, span: &tracing::span::Id) {
         self.subscriber.exit(span)
     }
 
-    #[inline]
     fn clone_span(&self, id: &tracing::span::Id) -> tracing::span::Id {
         self.subscriber.clone_span(id)
     }
 
-    #[inline]
     fn try_close(&self, id: tracing::span::Id) -> bool {
         self.subscriber.try_close(id)
     }

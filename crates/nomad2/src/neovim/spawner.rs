@@ -10,7 +10,6 @@ pub struct NeovimSpawner;
 impl Spawner for NeovimSpawner {
     type JoinHandle<T> = NeovimJoinHandle<T>;
 
-    #[inline]
     fn spawn<F>(&self, fut: F) -> Self::JoinHandle<F::Output>
     where
         F: Future + 'static,
@@ -19,7 +18,6 @@ impl Spawner for NeovimSpawner {
         executor::spawn(fut)
     }
 
-    #[inline]
     fn spawn_background<F>(&self, fut: F) -> Self::JoinHandle<F::Output>
     where
         F: Future + 'static + Send,

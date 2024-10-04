@@ -60,25 +60,21 @@ pub struct CommandArgs {
 
 impl CommandArgs {
     /// TODO: docs.
-    #[inline]
     pub fn as_slice(&self) -> &[String] {
         self.inner.as_slice()
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
     /// TODO: docs.
-    #[inline]
     pub fn pop_front(&mut self) -> Option<String> {
         self.inner.next()
     }
@@ -112,7 +108,6 @@ where
 }
 
 impl From<nvim_oxi::api::types::CommandArgs> for CommandArgs {
-    #[inline]
     fn from(args: nvim_oxi::api::types::CommandArgs) -> Self {
         Self { inner: args.fargs.into_iter() }
     }
@@ -137,7 +132,6 @@ impl<T: Command> Event<Neovim> for CommandEvent<T> {
     type Payload = T::Args;
     type SubscribeCtx = ();
 
-    #[inline]
     fn subscribe(&mut self, emitter: Emitter<T::Args>, _: &Context<Neovim>) {
         let on_execute = Box::new(move |mut args| {
             let args = T::Args::try_from(&mut args).map_err(Into::into)?;
@@ -152,7 +146,6 @@ impl<T: Command> Event<Neovim> for CommandEvent<T> {
 }
 
 impl<T> PartialEq for CommandEvent<T> {
-    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
@@ -161,14 +154,12 @@ impl<T> PartialEq for CommandEvent<T> {
 impl<T> Eq for CommandEvent<T> {}
 
 impl<T> PartialOrd for CommandEvent<T> {
-    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<T> Ord for CommandEvent<T> {
-    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         match self.module_name.cmp(other.module_name) {
             Ordering::Equal => self.command_name.cmp(other.command_name),
@@ -184,12 +175,10 @@ pub(super) struct CommandArgsError {
 }
 
 impl CommandArgsError {
-    #[inline]
     pub(super) fn emit(self) {
         self.msg.emit(Level::Error, self.source);
     }
 
-    #[inline]
     pub(super) fn missing_command(commands: &ModuleCommands) -> Self {
         debug_assert!(!commands.map.is_empty());
 
@@ -206,7 +195,6 @@ impl CommandArgsError {
         Self { source, msg }
     }
 
-    #[inline]
     pub(super) fn missing_module(commands: &Commands) -> Self {
         debug_assert!(!commands.map.is_empty());
 
@@ -227,7 +215,6 @@ impl CommandArgsError {
         Self { source, msg }
     }
 
-    #[inline]
     pub(super) fn unknown_command(
         command_name: &str,
         commands: &ModuleCommands,
@@ -249,7 +236,6 @@ impl CommandArgsError {
         Self { source, msg }
     }
 
-    #[inline]
     pub(super) fn unknown_module(
         module_name: &str,
         commands: &Commands,

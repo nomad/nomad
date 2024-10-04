@@ -35,7 +35,6 @@ pub(crate) struct AnyEvent {
 }
 
 impl AnyEvent {
-    #[inline]
     pub(crate) fn downcast_mut<T: Event<E>, E: Editor>(&mut self) -> &mut T {
         let Some(inner) = Rc::get_mut(&mut self.inner) else {
             panic!("failed to call AnyEvent::downcast_mut");
@@ -46,7 +45,6 @@ impl AnyEvent {
         }
     }
 
-    #[inline]
     pub(crate) fn downcast_ref<T: Event<E>, E: Editor>(&self) -> &T {
         match self.inner.downcast_ref() {
             Some(event) => event,
@@ -54,12 +52,10 @@ impl AnyEvent {
         }
     }
 
-    #[inline]
     pub(crate) fn new<T: Event<E>, E: Editor>(event: T) -> Self {
         Self { inner: Rc::new(event) }
     }
 
-    #[inline]
     pub(crate) fn ref_count(&self) -> usize {
         Rc::strong_count(&self.inner)
     }

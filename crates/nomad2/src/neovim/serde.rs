@@ -22,7 +22,6 @@ pub(super) struct DeserializeError {
 }
 
 impl DeserializeError {
-    #[inline]
     pub(super) fn into_msg(self) -> DiagnosticMessage {
         let mut msg = DiagnosticMessage::new();
         msg.push_str("couldn't deserialize ");
@@ -76,7 +75,6 @@ impl DeserializeError {
         msg
     }
 
-    #[inline]
     fn segments(&self) -> impl ExactSizeIterator<Item = &impl fmt::Display> {
         self.inner.path().iter()
     }

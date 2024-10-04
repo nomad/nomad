@@ -38,7 +38,6 @@ impl<T: Module<Neovim>> ConfigEvent<T> {
 }
 
 impl<T> PartialEq for ConfigEvent<T> {
-    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
@@ -47,14 +46,12 @@ impl<T> PartialEq for ConfigEvent<T> {
 impl<T> Eq for ConfigEvent<T> {}
 
 impl<T> PartialOrd for ConfigEvent<T> {
-    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<T> Ord for ConfigEvent<T> {
-    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.module_name.cmp(other.module_name)
     }
