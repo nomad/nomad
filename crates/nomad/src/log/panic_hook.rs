@@ -1,8 +1,8 @@
 use core::any::Any;
 use core::fmt::{self, Display};
-use std::panic::{self, Location, PanicInfo};
+use std::panic::{self, Location, PanicHookInfo};
 
-use super::error;
+use tracing::error;
 
 /// Initializes the panic hook.
 pub(super) fn init() {
@@ -19,8 +19,8 @@ struct PanicMsg<'a> {
     msg: Option<&'a dyn Display>,
 }
 
-impl<'a> From<&'a PanicInfo<'_>> for PanicMsg<'a> {
-    fn from(info: &'a PanicInfo<'_>) -> Self {
+impl<'a> From<&'a PanicHookInfo<'_>> for PanicMsg<'a> {
+    fn from(info: &'a PanicHookInfo<'_>) -> Self {
         let payload = info.payload();
 
         let msg = downcast_display::<&str>(payload)

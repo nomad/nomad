@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "crates/*/tests", "xtask"]
-default-members = ["crates/*", "crates/*/tests"]
+members = ["crates/*", "xtask"]
+default-members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,21 +12,25 @@ publish = false
 
 [workspace.dependencies]
 async-net = "2"
-clipboard = { path = "./crates/clipboard" }
 cola = "0.4"
 collab-fs = { git = "ssh://git@github.com/nomad/collab.git", package = "collab-fs" }
+compact_str = "0.8"
 crop = "0.4"
 futures = "0.3"
 futures-util = "0.3"
+nohash = "0.2"
+nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
 quickcheck = "1"
 quickcheck_macros = "1"
-nomad = { path = "./crates/nomad" }
-nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
 serde = "1.0"
 smallvec = "1.13"
-smol_str = "0.2"
+smol_str = "0.3"
 thiserror = "1.0"
 tracing = "0.1"
+
+clipboard = { path = "./crates/clipboard" }
+nomad = { path = "./crates/nomad" }
+root-finder = { path = "./crates/root-finder" }
 
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"

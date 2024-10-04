@@ -7,25 +7,16 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-async-net = { workspace = true }
-clipboard = { workspace = true }
-cola = { workspace = true }
-# collab-client = { git = "ssh://git@github.com/nomad/collab.git", package = "collab" }
-futures = { workspace = true }
+collab-fs = { git = "ssh://git@github.com/nomad/collab.git" }
+collab-messaging = { git = "ssh://git@github.com/nomad/collab.git" }
+collab-project = { git = "ssh://git@github.com/nomad/collab.git" }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git" }
+futures-util = { workspace = true }
+nohash = { workspace = true }
+nomad-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client"] }
 nomad = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
-url = { version = "2", features = ["serde"] }
-webpki-roots = "0.26"
-
-[dev-dependencies]
-macro_rules_attribute = "0.2"
-smol-macros = "0.1"
+root-finder = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
-
-# Blocked by https://github.com/rust-lang/cargo/issues/13157
-#
-# [lints.rust]
-# unsafe_code = "deny"

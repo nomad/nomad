@@ -11,7 +11,6 @@ pub struct Finder;
 impl Finder {
     /// TODO: docs.
     pub async fn find_root<T: Marker, F: Fs>(
-        &mut self,
         start_from: &AbsUtf8Path,
         marker: &T,
         fs: &F,

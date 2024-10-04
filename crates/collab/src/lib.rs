@@ -1,21 +1,18 @@
-//! # Collab
-//!
-//! TODO: docs
+//! TODO: docs.
 
-mod activity;
 mod collab;
+mod collab_editor;
 mod config;
-mod join;
+mod events;
+mod neovim_collab;
 mod session;
+mod session_error;
 mod session_id;
-mod start;
-mod utils;
 
-use activity::Activity;
-pub use collab::Collab;
+use collab::Collab;
+use collab_editor::CollabEditor;
 use config::Config;
-use join::Join;
+pub use neovim_collab::NeovimCollab;
 use session::Session;
+use session_error::SessionError;
 use session_id::SessionId;
-use start::Start;
-use utils::*;

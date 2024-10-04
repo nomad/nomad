@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-
+use collab_fs::AbsUtf8Path;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
@@ -14,8 +13,8 @@ use tracing_subscriber::{filter, fmt as fmt_builder};
 /// log files will be named like `nomad.log.2020-01-01`.
 const LOG_FILE_NAME: &str = "nomad.log";
 
-pub(super) fn init() {
-    let subscriber = NomadTracingSubscriber::new();
+pub(super) fn init(log_dir: &AbsUtf8Path) {
+    let subscriber = NomadTracingSubscriber::new(log_dir);
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("failed to set the global default subscriber");
@@ -41,9 +40,9 @@ struct NomadTracingSubscriber {
 }
 
 impl NomadTracingSubscriber {
-    fn new() -> Self {
+    fn new(log_dir: &AbsUtf8Path) -> Self {
         let file_appender =
-            tracing_appender::rolling::daily(log_dir(), LOG_FILE_NAME);
+            tracing_appender::rolling::daily(log_dir, LOG_FILE_NAME);
 
         let (non_blocking, _guard) =
             tracing_appender::non_blocking(file_appender);
@@ -64,12 +63,10 @@ impl NomadTracingSubscriber {
 }
 
 impl tracing::Subscriber for NomadTracingSubscriber {
-    #[inline]
     fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
         self.subscriber.enabled(metadata)
     }
 
-    #[inline]
     fn new_span(
         &self,
         span: &tracing::span::Attributes<'_>,
@@ -77,7 +74,6 @@ impl tracing::Subscriber for NomadTracingSubscriber {
         self.subscriber.new_span(span)
     }
 
-    #[inline]
     fn record(
         &self,
         span: &tracing::span::Id,
@@ -86,7 +82,6 @@ impl tracing::Subscriber for NomadTracingSubscriber {
         self.subscriber.record(span, values)
     }
 
-    #[inline]
     fn record_follows_from(
         &self,
         span: &tracing::span::Id,
@@ -95,49 +90,23 @@ impl tracing::Subscriber for NomadTracingSubscriber {
         self.subscriber.record_follows_from(span, follows)
     }
 
-    #[inline]
     fn event(&self, event: &tracing::Event<'_>) {
         self.subscriber.event(event)
     }
 
-    #[inline]
     fn enter(&self, span: &tracing::span::Id) {
         self.subscriber.enter(span)
     }
 
-    #[inline]
     fn exit(&self, span: &tracing::span::Id) {
         self.subscriber.exit(span)
     }
 
-    #[inline]
     fn clone_span(&self, id: &tracing::span::Id) -> tracing::span::Id {
         self.subscriber.clone_span(id)
     }
 
-    #[inline]
     fn try_close(&self, id: tracing::span::Id) -> bool {
         self.subscriber.try_close(id)
-    }
-}
-
-#[inline]
-fn log_dir() -> PathBuf {
-    nvim_data_dir().join("nomad").join("logs")
-}
-
-#[inline]
-fn nvim_data_dir() -> PathBuf {
-    data_local_dir().join("nvim")
-}
-
-#[allow(unreachable_code)]
-#[cfg(target_family = "unix")]
-fn data_local_dir() -> PathBuf {
-    match home::home_dir() {
-        Some(home) if !home.as_os_str().is_empty() => {
-            home.join(".local").join("share")
-        },
-        _ => panic!("failed to get the home directory"),
     }
 }

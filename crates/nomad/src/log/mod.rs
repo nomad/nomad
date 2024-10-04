@@ -3,11 +3,8 @@
 mod panic_hook;
 mod tracing_subscriber;
 
-pub use tracing::{debug, error, info, trace, warn};
-
 /// Intializes the logging system.
-#[inline]
-pub(crate) fn init() {
+pub(crate) fn init(log_dir: &collab_fs::AbsUtf8Path) {
     panic_hook::init();
-    tracing_subscriber::init();
+    tracing_subscriber::init(log_dir);
 }

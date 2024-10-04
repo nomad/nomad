@@ -4,54 +4,37 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish = false
+publish.workspace = true
 
 [features]
-default = ["neovim-nightly"]
-neovim-nightly = ["nvim/neovim-nightly"]
-tests = ["nvim/test-terminator", "rand", "rand_chacha", "rand_distr"]
+default = ["neovim"]
+neovim-nightly = []
+neovim = []
 
 [dependencies]
-cola = { workspace = true }
-crop = { workspace = true }
-home = "0.5"
-macros = { path = "./macros" }
-nvim = { workspace = true, features = ["libuv"] }
+collab-fs = { workspace = true }
+compact_str = { workspace = true }
+futures-util = { workspace = true }
+nohash = { workspace = true }
+nomad-macros = { path = "./macros" }
+serde = { workspace = true }
 smallvec = { workspace = true }
 smol_str = { workspace = true }
 
-# Async executor
-async-task = "4.7"
-concurrent-queue = "2.4"
-
-# Futures
-async-broadcast = "0.7"
-flume = "0.11"
-futures = { workspace = true }
-pin-project = "1.1"
-pin-project-lite = "0.2"
-
-# Logging
+# Instrumentation-related dependencies.
+home = "0.5"
 time = { version = "0.3", features = ["macros"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["time"] }
 
-# Rust <-> Lua interop
-serde = { workspace = true }
+# Neovim-specific dependencies.
+async-task = "4.7"
+concurrent-queue = "2.4"
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv", "neovim-0-10" ] }
+pin-project-lite = "0.2"
 serde_path_to_error = "0.1"
-strsim = "0.11"
 
-# Tests
-rand = { version = "0.8", optional = true }
-rand_chacha = { version = "0.3", optional = true }
-rand_distr = { version = "0.4", optional = true }
 
 [lints]
 workspace = true
-
-# Blocked by https://github.com/rust-lang/cargo/issues/13157
-#
-# [lints.clippy]
-# multiple_unsafe_ops_per_block = "deny"
-# undocumented_unsafe_blocks = "deny"

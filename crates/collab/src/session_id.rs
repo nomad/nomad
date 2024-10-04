@@ -1,70 +1,34 @@
-use std::fmt::{self, Display};
-use std::str::FromStr;
+use core::num::ParseIntError;
+use core::{fmt, str};
 
-use collab_client::messages::SessionId as CollabSessionId;
-use nomad::prelude::{CommandArgs, WarningMsg};
+use nomad::neovim::{CommandArgs, DiagnosticMessage};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
-pub struct SessionId(CollabSessionId);
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub(crate) struct SessionId(pub(crate) collab_server::SessionId);
 
-impl From<CollabSessionId> for SessionId {
-    fn from(id: CollabSessionId) -> Self {
-        Self(id)
-    }
-}
-
-impl From<SessionId> for CollabSessionId {
-    fn from(id: SessionId) -> Self {
-        id.0
-    }
-}
-
-impl Display for SessionId {
+impl fmt::Display for SessionId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        write!(f, "{:x}", self.0.into_u64())
     }
 }
 
-impl FromStr for SessionId {
-    type Err = <CollabSessionId as FromStr>::Err;
+impl str::FromStr for SessionId {
+    type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        CollabSessionId::from_str(s).map(Self)
+        u64::from_str_radix(s, 16).map(collab_server::SessionId::new).map(Self)
     }
 }
 
-impl TryFrom<CommandArgs> for SessionId {
-    type Error = SessionIdFromArgsError;
+impl TryFrom<&mut CommandArgs> for SessionId {
+    type Error = DiagnosticMessage;
 
-    fn try_from(args: CommandArgs) -> Result<Self, Self::Error> {
-        match args.as_slice() {
-            [arg] => arg.parse().map_err(Into::into),
-            [] => Err(Self::Error::NoArgs),
-            args => Err(Self::Error::TooManyArgs { num_args: args.len() }),
-        }
-    }
-}
-
-/// Errors that can occur when converting [`CommandArgs`] into a[`SessionId`].
-#[derive(Debug, thiserror::Error)]
-pub enum SessionIdFromArgsError {
-    /// The command arguments were empty.
-    #[error("expected a session ID")]
-    NoArgs,
-
-    /// The command arguments contained an invalid session ID.
-    #[error(transparent)]
-    InvalidArg(#[from] collab_client::SessionIdFromStrError),
-
-    /// The command arguments contained more than one argument.
-    #[error("expected a session ID")]
-    TooManyArgs { num_args: usize },
-}
-
-impl From<SessionIdFromArgsError> for WarningMsg {
-    fn from(err: SessionIdFromArgsError) -> Self {
-        let mut msg = WarningMsg::new();
-        msg.add(err.to_string());
-        msg
+    fn try_from(args: &mut CommandArgs) -> Result<Self, Self::Error> {
+        let [id] = args.as_slice() else {
+            todo!();
+        };
+        id.parse::<Self>().map_err(|err| {
+            todo!();
+        })
     }
 }

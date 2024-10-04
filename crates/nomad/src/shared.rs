@@ -12,7 +12,6 @@ pub struct Shared<T> {
 }
 
 impl<T> Clone for Shared<T> {
-    #[inline]
     fn clone(&self) -> Self {
         Self { inner: Rc::clone(&self.inner) }
     }
@@ -20,7 +19,6 @@ impl<T> Clone for Shared<T> {
 
 impl<T> Shared<T> {
     /// Returns a copy of the value.
-    #[inline]
     pub fn get(&self) -> T
     where
         T: Copy,
@@ -29,28 +27,24 @@ impl<T> Shared<T> {
     }
 
     /// Constructs a new `Shared<T>`.
-    #[inline]
     pub fn new(value: T) -> Self {
         Self { inner: Rc::new(WithCell::new(value)) }
     }
 
     /// TODO: docs
     #[track_caller]
-    #[inline]
     pub fn replace(&self, new_value: T) -> T {
         self.with_mut(|this| core::mem::replace(this, new_value))
     }
 
     /// TODO: docs
     #[track_caller]
-    #[inline]
     pub fn set(&self, new_value: T) {
         self.with_mut(|this| *this = new_value);
     }
 
     /// TODO: docs
     #[track_caller]
-    #[inline]
     pub fn take(&self) -> T
     where
         T: Default,
@@ -61,7 +55,6 @@ impl<T> Shared<T> {
     /// Tries to call a closure with a shared reference to the value, returning
     /// an error if the value is already exclusively borrowed.
     #[track_caller]
-    #[inline]
     pub fn try_with<R>(
         &self,
         fun: impl FnOnce(&T) -> R,
@@ -72,7 +65,6 @@ impl<T> Shared<T> {
     /// Tries to call a closure with an exclusive reference to the value,
     /// returning an error if the value is already borrowed.
     #[track_caller]
-    #[inline]
     pub fn try_with_mut<R>(
         &self,
         fun: impl FnOnce(&mut T) -> R,
@@ -85,7 +77,6 @@ impl<T> Shared<T> {
     ///
     /// Check out [`try_with`](Self::try_with) for a non-panicking alternative.
     #[track_caller]
-    #[inline]
     pub fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
         self.inner.with(fun)
     }
@@ -96,7 +87,6 @@ impl<T> Shared<T> {
     /// Check out [`try_with_mut`](Self::try_with_mut) for a non-panicking
     /// alternative.
     #[track_caller]
-    #[inline]
     pub fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
         self.inner.with_mut(fun)
     }
@@ -109,7 +99,6 @@ struct WithCell<T> {
 }
 
 impl<T> WithCell<T> {
-    #[inline]
     fn get(&self) -> T
     where
         T: Copy,
@@ -119,13 +108,11 @@ impl<T> WithCell<T> {
         unsafe { *self.value.get() }
     }
 
-    #[inline]
     fn new(value: T) -> Self {
         Self { borrow: Cell::new(Borrow::None), value: UnsafeCell::new(value) }
     }
 
     #[track_caller]
-    #[inline]
     fn try_with<R>(
         &self,
         fun: impl FnOnce(&T) -> R,
@@ -150,7 +137,6 @@ impl<T> WithCell<T> {
     }
 
     #[track_caller]
-    #[inline]
     fn try_with_mut<R>(
         &self,
         fun: impl FnOnce(&mut T) -> R,
@@ -175,7 +161,6 @@ impl<T> WithCell<T> {
     }
 
     #[track_caller]
-    #[inline]
     fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
         match self.try_with(fun) {
             Ok(result) => result,
@@ -184,7 +169,6 @@ impl<T> WithCell<T> {
     }
 
     #[track_caller]
-    #[inline]
     fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
         match self.try_with_mut(fun) {
             Ok(result) => result,
@@ -202,7 +186,6 @@ pub struct BorrowError {
 }
 
 impl BorrowError {
-    #[inline]
     fn new_exclusive(_borrow: ExclusiveBorrow) -> Self {
         Self {
             is_exclusive: true,
@@ -211,7 +194,6 @@ impl BorrowError {
         }
     }
 
-    #[inline]
     fn new_shared(_borrow: SharedBorrow) -> Self {
         Self {
             is_exclusive: false,
@@ -222,7 +204,6 @@ impl BorrowError {
 }
 
 impl core::fmt::Display for BorrowError {
-    #[inline]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
@@ -249,13 +230,11 @@ enum Borrow {
 
 impl Borrow {
     #[track_caller]
-    #[inline]
     fn exclusive() -> Self {
         Self::Exclusive(ExclusiveBorrow::new())
     }
 
     #[track_caller]
-    #[inline]
     fn shared() -> Self {
         Self::Shared(SharedBorrow::new())
     }
@@ -269,7 +248,6 @@ struct SharedBorrow {
 
 impl SharedBorrow {
     #[track_caller]
-    #[inline]
     fn new() -> Self {
         Self {
             #[cfg(debug_assertions)]
@@ -286,7 +264,6 @@ struct ExclusiveBorrow {
 
 impl ExclusiveBorrow {
     #[track_caller]
-    #[inline]
     fn new() -> Self {
         Self {
             #[cfg(debug_assertions)]

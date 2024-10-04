@@ -1,154 +1,357 @@
-use core::future::ready;
+use core::fmt;
+use std::collections::HashMap;
+use std::io;
 
-use cola::Replica;
-use collab_client::messages::{FileKind, InboundMessage};
-use futures::{pin_mut, select as race, FutureExt, StreamExt};
-use nomad::prelude::{Buffer, EditorId, Get, NvimBuffer};
+use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf, Fs};
+use collab_messaging::{Outbound, PeerId, Recipients};
+use collab_project::file::FileId;
+use collab_project::{Integrate, Project, Synchronize};
+use collab_server::JoinRequest;
+use futures_util::stream::select_all;
+use futures_util::{select, FutureExt, StreamExt};
+use nohash::IntSet as NoHashSet;
+use nomad::{Context, Editor, Event, JoinHandle, Spawner, Subscription};
+use nomad_server::client::{Joined, Receiver, Sender};
+use nomad_server::{Io, Message};
+use root_finder::markers::Git;
+use root_finder::Finder;
 
-use crate::config::ConnectorError;
-use crate::{Config, Convert, SessionId};
+use crate::events::{
+    Cursor,
+    CursorEvent,
+    Edit,
+    EditEvent,
+    Selection,
+    SelectionEvent,
+};
+use crate::{CollabEditor, Config, SessionId};
 
-/// TODO: docs
-pub(crate) struct Session {
-    /// TODO: docs
-    buffer: Buffer,
+pub(crate) struct Session<E: CollabEditor> {
+    /// TODO: docs.
+    config: Config,
 
-    /// TODO: docs
-    editor_id: EditorId,
+    /// TODO: docs.
+    ctx: Context<E>,
 
-    /// TODO: docs
-    receiver: collab_client::Receiver,
+    /// The session's ID.
+    id: SessionId,
 
-    /// TODO: docs
-    sender: collab_client::Sender,
+    /// The peers currently in the session, including the local peer but
+    /// excluding the server.
+    peers: NoHashSet<PeerId>,
 
-    /// TODO: docs
-    session_id: SessionId,
+    /// TODO: docs.
+    project: Project,
+
+    /// The path to the root of the project.
+    project_root: AbsUtf8PathBuf,
+
+    /// A receiver for receiving messages from the server.
+    receiver: Receiver,
+
+    /// The server's ID.
+    server_id: PeerId,
+
+    /// A sender for sending messages to the server.
+    sender: Sender,
+
+    /// TODO: docs.
+    subs_edits: HashMap<FileId, E::EditStream>,
+
+    /// TODO: docs.
+    subs_cursors: HashMap<FileId, E::CursorStream>,
+
+    /// TODO: docs.
+    subs_selections: HashMap<FileId, E::SelectionStream>,
 }
 
-impl Session {
-    /// Returns the [`SessionId`] of the session, which is unique to each
-    /// session and can be sent to other peers to join the session.
-    pub(crate) fn id(&self) -> SessionId {
-        self.session_id
+impl<E: CollabEditor> Session<E> {
+    pub(crate) async fn join(
+        id: SessionId,
+        config: Config,
+        ctx: Context<E>,
+    ) -> Result<Self, JoinSessionError> {
+        todo!();
+        // let mut joined = Io::connect()
+        //     .await?
+        //     .authenticate(())
+        //     .await?
+        //     .join(JoinRequest::JoinExistingSession(id))
+        //     .await?;
+        //
+        // let project = ask_for_project(&mut joined).await?;
+        //
+        // let project_root = config.nomad_dir().join(project.name());
+        //
+        // create_project_dir(&project, project_root, ctx.fs()).await?;
+        //
+        // // TODO: navigate to the project.
+        // //
+        // // focus_project_file(ctx, &project_root).await?;
+        //
+        // Ok(Self::new(config, ctx, joined, project, project_root))
     }
 
-    /// TODO: docs
-    pub async fn join(
-        config: &Get<Config>,
-        session_id: SessionId,
-    ) -> Result<Self, JoinError> {
-        let peer_id = collab_client::messages::PeerId::new_random();
+    pub(crate) async fn start(
+        config: Config,
+        ctx: Context<E>,
+    ) -> Result<Self, StartSessionError> {
+        todo!();
+        // let Some(file) = ctx.buffer().file() else {
+        //     return Err(StartSessionError::NotInFile);
+        // };
+        //
+        // let Some(root_candidate) =
+        //     Finder::find_root(file.path(), &Git, ctx.fs()).await?
+        // else {
+        //     return Err(StartSessionError::CouldntFindRoot(
+        //         file.path().to_owned(),
+        //     ));
+        // };
+        //
+        // let project_root =
+        //     match ctx.ask_user(ConfirmStart(&root_candidate)).await {
+        //         Ok(true) => root_candidate,
+        //         Ok(false) => return Err(StartSessionError::UserCancelled),
+        //         Err(err) => return Err(err.into()),
+        //     };
+        //
+        // let joined = Io::connect()
+        //     .await?
+        //     .authenticate(())
+        //     .await?
+        //     .join(JoinRequest::StartNewSession)
+        //     .await?;
+        //
+        // let peer_id = joined.join_response.client_id;
+        //
+        // let project = Project::from_fs(peer_id, ctx.fs()).await?;
+        //
+        // Ok(Self::new(config, ctx, joined, project, project_root))
+    }
 
-        let (sender, receiver, session) = config
-            .get()
-            .connector()?
-            .peer_id(peer_id)
-            .join(session_id.into())
-            .await?;
+    fn is_host(&self) -> bool {
+        todo!()
+    }
 
-        let FileKind::Document(doc) = session.project().root().kind() else {
-            unreachable!();
-        };
+    fn peer_id(&self) -> PeerId {
+        self.sender.peer_id()
+    }
 
-        let Ok(replica) = Replica::decode(peer_id.as_u64(), doc.replica())
-        else {
-            unreachable!();
-        };
-
-        Ok(Self {
-            buffer: Buffer::create(doc.text(), replica),
-            editor_id: EditorId::generate(),
-            session_id,
+    fn new(
+        config: Config,
+        ctx: Context<E>,
+        joined: Joined,
+        project: Project,
+        project_root: AbsUtf8PathBuf,
+    ) -> Self {
+        let Joined { sender, receiver, join_response, peers } = joined;
+        Self {
+            config,
+            ctx,
+            id: SessionId(join_response.session_id),
+            peers,
+            project,
+            project_root,
             receiver,
             sender,
-        })
-    }
-
-    /// TODO: docs
-    async fn handle_inbound(&mut self, msg: InboundMessage) {
-        let buffer = &mut self.buffer;
-
-        let id = self.editor_id;
-
-        match msg {
-            InboundMessage::RemoteDeletion(deletion) => {
-                // TODO: don't clone.
-                buffer.edit(deletion.crdt().clone(), id);
-            },
-            InboundMessage::RemoteInsertion(insertion) => {
-                // TODO: don't clone.
-                buffer.edit((insertion.crdt().clone(), insertion.text()), id);
-            },
-            InboundMessage::SessionRequest(request) => {
-                request.send(buffer.snapshot().convert());
-            },
-            _ => {},
+            server_id: join_response.server_id,
+            subs_cursors: HashMap::new(),
+            subs_edits: HashMap::new(),
+            subs_selections: HashMap::new(),
         }
     }
+}
 
-    /// TODO: docs
-    pub async fn run(&mut self) -> Result<(), RunError> {
-        let editor_id = self.editor_id;
+impl<E: CollabEditor> Session<E> {
+    async fn integrate_message(
+        &mut self,
+        message: Message,
+    ) -> Result<(), RunSessionError> {
+        todo!();
+    }
 
-        let edits = self
-            .buffer
-            .edits()
-            .filter(|edit| ready(edit.applied_by() != editor_id));
-
-        pin_mut!(edits);
-
+    pub(crate) async fn run(mut self) -> Result<(), RunSessionError> {
         loop {
-            race! {
-                maybe_edit = edits.next().fuse() => {
-                    let Some(edit) = maybe_edit else { return Ok(()) };
-                    self.sender.send(edit.convert())?;
+            let mut cursors = select_all(self.subs_cursors.values_mut());
+            let mut edits = select_all(self.subs_edits.values_mut());
+            let mut selections = select_all(self.subs_selections.values_mut());
+
+            select! {
+                cursor = cursors.next().fuse() => {
+                    let cursor = cursor.expect("never ends");
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
+                    self.sync_cursor_moved(cursor).await?;
                 },
-                maybe_msg = self.receiver.recv().fuse() => {
-                    let Ok(msg) = maybe_msg else { return Ok(()) };
-                    self.handle_inbound(msg).await;
+
+                edit = edits.next().fuse() => {
+                    let edit = edit.expect("never ends");
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
+                    self.sync_local_edit(edit).await?;
+                },
+
+                selection = selections.next().fuse() => {
+                    let selection = selection.expect("never ends");
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
+                    self.sync_selection_changed(selection).await?;
+                },
+
+                maybe_msg = self.receiver.next().fuse() => {
+                    drop(cursors);
+                    drop(edits);
+                    drop(selections);
+                    match maybe_msg {
+                        Some(Ok(msg)) => self.integrate_message(msg).await?,
+                        Some(Err(err)) => return Err(err.into()),
+                        None => todo!(),
+                    };
                 },
             }
         }
     }
 
-    /// TODO: docs
-    pub async fn start(config: &Get<Config>) -> Result<Self, StartError> {
-        let peer_id = collab_client::messages::PeerId::new_random();
+    #[inline]
+    async fn sync_cursor_moved(
+        &mut self,
+        cursor: Cursor,
+    ) -> Result<(), RunSessionError> {
+        todo!();
+    }
 
-        let (sender, receiver, session_id) =
-            config.get().connector()?.peer_id(peer_id).start().await?;
+    #[inline]
+    async fn sync_local_edit(
+        &mut self,
+        edit: Edit,
+    ) -> Result<(), RunSessionError> {
+        todo!();
+    }
 
-        Ok(Self {
-            buffer: Buffer::from_id(peer_id.as_u64(), NvimBuffer::current()),
-            editor_id: EditorId::generate(),
-            receiver,
-            sender,
-            session_id: session_id.into(),
-        })
+    #[inline]
+    async fn sync_selection_changed(
+        &mut self,
+        selection: Selection,
+    ) -> Result<(), RunSessionError> {
+        todo!();
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum JoinError {
-    #[error(transparent)]
-    Connection(#[from] collab_client::Error),
-
-    #[error(transparent)]
-    Connector(#[from] ConnectorError),
+async fn ask_for_project(
+    joined: &mut Joined,
+) -> Result<Project, JoinSessionError> {
+    todo!();
+    // let local_id = joined.join_response.client_id;
+    //
+    // let &ask_project_to =
+    //     joined.peers.iter().find(|id| id != local_id).expect("never empty");
+    //
+    // let message = Message::ProjectRequest(local_id);
+    //
+    // let outbound = Outbound {
+    //     should_compress: message.should_compress(),
+    //     message,
+    //     recipients: Recipients::only([ask_project_to]),
+    // };
+    //
+    // let mut buffered = Vec::new();
+    //
+    // let mut project = loop {
+    //     let message = match this.receiver.next().await {
+    //         Some(Ok(message)) => message,
+    //         Some(Err(err)) => return Err(err.into()),
+    //         None => todo!(),
+    //     };
+    //
+    //     match message {
+    //         Message::ProjectResponse(project) => break project,
+    //         other => buffered.push(other),
+    //     }
+    // };
+    //
+    // for project_msg in buffered {
+    //     let _ = project.integrate(project_msg);
+    // }
+    //
+    // project
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum StartError {
-    #[error(transparent)]
-    Connection(#[from] collab_client::Error),
-
-    #[error(transparent)]
-    Connector(#[from] ConnectorError),
+async fn create_project_dir(
+    project: &Project,
+    project_root: &AbsUtf8Path,
+    fs: &mut impl Fs,
+) -> Result<(), JoinSessionError> {
+    fs.create_dir(project_root).await?;
+    fs.set_root(project_root.to_owned());
+    Ok(())
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum RunError {
-    #[error(transparent)]
-    Collab(#[from] collab_client::Error),
+impl<E: CollabEditor> Drop for Session<E> {
+    fn drop(&mut self) {
+        if self.is_host() {
+            return;
+        }
+
+        let fs = self.ctx.fs();
+        let project_root = self.project_root.clone();
+
+        self.ctx
+            .spawner()
+            .spawn(async move {
+                if let Err(err) = fs.remove_dir(&project_root).await {
+                    println!("failed to remove project directory: {err}");
+                }
+            })
+            .detach();
+    }
+}
+
+struct ConfirmStart<'path>(&'path AbsUtf8Path);
+
+impl fmt::Display for ConfirmStart<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "found root of project at '{}'. Start session?", self.0)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum JoinSessionError {}
+
+impl From<io::Error> for JoinSessionError {
+    fn from(err: io::Error) -> Self {
+        todo!();
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum RunSessionError {}
+
+impl From<io::Error> for RunSessionError {
+    fn from(err: io::Error) -> Self {
+        todo!();
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum StartSessionError {
+    /// The session was started in a non-file buffer.
+    NotInFile,
+
+    /// It was not possible to find the root of the project containing the
+    /// file at the given path.
+    CouldntFindRoot(AbsUtf8PathBuf),
+
+    /// We asked the user for confirmation to start the session, but they
+    /// cancelled.
+    UserCancelled,
+}
+
+impl From<io::Error> for StartSessionError {
+    fn from(err: io::Error) -> Self {
+        todo!();
+    }
 }
