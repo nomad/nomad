@@ -1,6 +1,6 @@
 use futures_util::stream::{select, Select};
 use futures_util::{Stream, StreamExt};
-use nomad2::neovim::{
+use nomad::neovim::{
     command,
     function,
     module_api,
@@ -10,7 +10,7 @@ use nomad2::neovim::{
     ModuleApi,
     Neovim,
 };
-use nomad2::{module_name, Context, Module, ModuleName, Subscription};
+use nomad::{module_name, Context, Module, ModuleName, Subscription};
 
 use crate::collab_editor::CollabEditor;
 use crate::events::{

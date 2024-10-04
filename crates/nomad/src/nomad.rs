@@ -1,86 +1,47 @@
-use nvim::Dictionary;
+use core::future::Future;
+use core::pin::Pin;
 
-use crate::{log, runtime, Api, Command, Config, Ctx, Module};
+use crate::{Context, Editor, JoinHandle, Module, Spawner};
 
-/// TODO: docs
-pub struct Nomad {
-    /// TODO: docs
-    api: Dictionary,
-
-    /// TODO: docs
-    command: Command,
-
-    /// TODO: docs
-    config: Config,
-
-    /// TODO: docs
-    ctx: Ctx,
+/// TODO: docs.
+pub struct Nomad<E: Editor> {
+    api: E::Api,
+    ctx: Context<E>,
+    run: Vec<Pin<Box<dyn Future<Output = ()>>>>,
 }
 
-impl Default for Nomad {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Nomad {
-    /// TODO: docs
-    #[inline]
-    pub fn api(self) -> Dictionary {
-        let Self { mut api, command, config, .. } = self;
-
-        command.create();
-
-        api.insert(Config::NAME.as_str(), config.into_function());
-
-        api
+impl<E: Editor> Nomad<E> {
+    /// TODO: docs.
+    pub fn into_api(self) -> E::Api {
+        self.api
     }
 
-    /// TODO: docs
-    #[inline]
-    pub fn new() -> Self {
-        log::init();
-        runtime::init();
-
-        log::info!("======== Starting Nomad ========");
-
-        Self::new_default()
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn new_default() -> Self {
+    /// TODO: docs.
+    pub fn new(editor: E) -> Self {
+        crate::log::init(&editor.log_dir());
         Self {
-            api: Dictionary::default(),
-            command: Command::default(),
-            config: Config::default(),
-            ctx: Ctx::default(),
+            api: E::Api::default(),
+            ctx: Context::new(editor),
+            run: Vec::default(),
         }
     }
 
-    /// TODO: docs
-    #[inline]
-    pub fn with_module<M: Module>(mut self) -> Self {
-        let (config, set_config) = runtime::new_input(M::Config::default());
+    /// TODO: docs.
+    pub fn start_modules(&mut self) {
+        for fut in self.run.drain(..) {
+            self.ctx.spawner().spawn(fut).detach();
+        }
+    }
 
-        let Api { commands, functions, module } = M::init(config, &self.ctx);
-
-        // Register the module's config.
-        self.config.add_module::<M>(set_config);
-
-        // Add the module's commands as sub-commands of the `Nomad` command.
-        self.command.add_module::<M>(commands);
-
-        // Add the module's API to the global API.
-        self.api.insert(M::NAME.as_str(), functions.into_dict());
-
-        // Spawn a new task that loads the module asynchronously.
-        crate::spawn(async move {
-            module.run().await;
-        })
-        .detach();
-
+    /// TODO: docs.
+    #[track_caller]
+    pub fn with_module<M: Module<E>>(mut self) -> Self {
+        let (mut module, module_api) = M::init(&self.ctx);
+        self.api += module_api;
+        self.run.push({
+            let ctx = self.ctx.clone();
+            Box::pin(async move { module.run(&ctx).await })
+        });
         self
     }
 }

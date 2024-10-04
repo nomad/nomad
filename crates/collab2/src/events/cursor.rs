@@ -1,5 +1,5 @@
-use nomad2::neovim::Neovim;
-use nomad2::{Context, Emitter, Event};
+use nomad::neovim::Neovim;
+use nomad::{Context, Emitter, Event};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct CursorEvent {}

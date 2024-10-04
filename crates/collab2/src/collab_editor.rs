@@ -1,5 +1,5 @@
 use futures_util::Stream;
-use nomad2::Editor;
+use nomad::Editor;
 
 use crate::events::{Cursor, Edit, Selection};
 use crate::{Config, SessionId};

@@ -1,7 +1,6 @@
 use futures_util::{select, FutureExt, Stream, StreamExt};
-use nomad2::{
+use nomad::{
     module_name,
-    Api,
     Context,
     Editor,
     Event,

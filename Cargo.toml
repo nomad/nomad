@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "crates/*/tests", "xtask"]
-default-members = ["crates/*", "crates/*/tests"]
+members = ["crates/*", "xtask"]
+default-members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -30,7 +30,6 @@ tracing = "0.1"
 
 clipboard = { path = "./crates/clipboard" }
 nomad = { path = "./crates/nomad" }
-nomad2 = { path = "./crates/nomad2" }
 root-finder = { path = "./crates/root-finder" }
 
 [workspace.lints.clippy]

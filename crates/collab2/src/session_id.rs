@@ -1,7 +1,7 @@
 use core::num::ParseIntError;
 use core::{fmt, str};
 
-use nomad2::neovim::{CommandArgs, DiagnosticMessage};
+use nomad::neovim::{CommandArgs, DiagnosticMessage};
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct SessionId(pub(crate) collab_server::SessionId);

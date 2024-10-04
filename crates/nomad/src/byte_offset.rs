@@ -1,8 +1,4 @@
-use core::ops::{Add, AddAssign, Range, Sub, SubAssign};
-
-use crop::Rope;
-
-use crate::{FromWith, IntoWith, Point};
+use core::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A byte offset in a buffer.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -31,6 +27,15 @@ impl AddAssign<Self> for ByteOffset {
     }
 }
 
+impl Add<usize> for ByteOffset {
+    type Output = Self;
+
+    #[inline]
+    fn add(self, rhs: usize) -> Self {
+        Self(self.0 + rhs)
+    }
+}
+
 impl Sub<Self> for ByteOffset {
     type Output = Self;
 
@@ -44,6 +49,15 @@ impl SubAssign<Self> for ByteOffset {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
+    }
+}
+
+impl Sub<usize> for ByteOffset {
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: usize) -> Self {
+        Self(self.0 - rhs)
     }
 }
 
@@ -61,19 +75,10 @@ impl From<ByteOffset> for usize {
     }
 }
 
-impl FromWith<Point<ByteOffset>, Rope> for ByteOffset {
+#[cfg(feature = "neovim")]
+impl From<ByteOffset> for nvim_oxi::Object {
     #[inline]
-    fn from_with(point: Point<ByteOffset>, rope: &Rope) -> Self {
-        let line_offset = rope.byte_of_line(point.line());
-        Self::new(line_offset) + point.offset()
-    }
-}
-
-impl FromWith<Range<Point<ByteOffset>>, Rope> for Range<ByteOffset> {
-    #[inline]
-    fn from_with(range: Range<Point<ByteOffset>>, rope: &Rope) -> Self {
-        let start = range.start.into_with(rope);
-        let end = range.end.into_with(rope);
-        start..end
+    fn from(offset: ByteOffset) -> Self {
+        (offset.0 as nvim_oxi::Integer).into()
     }
 }

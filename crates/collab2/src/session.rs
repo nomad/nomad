@@ -10,7 +10,7 @@ use collab_server::JoinRequest;
 use futures_util::stream::select_all;
 use futures_util::{select, FutureExt, StreamExt};
 use nohash::IntSet as NoHashSet;
-use nomad2::{Context, Editor, Event, JoinHandle, Spawner, Subscription};
+use nomad::{Context, Editor, Event, JoinHandle, Spawner, Subscription};
 use nomad_server::client::{Joined, Receiver, Sender};
 use nomad_server::{Io, Message};
 use root_finder::markers::Git;
