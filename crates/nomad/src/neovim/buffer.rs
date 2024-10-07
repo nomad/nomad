@@ -7,8 +7,7 @@ use core::ops::{Bound, Range, RangeBounds};
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
-use super::point::Point;
-use super::{Cursor, CursorEvent, Neovim};
+use super::{Cursor, CursorEvent, Neovim, Point};
 use crate::{
     ActorId,
     ByteOffset,

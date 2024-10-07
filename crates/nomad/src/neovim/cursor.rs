@@ -2,8 +2,7 @@ use core::cmp::Ordering;
 
 use nvim_oxi::api;
 
-use super::point::Point;
-use super::{BufferId, Neovim};
+use super::{BufferId, Neovim, Point};
 use crate::{ActorId, ByteOffset, Context, Emitter, Event, Shared};
 
 /// TODO: docs.
@@ -11,6 +10,18 @@ use crate::{ActorId, ByteOffset, Context, Emitter, Event, Shared};
 pub struct Cursor {
     action: CursorAction,
     moved_by: ActorId,
+}
+
+impl Cursor {
+    /// TODO: docs.
+    pub fn action(&self) -> CursorAction {
+        self.action
+    }
+
+    /// TODO: docs.
+    pub fn moved_by(&self) -> ActorId {
+        self.moved_by
+    }
 }
 
 /// TODO: docs.

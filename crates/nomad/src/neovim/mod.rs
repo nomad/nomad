@@ -31,4 +31,5 @@ pub use function::{function, Function, FunctionEvent, FunctionHandle};
 pub use join_handle::NeovimJoinHandle;
 pub use module_api::{module_api, ModuleApi};
 pub use neovim::Neovim;
+pub use point::Point;
 pub use spawner::NeovimSpawner;
