@@ -13,6 +13,7 @@ pub struct FocusBuffer {
 
 /// TODO: docs.
 pub struct FocusBufferEvent {
+    send_current: bool,
     next_buffer_focused_by: Shared<Option<ActorId>>,
 }
 
@@ -57,6 +58,18 @@ impl Event<Neovim> for FocusBufferEvent {
         emitter: Emitter<Self::Payload>,
         _: &Context<Neovim>,
     ) -> Self::SubscribeCtx {
+        if self.send_current {
+            let id = BufferId::new(api::Buffer::current());
+
+            if id.is_of_text_buffer() {
+                let focused_by = self
+                    .next_buffer_focused_by
+                    .with_mut(Option::take)
+                    .unwrap_or(ActorId::unknown());
+                emitter.send(FocusBuffer { focused_by, id });
+            }
+        }
+
         let opts = api::opts::CreateAutocmdOpts::builder()
             .callback({
                 let next_buffer_focused_by =
