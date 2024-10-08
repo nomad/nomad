@@ -176,6 +176,19 @@ impl<E: CollabEditor> Session<E> {
 }
 
 impl<E: CollabEditor> Session<E> {
+    async fn broadcast(
+        &mut self,
+        message: impl Into<Message>,
+    ) -> Result<(), RunSessionError> {
+        let outbound = Outbound {
+            message: message.into(),
+            recipients: Recipients::except([self.server_id]),
+            should_compress: false,
+        };
+
+        self.sender.send(outbound).await.map_err(Into::into)
+    }
+
     async fn integrate_message(
         &mut self,
         message: Message,
@@ -236,15 +249,13 @@ impl<E: CollabEditor> Session<E> {
         let cursor_id = cursor.cursor_id;
         let file_id = cursor.file_id;
         match cursor.action {
-            CursorAction::Created(pos) => {
-                self.sync_created_cursor(file_id, cursor_id, pos).await
+            CursorAction::Created(offset) => {
+                self.sync_created_cursor(file_id, cursor_id, offset).await
             },
-            CursorAction::Moved(pos) => {
-                self.sync_moved_cursor(file_id, cursor_id, pos).await
+            CursorAction::Moved(offset) => {
+                self.sync_moved_cursor(file_id, cursor_id, offset).await
             },
-            CursorAction::Removed => {
-                self.sync_removed_cursor(file_id, cursor_id).await
-            },
+            CursorAction::Removed => self.sync_removed_cursor(cursor_id).await,
         }
     }
 
@@ -274,13 +285,8 @@ impl<E: CollabEditor> Session<E> {
 
         self.cursors.insert_local(cursor_id, cursor);
 
-        let outbound = Outbound {
-            message: Message::Project(ProjectMessage::CreatedCursor(msg)),
-            recipients: Recipients::except([]),
-            should_compress: false,
-        };
-
-        self.sender.send(outbound).await.map_err(Into::into)
+        self.broadcast(Message::Project(ProjectMessage::CreatedCursor(msg)))
+            .await
     }
 
     async fn sync_moved_cursor(
@@ -306,22 +312,14 @@ impl<E: CollabEditor> Session<E> {
 
         let msg = self.project.synchronize(action);
 
-        let outbound = Outbound {
-            message: Message::Project(ProjectMessage::MovedCursor(msg)),
-            recipients: Recipients::except([]),
-            should_compress: false,
-        };
-
-        self.sender.send(outbound).await.map_err(Into::into)
+        self.broadcast(Message::Project(ProjectMessage::MovedCursor(msg)))
+            .await
     }
 
     async fn sync_removed_cursor(
         &mut self,
-        file_id: E::FileId,
         cursor_id: E::CursorId,
     ) -> Result<(), RunSessionError> {
-        let file_id = self.to_file_id(file_id);
-
         let cursor = self
             .cursors
             .remove_local(cursor_id)
@@ -331,13 +329,8 @@ impl<E: CollabEditor> Session<E> {
 
         let msg = self.project.synchronize(action);
 
-        let outbound = Outbound {
-            message: Message::Project(ProjectMessage::RemovedCursor(msg)),
-            recipients: Recipients::except([]),
-            should_compress: false,
-        };
-
-        self.sender.send(outbound).await.map_err(Into::into)
+        self.broadcast(Message::Project(ProjectMessage::RemovedCursor(msg)))
+            .await
     }
 
     #[inline]
