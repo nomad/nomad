@@ -23,6 +23,7 @@ use nomad_server::client::{Joined, Receiver, Sender};
 use nomad_server::{Io, Message, ProjectMessage};
 use root_finder::markers::Git;
 use root_finder::Finder;
+use tracing::error;
 
 use crate::events::cursor::{Cursor, CursorAction};
 use crate::events::{Edit, EditEvent, Selection, SelectionEvent};
@@ -238,6 +239,9 @@ impl<E: CollabEditor> Session<E> {
             CursorAction::Created(pos) => {
                 self.sync_created_cursor(file_id, cursor_id, pos).await
             },
+            CursorAction::Moved(pos) => {
+                self.sync_moved_cursor(file_id, cursor_id, pos).await
+            },
             _ => todo!(),
         }
     }
@@ -260,13 +264,48 @@ impl<E: CollabEditor> Session<E> {
 
         let (cursor, msg) = match self.project.synchronize(action) {
             Ok(res) => res,
-            Err(_file_deleted_err) => todo!(),
+            Err(err) => {
+                error!("moved cursor to a deleted file: {err}");
+                return Ok(());
+            },
         };
 
         self.cursors.insert_local(cursor_id, cursor);
 
         let outbound = Outbound {
             message: Message::Project(ProjectMessage::CreatedCursor(msg)),
+            recipients: Recipients::except([]),
+            should_compress: false,
+        };
+
+        self.sender.send(outbound).await.map_err(Into::into)
+    }
+
+    async fn sync_moved_cursor(
+        &mut self,
+        file_id: E::FileId,
+        cursor_id: E::CursorId,
+        offset: ByteOffset,
+    ) -> Result<(), RunSessionError> {
+        let file_id = self.to_file_id(file_id);
+
+        let anchor = self
+            .project
+            .file(file_id)
+            .expect("")
+            .create_anchor(offset.into(), AnchorBias::Right);
+
+        let cursor = self
+            .cursors
+            .get_local_mut(cursor_id)
+            .expect("already received its creation");
+
+        let action = actions::move_cursor::MovedCursor { anchor, cursor };
+
+        let msg = self.project.synchronize(action);
+
+        let outbound = Outbound {
+            message: Message::Project(ProjectMessage::MovedCursor(msg)),
             recipients: Recipients::except([]),
             should_compress: false,
         };
