@@ -216,7 +216,7 @@ impl<E: CollabEditor> Session<E> {
                     drop(cursors);
                     drop(edits);
                     drop(selections);
-                    self.sync_local_edit(edit).await?;
+                    self.sync_edit(edit).await?;
                 },
 
                 selection = selections.next().fuse() => {
@@ -299,6 +299,58 @@ impl<E: CollabEditor> Session<E> {
             .await
     }
 
+    async fn sync_edit(
+        &mut self,
+        edit: Edit<E>,
+    ) -> Result<(), RunSessionError> {
+        let file_id = self.to_file_id(edit.file_id);
+
+        for hunk in edit.hunks {
+            let byte_range = hunk.deleted_byte_range();
+
+            if !byte_range.is_empty() {
+                let action =
+                    actions::delete_text::DeletedText { file_id, byte_range };
+
+                let msg = match self.project.synchronize(action) {
+                    Ok(msg) => msg,
+                    Err(err) => {
+                        error!("deleted text from a deleted file: {err}");
+                        continue;
+                    },
+                };
+
+                self.broadcast(Message::Project(ProjectMessage::DeletedText(
+                    msg,
+                )))
+                .await?;
+            }
+
+            if !hunk.text.is_empty() {
+                let action = actions::insert_text::InsertedText {
+                    file_id,
+                    byte_offset: hunk.start.into(),
+                    text_len: hunk.text.len(),
+                };
+
+                let msg = match self.project.synchronize(action) {
+                    Ok(msg) => msg,
+                    Err(err) => {
+                        error!("inserted text into a deleted file: {err}");
+                        continue;
+                    },
+                };
+
+                self.broadcast(Message::Project(
+                    ProjectMessage::InsertedText(msg),
+                ))
+                .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     async fn sync_moved_cursor(
         &mut self,
         cursor_id: E::CursorId,
@@ -341,13 +393,6 @@ impl<E: CollabEditor> Session<E> {
 
         self.broadcast(Message::Project(ProjectMessage::RemovedCursor(msg)))
             .await
-    }
-
-    async fn sync_local_edit(
-        &mut self,
-        edit: Edit<E>,
-    ) -> Result<(), RunSessionError> {
-        todo!();
     }
 
     async fn sync_selection_changed(

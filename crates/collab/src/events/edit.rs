@@ -1,5 +1,7 @@
+use core::ops::Range;
+
 use nomad::ByteOffset;
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 use smol_str::SmolStr;
 
 use crate::CollabEditor;
@@ -18,6 +20,12 @@ pub(crate) struct Hunk {
     pub(crate) text: SmolStr,
 }
 
+impl Hunk {
+    pub(crate) fn deleted_byte_range(&self) -> Range<usize> {
+        self.start.into()..self.end.into()
+    }
+}
+
 mod neovim {
     use core::pin::Pin;
     use core::task::{Context, Poll};
@@ -29,7 +37,6 @@ mod neovim {
     use super::*;
 
     pin_project_lite::pin_project! {
-        /// TODO: docs.
         pub(crate) struct Edits {
             buffer_id: neovim::BufferId,
             #[pin]
@@ -48,7 +55,7 @@ mod neovim {
             this.inner.poll_next(ctx).map(|maybe_edit| {
                 maybe_edit.map(|edit| Edit {
                     file_id: this.buffer_id.clone(),
-                    hunks: smallvec::smallvec![edit.into()],
+                    hunks: smallvec![edit.into()],
                 })
             })
         }
