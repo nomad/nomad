@@ -238,9 +238,30 @@ impl<E: CollabEditor> Session<E> {
 
     async fn integrate_message(
         &mut self,
-        _message: Message,
+        msg: Message,
     ) -> Result<(), RunSessionError> {
-        todo!();
+        match msg {
+            Message::PeerDisconnected(peer_id) => {
+                self.on_peer_disconnected(peer_id);
+                Ok(())
+            },
+            Message::Project(project_msg) => {
+                self.integrate_project_message(project_msg).await
+            },
+            _ => {
+                error!("received unexpected message: {msg:?}");
+                Ok(())
+            },
+        }
+    }
+
+    async fn integrate_project_message(
+        &mut self,
+        msg: ProjectMessage,
+    ) -> Result<(), RunSessionError> {
+        match msg {
+            _ => todo!(),
+        }
     }
 
     fn is_ignored(&mut self, id: &E::FileId) -> bool {
@@ -284,6 +305,10 @@ impl<E: CollabEditor> Session<E> {
             self.subs_cursors.insert(file_id.clone(), cursors);
             self.subs_selections.insert(file_id.clone(), selections);
         }
+    }
+
+    fn on_peer_disconnected(&mut self, peer_id: PeerId) {
+        todo!();
     }
 
     async fn sync_cursor(
