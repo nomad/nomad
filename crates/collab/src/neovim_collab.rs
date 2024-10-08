@@ -1,7 +1,18 @@
+use std::borrow::Cow;
+
+use collab_fs::AbsUtf8Path;
 use futures_util::stream::{select, Pending, Select};
 use nomad::neovim::events::{CommandEvent, ConfigEvent, FunctionEvent};
 use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
-use nomad::{module_name, Context, Module, ModuleName, Subscription};
+use nomad::{
+    module_name,
+    Buffer,
+    Context,
+    Editor,
+    Module,
+    ModuleName,
+    Subscription,
+};
 
 use crate::collab_editor::CollabEditor;
 use crate::events::{self, JoinSession, Selection, StartSession};
@@ -59,6 +70,20 @@ impl CollabEditor for Neovim {
 
     fn edits(&mut self, _file_id: &Self::FileId) -> Self::Edits {
         todo!();
+    }
+
+    fn is_text_file(&mut self, _file_id: &Self::FileId) -> bool {
+        todo!();
+    }
+
+    fn path(&mut self, file_id: &Self::FileId) -> Cow<AbsUtf8Path> {
+        Cow::Owned(
+            self.get_buffer(file_id.clone())
+                .expect("already checked")
+                .path()
+                .expect("already checked")
+                .into_owned(),
+        )
     }
 
     fn selections(&mut self, _file_id: &Self::FileId) -> Self::Selections {

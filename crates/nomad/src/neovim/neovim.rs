@@ -14,6 +14,20 @@ pub struct Neovim {
     next_edit_ids: NoHashMap<BufferId, Shared<Option<ActorId>>>,
 }
 
+impl Neovim {
+    /// TODO: docs.
+    pub fn get_buffer(&mut self, buffer_id: BufferId) -> Option<Buffer> {
+        if !buffer_id.is_of_text_buffer() {
+            return None;
+        }
+        let next_cursor_id =
+            self.next_cursor_ids.entry(buffer_id.clone()).or_default().clone();
+        let next_edit_id =
+            self.next_edit_ids.entry(buffer_id.clone()).or_default().clone();
+        Some(Buffer::new(buffer_id, next_cursor_id, next_edit_id))
+    }
+}
+
 impl Editor for Neovim {
     type Api = Api;
     type Buffer<'ed> = Buffer;
@@ -23,17 +37,6 @@ impl Editor for Neovim {
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.get_buffer(BufferId::new(nvim_oxi::api::Buffer::current()))
-    }
-
-    fn get_buffer(&mut self, buffer_id: BufferId) -> Option<Self::Buffer<'_>> {
-        if !buffer_id.is_of_text_buffer() {
-            return None;
-        }
-        let next_cursor_id =
-            self.next_cursor_ids.entry(buffer_id.clone()).or_default().clone();
-        let next_edit_id =
-            self.next_edit_ids.entry(buffer_id.clone()).or_default().clone();
-        Some(Buffer::new(buffer_id, next_cursor_id, next_edit_id))
     }
 
     fn fs(&self) -> Self::Fs {

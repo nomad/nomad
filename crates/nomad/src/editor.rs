@@ -28,12 +28,6 @@ pub trait Editor: Sized + 'static {
     fn fs(&self) -> Self::Fs;
 
     /// TODO: docs.
-    fn get_buffer(
-        &mut self,
-        id: <Self::Buffer<'_> as Buffer<Self>>::Id,
-    ) -> Option<Self::Buffer<'_>>;
-
-    /// TODO: docs.
     fn log_dir(&self) -> AbsUtf8PathBuf;
 
     /// TODO: docs.

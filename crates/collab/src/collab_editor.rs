@@ -1,6 +1,8 @@
 use core::fmt::Debug;
 use core::hash::Hash;
+use std::borrow::Cow;
 
+use collab_fs::AbsUtf8Path;
 use futures_util::Stream;
 
 use crate::events::cursor::Cursor;
@@ -24,10 +26,19 @@ pub(crate) trait CollabEditor: Sized {
     type Selections: Stream<Item = Selection> + Unpin;
 
     /// TODO: docs.
+    fn cursors(&mut self, file_id: &Self::FileId) -> Self::Cursors;
+
+    /// TODO: docs.
     fn edits(&mut self, file_id: &Self::FileId) -> Self::Edits;
 
     /// TODO: docs.
-    fn cursors(&mut self, file_id: &Self::FileId) -> Self::Cursors;
+    fn is_text_file(&mut self, file_id: &Self::FileId) -> bool;
+
+    /// TODO: docs.
+    fn path<'ed>(
+        &'ed mut self,
+        file_id: &Self::FileId,
+    ) -> Cow<'ed, AbsUtf8Path>;
 
     /// TODO: docs.
     fn selections(&mut self, file_id: &Self::FileId) -> Self::Selections;

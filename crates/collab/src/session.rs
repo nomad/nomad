@@ -229,30 +229,52 @@ impl<E: CollabEditor> Session<E> {
 
     async fn integrate_message(
         &mut self,
-        message: Message,
+        _message: Message,
     ) -> Result<(), RunSessionError> {
         todo!();
     }
 
-    fn is_opened(&self, file_id: &E::FileId) -> bool {
+    fn is_ignored(&mut self, id: &E::FileId) -> bool {
+        !self.editor.is_text_file(&id)
+    }
+
+    fn is_in_project_tree(&mut self, id: &E::FileId) -> bool {
+        let mut path = self.editor.path(&id).into_owned();
+
+        loop {
+            if path == self.project_root {
+                return true;
+            }
+
+            if !path.pop() {
+                return false;
+            }
+        }
+    }
+
+    fn is_tracked(&self, file_id: &E::FileId) -> bool {
         self.subs_edits.contains_key(file_id)
     }
 
     fn on_closed_file(&mut self, file_id: E::FileId) {
-        assert!(self.is_opened(&file_id), "file not opened");
-        self.subs_edits.remove(&file_id);
-        self.subs_cursors.remove(&file_id);
-        self.subs_selections.remove(&file_id);
+        if self.is_tracked(&file_id) {
+            self.subs_edits.remove(&file_id);
+            self.subs_cursors.remove(&file_id);
+            self.subs_selections.remove(&file_id);
+        }
     }
 
     fn on_opened_file(&mut self, file_id: E::FileId) {
-        assert!(!self.is_opened(&file_id), "file already opened");
-        let edits = self.editor.edits(&file_id);
-        let cursors = self.editor.cursors(&file_id);
-        let selections = self.editor.selections(&file_id);
-        self.subs_edits.insert(file_id.clone(), edits);
-        self.subs_cursors.insert(file_id.clone(), cursors);
-        self.subs_selections.insert(file_id.clone(), selections);
+        assert!(!self.is_tracked(&file_id), "file already tracked");
+
+        if self.is_in_project_tree(&file_id) && !self.is_ignored(&file_id) {
+            let edits = self.editor.edits(&file_id);
+            let cursors = self.editor.cursors(&file_id);
+            let selections = self.editor.selections(&file_id);
+            self.subs_edits.insert(file_id.clone(), edits);
+            self.subs_cursors.insert(file_id.clone(), cursors);
+            self.subs_selections.insert(file_id.clone(), selections);
+        }
     }
 
     async fn sync_cursor(
