@@ -4,19 +4,27 @@ use std::io;
 
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf, Fs};
 use collab_messaging::{Outbound, PeerId, Recipients};
-use collab_project::file::FileId;
-use collab_project::{Integrate, Project, Synchronize};
+use collab_project::file::{AnchorBias, FileId};
+use collab_project::{actions, cursor, Integrate, Project, Synchronize};
 use collab_server::JoinRequest;
 use futures_util::stream::select_all;
-use futures_util::{select, FutureExt, StreamExt};
-use nohash::IntSet as NoHashSet;
-use nomad::{Context, Editor, Event, JoinHandle, Spawner, Subscription};
+use futures_util::{select, FutureExt, SinkExt, StreamExt};
+use nohash::{IntMap as NoHashMap, IntSet as NoHashSet};
+use nomad::{
+    ByteOffset,
+    Context,
+    Editor,
+    Event,
+    JoinHandle,
+    Spawner,
+    Subscription,
+};
 use nomad_server::client::{Joined, Receiver, Sender};
-use nomad_server::{Io, Message};
+use nomad_server::{Io, Message, ProjectMessage};
 use root_finder::markers::Git;
 use root_finder::Finder;
 
-use crate::events::cursor::Cursor;
+use crate::events::cursor::{Cursor, CursorAction};
 use crate::events::{Edit, EditEvent, Selection, SelectionEvent};
 use crate::{CollabEditor, Config, SessionId};
 
@@ -57,6 +65,14 @@ pub(crate) struct Session<E: CollabEditor> {
 
     /// TODO: docs.
     subs_selections: HashMap<FileId, E::SelectionStream>,
+
+    /// TODO: docs.
+    cursors: Cursors<E>,
+}
+
+struct Cursors<E: CollabEditor> {
+    local: HashMap<E::CursorId, cursor::Cursor>,
+    remote: NoHashMap<PeerId, HashMap<FileId, cursor::Cursor>>,
 }
 
 impl<E: CollabEditor> Session<E> {
@@ -142,6 +158,7 @@ impl<E: CollabEditor> Session<E> {
         let Joined { sender, receiver, join_response, peers } = joined;
         Self {
             config,
+            cursors: Default::default(),
             ctx,
             id: SessionId(join_response.session_id),
             peers,
@@ -177,7 +194,7 @@ impl<E: CollabEditor> Session<E> {
                     drop(cursors);
                     drop(edits);
                     drop(selections);
-                    self.sync_cursor_moved(cursor).await?;
+                    self.sync_cursor(cursor).await?;
                 },
 
                 edit = edits.next().fuse() => {
@@ -211,11 +228,50 @@ impl<E: CollabEditor> Session<E> {
     }
 
     #[inline]
-    async fn sync_cursor_moved(
+    async fn sync_cursor(
         &mut self,
         cursor: Cursor<E>,
     ) -> Result<(), RunSessionError> {
-        todo!();
+        let cursor_id = cursor.cursor_id;
+        let file_id = cursor.file_id;
+        match cursor.action {
+            CursorAction::Created(pos) => {
+                self.sync_created_cursor(file_id, cursor_id, pos).await
+            },
+            _ => todo!(),
+        }
+    }
+
+    async fn sync_created_cursor(
+        &mut self,
+        file_id: E::FileId,
+        cursor_id: E::CursorId,
+        offset: ByteOffset,
+    ) -> Result<(), RunSessionError> {
+        let file_id = self.to_file_id(file_id);
+
+        let anchor = self
+            .project
+            .file(file_id)
+            .expect("")
+            .create_anchor(offset.into(), AnchorBias::Right);
+
+        let action = actions::create_cursor::CreatedCursor { file_id, anchor };
+
+        let (cursor, msg) = match self.project.synchronize(action) {
+            Ok(res) => res,
+            Err(_file_deleted_err) => todo!(),
+        };
+
+        self.cursors.insert_local(cursor_id, cursor);
+
+        let outbound = Outbound {
+            message: Message::Project(ProjectMessage::CreatedCursor(msg)),
+            recipients: Recipients::except([]),
+            should_compress: false,
+        };
+
+        self.sender.send(outbound).await.map_err(Into::into)
     }
 
     #[inline]
@@ -232,6 +288,48 @@ impl<E: CollabEditor> Session<E> {
         selection: Selection,
     ) -> Result<(), RunSessionError> {
         todo!();
+    }
+
+    #[inline]
+    fn to_file_id(&self, file_id: E::FileId) -> FileId {
+        todo!();
+    }
+}
+
+impl<E: CollabEditor> Default for Cursors<E> {
+    fn default() -> Self {
+        Self { local: Default::default(), remote: Default::default() }
+    }
+}
+
+impl<E: CollabEditor> Cursors<E> {
+    fn get_local_mut(
+        &mut self,
+        id: E::CursorId,
+    ) -> Option<&mut cursor::Cursor> {
+        self.local.get_mut(&id)
+    }
+
+    fn get_remote_mut(
+        &mut self,
+        owner: PeerId,
+        in_file: FileId,
+    ) -> Option<&mut cursor::Cursor> {
+        self.remote.get_mut(&owner).and_then(|map| map.get_mut(&in_file))
+    }
+
+    /// # Panics
+    ///
+    /// Panics if the given cursor ID already exists.
+    #[track_caller]
+    fn insert_local(&mut self, id: E::CursorId, cursor: cursor::Cursor) {
+        if self.local.insert(id.clone(), cursor).is_some() {
+            panic!("cursor {id:?} already exists");
+        }
+    }
+
+    fn remove_local(&mut self, id: E::CursorId) -> Option<cursor::Cursor> {
+        self.local.remove(&id)
     }
 }
 

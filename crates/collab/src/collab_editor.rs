@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 use core::hash::Hash;
 
 use futures_util::Stream;
@@ -12,7 +13,7 @@ pub(crate) trait CollabEditor: Editor {
     type FileId: Hash + Clone;
 
     /// TODO: docs.
-    type CursorId: Hash + Clone;
+    type CursorId: Clone + Eq + Hash + Debug;
 
     /// TODO: docs.
     type Cursors: Stream<Item = Cursor<Self>> + Unpin;
