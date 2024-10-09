@@ -304,11 +304,35 @@ impl<E: CollabEditor> Session<E> {
         Ok(())
     }
 
-    async fn integrate_moved_cursor(
+    fn integrate_moved_cursor(
         &mut self,
-        _msg: actions::move_cursor::MovedCursorRemote,
-    ) -> Result<(), RunSessionError> {
-        Ok(())
+        msg: actions::move_cursor::MovedCursorRemote,
+    ) {
+        let Some(move_cursor) = self.project.integrate(msg) else {
+            return;
+        };
+
+        let cursor = self
+            .cursors
+            .get_remote_mut(move_cursor.id())
+            .expect("already received cursor creation");
+
+        cursor
+            .move_to(move_cursor)
+            .expect("move op was applied to the correct cursor");
+
+        if let Some(tooltip) = self.cursor_tooltips.get_mut(&cursor.id()) {
+            let new_offset = self
+                .project
+                .file(cursor.file_id())
+                .expect("move op was integrated, so file must still exist")
+                .resolve_anchor(cursor.anchor());
+
+            if let Some(new_offset) = new_offset {
+                self.editor
+                    .move_tooltip(&mut tooltip.inner, new_offset.into());
+            }
+        }
     }
 
     async fn integrate_moved_directory(
@@ -376,7 +400,8 @@ impl<E: CollabEditor> Session<E> {
                 self.integrate_inserted_text(msg).await
             },
             ProjectMessage::MovedCursor(msg) => {
-                self.integrate_moved_cursor(msg).await
+                self.integrate_moved_cursor(msg);
+                Ok(())
             },
             ProjectMessage::MovedDirectory(msg) => {
                 self.integrate_moved_directory(msg).await
