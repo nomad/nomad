@@ -9,8 +9,8 @@ use collab_project::{actions, cursor, selection, Project};
 use collab_server::JoinRequest;
 use futures_util::stream::select_all;
 use futures_util::{select, FutureExt, SinkExt, StreamExt};
-use nohash::{IntMap as NoHashMap, IntSet as NoHashSet};
-use nomad::{ByteOffset, Context, JoinHandle, Spawner, Subscription};
+use nohash::IntMap as NoHashMap;
+use nomad::{ActorId, ByteOffset, Context};
 use nomad_server::client::{Joined, Receiver, Sender};
 use nomad_server::{Io, Message, ProjectMessage};
 use root_finder::markers::Git;
@@ -18,11 +18,14 @@ use root_finder::Finder;
 use tracing::error;
 
 use crate::events::cursor::{Cursor, CursorAction};
-use crate::events::edit::Edit;
+use crate::events::edit::{Edit, Hunk};
 use crate::events::selection::{Selection, SelectionAction};
 use crate::{CollabEditor, Config, SessionId};
 
 pub(crate) struct Session<E: CollabEditor> {
+    /// TODO: docs.
+    actor_id: ActorId,
+
     /// TODO: docs.
     config: Config,
 
@@ -34,7 +37,7 @@ pub(crate) struct Session<E: CollabEditor> {
 
     /// The peers currently in the session, including the local peer but
     /// excluding the server.
-    peers: NoHashSet<PeerId>,
+    peers: NoHashMap<PeerId, PeerId>,
 
     /// TODO: docs.
     project: Project,
@@ -230,6 +233,24 @@ impl<E: CollabEditor> Session<E> {
         }
     }
 
+    async fn apply_hunks<I>(
+        &mut self,
+        file_id: FileId,
+        hunks: I,
+    ) -> Result<(), RunSessionError>
+    where
+        I: Iterator<Item = Hunk>,
+    {
+        if let Some(file_id) = self.to_editor_file_id(file_id) {
+            self.editor.apply_hunks(&file_id, hunks, self.actor_id);
+        } else if let Some(file) = self.project.file(file_id) {
+            let _file_path = file.path();
+            todo!("apply hunks via the fs");
+        }
+
+        Ok(())
+    }
+
     async fn broadcast(
         &mut self,
         message: impl Into<Message>,
@@ -321,16 +342,60 @@ impl<E: CollabEditor> Session<E> {
 
     async fn integrate_deleted_text(
         &mut self,
-        _msg: actions::delete_text::DeletedTextRemote,
+        msg: actions::delete_text::DeletedTextRemote,
     ) -> Result<(), RunSessionError> {
-        Ok(())
+        let Some(delete_text) = self.project.integrate(msg) else {
+            return Ok(());
+        };
+
+        let hunks = delete_text.deletions.map(|byte_range| Hunk {
+            start: ByteOffset::from(byte_range.start),
+            end: ByteOffset::from(byte_range.end),
+            text: Default::default(),
+        });
+
+        self.apply_hunks(delete_text.file_id, hunks).await
     }
 
     async fn integrate_inserted_text(
         &mut self,
-        _msg: actions::insert_text::InsertedTextRemote,
+        msg: actions::insert_text::InsertedTextRemote,
     ) -> Result<(), RunSessionError> {
-        Ok(())
+        let Some(insert_text) = self.project.integrate(msg) else {
+            return Ok(());
+        };
+
+        let mut insertions = insert_text.insertions;
+
+        let Some((_, offset)) = insertions.next() else {
+            todo!("store text for later, then return");
+        };
+
+        let first_hunk = Hunk {
+            start: offset.into(),
+            end: offset.into(),
+            // TODO: send the text with the message.
+            text: Default::default(),
+        };
+
+        let hunks = insert_text
+            .deletions
+            .map(|byte_range| Hunk {
+                start: ByteOffset::from(byte_range.start),
+                end: ByteOffset::from(byte_range.end),
+                text: Default::default(),
+            })
+            .chain([first_hunk])
+            .chain(insertions.map(|(_text, offset)| {
+                Hunk {
+                    start: offset.into(),
+                    end: offset.into(),
+                    // TODO: get the text from the store.
+                    text: Default::default(),
+                }
+            }));
+
+        self.apply_hunks(insert_text.file_id, hunks).await
     }
 
     fn integrate_moved_cursor(
