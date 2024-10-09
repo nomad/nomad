@@ -5,10 +5,10 @@ use std::borrow::Cow;
 
 use collab_fs::AbsUtf8Path;
 use futures_util::Stream;
-use nomad::ByteOffset;
+use nomad::{ActorId, ByteOffset};
 
 use crate::events::cursor::Cursor;
-use crate::events::edit::Edit;
+use crate::events::edit::{Edit, Hunk};
 use crate::events::selection::Selection;
 use crate::{Config, SessionId};
 
@@ -60,6 +60,15 @@ pub(crate) trait CollabEditor: Sized {
 
     /// TODO: docs.
     fn selections(&mut self, file_id: &Self::FileId) -> Self::Selections;
+
+    /// TODO: docs.
+    fn apply_hunks<I>(
+        &mut self,
+        file_id: &Self::FileId,
+        hunks: I,
+        actor_id: ActorId,
+    ) where
+        I: Iterator<Item = Hunk>;
 
     /// TODO: docs.
     type Tooltip;

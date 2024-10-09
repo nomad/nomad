@@ -8,6 +8,7 @@ use nomad::neovim::events::{CommandEvent, ConfigEvent, FunctionEvent};
 use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
 use nomad::{
     module_name,
+    ActorId,
     Buffer,
     ByteOffset,
     Context,
@@ -17,6 +18,7 @@ use nomad::{
 };
 
 use crate::collab_editor::CollabEditor;
+use crate::events::edit::Hunk;
 use crate::events::{self, JoinSession, StartSession};
 use crate::{Collab, Config};
 
@@ -102,6 +104,21 @@ impl CollabEditor for Neovim {
                 .expect("already checked")
                 .into_owned(),
         )
+    }
+
+    fn apply_hunks<I>(
+        &mut self,
+        file_id: &Self::FileId,
+        hunks: I,
+        actor_id: ActorId,
+    ) where
+        I: Iterator<Item = Hunk>,
+    {
+        if let Some(mut buffer) = self.get_buffer(file_id.clone()) {
+            for hunk in hunks {
+                buffer.set_text(hunk.start..hunk.end, hunk.text, actor_id);
+            }
+        }
     }
 
     type Tooltip = ();
