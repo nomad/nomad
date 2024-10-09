@@ -5,7 +5,7 @@ use std::io;
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf, Fs};
 use collab_messaging::{Outbound, PeerId, Recipients};
 use collab_project::file::{AnchorBias, FileId};
-use collab_project::{actions, cursor, selection, Integrate, Project};
+use collab_project::{actions, cursor, selection, Project};
 use collab_server::JoinRequest;
 use futures_util::stream::select_all;
 use futures_util::{select, FutureExt, SinkExt, StreamExt};
@@ -68,6 +68,10 @@ pub(crate) struct Session<E: CollabEditor> {
 
     /// TODO: docs.
     selections: Selections<E>,
+
+    /// TODO: docs.
+    selection_highlights:
+        HashMap<selection::SelectionId, SelectionHighlight<E>>,
 }
 
 struct Cursors<E: CollabEditor> {
@@ -258,6 +262,27 @@ impl<E: CollabEditor> Session<E> {
         })
     }
 
+    fn create_selection_highlight(
+        &mut self,
+        selection: &selection::Selection,
+    ) -> Option<SelectionHighlight<E>> {
+        let file_id = self.to_editor_file_id(selection.file_id())?;
+        let file = self.project.file(selection.file_id())?;
+        let head = file.resolve_anchor(selection.head())?.into();
+        let tail = file.resolve_anchor(selection.tail())?.into();
+        let owner_id = PeerId::new(selection.owner().as_u64());
+        let owner = self.peers.get(&owner_id)?;
+        let byte_range = if head < tail { head..tail } else { tail..head };
+        Some(SelectionHighlight {
+            selection_id: selection.id(),
+            inner: self.editor.create_highlight(
+                &file_id,
+                byte_range,
+                (owner.into_u64() as u8, 0, 0),
+            ),
+        })
+    }
+
     fn integrate_created_cursor(
         &mut self,
         msg: actions::create_cursor::CreatedCursorRemote,
@@ -283,11 +308,15 @@ impl<E: CollabEditor> Session<E> {
         Ok(())
     }
 
-    async fn integrate_created_selection(
+    fn integrate_created_selection(
         &mut self,
-        _msg: actions::create_selection::CreatedSelectionRemote,
-    ) -> Result<(), RunSessionError> {
-        Ok(())
+        msg: actions::create_selection::CreatedSelectionRemote,
+    ) {
+        let Some(selection) = self.project.integrate(msg) else { return };
+        if let Some(highlight) = self.create_selection_highlight(&selection) {
+            self.selection_highlights.insert(selection.id(), highlight);
+        }
+        self.selections.insert_remote(selection);
     }
 
     async fn integrate_deleted_text(
@@ -391,7 +420,8 @@ impl<E: CollabEditor> Session<E> {
                 self.integrate_created_file(msg).await
             },
             ProjectMessage::CreatedSelection(msg) => {
-                self.integrate_created_selection(msg).await
+                self.integrate_created_selection(msg);
+                Ok(())
             },
             ProjectMessage::DeletedText(msg) => {
                 self.integrate_deleted_text(msg).await
@@ -875,11 +905,24 @@ impl<E: CollabEditor> Selections<E> {
         }
     }
 
+    fn insert_remote(&mut self, selection: selection::Selection) {
+        if self.remote.insert(selection.id(), selection).is_some() {
+            panic!("selection already exists");
+        }
+    }
+
     fn remove_local(
         &mut self,
         id: E::SelectionId,
     ) -> Option<selection::Selection> {
         self.local.remove(&id)
+    }
+
+    fn remove_remote(
+        &mut self,
+        id: selection::SelectionId,
+    ) -> Option<selection::Selection> {
+        self.remote.remove(&id)
     }
 }
 
@@ -955,6 +998,11 @@ impl<E: CollabEditor> Drop for Session<E> {
 struct CursorTooltip<E: CollabEditor> {
     cursor_id: cursor::CursorId,
     inner: E::Tooltip,
+}
+
+struct SelectionHighlight<E: CollabEditor> {
+    selection_id: selection::SelectionId,
+    inner: E::Highlight,
 }
 
 struct ConfirmStart<'path>(&'path AbsUtf8Path);
