@@ -9,6 +9,7 @@ mod neovim_collab;
 mod session;
 mod session_error;
 mod session_id;
+mod text_backlog;
 
 use collab::Collab;
 use collab_editor::CollabEditor;

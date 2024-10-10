@@ -27,6 +27,7 @@ use crate::events::cursor::{Cursor, CursorAction};
 use crate::events::edit::{Edit, Hunk};
 use crate::events::selection::{Selection, SelectionAction};
 use crate::mapped::Mapped;
+use crate::text_backlog::TextBacklog;
 use crate::{CollabEditor, Config, SessionId};
 
 pub(crate) struct Session<E: CollabEditor> {
@@ -62,6 +63,7 @@ struct InnerSession<E: CollabEditor> {
 
     cursors: Cursors<E>,
     selections: Selections<E>,
+    text_backlog: TextBacklog,
 }
 
 struct Cursors<E: CollabEditor> {
@@ -435,7 +437,8 @@ impl<E: CollabEditor> InnerSession<E> {
         let mut insertions = insert_text.insertions;
 
         let Some((_, offset)) = insertions.next() else {
-            todo!("store text for later, then return");
+            self.text_backlog.insert(insert_text.text, Default::default());
+            return Ok(());
         };
 
         let first_hunk = Hunk {
@@ -445,6 +448,14 @@ impl<E: CollabEditor> InnerSession<E> {
             text: Default::default(),
         };
 
+        let other_hunks = insertions
+            .map(|(text, offset)| Hunk {
+                start: offset.into(),
+                end: offset.into(),
+                text: self.text_backlog.remove(text),
+            })
+            .collect::<Vec<_>>();
+
         let hunks = insert_text
             .deletions
             .map(|byte_range| Hunk {
@@ -453,14 +464,7 @@ impl<E: CollabEditor> InnerSession<E> {
                 text: Default::default(),
             })
             .chain([first_hunk])
-            .chain(insertions.map(|(_text, offset)| {
-                Hunk {
-                    start: offset.into(),
-                    end: offset.into(),
-                    // TODO: get the text from the store.
-                    text: Default::default(),
-                }
-            }));
+            .chain(other_hunks);
 
         self.apply_hunks(insert_text.file_id, hunks).await
     }
