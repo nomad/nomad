@@ -980,12 +980,20 @@ impl<E: CollabEditor> InnerSession<E> {
         }
     }
 
-    fn to_editor_file_id(&self, _file_id: FileId) -> Option<E::FileId> {
-        todo!();
+    fn to_editor_file_id(&self, file_id: FileId) -> Option<E::FileId> {
+        let file_path = self.project.file(file_id).expect("sum").path();
+        let file_path = self.project_root.concat(&file_path);
+        self.editor.file_id_at_path(file_path.as_ref())
     }
 
-    fn to_project_file_id(&self, _file_id: E::FileId) -> FileId {
-        todo!();
+    fn to_project_file_id(&self, file_id: E::FileId) -> FileId {
+        let file_path = self.editor.path(&file_id);
+        let suffix = file_path.strip_prefix(&self.project_root);
+        match self.project.file_id_at_path(suffix) {
+            Ok(Some(file_id)) => file_id,
+            Ok(None) => panic!("no file at {suffix:?}"),
+            Err(_) => panic!("{suffix:?} is a path to a directory"),
+        }
     }
 }
 

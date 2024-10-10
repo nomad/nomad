@@ -5,7 +5,15 @@ use std::borrow::Cow;
 use collab_fs::{AbsUtf8Path, OsFs};
 use futures_util::stream::{select, Select};
 use nomad::neovim::events::{CommandEvent, ConfigEvent, FunctionEvent};
-use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
+use nomad::neovim::{
+    self,
+    command,
+    function,
+    module_api,
+    BufferId,
+    ModuleApi,
+    Neovim,
+};
 use nomad::{
     module_name,
     ActorId,
@@ -97,18 +105,17 @@ impl CollabEditor for Neovim {
         todo!();
     }
 
-    fn is_text_file(&mut self, _file_id: &Self::FileId) -> bool {
+    fn is_text_file(&self, _file_id: &Self::FileId) -> bool {
         todo!();
     }
 
-    fn path(&mut self, file_id: &Self::FileId) -> Cow<AbsUtf8Path> {
-        Cow::Owned(
-            self.get_buffer(file_id.clone())
-                .expect("already checked")
-                .path()
-                .expect("already checked")
-                .into_owned(),
-        )
+    fn path(&self, file_id: &Self::FileId) -> Cow<AbsUtf8Path> {
+        Cow::Owned(file_id.path().expect(""))
+    }
+
+    fn file_id_at_path(&self, path: &AbsUtf8Path) -> Option<BufferId> {
+        BufferId::from_path(path)
+            .and_then(|id| self.is_text_file(&id).then_some(id))
     }
 
     fn apply_hunks<I>(

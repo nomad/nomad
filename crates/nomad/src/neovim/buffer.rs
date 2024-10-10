@@ -77,7 +77,11 @@ impl crate::Buffer<Neovim> for Buffer {
 
     #[track_caller]
     fn path(&self) -> Option<Cow<'_, AbsUtf8Path>> {
-        self.id.is_of_text_buffer().then(|| Cow::Owned(self.id.path()))
+        self.id.is_of_text_buffer().then(|| {
+            Cow::Owned(
+                self.id.path().expect("checked that id is of text buffer"),
+            )
+        })
     }
 
     fn set_text<R, T>(
@@ -102,6 +106,24 @@ impl fmt::Debug for Buffer {
 }
 
 impl BufferId {
+    /// Returns the [`BufferId`] of the buffer at the given path, if there is
+    /// one.
+    pub fn from_path(path: &AbsUtf8Path) -> Option<Self> {
+        api::call_function::<_, i32>("bufnr", (path.to_string(),))
+            .ok()
+            .and_then(|id| {
+                (id != -1).then_some(Self { inner: NvimBuffer::from(id) })
+            })
+    }
+
+    /// TODO: docs.
+    pub fn path(&self) -> Option<AbsUtf8PathBuf> {
+        self.inner
+            .get_name()
+            .ok()
+            .and_then(|name| AbsUtf8PathBuf::from_path_buf(name).ok())
+    }
+
     pub(super) fn as_nvim(&self) -> &NvimBuffer {
         &self.inner
     }
@@ -176,15 +198,6 @@ impl BufferId {
 
     fn handle(&self) -> i32 {
         self.inner.handle()
-    }
-
-    #[track_caller]
-    fn path(&self) -> AbsUtf8PathBuf {
-        let Ok(path) = self.inner.get_name() else {
-            panic!("{self:?} has been deleted");
-        };
-        AbsUtf8PathBuf::from_path_buf(path)
-            .expect("path is absolute and valid UTF-8")
     }
 
     #[track_caller]

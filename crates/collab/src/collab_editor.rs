@@ -56,13 +56,13 @@ pub(crate) trait CollabEditor: Sized {
     fn edits(&mut self, file_id: &Self::FileId) -> Self::Edits;
 
     /// TODO: docs.
-    fn is_text_file(&mut self, file_id: &Self::FileId) -> bool;
+    fn is_text_file(&self, file_id: &Self::FileId) -> bool;
 
     /// TODO: docs.
-    fn path<'ed>(
-        &'ed mut self,
-        file_id: &Self::FileId,
-    ) -> Cow<'ed, AbsUtf8Path>;
+    fn file_id_at_path(&self, path: &AbsUtf8Path) -> Option<Self::FileId>;
+
+    /// TODO: docs.
+    fn path<'ed>(&'ed self, file_id: &Self::FileId) -> Cow<'ed, AbsUtf8Path>;
 
     /// TODO: docs.
     fn selections(&mut self, file_id: &Self::FileId) -> Self::Selections;
