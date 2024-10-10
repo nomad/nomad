@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use std::io;
 
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf, Fs};
-use collab_messaging::{Outbound, PeerId, Recipients};
+use collab_messaging::{Outbound, Recipients};
 use collab_project::cursor::{self, CursorId};
 use collab_project::file::{AnchorBias, FileId};
 use collab_project::selection::{self, SelectionId};
-use collab_project::{actions, Project};
+use collab_project::{actions, PeerId, Project};
 use collab_server::JoinRequest;
 use futures_util::stream::select_all;
 use futures_util::{select, FutureExt, SinkExt, StreamExt};
@@ -34,7 +34,7 @@ pub(crate) struct Session<E: CollabEditor> {
     local_streams: LocalStreams<E>,
     remote_sender: ServerSender,
     remote_stream: ServerReceiver,
-    server_id: PeerId,
+    server_id: collab_messaging::PeerId,
 }
 
 struct InnerSession<E: CollabEditor> {
@@ -232,18 +232,18 @@ impl<E: CollabEditor> Session<E> {
 
                 cursor = self.local_streams.cursors.next().fuse() => {
                     let cursor = cursor.expect("never ends");
-                    self.inner.sync_cursor(cursor).map(Into::into)
+                    self.inner.sync_cursor(cursor).map(Message::Project)
                 },
 
 
                 edit = self.local_streams.edits.next().fuse() => {
                     let edit = edit.expect("never ends");
-                    self.inner.sync_edit(edit).map(Into::into)
+                    self.inner.sync_edit(edit).map(Message::Project)
                 },
 
                 selection = self.local_streams.selections.next().fuse() => {
                     let selection = selection.expect("never ends");
-                    self.inner.sync_selection(selection).map(Into::into)
+                    self.inner.sync_selection(selection).map(Message::Project)
                 },
 
                 maybe_msg = self.remote_stream.next().fuse() => {
@@ -258,9 +258,9 @@ impl<E: CollabEditor> Session<E> {
                 },
             };
 
-            if let Some(msg) = maybe_msg {
+            if let Some(message) = maybe_msg {
                 let outbound = Outbound {
-                    message: Message::Project(msg),
+                    message,
                     recipients: Recipients::except([self.server_id]),
                     should_compress: false,
                 };
@@ -345,7 +345,7 @@ impl<E: CollabEditor> InnerSession<E> {
             inner: self.editor.create_tooltip(
                 &file_id,
                 offset.into(),
-                owner.into_u64(),
+                owner.as_u64(),
             ),
         })
     }
@@ -366,7 +366,7 @@ impl<E: CollabEditor> InnerSession<E> {
             inner: self.editor.create_highlight(
                 &file_id,
                 byte_range,
-                (owner.into_u64() as u8, 0, 0),
+                (owner.as_u64() as u8, 0, 0),
             ),
         })
     }
@@ -510,6 +510,7 @@ impl<E: CollabEditor> InnerSession<E> {
     ) -> Result<(), RunSessionError> {
         match msg {
             Message::PeerDisconnected(peer_id) => {
+                let peer_id = PeerId::new(peer_id.into());
                 self.on_peer_disconnected(peer_id);
                 Ok(())
             },
@@ -703,7 +704,49 @@ impl<E: CollabEditor> InnerSession<E> {
     }
 
     fn on_peer_disconnected(&mut self, peer_id: PeerId) {
-        todo!();
+        self.peers.remove(&peer_id);
+
+        self.cursors.remote.retain(|_, cursor| cursor.owner() != peer_id);
+
+        let cursor_ids = self
+            .cursors
+            .tooltips
+            .keys()
+            .filter(|cursor_id| cursor_id.owner() == peer_id)
+            .copied()
+            .collect::<Vec<_>>();
+
+        for cursor_id in cursor_ids {
+            let tooltip = self
+                .cursors
+                .tooltips
+                .remove(&cursor_id)
+                .expect("just checked");
+
+            self.editor.remove_tooltip(tooltip.inner);
+        }
+
+        self.selections
+            .remote
+            .retain(|_, selection| selection.owner() != peer_id);
+
+        let selection_ids = self
+            .selections
+            .highlights
+            .keys()
+            .filter(|selection_id| selection_id.owner() == peer_id)
+            .copied()
+            .collect::<Vec<_>>();
+
+        for selection_id in selection_ids {
+            let highlight = self
+                .selections
+                .highlights
+                .remove(&selection_id)
+                .expect("just checked");
+
+            self.editor.remove_highlight(highlight.inner);
+        }
     }
 
     fn sync_cursor(&mut self, cursor: Cursor<E>) -> Option<ProjectMessage> {
