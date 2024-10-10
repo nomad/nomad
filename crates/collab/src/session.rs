@@ -600,11 +600,14 @@ impl<E: CollabEditor> InnerSession<E> {
                 self.integrate_created_selection(msg);
                 Ok(())
             },
-            ProjectMessage::DeletedText(msg) => {
-                self.integrate_deleted_text(msg).await
-            },
-            ProjectMessage::InsertedText(msg, text) => {
-                self.integrate_inserted_text(msg, text).await
+            ProjectMessage::EditedText { insertions, deletions } => {
+                for deletion in deletions {
+                    self.integrate_deleted_text(deletion).await?;
+                }
+                for (msg, text) in insertions {
+                    self.integrate_inserted_text(msg, text).await?
+                }
+                Ok(())
             },
             ProjectMessage::MovedCursor(msg) => {
                 self.integrate_moved_cursor(msg);
@@ -844,6 +847,9 @@ impl<E: CollabEditor> InnerSession<E> {
     fn sync_edit(&mut self, edit: Edit<E>) -> Option<ProjectMessage> {
         let file_id = self.to_project_file_id(edit.file_id);
 
+        let mut deletions = Vec::new();
+        let mut insertions = Vec::new();
+
         for hunk in edit.hunks {
             let byte_range = hunk.deleted_byte_range();
 
@@ -859,7 +865,7 @@ impl<E: CollabEditor> InnerSession<E> {
                     },
                 };
 
-                // ProjectMessage::DeletedText(msg)
+                deletions.push(msg);
             }
 
             if !hunk.text.is_empty() {
@@ -877,11 +883,15 @@ impl<E: CollabEditor> InnerSession<E> {
                     },
                 };
 
-                // ProjectMessage::InsertedText(msg)
+                insertions.push((msg, hunk.text));
             }
         }
 
-        todo!();
+        if deletions.is_empty() && insertions.is_empty() {
+            None
+        } else {
+            Some(ProjectMessage::EditedText { deletions, insertions })
+        }
     }
 
     fn sync_moved_cursor(
