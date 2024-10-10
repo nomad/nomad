@@ -21,6 +21,7 @@ use nomad_server::client::{
 use nomad_server::{Io, Message, ProjectMessage};
 use root_finder::markers::Git;
 use root_finder::Finder;
+use smol_str::SmolStr;
 use tracing::{error, warn};
 
 use crate::events::cursor::{Cursor, CursorAction};
@@ -429,6 +430,7 @@ impl<E: CollabEditor> InnerSession<E> {
     async fn integrate_inserted_text(
         &mut self,
         msg: actions::insert_text::InsertedTextRemote,
+        text: SmolStr,
     ) -> Result<(), RunSessionError> {
         let Some(insert_text) = self.project.integrate(msg) else {
             return Ok(());
@@ -441,12 +443,8 @@ impl<E: CollabEditor> InnerSession<E> {
             return Ok(());
         };
 
-        let first_hunk = Hunk {
-            start: offset.into(),
-            end: offset.into(),
-            // TODO: send the text with the message.
-            text: Default::default(),
-        };
+        let first_hunk =
+            Hunk { start: offset.into(), end: offset.into(), text };
 
         let other_hunks = insertions
             .map(|(text, offset)| Hunk {
@@ -595,8 +593,8 @@ impl<E: CollabEditor> InnerSession<E> {
             ProjectMessage::DeletedText(msg) => {
                 self.integrate_deleted_text(msg).await
             },
-            ProjectMessage::InsertedText(msg) => {
-                self.integrate_inserted_text(msg).await
+            ProjectMessage::InsertedText(msg, text) => {
+                self.integrate_inserted_text(msg, text).await
             },
             ProjectMessage::MovedCursor(msg) => {
                 self.integrate_moved_cursor(msg);

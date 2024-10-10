@@ -285,7 +285,7 @@ dependencies = [
 [[package]]
 name = "collab-fs"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#0f4c78bd52cef9f2ebaf7d8a967d4f37e4991931"
+source = "git+ssh://git@github.com/nomad/collab.git#7ec3ee328de5931df1bc3dac390274aa7a3807ef"
 dependencies = [
  "async-fs",
  "camino",
@@ -298,7 +298,7 @@ dependencies = [
 [[package]]
 name = "collab-messaging"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#0f4c78bd52cef9f2ebaf7d8a967d4f37e4991931"
+source = "git+ssh://git@github.com/nomad/collab.git#7ec3ee328de5931df1bc3dac390274aa7a3807ef"
 dependencies = [
  "bincode",
  "bytes",
@@ -314,7 +314,7 @@ dependencies = [
 [[package]]
 name = "collab-project"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#0f4c78bd52cef9f2ebaf7d8a967d4f37e4991931"
+source = "git+ssh://git@github.com/nomad/collab.git#7ec3ee328de5931df1bc3dac390274aa7a3807ef"
 dependencies = [
  "async-recursion",
  "cola",
@@ -330,7 +330,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#0f4c78bd52cef9f2ebaf7d8a967d4f37e4991931"
+source = "git+ssh://git@github.com/nomad/collab.git#7ec3ee328de5931df1bc3dac390274aa7a3807ef"
 dependencies = [
  "async-channel",
  "collab-messaging",
@@ -696,7 +696,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -787,7 +787,7 @@ dependencies = [
 [[package]]
 name = "nomad-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#0f4c78bd52cef9f2ebaf7d8a967d4f37e4991931"
+source = "git+ssh://git@github.com/nomad/collab.git#7ec3ee328de5931df1bc3dac390274aa7a3807ef"
 dependencies = [
  "async-net",
  "collab-messaging",
@@ -800,6 +800,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "serde",
+ "smol_str",
  "webpki-roots",
 ]
 
