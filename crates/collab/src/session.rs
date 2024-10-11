@@ -61,7 +61,7 @@ struct LocalStreams<E: CollabEditor> {
     selections: StreamMap<E::FileId, E::Selections>,
 }
 
-struct InnerSession<E: CollabEditor> {
+pub(crate) struct InnerSession<E: CollabEditor> {
     /// This session's actor ID.
     actor_id: ActorId,
 
@@ -136,7 +136,7 @@ impl<E: CollabEditor> Session<E> {
             .connect_to_server().await?
             .authenticate(()).await?
             .start_session().await?
-            .read_project_tree().await?
+            .read_project_tree(editor.fs()).await?
             .into_session(editor))
     }
 
@@ -147,7 +147,13 @@ impl<E: CollabEditor> Session<E> {
         remote_stream: ServerReceiver,
         server_id: collab_messaging::PeerId,
     ) -> Self {
-        Self { inner, local_streams, remote_sender, remote_stream, server_id }
+        Self {
+            inner,
+            local_streams: LocalStreams::new(&inner.editor),
+            remote_sender,
+            remote_stream,
+            server_id,
+        }
     }
 
     fn is_host(&self) -> bool {
@@ -161,7 +167,7 @@ impl<E: CollabEditor> Session<E> {
 }
 
 impl<E: CollabEditor> Session<E> {
-    pub(crate) async fn run(mut self) -> Result<(), RunSessionError> {
+    pub(crate) async fn run(&mut self) -> Result<(), RunSessionError> {
         loop {
             let maybe_msg = select! {
                 file_id = self.local_streams.open_files.next().fuse() => {

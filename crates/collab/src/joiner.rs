@@ -185,10 +185,42 @@ impl Starter<StartSession> {
 }
 
 impl Starter<ReadProjectTree> {
-    pub(crate) async fn read_project_tree(
+    pub(crate) async fn read_project_tree<Fs: collab_fs::Fs>(
         self,
+        mut fs: Fs,
     ) -> Result<Starter<Done>, ReadProjectTreeError> {
-        todo!();
+        let Self { status: ReadProjectTree { joined } } = self;
+        let project_root = AbsUtf8PathBuf::root();
+
+        let nomad_server::client::Joined {
+            sender,
+            receiver,
+            join_response,
+            peers,
+        } = joined;
+
+        let collab_server::JoinResponse { session_id, client_id, server_id } =
+            join_response;
+
+        let peer_id = collab_project::PeerId::new(
+            joined.join_response.client_id.into_u64(),
+        );
+
+        fs.set_root(project_root.clone());
+
+        let project = collab_project::Project::from_fs(peer_id, &fs)
+            .await
+            .map_err(|err| ReadProjectTreeError { inner: err })?;
+
+        let inner_session = InnerSession::new(
+            // editor,
+            session_id,
+            peers,
+            project,
+            project_root,
+        );
+
+        Session::new(inner_session, sender, receiver, server_id)
     }
 }
 
@@ -298,7 +330,9 @@ pub(crate) struct StartSessionError {
 }
 
 /// TODO: docs.
-pub(crate) struct ReadProjectTreeError;
+pub(crate) struct ReadProjectTreeError {
+    inner: io::Error,
+}
 
 impl From<ConnectToServerError> for JoinError {
     fn from(err: ConnectToServerError) -> Self {
