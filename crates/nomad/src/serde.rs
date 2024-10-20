@@ -7,7 +7,7 @@ use nvim_oxi::serde::{
 use nvim_oxi::Object as NvimObject;
 use serde::de::DeserializeOwned;
 
-use super::diagnostic::{DiagnosticMessage, HighlightGroup};
+use crate::diagnostics::{DiagnosticMessage, HighlightGroup};
 
 pub(super) fn deserialize<T>(obj: NvimObject) -> Result<T, DeserializeError>
 where

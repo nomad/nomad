@@ -13,7 +13,6 @@ mod module_api;
 mod neovim;
 mod offset;
 mod point;
-mod serde;
 mod spawner;
 
 pub use api::Api;

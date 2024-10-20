@@ -21,6 +21,7 @@ mod module_api;
 mod module_name;
 pub mod neovim;
 mod nomad;
+mod serde;
 mod shared;
 mod spawner;
 mod subscription;

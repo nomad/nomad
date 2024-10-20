@@ -1,5 +1,10 @@
 //! TODO: docs.
 
+use core::marker::PhantomData;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+
+use futures_util::{Stream, StreamExt};
 use fxhash::FxHashMap;
 use nvim_oxi::{
     Object as NvimObject,
@@ -21,8 +26,8 @@ use crate::Module;
 type ModuleNameStr = &'static str;
 
 /// TODO: docs.
-pub struct ConfigReceiver<M: Module> {
-    _config: M::Config,
+pub struct ConfigReceiver<M> {
+    stream: ConfigStream<M>,
 }
 
 /// TODO: docs.
@@ -33,11 +38,22 @@ pub(crate) struct Setup {
 }
 
 /// TODO: docs.
+struct ConfigStream<T> {
+    inner: futures_util::stream::Pending<NvimObject>,
+    ty: PhantomData<T>,
+}
+
+/// TODO: docs.
 struct ConfigSender {}
 
 impl<M: Module> ConfigReceiver<M> {
+    /// TODO: docs.
     pub async fn recv(&mut self) -> M::Config {
-        todo!();
+        use futures_util::StreamExt;
+        self.stream
+            .next()
+            .await
+            .expect("sender never dropped, stream never ends")
     }
 }
 
@@ -121,7 +137,7 @@ enum SetupError {
     /// string.
     NonUnicodeKey(NvimString),
 
-    /// The configuration dictionary contains an module name that doesn't match
+    /// The configuration dictionary contains a module name that doesn't match
     /// any of the modules that were added to [`Setup`].
     UnknownModule { name: SmolStr, valid: Vec<ModuleNameStr> },
 }
@@ -167,5 +183,37 @@ impl SetupError {
         let mut source = DiagnosticSource::new();
         source.push_segment(Setup::NAME);
         source
+    }
+}
+
+impl<M: Module> Unpin for ConfigStream<M> {}
+
+impl<M> Stream for ConfigStream<M>
+where
+    M: Module,
+{
+    type Item = M::Config;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context,
+    ) -> Poll<Option<Self::Item>> {
+        let obj = match self.get_mut().inner.poll_next_unpin(ctx) {
+            Poll::Ready(Some(obj)) => obj,
+            Poll::Ready(None) => return Poll::Ready(None),
+            Poll::Pending => unreachable!(),
+        };
+
+        match crate::serde::deserialize::<M::Config>(obj) {
+            Ok(config) => Poll::Ready(Some(config)),
+            Err(err) => {
+                let mut source = DiagnosticSource::new();
+                source
+                    .push_segment(Setup::NAME)
+                    .push_segment(M::NAME.as_str());
+                err.into_msg().emit(Level::Warning, source);
+                Poll::Pending
+            },
+        }
     }
 }
