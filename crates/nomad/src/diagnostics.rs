@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use core::{fmt, iter};
 
 use nvim_oxi::{api, String as NvimString};
@@ -34,7 +36,7 @@ impl From<Level> for HighlightGroup {
 }
 
 #[derive(Default)]
-pub(super) struct DiagnosticSource {
+pub(crate) struct DiagnosticSource {
     segments: Vec<SmolStr>,
 }
 

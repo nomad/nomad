@@ -11,6 +11,7 @@ mod byte_offset;
 mod command_args;
 pub mod config;
 mod context;
+pub mod diagnostics;
 mod editor;
 mod event;
 mod log;
