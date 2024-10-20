@@ -16,6 +16,7 @@ async-broadcast = "0.7"
 collab-fs = { workspace = true }
 compact_str = { workspace = true }
 futures-util = { workspace = true }
+fxhash = "0.2"
 nohash = { workspace = true }
 nomad-macros = { path = "./macros" }
 serde = { workspace = true }

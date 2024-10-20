@@ -751,6 +751,7 @@ dependencies = [
  "compact_str",
  "concurrent-queue",
  "futures-util",
+ "fxhash",
  "home",
  "nohash",
  "nomad-macros",
