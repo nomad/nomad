@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use nvim_oxi::Dictionary as NvimDictionary;
 
 use crate::module_commands::ModuleCommands;
-use crate::{Autocmd, Command, Function, Module};
+use crate::{Action, Autocmd, Command, Function, Module};
 
 /// TODO: docs.
 pub struct ModuleApi<M: Module> {
@@ -13,17 +13,26 @@ pub struct ModuleApi<M: Module> {
 }
 
 impl<M: Module> ModuleApi<M> {
-    pub fn autocmd<T: Autocmd>(self, autocmd: T) -> Self {
-        let _ = autocmd.register();
+    pub fn autocmd<T>(self, autocmd: T) -> Self
+    where
+        T: Autocmd<Action: Action<Module = M>>,
+    {
+        // let _ = autocmd.register();
         self
     }
 
-    pub fn command<T: Command<Module = M>>(mut self, command: T) -> Self {
+    pub fn command<T>(mut self, command: T) -> Self
+    where
+        T: Command<Module = M>,
+    {
         self.commands.add_command(command);
         self
     }
 
-    pub fn function<T: Function<Module = M>>(mut self, function: T) -> Self {
+    pub fn function<T>(mut self, function: T) -> Self
+    where
+        T: Function<Module = M>,
+    {
         if self.dictionary.get(T::NAME.as_str()).is_some() {
             panic!(
                 "a function with the name '{}' has already been added to the \

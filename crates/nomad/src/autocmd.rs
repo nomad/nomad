@@ -3,29 +3,19 @@ use nvim_oxi::api::{self, opts, types};
 use smallvec::SmallVec;
 
 use crate::ctx::{AutocmdCtx, NeovimCtx};
-use crate::diagnostics::{DiagnosticMessage, DiagnosticSource, Level};
-use crate::{ActorId, Shared};
-
-pub trait AutocmdCallback:
-    for<'a> FnMut(
-    ActorId,
-    &'a AutocmdCtx<'a>,
-) -> Result<ShouldDetach, DiagnosticMessage>
-{
-}
-
-impl<F> AutocmdCallback for F where
-    F: for<'a> FnMut(
-        ActorId,
-        &'a AutocmdCtx<'a>,
-    ) -> Result<ShouldDetach, DiagnosticMessage>
-{
-}
+use crate::diagnostics::{DiagnosticSource, Level};
+use crate::maybe_result::MaybeResult;
+use crate::{Action, ActorId, Module, Shared};
 
 /// TODO: docs.
 pub trait Autocmd: Sized {
+    type Action: Action<
+            Args: for<'a> From<(ActorId, &'a AutocmdCtx<'a>)>,
+            Return: Into<ShouldDetach>,
+        > + Clone;
+
     /// TODO: docs.
-    fn into_callback(self) -> impl AutocmdCallback + Clone + 'static;
+    fn into_action(self) -> Self::Action;
 
     /// TODO: docs.
     fn on_events(&self) -> impl IntoIterator<Item = AutocmdEvent>;
@@ -57,9 +47,12 @@ pub(crate) struct AugroupId(u32);
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AutocmdId(u32);
 
+type AutocmdCallback =
+    Box<dyn for<'a> FnMut(ActorId, &'a AutocmdCtx<'a>) -> ShouldDetach>;
+
 #[derive(Clone)]
 pub(crate) struct AutocmdMap {
-    map: Shared<FxHashMap<AutocmdEvent, Vec<Box<dyn AutocmdCallback>>>>,
+    map: Shared<FxHashMap<AutocmdEvent, Vec<AutocmdCallback>>>,
 }
 
 impl AutocmdMap {
@@ -74,7 +67,7 @@ impl AutocmdMap {
             .map(|event| (event, true))
             .collect::<SmallVec<[_; 4]>>();
         let events_len = events.len();
-        let callback = autocmd.into_callback();
+        let action = autocmd.into_action();
 
         self.map.with_mut(|map| {
             for (event, has_event_been_registered) in events.iter_mut() {
@@ -82,7 +75,22 @@ impl AutocmdMap {
                     *has_event_been_registered = false;
                     Vec::with_capacity(events_len)
                 });
-                callbacks.push(Box::new(callback.clone()));
+                let mut action = action.clone();
+                let callback = move |actor_id, ctx: &AutocmdCtx| {
+                    let args = (actor_id, ctx).into();
+                    match action.execute(args).into_result() {
+                        Ok(res) => res.into(),
+                        Err(err) => {
+                            let mut source = DiagnosticSource::new();
+                            source
+                                .push_segment(<<A::Action as Action>::Module as Module>::NAME.as_str())
+                                .push_segment(A::Action::NAME.as_str());
+                            err.into().emit(Level::Error, source);
+                            ShouldDetach::Yes
+                        },
+                    }
+                };
+                callbacks.push(Box::new(callback));
             }
         });
 
@@ -118,15 +126,7 @@ impl AutocmdMap {
                     let Some(callback) = callbacks.get_mut(idx) else {
                         break;
                     };
-                    let should_detach = match callback(actor_id, &ctx) {
-                        Ok(res) => res,
-                        Err(err) => {
-                            let source = DiagnosticSource::new();
-                            err.emit(Level::Error, source);
-                            ShouldDetach::Yes
-                        },
-                    };
-                    if should_detach.into() {
+                    if callback(actor_id, &ctx).into() {
                         callbacks.remove(idx);
                     } else {
                         idx += 1;
