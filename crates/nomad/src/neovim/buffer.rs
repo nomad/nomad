@@ -8,7 +8,7 @@ use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
 use super::events::{CursorEvent, EditEvent};
-use super::{Neovim, Offset, Point};
+use super::{Neovim, Offset};
 use crate::{ActorId, ByteOffset, Context, Shared, Subscription, Text};
 
 /// TODO: docs.
