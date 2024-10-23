@@ -45,13 +45,13 @@ pub enum ShouldDetach {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct AugroupId(u32);
 
-type AutoCommandCallback =
-    Box<dyn for<'a> FnMut(ActorId, &'a AutoCommandCtx<'a>) -> ShouldDetach>;
-
 #[derive(Default, Clone)]
 pub(crate) struct AutoCommandMap {
     map: Shared<FxHashMap<AutoCommandEvent, Vec<AutoCommandCallback>>>,
 }
+
+type AutoCommandCallback =
+    Box<dyn for<'a> FnMut(ActorId, &'a AutoCommandCtx<'a>) -> ShouldDetach>;
 
 impl AutoCommandMap {
     pub(crate) fn register<A: AutoCommand>(
@@ -120,7 +120,7 @@ impl AutoCommandMap {
                     panic!(
                         "Neovim executed an unregistered autocommand: \
                          {event:?}"
-                    )
+                    );
                 };
                 let mut idx = 0;
                 loop {

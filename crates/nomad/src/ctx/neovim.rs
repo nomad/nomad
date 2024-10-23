@@ -3,6 +3,8 @@ use nvim_oxi::api;
 use crate::actor_map::ActorMap;
 use crate::autocmd::{AugroupId, AutoCommandMap};
 use crate::buf_attach::BufAttachMap;
+use crate::ctx::BufferCtx;
+use crate::neovim::BufferId;
 use crate::{Boo, Shared};
 
 /// TODO: docs.
@@ -27,7 +29,11 @@ struct CtxInner {
 #[derive(Copy, Clone)]
 struct NomadAugroupId(AugroupId);
 
-impl NeovimCtx<'_> {
+impl<'ctx> NeovimCtx<'ctx> {
+    pub fn into_buffer(self, buffer_id: BufferId) -> Option<BufferCtx<'ctx>> {
+        BufferCtx::from_neovim(buffer_id, self)
+    }
+
     pub(crate) fn augroup_id(&self) -> AugroupId {
         self.ctx.with_inner(|inner| inner.augroup_id.into())
     }
@@ -40,21 +46,21 @@ impl NeovimCtx<'_> {
         NeovimCtx { ctx: self.ctx.clone().into_owned() }
     }
 
-    pub(in crate::ctx) fn with_actor_map<F, R>(&self, fun: F) -> R
+    pub(crate) fn with_actor_map<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&mut ActorMap) -> R,
     {
         self.ctx.with_inner(|inner| fun(&mut inner.actor_map))
     }
 
-    pub(in crate::ctx) fn with_autocmd_map<F, R>(&self, fun: F) -> R
+    pub(crate) fn with_autocmd_map<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&mut AutoCommandMap) -> R,
     {
         self.ctx.with_inner(|inner| fun(&mut inner.autocmd_map))
     }
 
-    pub(in crate::ctx) fn with_buf_attach_map<F, R>(&self, fun: F) -> R
+    pub(crate) fn with_buf_attach_map<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&mut BufAttachMap) -> R,
     {

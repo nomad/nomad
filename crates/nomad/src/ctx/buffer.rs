@@ -38,7 +38,7 @@ impl<'ctx> BufferCtx<'ctx> {
             .to_string()
     }
 
-    pub(crate) fn new(
+    pub(crate) fn from_neovim(
         buffer_id: BufferId,
         neovim_ctx: NeovimCtx<'ctx>,
     ) -> Option<Self> {
