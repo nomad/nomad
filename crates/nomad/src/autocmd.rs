@@ -174,6 +174,12 @@ impl From<ShouldDetach> for bool {
     }
 }
 
+impl From<u32> for AugroupId {
+    fn from(id: u32) -> Self {
+        Self(id)
+    }
+}
+
 impl api::StringOrInt for AugroupId {
     fn to_object(self) -> nvim_oxi::Object {
         self.0.to_object()

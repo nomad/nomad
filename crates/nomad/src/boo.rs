@@ -29,6 +29,12 @@ impl<'a, T> Boo<'a, T> {
     }
 }
 
+impl<T: Default> Default for Boo<'_, T> {
+    fn default() -> Self {
+        Boo::Owned(T::default())
+    }
+}
+
 impl<T: Clone> Clone for Boo<'_, T> {
     fn clone(&self) -> Self {
         match self {
