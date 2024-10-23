@@ -3,6 +3,7 @@ use crate::autocmd::AugroupId;
 use crate::{Boo, Shared};
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct NeovimCtx<'ctx> {
     ctx: Boo<'ctx, Ctx>,
 }
@@ -44,11 +45,5 @@ impl Ctx {
         F: FnOnce(&mut CtxInner) -> R,
     {
         self.inner.with_mut(|inner| fun(inner))
-    }
-}
-
-impl Clone for NeovimCtx<'_> {
-    fn clone(&self) -> Self {
-        Self { ctx: self.ctx.clone() }
     }
 }

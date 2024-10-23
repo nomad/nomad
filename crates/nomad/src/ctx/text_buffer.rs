@@ -13,7 +13,7 @@ use crate::{ByteOffset, Text};
 /// TODO: docs.
 #[derive(Clone)]
 pub struct TextBufferCtx<'ctx> {
-    ctx: BufferCtx<'ctx>,
+    buffer_ctx: BufferCtx<'ctx>,
 }
 
 /// The 2D equivalent of a [`ByteOffset`].
@@ -69,7 +69,7 @@ impl<'ctx> TextBufferCtx<'ctx> {
                     })
                     .unwrap_or(false);
 
-        is_text_file.then_some(Self { ctx })
+        is_text_file.then_some(Self { buffer_ctx: ctx })
     }
 
     /// Returns the text in the given point range.
@@ -186,6 +186,6 @@ impl<'ctx> Deref for TextBufferCtx<'ctx> {
     type Target = BufferCtx<'ctx>;
 
     fn deref(&self) -> &Self::Target {
-        &self.ctx
+        &self.buffer_ctx
     }
 }
