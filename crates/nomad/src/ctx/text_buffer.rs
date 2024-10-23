@@ -6,6 +6,7 @@ use crate::autocmd::ShouldDetach;
 use crate::buf_attach::BufAttachArgs;
 use crate::ctx::{BufferCtx, TextFileCtx};
 use crate::neovim::BufferId;
+use crate::point::Point;
 use crate::{Action, ActorId, ByteOffset, Text};
 
 /// TODO: docs.
@@ -13,16 +14,6 @@ use crate::{Action, ActorId, ByteOffset, Text};
 #[repr(transparent)]
 pub struct TextBufferCtx<'ctx> {
     buffer_ctx: BufferCtx<'ctx>,
-}
-
-/// The 2D equivalent of a [`ByteOffset`].
-#[derive(Copy, Clone, PartialEq)]
-struct Point {
-    /// The index of the line in the buffer.
-    pub(super) line_idx: usize,
-
-    /// The byte offset in the line.
-    pub(super) byte_offset: ByteOffset,
 }
 
 impl<'ctx> TextBufferCtx<'ctx> {
@@ -109,21 +100,12 @@ impl<'ctx> TextBufferCtx<'ctx> {
         is_text_file.then_some(Self { buffer_ctx: ctx })
     }
 
-    pub(crate) fn new_unchecked(buffer_ctx: BufferCtx<'ctx>) -> Self {
-        debug_assert!(Self::from_buffer(buffer_ctx.clone()).is_some());
-        Self { buffer_ctx }
-    }
-
-    pub(super) fn new_ref_unchecked<'a>(ctx: &'a BufferCtx<'ctx>) -> &'a Self {
-        debug_assert!(Self::from_buffer(ctx.clone()).is_some());
-        // SAFETY: `TextBufferCtx` is a `repr(transparent)` newtype over
-        // `BufferCtx`.
-        unsafe { &*(ctx as *const BufferCtx<'ctx> as *const Self) }
-    }
-
     /// Returns the text in the given point range.
     #[track_caller]
-    fn get_text_in_point_range(&self, point_range: Range<Point>) -> Text {
+    pub(crate) fn get_text_in_point_range(
+        &self,
+        point_range: Range<Point>,
+    ) -> Text {
         let lines = match self.buffer_id().as_nvim().get_text(
             point_range.start.line_idx..point_range.end.line_idx,
             point_range.start.byte_offset.into(),
@@ -148,6 +130,18 @@ impl<'ctx> TextBufferCtx<'ctx> {
         }
 
         text
+    }
+
+    pub(crate) fn new_unchecked(buffer_ctx: BufferCtx<'ctx>) -> Self {
+        debug_assert!(Self::from_buffer(buffer_ctx.clone()).is_some());
+        Self { buffer_ctx }
+    }
+
+    pub(super) fn new_ref_unchecked<'a>(ctx: &'a BufferCtx<'ctx>) -> &'a Self {
+        debug_assert!(Self::from_buffer(ctx.clone()).is_some());
+        // SAFETY: `TextBufferCtx` is a `repr(transparent)` newtype over
+        // `BufferCtx`.
+        unsafe { &*(ctx as *const BufferCtx<'ctx> as *const Self) }
     }
 
     /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the
@@ -246,12 +240,6 @@ impl<'ctx> TextBufferCtx<'ctx> {
                 lines,
             )
             .expect("replacing text failed");
-    }
-}
-
-impl Point {
-    pub(super) fn zero() -> Self {
-        Self { line_idx: 0, byte_offset: ByteOffset::new(0) }
     }
 }
 

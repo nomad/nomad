@@ -3,6 +3,7 @@ use core::ops::Range;
 use nvim_oxi::api::opts;
 
 use crate::ctx::TextBufferCtx;
+use crate::point::Point;
 use crate::{ByteOffset, Text};
 
 /// TODO: docs.
@@ -27,7 +28,43 @@ impl Replacement {
         args: opts::OnBytesArgs,
         ctx: TextBufferCtx<'_>,
     ) -> Self {
-        todo!();
+        let (
+            _bytes,
+            buf,
+            _changedtick,
+            start_row,
+            start_col,
+            start_offset,
+            _old_end_row,
+            _old_end_col,
+            old_end_len,
+            new_end_row,
+            new_end_col,
+            _new_end_len,
+        ) = args;
+
+        debug_assert_eq!(buf, ctx.buffer_id().as_nvim());
+
+        let deleted_range =
+            (start_offset).into()..(start_offset + old_end_len).into();
+
+        let start =
+            Point { line_idx: start_row, byte_offset: start_offset.into() };
+
+        let end = Point {
+            line_idx: start_row + new_end_row,
+            byte_offset: (start_col * (new_end_row == 0) as usize
+                + new_end_col)
+                .into(),
+        };
+
+        let inserted_text = if start == end {
+            Text::new()
+        } else {
+            ctx.get_text_in_point_range(start..end)
+        };
+
+        Self { deleted_range, inserted_text }
     }
 
     pub(crate) fn new(
