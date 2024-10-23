@@ -67,8 +67,7 @@ impl crate::Buffer<Neovim> for Buffer {
     where
         R: RangeBounds<ByteOffset>,
     {
-        let point_range = self.id.point_range_of_byte_range(byte_range);
-        self.id.get_text_in_point_range(point_range)
+        todo!();
     }
 
     fn id(&self) -> Self::Id {
@@ -128,8 +127,8 @@ impl BufferId {
         Self::new(NvimBuffer::current())
     }
 
-    pub(super) fn as_nvim(&self) -> &NvimBuffer {
-        &self.inner
+    pub(crate) fn as_nvim(&self) -> NvimBuffer {
+        self.inner.clone()
     }
 
     /// # Panics
@@ -168,26 +167,7 @@ impl BufferId {
     }
 
     pub(super) fn is_of_text_buffer(&self) -> bool {
-        let opts = api::opts::OptionOpts::builder()
-            .buffer(self.inner.clone())
-            .build();
-
-        self.inner.is_loaded()
-        // Checks that the buftype is empty. This filters out help and terminal
-        // buffers, the quickfix list, etc.
-        && api::get_option_value::<String>("buftype", &opts)
-                .ok()
-                .map(|buftype| buftype.is_empty())
-                .unwrap_or(false)
-        // Checks that the buffer contents are UTF-8 encoded, which filters
-        // out buffers containing binary data.
-        && api::get_option_value::<String>("fileencoding", &opts)
-                .ok()
-                .map(|mut encoding| {
-                    encoding.make_ascii_lowercase();
-                    encoding == "utf-8"
-                })
-                .unwrap_or(false)
+        true
     }
 
     pub(crate) fn new(inner: NvimBuffer) -> Self {
