@@ -35,35 +35,49 @@ pub trait Action: 'static {
 }
 
 /// TODO: docs.
-pub struct FnAction<Fn, Args, Mod> {
+pub struct FnAction<Fn, Mod, Args, Ret> {
     fun: Fn,
-    args: PhantomData<Args>,
     module: PhantomData<Mod>,
+    args: PhantomData<Args>,
+    ret: PhantomData<Ret>,
 }
 
-impl<Fun, Args, Mod> FnAction<Fun, Args, Mod> {
+impl<Fun, Mod, Args, Ret> FnAction<Fun, Mod, Args, Ret> {
     pub fn new(fun: Fun) -> Self {
-        Self { fun, args: PhantomData, module: PhantomData }
+        Self { fun, args: PhantomData, module: PhantomData, ret: PhantomData }
     }
 }
 
-impl<Fun, Args, Ret, Mod> Action for FnAction<Fun, Args, Mod>
+impl<Fun, Mod, Args, Ret, Res> Action for FnAction<Fun, Mod, Args, Ret>
 where
-    Fun: FnMut(Args) -> Ret + 'static,
-    Args: 'static,
+    Fun: FnMut(Args) -> Res + 'static,
+    Res: MaybeResult<Ret>,
     Mod: Module,
+    Args: 'static,
+    Ret: 'static,
 {
     // FIXME: use `type_name()` once it's const-stable.
     const NAME: ActionName = ActionName::from_str("{closure}");
     type Args = Args;
     type Docs = ();
     type Module = Mod;
-    type Return = Fun::Output;
+    type Return = Ret;
 
     fn execute(&mut self, args: Self::Args) -> impl MaybeResult<Self::Return> {
         (self.fun)(args)
     }
     fn docs(&self) {}
+}
+
+impl<Fun: Clone, Mod, Args, Ret> Clone for FnAction<Fun, Mod, Args, Ret> {
+    fn clone(&self) -> Self {
+        Self {
+            fun: self.fun.clone(),
+            args: PhantomData,
+            module: PhantomData,
+            ret: PhantomData,
+        }
+    }
 }
 
 /// TODO: docs
