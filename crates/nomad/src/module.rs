@@ -2,10 +2,14 @@ use core::future::Future;
 
 use serde::de::DeserializeOwned;
 
-use crate::{Context, Editor, ModuleName};
+use crate::config::ConfigReceiver;
+use crate::ctx::NeovimCtx;
+use crate::maybe_result::MaybeResult;
+use crate::module_api::ModuleApi;
+use crate::ModuleName;
 
 /// TODO: docs.
-pub trait Module<E: Editor>: 'static + Sized {
+pub trait Module: 'static + From<ConfigReceiver<Self>> {
     /// TODO: docs.
     const NAME: ModuleName;
 
@@ -13,8 +17,11 @@ pub trait Module<E: Editor>: 'static + Sized {
     type Config: Default + Clone + DeserializeOwned;
 
     /// TODO: docs.
-    fn init(ctx: &Context<E>) -> (Self, E::ModuleApi);
+    fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self>;
 
     /// TODO: docs.
-    fn run(&mut self, ctx: &Context<E>) -> impl Future<Output = ()>;
+    fn run(
+        self,
+        ctx: NeovimCtx<'static>,
+    ) -> impl Future<Output = impl MaybeResult<()>>;
 }

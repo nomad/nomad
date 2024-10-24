@@ -1,0 +1,132 @@
+use crate::autocmds::{
+    BufEnter,
+    BufEnterArgs,
+    BufLeave,
+    BufLeaveArgs,
+    CursorMoved,
+    CursorMovedArgs,
+    CursorMovedI,
+};
+use crate::ctx::BufferCtx;
+use crate::maybe_result::MaybeResult;
+use crate::point::Point;
+use crate::{Action, ActorId, Event, FnAction, Shared, ShouldDetach};
+
+/// TODO: docs.
+#[derive(Clone)]
+pub struct Cursor {
+    action: CursorAction,
+    moved_by: ActorId,
+}
+
+/// TODO: docs.
+#[derive(Clone, Copy)]
+pub enum CursorAction {
+    /// The cursor has been moved into the buffer at the given point.
+    Created(Point),
+
+    /// The cursor has been moved to the given point.
+    Moved(Point),
+
+    /// The cursor has been moved away from the buffer.
+    Removed,
+}
+
+/// TODO: docs.
+pub struct CursorEvent<A> {
+    action: A,
+}
+
+impl Cursor {
+    /// TODO: docs.
+    pub fn action(&self) -> CursorAction {
+        self.action
+    }
+
+    /// TODO: docs.
+    pub fn moved_by(&self) -> ActorId {
+        self.moved_by
+    }
+}
+
+impl<A> CursorEvent<A> {
+    /// Creates a new [`CursorEvent`] with the given action.
+    pub fn new(action: A) -> Self {
+        Self { action }
+    }
+}
+
+impl<A> Event for CursorEvent<A>
+where
+    A: Action<Args = Cursor> + Clone,
+    A::Return: Into<ShouldDetach>,
+{
+    type Ctx<'a> = BufferCtx<'a>;
+
+    fn register(self, ctx: Self::Ctx<'_>) {
+        let mut action = self.action;
+        let should_detach = Shared::new(ShouldDetach::No);
+        let has_just_entered_buf = Shared::new(false);
+
+        let cursor_moved_action =
+            FnAction::<_, A::Module, _, ShouldDetach>::new({
+                let mut action = action.clone();
+                let should_detach = should_detach.clone();
+                let just_entered_buf = has_just_entered_buf.clone();
+                move |args: CursorMovedArgs| {
+                    let cursor_action = if just_entered_buf.take() {
+                        CursorAction::Created(args.moved_to)
+                    } else {
+                        CursorAction::Moved(args.moved_to)
+                    };
+                    action
+                        .execute(Cursor {
+                            action: cursor_action,
+                            moved_by: args.actor_id,
+                        })
+                        .into_result()
+                        .map(|ret| {
+                            should_detach.set(ret.into());
+                            should_detach.get()
+                        })
+                        .map_err(Into::into)
+                }
+            });
+
+        CursorMoved::new(cursor_moved_action.clone())
+            .buffer_id(ctx.buffer_id())
+            .register((&*ctx).reborrow());
+
+        CursorMovedI::new(cursor_moved_action)
+            .buffer_id(ctx.buffer_id())
+            .register((&*ctx).reborrow());
+
+        BufEnter::new(FnAction::<_, A::Module, _, _>::new({
+            let should_detach = should_detach.clone();
+            move |_: BufEnterArgs| {
+                has_just_entered_buf.set(true);
+                should_detach.get()
+            }
+        }))
+        .buffer_id(ctx.buffer_id())
+        .register((&*ctx).reborrow());
+
+        BufLeave::new(FnAction::<_, A::Module, _, ShouldDetach>::new(
+            move |args: BufLeaveArgs| {
+                action
+                    .execute(Cursor {
+                        action: CursorAction::Removed,
+                        moved_by: args.actor_id,
+                    })
+                    .into_result()
+                    .map(|ret| {
+                        should_detach.set(ret.into());
+                        should_detach.get()
+                    })
+                    .map_err(Into::into)
+            },
+        ))
+        .buffer_id(ctx.buffer_id())
+        .register((&*ctx).reborrow());
+    }
+}

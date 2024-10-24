@@ -15,7 +15,9 @@ neovim = []
 async-broadcast = "0.7"
 collab-fs = { workspace = true }
 compact_str = { workspace = true }
+flume = { version = "0.11", features = ["async"] }
 futures-util = { workspace = true }
+fxhash = "0.2"
 nohash = { workspace = true }
 nomad-macros = { path = "./macros" }
 serde = { workspace = true }

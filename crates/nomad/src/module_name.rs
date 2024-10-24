@@ -1,7 +1,11 @@
 use core::fmt;
 
+/// The output of calling [`as_str`](crate::ModuleName::as_str) on a
+/// [`ModuleName`](crate::ModuleName).
+pub(crate) type ModuleNameStr = &'static str;
+
 /// TODO: docs
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleName {
     name: &'static str,
 }
@@ -9,12 +13,12 @@ pub struct ModuleName {
 impl ModuleName {
     /// TODO: docs
     #[doc(hidden)]
-    pub const fn from_str(name: &'static str) -> Self {
+    pub const fn from_str(name: ModuleNameStr) -> Self {
         Self { name }
     }
 
     /// TODO: docs
-    pub(crate) const fn as_str(&self) -> &'static str {
+    pub(crate) const fn as_str(&self) -> ModuleNameStr {
         self.name
     }
 }
