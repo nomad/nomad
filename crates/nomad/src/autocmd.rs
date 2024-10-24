@@ -8,7 +8,7 @@ use crate::maybe_result::MaybeResult;
 use crate::{Action, ActorId, Module};
 
 /// TODO: docs.
-pub trait AutoCommand: Sized {
+pub trait AutoCommand {
     type Action: Action<
             Args: for<'a> From<(ActorId, &'a AutoCommandCtx<'a>)>,
             Return: Into<ShouldDetach>,
@@ -138,7 +138,7 @@ fn register_autocmd<A: AutoCommand>(
 
     let opts = opts::CreateAutocmdOpts::builder()
         .group(augroup_id)
-        .callback(nvim_oxi::Function::from_fn_mut(callback))
+        .callback(callback)
         .build();
 
     let _autocmd_id = api::create_autocmd([event.as_str()], &opts)
@@ -162,6 +162,12 @@ impl AutoCommandEvent {
 impl From<()> for ShouldDetach {
     fn from(_: ()) -> Self {
         Self::No
+    }
+}
+
+impl From<crate::Shared<Self>> for ShouldDetach {
+    fn from(should_detach: crate::Shared<Self>) -> Self {
+        should_detach.get()
     }
 }
 
