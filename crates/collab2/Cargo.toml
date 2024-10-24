@@ -1,0 +1,23 @@
+[package]
+name = "collab2"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+e31e = { workspace = true }
+futures-util = { workspace = true }
+nohash = { workspace = true }
+nomad = { workspace = true }
+nomad-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client"] }
+pin-project-lite = { workspace = true }
+root-finder = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+smallvec = { workspace = true }
+smol_str = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

@@ -347,6 +347,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "collab2"
+version = "0.1.0"
+dependencies = [
+ "e31e",
+ "futures-util",
+ "nohash",
+ "nomad",
+ "nomad-server",
+ "pin-project-lite",
+ "root-finder",
+ "serde",
+ "smallvec",
+ "smol_str",
+ "tracing",
+]
+
+[[package]]
 name = "compact_str"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
