@@ -6,7 +6,7 @@ use syn::{Error, LitStr};
 
 const MIN_LENGTH: usize = 2;
 
-const MAX_LENGTH: usize = 16;
+const MAX_LENGTH: usize = 64;
 
 pub fn action_name(name: LitStr) -> Result<TokenStream, Error> {
     let name_str = name.value();
@@ -27,12 +27,10 @@ pub fn action_name(name: LitStr) -> Result<TokenStream, Error> {
         if ch.is_ascii_whitespace() {
             return Err(Error::new_spanned(name, ContainsWhitespace));
         }
-
         if ch.is_ascii_digit() {
             return Err(Error::new_spanned(name, ContainsDigit));
         }
-
-        if !(ch.is_ascii_lowercase() || ch.is_ascii_digit()) {
+        if !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
             return Err(Error::new_spanned(name, ContainsOther));
         }
     }
@@ -54,7 +52,8 @@ impl Display for ContainsOther {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
-            "action name can only contain lowercase ASCII letters and digits"
+            "action name can only contain lowercase ASCII letters, digits \
+             and dashes"
         )
     }
 }
