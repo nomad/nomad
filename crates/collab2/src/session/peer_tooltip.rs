@@ -37,6 +37,9 @@ impl PeerTooltip {
             ctx.buffer_id(),
             "relocating tooltip in wrong buffer"
         );
+        if self.at_offset == new_offset {
+            return;
+        }
         todo!();
     }
 

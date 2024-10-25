@@ -24,7 +24,6 @@ use nomad::{
 
 use super::PeerTooltip;
 
-#[derive(Clone)]
 pub(super) struct SessionCtx {
     /// The [`ActorId`] of the [`Session`].
     pub(super) actor_id: ActorId,
@@ -37,8 +36,8 @@ pub(super) struct SessionCtx {
     pub(super) local_cursor_id: Option<CursorId>,
 
     /// Map from [`PeerId`] to the [`PeerTooltip`] displayed in the editor for
-    /// that peer, if any.
-    pub(super) remote_tooltips: FxHashMap<CursorId, Option<PeerTooltip>>,
+    /// that peer.
+    pub(super) remote_tooltips: FxHashMap<CursorId, PeerTooltip>,
 
     /// An instance of the [`NeovimCtx`].
     pub(super) neovim_ctx: NeovimCtx<'static>,
@@ -97,16 +96,15 @@ impl SessionCtx {
         else {
             return;
         };
-        let Some(buffer) = self.buffer_of_file_id(cursor.file().id()) else {
+        let cursor_id = cursor.id();
+        let cursor_offset = cursor.byte_offset().into();
+        let file_id = cursor.file().id();
+        let Some(buffer) = self.buffer_of_file_id(file_id) else {
             return;
         };
-        let remote_peer = String::from("TODO: get peer");
-        let peer_tooltip = PeerTooltip::create(
-            remote_peer,
-            cursor.byte_offset().into(),
-            buffer,
-        );
-        self.remote_tooltips.insert(cursor.id(), Some(peer_tooltip));
+        let peer = String::from("TODO: get peer");
+        let peer_tooltip = PeerTooltip::create(peer, cursor_offset, buffer);
+        self.remote_tooltips.insert(cursor_id, peer_tooltip);
     }
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
