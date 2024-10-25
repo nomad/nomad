@@ -17,6 +17,8 @@ impl DetachBufferActions {
                 session_ctx.buffer_actions.get(&buffer_id)
             {
                 should_detach.set(ShouldDetach::Yes);
+
+                todo!("remove tooltips for cursors in this buffer");
             }
         });
     }

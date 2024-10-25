@@ -76,6 +76,8 @@ impl RegisterBufferActions {
                 should_detach: should_detach.clone(),
             })
             .register((&**text_buffer_ctx).reborrow());
+
+            todo!("display tooltips for cursors in this buffer");
         });
     }
 }

@@ -36,7 +36,7 @@ impl Action for SyncCursor {
                 );
             };
 
-            let message = match cursor.action {
+            Some(match cursor.action {
                 CursorAction::Created(byte_offset) => {
                     file.sync_created_cursor(byte_offset);
                     todo!();
@@ -55,9 +55,7 @@ impl Action for SyncCursor {
                         .sync_removed();
                     todo!();
                 },
-            };
-
-            Some(message)
+            })
         });
 
         if let Some(message) = message {
