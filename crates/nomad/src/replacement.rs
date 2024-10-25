@@ -74,3 +74,24 @@ impl Replacement {
         Self { deleted_range, inserted_text }
     }
 }
+
+impl From<e31e::Hunk> for Replacement {
+    fn from(hunk: e31e::Hunk) -> Self {
+        let deleted_start = hunk.removed_range.start.into();
+        let deleted_end = hunk.removed_range.start.into();
+        let mut inserted_text = Text::new();
+        inserted_text.push_str(hunk.inserted_text.as_str());
+        Self { deleted_range: deleted_start..deleted_end, inserted_text }
+    }
+}
+
+impl From<Replacement> for e31e::Hunk {
+    fn from(replacement: Replacement) -> Self {
+        let removed_start = replacement.deleted_range.start.into_u64();
+        let removed_end = replacement.deleted_range.end.into_u64();
+        Self {
+            removed_range: removed_start..removed_end,
+            inserted_text: e31e::Text::new(replacement.inserted_text),
+        }
+    }
+}

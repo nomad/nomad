@@ -27,3 +27,9 @@ impl Text {
         self.inner.push_str(s);
     }
 }
+
+impl AsRef<str> for Text {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
