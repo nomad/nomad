@@ -12,11 +12,9 @@ publish = false
 
 [workspace.dependencies]
 async-net = "2"
-cola = "0.4"
-collab-fs = { git = "ssh://git@github.com/nomad/collab.git", package = "collab-fs" }
 compact_str = "0.8"
-crop = "0.4"
 e31e = { git = "ssh://git@github.com/nomad/e31e.git" }
+flume = { version = "0.11", features = ["async"] }
 futures = "0.3"
 futures-util = "0.3"
 nohash = "0.2"
@@ -31,6 +29,7 @@ thiserror = "1.0"
 tracing = "0.1"
 
 clipboard = { path = "./crates/clipboard" }
+collab = { path = "./crates/collab2" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 
@@ -69,5 +68,5 @@ crate-type = ["cdylib"]
 neovim-nightly = ["nomad/neovim-nightly"]
 
 [dependencies]
-collab = { path = "./crates/collab" }
+collab = { workspace = true }
 nomad = { workspace = true }

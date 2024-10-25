@@ -272,10 +272,8 @@ dependencies = [
 name = "collab"
 version = "0.1.0"
 dependencies = [
- "collab-fs",
- "collab-messaging",
- "collab-project",
- "collab-server",
+ "e31e",
+ "flume",
  "futures-util",
  "nohash",
  "nomad",
@@ -318,6 +316,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "collab-old"
+version = "0.1.0"
+dependencies = [
+ "collab-fs",
+ "collab-messaging",
+ "collab-project",
+ "collab-server",
+ "futures-util",
+ "nohash",
+ "nomad",
+ "nomad-server",
+ "pin-project-lite",
+ "root-finder",
+ "serde",
+ "smallvec",
+ "smol_str",
+ "tracing",
+]
+
+[[package]]
 name = "collab-project"
 version = "0.0.8"
 source = "git+ssh://git@github.com/nomad/collab.git#68ecf61504d6ae5d8684824f90b827ccafdb7f19"
@@ -344,23 +362,6 @@ dependencies = [
  "nohash",
  "pin-project-lite",
  "serde",
-]
-
-[[package]]
-name = "collab2"
-version = "0.1.0"
-dependencies = [
- "e31e",
- "futures-util",
- "nohash",
- "nomad",
- "nomad-server",
- "pin-project-lite",
- "root-finder",
- "serde",
- "smallvec",
- "smol_str",
- "tracing",
 ]
 
 [[package]]
@@ -756,7 +757,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -1147,7 +1148,7 @@ dependencies = [
 name = "root-finder"
 version = "0.1.0"
 dependencies = [
- "collab-fs",
+ "e31e",
  "futures-util",
 ]
 
