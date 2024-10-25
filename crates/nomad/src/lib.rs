@@ -53,7 +53,7 @@ pub use module::Module;
 pub use module_api::ModuleApi;
 pub use module_name::ModuleName;
 pub use nomad::Nomad;
-pub use nomad_macros::module_name;
+pub use nomad_macros::{action_name, module_name};
 pub use replacement::Replacement;
 pub use shared::Shared;
 pub use spawner::{JoinHandle, Spawner};
