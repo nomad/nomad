@@ -17,6 +17,11 @@ impl BufferId {
         Self::new(NvimBuffer::current())
     }
 
+    /// Returns the [`BufferId`] of the buffer with the given name.
+    pub fn of_name<T: AsRef<str>>(_name: T) -> Option<Self> {
+        todo!();
+    }
+
     /// Returns an iterator of the [`BufferId`]s of all the currently opened
     /// buffers.
     pub fn opened() -> impl ExactSizeIterator<Item = Self> {

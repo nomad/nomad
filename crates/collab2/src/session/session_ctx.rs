@@ -3,7 +3,7 @@ use core::ops::Deref;
 use e31e::fs::AbsPathBuf;
 use e31e::{CursorCreation, CursorId, CursorRefMut, Edit, FileId, FileRef};
 use nohash::IntMap as NoHashMap;
-use nomad::ctx::NeovimCtx;
+use nomad::ctx::{BufferCtx, NeovimCtx};
 use nomad::{
     ActorId,
     BufferId,
@@ -73,8 +73,34 @@ impl SessionCtx {
         }
     }
 
+    pub(super) fn integrate_cursor_creation(
+        &mut self,
+        cursor_creation: CursorCreation,
+    ) {
+        let Some(cursor) =
+            self.replica.integrate_cursor_creation(cursor_creation)
+        else {
+            return;
+        };
+        let Some(buffer) = self.buffer_of_file_id(cursor.file().id()) else {
+            return;
+        };
+
+        todo!();
+    }
+
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
         self.local_cursor_id.and_then(|id| self.replica.cursor_mut(id))
+    }
+
+    /// Returns the [`BufferCtx`] of the buffer displaying the file with the
+    /// given [`FileId`], if any.
+    fn buffer_of_file_id(&self, file_id: FileId) -> Option<BufferCtx<'_>> {
+        let file = self.replica.file(file_id)?;
+        let file_path_in_project = file.path();
+        let file_path = (&*self.project_root).concat(&file_path_in_project);
+        let buffer_id = BufferId::of_name(&*file_path)?;
+        self.neovim_ctx.reborrow().into_buffer(buffer_id)
     }
 }
 
