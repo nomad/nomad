@@ -18,7 +18,7 @@ pub(super) struct SessionCtx {
     /// The [`ActorId`] of the [`Session`].
     pub(super) actor_id: ActorId,
 
-    /// Map from [`BufferId`]
+    /// Map from [`BufferId`]..
     pub(super) buffer_actions: NoHashMap<BufferId, Shared<ShouldDetach>>,
 
     /// The [`CursorId`] of the cursor owned by the local peer, or `None` if

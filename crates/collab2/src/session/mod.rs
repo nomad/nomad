@@ -1,4 +1,5 @@
 mod detach_buffer_actions;
+mod peer_tooltip;
 mod register_buffer_actions;
 mod session_ctx;
 mod sync_cursor;
