@@ -82,6 +82,9 @@ impl RegisterBufferActions {
                 .replica
                 .cursors()
                 .filter_map(|cursor| {
+                    if cursor.owner() == session_ctx.replica.id() {
+                        return None;
+                    }
                     let file_id = cursor.file().id();
                     let buffer_ctx = session_ctx.buffer_of_file_id(file_id)?;
                     if buffer_ctx.buffer_id() != buffer_id {
