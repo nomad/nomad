@@ -12,6 +12,7 @@ use e31e::{
     FileRef,
     Hunks,
     PeerId,
+    SelectionCreation,
     SelectionId,
 };
 use fxhash::FxHashMap;
@@ -217,6 +218,28 @@ impl SessionCtx {
             peer_selection.relocate(selection_range);
         }
         None
+    }
+
+    pub(super) fn integrate_selection_creation(
+        &mut self,
+        selection_creation: SelectionCreation,
+    ) {
+        let Some(selection) =
+            self.replica.integrate_selection_creation(selection_creation)
+        else {
+            return;
+        };
+        let selection_id = selection.id();
+        let selection_range = {
+            let r = selection.byte_range();
+            r.start.into()..r.end.into()
+        };
+        let file_id = selection.file().id();
+        let Some(buffer) = self.buffer_of_file_id(file_id) else {
+            return;
+        };
+        let peer_selection = PeerSelection::create(selection_range, buffer);
+        self.remote_selections.insert(selection_id, peer_selection);
     }
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {

@@ -123,11 +123,12 @@ impl RegisterBufferActions {
                     if buffer_ctx.buffer_id() != buffer_id {
                         return None;
                     }
-                    let byte_range = selection.byte_range();
-                    let peer_selection = PeerSelection::create(
-                        byte_range.start.into()..byte_range.end.into(),
-                        buffer_ctx,
-                    );
+                    let selection_range = {
+                        let r = selection.byte_range();
+                        r.start.into()..r.end.into()
+                    };
+                    let peer_selection =
+                        PeerSelection::create(selection_range, buffer_ctx);
                     Some((selection.id(), peer_selection))
                 })
                 .collect::<SmallVec<[_; 4]>>();
