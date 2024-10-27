@@ -47,6 +47,7 @@ pub use buffer_id::BufferId;
 pub use byte_offset::ByteOffset;
 pub use command::Command;
 pub use command_args::CommandArgs;
+pub use decoration_provider::Selection;
 pub use event::Event;
 pub use function::Function;
 pub use module::Module;

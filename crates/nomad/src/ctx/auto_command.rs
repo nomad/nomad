@@ -1,5 +1,3 @@
-use core::ops::Deref;
-
 use nvim_oxi::api::types;
 
 use crate::actor_map::ActorMap;

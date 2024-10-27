@@ -5,6 +5,8 @@ use nvim_oxi::api;
 use crate::buffer_id::BufferId;
 use crate::byte_offset::ByteOffset;
 use crate::ctx::{FileCtx, NeovimCtx, TextBufferCtx};
+use crate::decoration_provider::Selection;
+use crate::diagnostics::HighlightGroup;
 use crate::point::Point;
 
 /// TODO: docs.
@@ -31,6 +33,21 @@ impl<'ctx> BufferCtx<'ctx> {
             .expect("couldn't get line offset")
             .into();
         line_offset + point.byte_offset
+    }
+
+    /// TODO: docs.
+    pub fn create_selection(
+        &self,
+        byte_range: Range<ByteOffset>,
+        hl_group: HighlightGroup,
+    ) -> Selection {
+        self.with_decoration_provider(|decoration_provider| {
+            decoration_provider.create_selection(
+                self.buffer_id(),
+                byte_range,
+                hl_group,
+            )
+        })
     }
 
     /// Consumes `self`, returning a [`FileCtx`] if the buffer is saved on

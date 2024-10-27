@@ -1,3 +1,4 @@
+use core::fmt;
 use core::ops::Range;
 
 use nohash::IntMap as NoHashMap;
@@ -23,14 +24,43 @@ pub(crate) struct NamespaceId(u32);
 struct SelectionInfos {
     range: Range<ByteOffset>,
     highlight_group: HighlightGroup,
-    extmark_id: ExtmarkId,
+    extmark_id: Option<ExtmarkId>,
     was_dropped: bool,
 }
 
 #[derive(Debug, Copy, Clone)]
 struct ExtmarkId(u32);
 
+impl Selection {
+    /// TODO: docs.
+    pub fn set_byte_range(&self, byte_range: Range<ByteOffset>) {
+        self.infos.with_mut(|infos| infos.range = byte_range);
+    }
+
+    /// TODO: docs.
+    pub fn set_highlight_group(&self, highlight_group: HighlightGroup) {
+        self.infos.with_mut(|infos| infos.highlight_group = highlight_group);
+    }
+}
+
 impl DecorationProvider {
+    pub(crate) fn create_selection(
+        &mut self,
+        buffer_id: BufferId,
+        byte_range: Range<ByteOffset>,
+        highlight_group: HighlightGroup,
+    ) -> Selection {
+        let infos = Shared::new(SelectionInfos {
+            range: byte_range,
+            highlight_group,
+            extmark_id: None,
+            was_dropped: false,
+        });
+        let selections = self.selections.entry(buffer_id).or_default();
+        selections.push(infos.clone());
+        Selection { infos }
+    }
+
     pub(crate) fn new(ctx: NeovimCtx<'static>) -> Self {
         let opts = opts::DecorationProviderOpts::builder()
             .on_start({
@@ -87,22 +117,27 @@ impl DecorationProvider {
                 }
                 let point_range =
                     buffer_ctx.point_range_of_byte_range(&infos.range);
-                let opts = opts::SetExtmarkOpts::builder()
-                    .id(infos.extmark_id.into_u32())
+                let mut builder = opts::SetExtmarkOpts::builder();
+                builder
                     .end_row(point_range.end.line_idx)
                     .end_col(point_range.end.byte_offset.into())
                     .hl_group(infos.highlight_group.as_str())
-                    .ephemeral(true)
-                    .build();
-                buffer_id
+                    .ephemeral(true);
+                if let Some(extmark_id) = infos.extmark_id {
+                    builder.id(extmark_id.into_u32());
+                }
+                let extmark_id = buffer_id
                     .as_nvim()
                     .set_extmark(
                         self.namespace_id.into_u32(),
                         point_range.start.line_idx,
                         point_range.start.byte_offset.into(),
-                        &opts,
+                        &builder.build(),
                     )
                     .expect("all arguments are valid");
+                // If the extmark was already set we'll just get back the same
+                // id.
+                infos.extmark_id = Some(ExtmarkId(extmark_id));
                 false
             });
             if was_dropped {
@@ -127,5 +162,25 @@ impl NamespaceId {
 impl ExtmarkId {
     fn into_u32(self) -> u32 {
         self.0
+    }
+}
+
+impl fmt::Debug for Selection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.infos.with(|infos| {
+            write!(
+                f,
+                "Selection({start}..{end}@{hl_group})",
+                start = infos.range.start.into_u64(),
+                end = infos.range.end.into_u64(),
+                hl_group = infos.highlight_group.as_str(),
+            )
+        })
+    }
+}
+
+impl Drop for Selection {
+    fn drop(&mut self) {
+        self.infos.with_mut(|infos| infos.was_dropped = true);
     }
 }

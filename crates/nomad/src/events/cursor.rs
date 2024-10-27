@@ -9,7 +9,6 @@ use crate::autocmds::{
 };
 use crate::ctx::BufferCtx;
 use crate::maybe_result::MaybeResult;
-use crate::point::Point;
 use crate::{
     Action,
     ActorId,
