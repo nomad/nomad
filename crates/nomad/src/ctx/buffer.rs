@@ -126,13 +126,11 @@ impl<'ctx> BufferCtx<'ctx> {
             },
             Bound::Unbounded => Point::zero(),
         };
-
         let end = match byte_range.end_bound() {
             Bound::Excluded(&end) => self.point_of_byte_offset(end),
             Bound::Included(&end) => self.point_of_byte_offset(end + 1),
             Bound::Unbounded => self.point_of_eof(),
         };
-
         start..end
     }
 

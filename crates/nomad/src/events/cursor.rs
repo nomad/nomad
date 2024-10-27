@@ -63,6 +63,7 @@ where
 {
     type Ctx<'a> = BufferCtx<'a>;
 
+    #[allow(clippy::too_many_lines)]
     fn register(self, ctx: Self::Ctx<'_>) {
         let mut action = self.action;
         let buffer_id = ctx.buffer_id();
@@ -97,11 +98,11 @@ where
 
         CursorMoved::new(cursor_moved_action.clone())
             .buffer_id(buffer_id)
-            .register((&*ctx).reborrow());
+            .register((*ctx).reborrow());
 
         CursorMovedI::new(cursor_moved_action)
             .buffer_id(buffer_id)
-            .register((&*ctx).reborrow());
+            .register((*ctx).reborrow());
 
         BufEnter::new(FnAction::<_, A::Module, _, _>::new({
             let should_detach = should_detach.clone();
@@ -111,7 +112,7 @@ where
             }
         }))
         .buffer_id(buffer_id)
-        .register((&*ctx).reborrow());
+        .register((*ctx).reborrow());
 
         BufLeave::new(FnAction::<_, A::Module, _, ShouldDetach>::new(
             move |args: BufLeaveArgs| {
@@ -130,6 +131,6 @@ where
             },
         ))
         .buffer_id(buffer_id)
-        .register((&*ctx).reborrow());
+        .register((*ctx).reborrow());
     }
 }
