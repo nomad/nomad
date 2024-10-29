@@ -18,7 +18,7 @@ impl ModuleName {
     }
 
     /// TODO: docs
-    pub(crate) const fn as_str(&self) -> ModuleNameStr {
+    pub const fn as_str(&self) -> ModuleNameStr {
         self.name
     }
 }

@@ -19,8 +19,12 @@ pub(super) fn emit(
     api::echo(chunks, true, &opts).expect("all parameters are valid");
 }
 
-pub(super) enum Level {
+/// TODO: docs.
+pub enum Level {
+    /// TODO: docs.
     Warning,
+
+    /// TODO: docs.
     Error,
 }
 
@@ -33,17 +37,20 @@ impl From<Level> for HighlightGroup {
     }
 }
 
+/// TODO: docs.
 #[derive(Default)]
-pub(crate) struct DiagnosticSource {
+pub struct DiagnosticSource {
     segments: Vec<SmolStr>,
 }
 
 impl DiagnosticSource {
-    pub(super) fn new() -> Self {
+    /// TODO: docs.
+    pub fn new() -> Self {
         Self { segments: Vec::new() }
     }
 
-    pub(super) fn push_segment(&mut self, segment: &str) -> &mut Self {
+    /// TODO: docs.
+    pub fn push_segment(&mut self, segment: &str) -> &mut Self {
         self.segments.push(SmolStr::new(segment));
         self
     }
@@ -72,13 +79,28 @@ pub struct DiagnosticMessage {
 }
 
 impl DiagnosticMessage {
+    /// TODO: docs.
+    pub fn emit(self, level: Level, source: DiagnosticSource) {
+        emit(level, source, self);
+    }
+
     /// Creates a new, empty [`DiagnosticMessage`].
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub(super) fn emit(self, level: Level, source: DiagnosticSource) {
-        emit(level, source, self);
+    /// TODO: docs.
+    pub fn push_str<T: AsRef<str>>(&mut self, s: T) -> &mut Self {
+        self.push_chunk(s.as_ref(), None)
+    }
+
+    /// TODO: docs.
+    pub fn push_str_highlighted<T: AsRef<str>>(
+        &mut self,
+        s: T,
+        hl: HighlightGroup,
+    ) -> &mut Self {
+        self.push_chunk(s.as_ref(), Some(hl))
     }
 
     pub(super) fn push_dot_separated<T, I>(
@@ -105,18 +127,6 @@ impl DiagnosticMessage {
         I::IntoIter: ExactSizeIterator,
     {
         self.push_separated(iter, hl, ", ")
-    }
-
-    pub(super) fn push_str<T: AsRef<str>>(&mut self, s: T) -> &mut Self {
-        self.push_chunk(s.as_ref(), None)
-    }
-
-    pub(super) fn push_str_highlighted<T: AsRef<str>>(
-        &mut self,
-        s: T,
-        hl: HighlightGroup,
-    ) -> &mut Self {
-        self.push_chunk(s.as_ref(), Some(hl))
     }
 
     fn push_chunk(
