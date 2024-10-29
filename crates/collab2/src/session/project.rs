@@ -1,5 +1,4 @@
-use core::ops::Deref;
-
+use collab_server::message::Peer;
 use e31e::fs::AbsPathBuf;
 use e31e::{
     CursorCreation,
@@ -21,14 +20,7 @@ use e31e::{
 use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
 use nomad::ctx::{BufferCtx, NeovimCtx};
-use nomad::{
-    ActorId,
-    BufferId,
-    ByteOffset,
-    Replacement,
-    Shared,
-    ShouldDetach,
-};
+use nomad::{ActorId, BufferId, Replacement, Shared, ShouldDetach};
 
 use super::{PeerSelection, PeerTooltip};
 
@@ -48,6 +40,11 @@ pub(super) struct Project {
 
     /// The absolute path to the root of the project.
     pub(super) project_root: AbsPathBuf,
+
+    /// Map from [`PeerId`] to the corresponding remote [`Peer`].
+    ///
+    /// It doesn't include the local peer.
+    pub(super) remote_peers: NoHashMap<PeerId, Peer>,
 
     /// Map from the [`SelectionId`] of a selection owned by a remote peer to
     /// the corresponding [`PeerTooltip`] displayed in the editor, if any.
@@ -71,7 +68,7 @@ impl Project {
     ) -> Option<BufferCtx<'_>> {
         let file = self.replica.file(file_id)?;
         let file_path_in_project = file.path();
-        let file_path = (&*self.project_root).concat(&file_path_in_project);
+        let file_path = (*self.project_root).concat(&file_path_in_project);
         let buffer_id = BufferId::of_name(&*file_path)?;
         self.neovim_ctx.reborrow().into_buffer(buffer_id)
     }
@@ -179,7 +176,7 @@ impl Project {
                 .file(file_id)
                 .expect("we just had a FileRef")
                 .path();
-            let file_path = (&*self.project_root)
+            let file_path = (*self.project_root)
                 .concat(&file_path_in_project)
                 .into_owned();
             return Some((file_path, hunks));
