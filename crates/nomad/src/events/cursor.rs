@@ -7,7 +7,7 @@ use crate::autocmds::{
     CursorMovedArgs,
     CursorMovedI,
 };
-use crate::ctx::BufferCtx;
+use crate::ctx::{BufferCtx, NeovimCtx};
 use crate::maybe_result::MaybeResult;
 use crate::{
     Action,
@@ -75,18 +75,21 @@ where
                 let mut action = action.clone();
                 let should_detach = should_detach.clone();
                 let just_entered_buf = has_just_entered_buf.clone();
-                move |args: CursorMovedArgs| {
+                move |args: CursorMovedArgs, ctx: NeovimCtx<'static>| {
                     let cursor_action = if just_entered_buf.take() {
                         CursorAction::Created(args.moved_to)
                     } else {
                         CursorAction::Moved(args.moved_to)
                     };
                     action
-                        .execute(Cursor {
-                            action: cursor_action,
-                            buffer_id,
-                            moved_by: args.actor_id,
-                        })
+                        .execute(
+                            Cursor {
+                                action: cursor_action,
+                                buffer_id,
+                                moved_by: args.actor_id,
+                            },
+                            ctx.clone(),
+                        )
                         .into_result()
                         .map(|ret| {
                             should_detach.set(ret.into());
@@ -106,7 +109,7 @@ where
 
         BufEnter::new(FnAction::<_, A::Module, _, _>::new({
             let should_detach = should_detach.clone();
-            move |_: BufEnterArgs| {
+            move |_: BufEnterArgs, _: NeovimCtx<'static>| {
                 has_just_entered_buf.set(true);
                 should_detach.get()
             }
@@ -114,22 +117,25 @@ where
         .buffer_id(buffer_id)
         .register((*ctx).reborrow());
 
-        BufLeave::new(FnAction::<_, A::Module, _, ShouldDetach>::new(
-            move |args: BufLeaveArgs| {
+        BufLeave::new(FnAction::<_, A::Module, _, ShouldDetach>::new({
+            move |args: BufLeaveArgs, ctx: NeovimCtx<'static>| {
                 action
-                    .execute(Cursor {
-                        action: CursorAction::Removed,
-                        buffer_id,
-                        moved_by: args.actor_id,
-                    })
+                    .execute(
+                        Cursor {
+                            action: CursorAction::Removed,
+                            buffer_id,
+                            moved_by: args.actor_id,
+                        },
+                        ctx.clone(),
+                    )
                     .into_result()
                     .map(|ret| {
                         should_detach.set(ret.into());
                         should_detach.get()
                     })
                     .map_err(Into::into)
-            },
-        ))
+            }
+        }))
         .buffer_id(buffer_id)
         .register((*ctx).reborrow());
     }

@@ -1,3 +1,5 @@
+use core::ops::Deref;
+
 use nvim_oxi::api::types;
 
 use crate::actor_map::ActorMap;
@@ -47,5 +49,13 @@ impl<'ctx> AutoCommandCtx<'ctx> {
         neovim_ctx: NeovimCtx<'ctx>,
     ) -> Self {
         Self { args, event, neovim_ctx }
+    }
+}
+
+impl<'ctx> Deref for AutoCommandCtx<'ctx> {
+    type Target = NeovimCtx<'ctx>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.neovim_ctx
     }
 }

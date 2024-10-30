@@ -1,6 +1,7 @@
 use fxhash::FxHashMap;
 
 use crate::action_name::ActionNameStr;
+use crate::ctx::NeovimCtx;
 use crate::{Command, CommandArgs, Module, ModuleName};
 
 pub(super) struct ModuleCommands {
@@ -12,6 +13,8 @@ pub(super) struct ModuleCommands {
 
     /// Map from command name to the corresponding [`Command`].
     pub(super) commands: FxHashMap<ActionNameStr, Box<dyn FnMut(CommandArgs)>>,
+
+    pub(super) neovim_ctx: NeovimCtx<'static>,
 }
 
 impl ModuleCommands {
@@ -33,8 +36,12 @@ impl ModuleCommands {
                 self.module_name
             );
         }
-        self.commands
-            .insert(T::NAME.as_str(), Box::new(command.into_callback()));
+        let mut callback = command.into_callback();
+        let ctx = self.neovim_ctx.clone();
+        self.commands.insert(
+            T::NAME.as_str(),
+            Box::new(move |args| callback(args, ctx.clone())),
+        );
     }
 
     #[track_caller]
@@ -47,15 +54,16 @@ impl ModuleCommands {
                 self.module_name
             );
         }
-
         if self.default_command.is_some() {
             panic!(
                 "a default command has already been set for module '{}'",
                 self.module_name
             );
         }
-
-        self.default_command = Some(Box::new(command.into_callback()));
+        let mut callback = command.into_callback();
+        let ctx = self.neovim_ctx.clone();
+        self.default_command =
+            Some(Box::new(move |args| callback(args, ctx.clone())));
     }
 
     pub(crate) fn default_command(
@@ -77,11 +85,12 @@ impl ModuleCommands {
         self.commands.keys().copied()
     }
 
-    pub(crate) fn new<M: Module>() -> Self {
+    pub(crate) fn new<M: Module>(neovim_ctx: NeovimCtx<'static>) -> Self {
         Self {
             module_name: M::NAME,
             default_command: None,
             commands: FxHashMap::default(),
+            neovim_ctx,
         }
     }
 }

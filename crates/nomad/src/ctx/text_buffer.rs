@@ -19,7 +19,7 @@ impl<'ctx> TextBufferCtx<'ctx> {
     /// TODO: docs.
     pub fn attach<A>(&self, action: A)
     where
-        A: Action,
+        A: Action<BufferCtx<'static>>,
         A::Args: From<BufAttachArgs>,
         A::Return: Into<ShouldDetach>,
     {

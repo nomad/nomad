@@ -41,7 +41,7 @@ pub trait AutoCommand: Sized {
                 }
             }
             let args = (actor_id, ctx).into();
-            match action.execute(args).into_result() {
+            match action.execute(args, (*ctx).to_static()).into_result() {
                 Ok(res) => res.into(),
                 Err(err) => {
                     let mut source = DiagnosticSource::new();

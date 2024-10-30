@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use collab_server::message::Message;
 use nomad::autocmds::BufAddArgs;
 use nomad::buf_attach::BufAttach;
+use nomad::ctx::NeovimCtx;
 use nomad::events::CursorEvent;
 use nomad::{
     action_name,
@@ -145,7 +146,7 @@ impl Action for RegisterBufferActions {
     type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, args: Self::Args) {
+    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'static>) {
         self.register_actions(args.buffer_id);
     }
 

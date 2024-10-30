@@ -17,8 +17,8 @@ impl Module for Collab {
     type Config = ();
 
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
-        let join = Join::new();
-        let start = Start::new();
+        let join = Join::new(self.session_status.clone());
+        let start = Start::new(self.session_status.clone());
 
         ModuleApi::new(ctx.to_static())
             .command(join.clone())

@@ -1,14 +1,17 @@
 use nomad::ctx::NeovimCtx;
-use nomad::{action_name, Action, ActionName};
+use nomad::{action_name, Action, ActionName, Shared};
 
+use crate::session_status::SessionStatus;
 use crate::Collab;
 
 #[derive(Clone)]
-pub(crate) struct Join {}
+pub(crate) struct Join {
+    session_status: Shared<SessionStatus>,
+}
 
 impl Join {
-    pub(crate) fn new() -> Self {
-        Self {}
+    pub(crate) fn new(session_status: Shared<SessionStatus>) -> Self {
+        Self { session_status }
     }
 }
 
@@ -19,7 +22,7 @@ impl Action for Join {
     type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, _args: Self::Args) {
+    fn execute(&mut self, _args: Self::Args, ctx: NeovimCtx<'static>) {
         todo!()
     }
 

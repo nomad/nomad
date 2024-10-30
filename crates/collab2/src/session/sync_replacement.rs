@@ -2,7 +2,8 @@ use core::any::type_name;
 
 use collab_server::message::Message;
 use nomad::buf_attach::BufAttachArgs;
-use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
+use nomad::ctx::BufferCtx;
+use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
 
 use super::Project;
 use crate::Collab;
@@ -13,14 +14,18 @@ pub(super) struct SyncReplacement {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl Action for SyncReplacement {
+impl Action<BufferCtx<'static>> for SyncReplacement {
     const NAME: ActionName = action_name!("synchronize-replacement");
     type Args = BufAttachArgs;
     type Docs = ();
     type Module = Collab;
     type Return = ShouldDetach;
 
-    fn execute(&mut self, args: Self::Args) -> Self::Return {
+    fn execute(
+        &mut self,
+        args: Self::Args,
+        _: BufferCtx<'static>,
+    ) -> Self::Return {
         let message = self.project.with_mut(|project| {
             if args.actor_id == project.actor_id {
                 return None;
@@ -40,7 +45,7 @@ impl Action for SyncReplacement {
             project.refresh_cursors(file_id);
             project.refresh_selections(file_id);
 
-            todo!();
+            Some(Message::EditedBuffer(edit))
         });
 
         if let Some(message) = message {

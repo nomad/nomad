@@ -1,5 +1,6 @@
 use collab_server::message::Message;
 use nomad::autocmds::BufUnloadArgs;
+use nomad::ctx::NeovimCtx;
 use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
 
 use super::Project;
@@ -34,7 +35,7 @@ impl Action for DetachBufferActions {
     type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, args: Self::Args) {
+    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'static>) {
         self.detach_actions(args.buffer_id);
     }
 

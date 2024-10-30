@@ -1,11 +1,12 @@
 use core::marker::PhantomData;
 
 use crate::action_name::ActionName;
+use crate::ctx::NeovimCtx;
 use crate::maybe_result::MaybeResult;
 use crate::Module;
 
 /// TODO: docs
-pub trait Action: 'static {
+pub trait Action<Ctx = NeovimCtx<'static>>: 'static {
     /// TODO: docs
     const NAME: ActionName;
 
@@ -25,7 +26,11 @@ pub trait Action: 'static {
     type Return;
 
     /// TODO: docs
-    fn execute(&mut self, args: Self::Args) -> impl MaybeResult<Self::Return>;
+    fn execute(
+        &mut self,
+        args: Self::Args,
+        ctx: Ctx,
+    ) -> impl MaybeResult<Self::Return>;
 
     /// TODO: docs
     fn docs(&self) -> Self::Docs;
@@ -48,7 +53,7 @@ impl<Fun, Mod, Args, Ret> FnAction<Fun, Mod, Args, Ret> {
 
 impl<Fun, Mod, Args, Ret, Res> Action for FnAction<Fun, Mod, Args, Ret>
 where
-    Fun: FnMut(Args) -> Res + 'static,
+    Fun: FnMut(Args, NeovimCtx<'static>) -> Res + 'static,
     Res: MaybeResult<Ret>,
     Mod: Module,
     Args: 'static,
@@ -61,8 +66,12 @@ where
     type Module = Mod;
     type Return = Ret;
 
-    fn execute(&mut self, args: Self::Args) -> impl MaybeResult<Self::Return> {
-        (self.fun)(args)
+    fn execute(
+        &mut self,
+        args: Self::Args,
+        ctx: NeovimCtx<'static>,
+    ) -> impl MaybeResult<Self::Return> {
+        (self.fun)(args, ctx)
     }
     fn docs(&self) {}
 }

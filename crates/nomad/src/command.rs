@@ -1,4 +1,5 @@
 use crate::command_args::CommandArgs;
+use crate::ctx::NeovimCtx;
 use crate::diagnostics::{DiagnosticMessage, DiagnosticSource, Level};
 use crate::maybe_result::MaybeResult;
 use crate::{Action, Module};
@@ -15,7 +16,9 @@ pub trait Command:
 >
 {
     /// TODO: docs.
-    fn into_callback(self) -> impl FnMut(CommandArgs) + 'static;
+    fn into_callback(
+        self,
+    ) -> impl FnMut(CommandArgs, NeovimCtx<'static>) + 'static;
 }
 
 impl<T> Command for T
@@ -29,8 +32,10 @@ where
         Return = (),
     >,
 {
-    fn into_callback(mut self) -> impl FnMut(CommandArgs) + 'static {
-        Box::new(move |mut args| {
+    fn into_callback(
+        mut self,
+    ) -> impl FnMut(CommandArgs, NeovimCtx<'static>) + 'static {
+        Box::new(move |mut args, ctx| {
             let args = match T::Args::try_from(&mut args) {
                 Ok(args) => args,
                 Err(err) => {
@@ -42,7 +47,7 @@ where
                     return;
                 },
             };
-            if let Err(err) = self.execute(args).into_result() {
+            if let Err(err) = self.execute(args, ctx).into_result() {
                 let mut source = DiagnosticSource::new();
                 source
                     .push_segment(T::Module::NAME.as_str())

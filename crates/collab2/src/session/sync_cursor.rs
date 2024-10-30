@@ -1,6 +1,7 @@
 use core::any::type_name;
 
 use collab_server::message::Message;
+use nomad::ctx::NeovimCtx;
 use nomad::events::{Cursor, CursorAction};
 use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
 
@@ -21,7 +22,11 @@ impl Action for SyncCursor {
     type Module = Collab;
     type Return = ShouldDetach;
 
-    fn execute(&mut self, cursor: Self::Args) -> Self::Return {
+    fn execute(
+        &mut self,
+        cursor: Self::Args,
+        _: NeovimCtx<'static>,
+    ) -> Self::Return {
         let message = self.project.with_mut(|project| {
             if cursor.moved_by == project.actor_id {
                 return None;
@@ -38,7 +43,7 @@ impl Action for SyncCursor {
 
             Some(match cursor.action {
                 CursorAction::Created(byte_offset) => {
-                    let (cursor_id, cursor_creation) =
+                    let (cursor_id, creation) =
                         file.sync_created_cursor(byte_offset.into_u64());
                     assert!(
                         project.local_cursor_id.is_none(),
@@ -46,21 +51,21 @@ impl Action for SyncCursor {
                          but Neovim only supports a single cursor"
                     );
                     project.local_cursor_id = Some(cursor_id);
-                    todo!();
+                    Message::CreatedCursor(creation)
                 },
                 CursorAction::Moved(byte_offset) => {
-                    project
+                    let relocation = project
                         .local_cursor_mut()
                         .expect("cursor is being moved, so it must exist")
-                        .sync_relocated(byte_offset.into_u64());
-                    todo!();
+                        .sync_relocated(byte_offset.into_u64())?;
+                    Message::MovedCursor(relocation)
                 },
                 CursorAction::Removed => {
-                    project
+                    let removal = project
                         .local_cursor_mut()
                         .expect("cursor is being removed, so it must exist")
                         .sync_removed();
-                    todo!();
+                    Message::RemovedCursor(removal)
                 },
             })
         });
