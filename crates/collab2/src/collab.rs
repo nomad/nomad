@@ -1,12 +1,14 @@
 use nomad::config::ConfigReceiver;
 use nomad::ctx::NeovimCtx;
-use nomad::{module_name, Module, ModuleApi, ModuleName};
+use nomad::{module_name, Module, ModuleApi, ModuleName, Shared};
 
 use crate::actions::{Join, Start};
+use crate::session_status::SessionStatus;
 
 /// TODO: docs.
 pub struct Collab {
     config_rx: ConfigReceiver<Self>,
+    session_status: Shared<SessionStatus>,
 }
 
 impl Module for Collab {
@@ -32,6 +34,6 @@ impl Module for Collab {
 
 impl From<ConfigReceiver<Self>> for Collab {
     fn from(config_rx: ConfigReceiver<Self>) -> Self {
-        Self { config_rx }
+        Self { config_rx, session_status: Shared::default() }
     }
 }

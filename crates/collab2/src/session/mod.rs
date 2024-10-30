@@ -13,6 +13,7 @@ use collab_server::message::{
     Message,
     Peer,
     Peers,
+    Project as CollabProject,
     ProjectRequest,
     ProjectResponse,
     ProjectTree,
@@ -39,7 +40,7 @@ use nomad::diagnostics::{
 use nomad::{BufferId, Event, Module, Shared};
 use peer_selection::PeerSelection;
 use peer_tooltip::PeerTooltip;
-use project::Project;
+pub(crate) use project::Project;
 use register_buffer_actions::RegisterBufferActions;
 use sync_cursor::SyncCursor;
 use sync_replacement::SyncReplacement;
@@ -55,7 +56,11 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    pub(crate) fn new() -> Self {
+    pub(crate) async fn join() -> Self {
+        todo!();
+    }
+
+    pub(crate) async fn start() -> Self {
         todo!();
     }
 
@@ -304,24 +309,15 @@ impl Session {
         });
     }
 
-    async fn read_project(
-        &self,
-    ) -> io::Result<collab_server::message::Project> {
+    async fn read_project(&self) -> io::Result<CollabProject> {
         let (peers, replica) = self.project.with(|p| {
-            (
-                p.remote_peers
-                    .values()
-                    .cloned()
-                    .chain([p.local_peer.clone()])
-                    .collect::<Peers>(),
-                p.replica.clone(),
-            )
+            (p.all_peers().cloned().collect::<Peers>(), p.replica.clone())
         });
 
         match ProjectTree::new(replica, |file_path| self.read_file(file_path))
             .await
         {
-            Ok(tree) => Ok(collab_server::message::Project { peers, tree }),
+            Ok(tree) => Ok(CollabProject { peers, tree }),
             Err((err, _)) => Err(err),
         }
     }

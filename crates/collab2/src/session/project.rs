@@ -24,7 +24,7 @@ use nomad::{ActorId, BufferId, Replacement, Shared, ShouldDetach};
 
 use super::{PeerSelection, PeerTooltip};
 
-pub(super) struct Project {
+pub(crate) struct Project {
     /// The [`ActorId`] of the [`Session`].
     pub(super) actor_id: ActorId,
 
@@ -63,6 +63,22 @@ pub(super) struct Project {
 }
 
 impl Project {
+    /// Returns an iterator over all the peers [`Peer`]s.
+    ///
+    /// Note that the local peer is included in the iterator. If you don't want
+    /// it be, use [`remote_peers`](Self::remote_peers) instead.
+    pub(crate) fn all_peers(&self) -> impl Iterator<Item = &Peer> {
+        self.remote_peers.values().chain(core::iter::once(&self.local_peer))
+    }
+
+    /// Returns an iterator over the remote [`Peer`]s.
+    ///
+    /// Note that the local peer is not included in the iterator. If you want
+    /// it be, use [`all_peers`](Self::all_peers) instead.
+    pub(crate) fn remote_peers(&self) -> impl Iterator<Item = &Peer> {
+        self.remote_peers.values()
+    }
+
     /// Returns the [`BufferCtx`] of the buffer displaying the file with the
     /// given [`FileId`], if any.
     pub(super) fn buffer_of_file_id(
