@@ -1,7 +1,7 @@
 use core::any::type_name;
 
 use collab_server::message::Message;
-use nomad::ctx::NeovimCtx;
+use nomad::ctx::BufferCtx;
 use nomad::events::{Cursor, CursorAction};
 use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
 
@@ -15,7 +15,7 @@ pub(super) struct SyncCursor {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl Action for SyncCursor {
+impl<'a> Action<BufferCtx<'a>> for SyncCursor {
     const NAME: ActionName = action_name!("synchronize-cursor");
     type Args = Cursor;
     type Docs = ();
@@ -25,7 +25,7 @@ impl Action for SyncCursor {
     fn execute(
         &mut self,
         cursor: Self::Args,
-        _: NeovimCtx<'static>,
+        _: BufferCtx<'a>,
     ) -> Self::Return {
         let message = self.project.with_mut(|project| {
             if cursor.moved_by == project.actor_id {

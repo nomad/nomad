@@ -51,9 +51,10 @@ impl<Fun, Mod, Args, Ret> FnAction<Fun, Mod, Args, Ret> {
     }
 }
 
-impl<Fun, Mod, Args, Ret, Res> Action for FnAction<Fun, Mod, Args, Ret>
+impl<Ctx, Fun, Mod, Args, Ret, Res> Action<Ctx>
+    for FnAction<Fun, Mod, Args, Ret>
 where
-    Fun: FnMut(Args, NeovimCtx<'static>) -> Res + 'static,
+    Fun: FnMut(Args, Ctx) -> Res + 'static,
     Res: MaybeResult<Ret>,
     Mod: Module,
     Args: 'static,
@@ -69,7 +70,7 @@ where
     fn execute(
         &mut self,
         args: Self::Args,
-        ctx: NeovimCtx<'static>,
+        ctx: Ctx,
     ) -> impl MaybeResult<Self::Return> {
         (self.fun)(args, ctx)
     }

@@ -8,20 +8,26 @@ use crate::maybe_result::MaybeResult;
 use crate::{Action, Module};
 
 /// TODO: docs.
-pub trait Function: Action<Args: DeserializeOwned, Return: Serialize> {
+pub trait Function:
+    for<'ctx> Action<NeovimCtx<'ctx>, Args: DeserializeOwned, Return: Serialize>
+{
     /// TODO: docs.
     fn into_callback(
         self,
-    ) -> impl FnMut(NvimObject, NeovimCtx<'static>) -> NvimObject;
+    ) -> impl for<'ctx> FnMut(NvimObject, NeovimCtx<'ctx>) -> NvimObject;
 }
 
 impl<T> Function for T
 where
-    T: Action<Args: DeserializeOwned, Return: Serialize>,
+    T: for<'ctx> Action<
+        NeovimCtx<'ctx>,
+        Args: DeserializeOwned,
+        Return: Serialize,
+    >,
 {
     fn into_callback(
         mut self,
-    ) -> impl FnMut(NvimObject, NeovimCtx<'static>) -> NvimObject {
+    ) -> impl for<'ctx> FnMut(NvimObject, NeovimCtx<'ctx>) -> NvimObject {
         move |args, ctx| {
             let args = match crate::serde::deserialize(args) {
                 Ok(args) => args,

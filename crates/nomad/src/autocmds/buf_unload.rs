@@ -1,6 +1,6 @@
 use crate::autocmd::{AutoCommand, AutoCommandEvent, ShouldDetach};
 use crate::buffer_id::BufferId;
-use crate::ctx::AutoCommandCtx;
+use crate::ctx::{AutoCommandCtx, NeovimCtx};
 use crate::{Action, ActorId};
 
 /// TODO: docs.
@@ -33,8 +33,11 @@ impl<A> BufUnload<A> {
 
 impl<A> AutoCommand for BufUnload<A>
 where
-    A: Action<Args = BufUnloadArgs>,
-    A::Return: Into<ShouldDetach>,
+    A: for<'a> Action<
+        NeovimCtx<'a>,
+        Args = BufUnloadArgs,
+        Return: Into<ShouldDetach>,
+    >,
 {
     type Action = A;
 

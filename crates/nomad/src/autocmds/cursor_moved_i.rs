@@ -1,7 +1,7 @@
 use crate::autocmd::{AutoCommand, AutoCommandEvent, ShouldDetach};
 use crate::autocmds::{CursorMoved, CursorMovedArgs};
 use crate::buffer_id::BufferId;
-use crate::ctx::AutoCommandCtx;
+use crate::ctx::{AutoCommandCtx, NeovimCtx};
 use crate::{Action, ActorId};
 
 /// TODO: docs.
@@ -25,8 +25,11 @@ impl<A> CursorMovedI<A> {
 
 impl<A> AutoCommand for CursorMovedI<A>
 where
-    A: Action<Args = CursorMovedArgs>,
-    A::Return: Into<ShouldDetach>,
+    A: for<'a> Action<
+        NeovimCtx<'a>,
+        Args = CursorMovedArgs,
+        Return: Into<ShouldDetach>,
+    >,
 {
     type Action = A;
 

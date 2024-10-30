@@ -37,9 +37,11 @@ type BufAttachCallback = Box<dyn FnMut(BufAttachArgs) -> ShouldDetach>;
 
 impl<A> BufAttach<A>
 where
-    A: Action<BufferCtx<'static>>,
-    A::Args: From<BufAttachArgs>,
-    A::Return: Into<ShouldDetach>,
+    A: for<'ctx> Action<
+        BufferCtx<'ctx>,
+        Args: From<BufAttachArgs>,
+        Return: Into<ShouldDetach>,
+    >,
 {
     /// Creates a new [`BufAttach`] event with the given action.
     pub fn new(action: A) -> Self {
@@ -49,9 +51,11 @@ where
 
 impl<A> Event for BufAttach<A>
 where
-    A: Action<BufferCtx<'static>>,
-    A::Args: From<BufAttachArgs>,
-    A::Return: Into<ShouldDetach>,
+    A: for<'ctx> Action<
+        BufferCtx<'ctx>,
+        Args: From<BufAttachArgs>,
+        Return: Into<ShouldDetach>,
+    >,
 {
     type Ctx<'a> = TextBufferCtx<'a>;
 
@@ -70,15 +74,17 @@ impl BufAttachMap {
         mut action: A,
         ctx: NeovimCtx<'static>,
     ) where
-        A: Action<BufferCtx<'static>>,
-        A::Args: From<BufAttachArgs>,
-        A::Return: Into<ShouldDetach>,
+        A: for<'ctx> Action<
+            BufferCtx<'ctx>,
+            Args: From<BufAttachArgs>,
+            Return: Into<ShouldDetach>,
+        >,
     {
         let callback = {
             let ctx = ctx.clone();
             move |buf_attach_args: BufAttachArgs| {
                 let buffer_ctx = ctx
-                    .clone()
+                    .reborrow()
                     .into_buffer(buf_attach_args.buffer_id)
                     .expect("`buffer_id` is valid");
                 let args = buf_attach_args.into();

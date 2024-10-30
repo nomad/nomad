@@ -40,7 +40,7 @@ impl ModuleCommands {
         let ctx = self.neovim_ctx.clone();
         self.commands.insert(
             T::NAME.as_str(),
-            Box::new(move |args| callback(args, ctx.clone())),
+            Box::new(move |args| callback(args, ctx.reborrow())),
         );
     }
 
@@ -63,7 +63,7 @@ impl ModuleCommands {
         let mut callback = command.into_callback();
         let ctx = self.neovim_ctx.clone();
         self.default_command =
-            Some(Box::new(move |args| callback(args, ctx.clone())));
+            Some(Box::new(move |args| callback(args, ctx.reborrow())));
     }
 
     pub(crate) fn default_command(

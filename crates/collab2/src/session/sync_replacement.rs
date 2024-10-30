@@ -14,18 +14,14 @@ pub(super) struct SyncReplacement {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl Action<BufferCtx<'static>> for SyncReplacement {
+impl<'a> Action<BufferCtx<'a>> for SyncReplacement {
     const NAME: ActionName = action_name!("synchronize-replacement");
     type Args = BufAttachArgs;
     type Docs = ();
     type Module = Collab;
     type Return = ShouldDetach;
 
-    fn execute(
-        &mut self,
-        args: Self::Args,
-        _: BufferCtx<'static>,
-    ) -> Self::Return {
+    fn execute(&mut self, args: Self::Args, _: BufferCtx<'a>) -> Self::Return {
         let message = self.project.with_mut(|project| {
             if args.actor_id == project.actor_id {
                 return None;

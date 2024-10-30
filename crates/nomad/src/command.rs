@@ -6,10 +6,11 @@ use crate::{Action, Module};
 
 /// TODO: docs.
 pub trait Command:
-    Action<
+    for<'ctx> Action<
+    NeovimCtx<'ctx>,
     Args: Clone
-              + for<'a> TryFrom<
-        &'a mut CommandArgs,
+              + for<'args> TryFrom<
+        &'args mut CommandArgs,
         Error: Into<DiagnosticMessage>,
     >,
     Return = (),
@@ -18,15 +19,16 @@ pub trait Command:
     /// TODO: docs.
     fn into_callback(
         self,
-    ) -> impl FnMut(CommandArgs, NeovimCtx<'static>) + 'static;
+    ) -> impl for<'ctx> FnMut(CommandArgs, NeovimCtx<'ctx>) + 'static;
 }
 
 impl<T> Command for T
 where
-    T: Action<
+    T: for<'ctx> Action<
+        NeovimCtx<'ctx>,
         Args: Clone
-                  + for<'a> TryFrom<
-            &'a mut CommandArgs,
+                  + for<'args> TryFrom<
+            &'args mut CommandArgs,
             Error: Into<DiagnosticMessage>,
         >,
         Return = (),
@@ -34,8 +36,8 @@ where
 {
     fn into_callback(
         mut self,
-    ) -> impl FnMut(CommandArgs, NeovimCtx<'static>) + 'static {
-        Box::new(move |mut args, ctx| {
+    ) -> impl for<'ctx> FnMut(CommandArgs, NeovimCtx<'ctx>) + 'static {
+        Box::new(move |mut args, ctx: NeovimCtx<'_>| {
             let args = match T::Args::try_from(&mut args) {
                 Ok(args) => args,
                 Err(err) => {

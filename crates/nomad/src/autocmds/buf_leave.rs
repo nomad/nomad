@@ -1,7 +1,8 @@
 use crate::autocmd::{AutoCommand, AutoCommandEvent, ShouldDetach};
 use crate::buffer_id::BufferId;
-use crate::ctx::AutoCommandCtx;
-use crate::{Action, ActorId};
+use crate::ctx::{AutoCommandCtx, BufferCtx, NeovimCtx};
+use crate::maybe_result::MaybeResult;
+use crate::{Action, ActionName, ActorId};
 
 /// TODO: docs.
 pub struct BufLeave<A> {
@@ -34,13 +35,16 @@ impl<A> BufLeave<A> {
 
 impl<A> AutoCommand for BufLeave<A>
 where
-    A: Action<Args = BufLeaveArgs>,
-    A::Return: Into<ShouldDetach>,
+    A: for<'ctx> Action<
+        BufferCtx<'ctx>,
+        Args = BufLeaveArgs,
+        Return: Into<ShouldDetach>,
+    >,
 {
-    type Action = A;
+    type Action = Compat<A>;
 
     fn into_action(self) -> Self::Action {
-        self.action
+        Compat(self.action)
     }
 
     fn on_event(&self) -> AutoCommandEvent {
@@ -54,6 +58,33 @@ where
     fn take_actor_id(_: &AutoCommandCtx<'_>) -> ActorId {
         // TODO: Implement this.
         ActorId::unknown()
+    }
+}
+
+pub struct Compat<A>(A);
+
+impl<'a, A> Action<NeovimCtx<'a>> for Compat<A>
+where
+    A: Action<BufferCtx<'a>, Args = BufLeaveArgs>,
+{
+    const NAME: ActionName = A::NAME;
+    type Args = A::Args;
+    type Docs = A::Docs;
+    type Module = A::Module;
+    type Return = A::Return;
+
+    fn execute(
+        &mut self,
+        args: Self::Args,
+        ctx: NeovimCtx<'a>,
+    ) -> impl MaybeResult<Self::Return> {
+        let buffer_ctx = ctx
+            .into_buffer(args.buffer_id)
+            .expect("autocmd was triggered, so buffer must exist");
+        self.0.execute(args, buffer_ctx)
+    }
+    fn docs(&self) -> Self::Docs {
+        self.0.docs()
     }
 }
 

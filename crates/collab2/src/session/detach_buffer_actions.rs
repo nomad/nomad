@@ -28,14 +28,14 @@ impl DetachBufferActions {
     }
 }
 
-impl Action for DetachBufferActions {
+impl<'a> Action<NeovimCtx<'a>> for DetachBufferActions {
     const NAME: ActionName = action_name!("detach-buffer-actions");
     type Args = BufUnloadArgs;
     type Docs = ();
     type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'static>) {
+    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'a>) {
         self.detach_actions(args.buffer_id);
     }
 

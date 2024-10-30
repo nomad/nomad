@@ -11,7 +11,7 @@ use crate::{Action, ActorId, Module};
 pub trait AutoCommand: Sized {
     /// TODO: docs.
     type Action: Action<
-        Args: for<'a> From<(ActorId, &'a AutoCommandCtx<'a>)>,
+        Args: for<'ctx> From<(ActorId, &'ctx AutoCommandCtx<'ctx>)>,
         Return: Into<ShouldDetach>,
     >;
 
@@ -30,8 +30,8 @@ pub trait AutoCommand: Sized {
     /// TODO: docs.
     fn into_callback(
         self,
-    ) -> impl for<'a> FnMut(ActorId, &'a AutoCommandCtx<'a>) -> ShouldDetach + 'static
-    {
+    ) -> impl for<'ctx> FnMut(ActorId, &'ctx AutoCommandCtx<'ctx>) -> ShouldDetach
+           + 'static {
         let on_buffer = self.on_buffer();
         let mut action = self.into_action();
         move |actor_id, ctx: &AutoCommandCtx| {

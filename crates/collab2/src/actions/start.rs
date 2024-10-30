@@ -15,14 +15,14 @@ impl Start {
     }
 }
 
-impl Action for Start {
+impl<'a> Action<NeovimCtx<'a>> for Start {
     const NAME: ActionName = action_name!("start");
     type Args = ();
     type Docs = ();
     type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, _args: Self::Args, ctx: NeovimCtx<'static>) {
+    fn execute(&mut self, _args: Self::Args, _: NeovimCtx<'a>) {
         todo!()
     }
 

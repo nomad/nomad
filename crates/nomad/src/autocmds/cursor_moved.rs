@@ -2,7 +2,7 @@ use nvim_oxi::api;
 
 use crate::autocmd::{AutoCommand, AutoCommandEvent, ShouldDetach};
 use crate::buffer_id::BufferId;
-use crate::ctx::AutoCommandCtx;
+use crate::ctx::{AutoCommandCtx, NeovimCtx};
 use crate::point::Point;
 use crate::{Action, ActorId, ByteOffset};
 
@@ -36,8 +36,11 @@ impl<A> CursorMoved<A> {
 
 impl<A> AutoCommand for CursorMoved<A>
 where
-    A: Action<Args = CursorMovedArgs>,
-    A::Return: Into<ShouldDetach>,
+    A: for<'a> Action<
+        NeovimCtx<'a>,
+        Args = CursorMovedArgs,
+        Return: Into<ShouldDetach>,
+    >,
 {
     type Action = A;
 

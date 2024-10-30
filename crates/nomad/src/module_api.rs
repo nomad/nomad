@@ -49,7 +49,9 @@ impl<M: Module> ModuleApi<M> {
         let mut callback = function.into_callback();
         self.dictionary.insert(
             T::NAME.as_str(),
-            NvimFunction::from_fn_mut(move |obj| callback(obj, ctx.clone())),
+            NvimFunction::from_fn_mut(move |obj| {
+                callback(obj, ctx.reborrow())
+            }),
         );
         self
     }

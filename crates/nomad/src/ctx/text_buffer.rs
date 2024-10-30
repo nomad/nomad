@@ -19,9 +19,11 @@ impl<'ctx> TextBufferCtx<'ctx> {
     /// TODO: docs.
     pub fn attach<A>(&self, action: A)
     where
-        A: Action<BufferCtx<'static>>,
-        A::Args: From<BufAttachArgs>,
-        A::Return: Into<ShouldDetach>,
+        A: for<'a> Action<
+            BufferCtx<'a>,
+            Args: From<BufAttachArgs>,
+            Return: Into<ShouldDetach>,
+        >,
     {
         BufAttach::new(action).register(self.reborrow());
     }
