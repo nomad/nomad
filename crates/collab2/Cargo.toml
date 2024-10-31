@@ -7,6 +7,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+async-fs = { workspace = true }
+async-recursion = "1"
 collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client"], package = "nomad-server" }
 e31e = { workspace = true }
 flume = { workspace = true }

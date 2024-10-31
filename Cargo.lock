@@ -254,12 +254,13 @@ dependencies = [
 
 [[package]]
 name = "cola"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfcfa9fc043c91fca3d7859d82ec683762037c500f029740e53849e5a1e80841"
+checksum = "b5c84fcb0382e4312b48cf9d07fe4280fc162a2bb25def79af73634971deeac3"
 dependencies = [
  "serde",
  "sha2",
+ "varint-simd",
 ]
 
 [[package]]
@@ -455,7 +456,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "e31e"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/e31e.git#8a72d577f375fe91c18a41c80fe100951432769a"
+source = "git+ssh://git@github.com/nomad/e31e.git#a895d4631150e29ac4baa8db15de1e05fee1d5ce"
 dependencies = [
  "cola",
  "compact_str",

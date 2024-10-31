@@ -90,8 +90,10 @@ impl RegisterBufferActions {
                 .replica
                 .cursors()
                 .filter_map(|cursor| {
-                    let peer =
-                        project.remote_peers.get(&cursor.owner()).cloned()?;
+                    let peer = project
+                        .remote_peers
+                        .get(&cursor.owner().id())
+                        .cloned()?;
                     let file_id = cursor.file().id();
                     let buffer_ctx = project.buffer_of_file_id(file_id)?;
                     if buffer_ctx.buffer_id() != buffer_id {
@@ -114,7 +116,10 @@ impl RegisterBufferActions {
                 .replica
                 .selections()
                 .filter_map(|selection| {
-                    if !project.remote_peers.contains_key(&selection.owner()) {
+                    if !project
+                        .remote_peers
+                        .contains_key(&selection.owner().id())
+                    {
                         return None;
                     }
                     let file_id = selection.file().id();

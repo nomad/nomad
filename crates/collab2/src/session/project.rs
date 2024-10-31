@@ -1,24 +1,29 @@
+use std::ffi::OsString;
 use std::io;
 
 use collab_server::message::Peer;
-use e31e::fs::{AbsPath, AbsPathBuf};
+use e31e::fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
 use e31e::{
     CursorCreation,
     CursorId,
     CursorRefMut,
     CursorRelocation,
     CursorRemoval,
+    DirectoryId,
     Edit,
     FileId,
     FileRef,
     FileRefMut,
     Hunks,
     PeerId,
+    Replica,
+    ReplicaBuilder,
     SelectionCreation,
     SelectionId,
     SelectionRelocation,
     SelectionRemoval,
 };
+use futures_util::StreamExt;
 use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
 use nomad::ctx::{BufferCtx, NeovimCtx};
@@ -52,16 +57,16 @@ pub(crate) struct Project {
     pub(super) remote_peers: NoHashMap<PeerId, Peer>,
 
     /// Map from the [`SelectionId`] of a selection owned by a remote peer to
-    /// the corresponding [`PeerTooltip`] displayed in the editor, if any.
+    /// the corresponding [`PeerSelection`] displayed in the editor, if any.
     pub(super) remote_selections: FxHashMap<SelectionId, PeerSelection>,
 
     /// Map from the [`CursorId`] of a cursor owned by a remote peer to the
     /// corresponding [`PeerTooltip`] displayed in the editor, if any.
     pub(super) remote_tooltips: FxHashMap<CursorId, PeerTooltip>,
 
-    /// The [`Replica`](e31e::Replica) used to integrate remote messages on the
-    /// project at [`project_root`](Self::project_root).
-    pub(super) replica: e31e::Replica,
+    /// The [`Replica`] used to integrate remote messages on the project at
+    /// [`project_root`](Self::project_root).
+    pub(super) replica: Replica,
 }
 
 impl Project {
@@ -78,8 +83,13 @@ impl Project {
         local_peer: Peer,
         project_root: AbsPathBuf,
         neovim_ctx: NeovimCtx<'static>,
-    ) -> io::Result<Self> {
-        let mut replica = e31e::Replica::new(local_peer.id());
+    ) -> Result<Self, ProjectFromFsError> {
+        let replica = read_replica(
+            local_peer.id(),
+            project_root.clone(),
+            neovim_ctx.reborrow(),
+        )
+        .await?;
         Ok(Self {
             actor_id: neovim_ctx.next_actor_id(),
             buffer_actions: NoHashMap::default(),
@@ -168,7 +178,7 @@ impl Project {
         else {
             return;
         };
-        let Some(peer) = self.remote_peers.get(&cursor.owner()).cloned()
+        let Some(peer) = self.remote_peers.get(&cursor.owner().id()).cloned()
         else {
             return;
         };
@@ -250,6 +260,14 @@ impl Project {
         assert_ne!(peer.id(), self.replica.id());
         assert!(self.remote_peers.insert(peer.id(), peer).is_none());
         // TODO: display backlogged cursors and selections.
+        //
+        // let peer = self.replica.peer();
+        //
+        // for cursor in peer.cursors() {
+        //     let Some(buffer) = self.buffer_of_file_id(cursor.file().id());
+        //     let tooltip = PeerTooltip::create(peer.clone() cursor.offset(), buffer);
+        //     self.remote_tooltips.insert(cursor_id, peer_tooltip);
+        // }
     }
 
     pub(super) fn integrate_peer_left(&mut self, peer_id: PeerId) {
@@ -267,7 +285,7 @@ impl Project {
         else {
             return;
         };
-        if !self.remote_peers.contains_key(&selection.owner()) {
+        if !self.remote_peers.contains_key(&selection.owner().id()) {
             return;
         }
         let selection_id = selection.id();
@@ -325,7 +343,7 @@ impl Project {
             .replica
             .cursors()
             .filter(|c| c.file().id() == file_id)
-            .filter(|c| c.owner() != self.replica.id())
+            .filter(|c| c.owner().id() != self.replica.id())
         {
             let tooltip = self.remote_tooltips.get_mut(&cursor.id()).expect(
                 "the cursor is in this file and owned by a remote peer, so \
@@ -340,7 +358,7 @@ impl Project {
             .replica
             .selections()
             .filter(|s| s.file().id() == file_id)
-            .filter(|s| s.owner() != self.replica.id())
+            .filter(|s| s.owner().id() != self.replica.id())
         {
             let peer_selection =
                 self.remote_selections.get_mut(&selection.id()).expect(
@@ -354,4 +372,144 @@ impl Project {
             peer_selection.relocate(selection_range);
         }
     }
+}
+
+async fn read_replica(
+    local_id: PeerId,
+    project_root: AbsPathBuf,
+    ctx: NeovimCtx<'_>,
+) -> Result<Replica, ProjectFromFsError> {
+    let (node_tx, mut node_rx) = flume::unbounded();
+    recurse(project_root, node_tx, ctx);
+
+    let mut builder = ReplicaBuilder::new(local_id);
+    while let Ok(res) = node_rx.recv_async().await {
+        let maybe_duplicate_path = match res? {
+            Node::Dir { path } => {
+                // TODO: strip the prefix.
+                builder.push_directory(&path).is_err().then_some(path)
+            },
+            Node::File { path, len } => {
+                // TODO: strip the prefix.
+                builder.push_file(&path, len).is_err().then_some(path)
+            },
+        };
+        if let Some(path) = maybe_duplicate_path {
+            return Err(ProjectFromFsError::ReadDuplicate(path));
+        }
+    }
+
+    Ok(builder.build())
+}
+
+enum Node {
+    Dir { path: AbsPathBuf },
+    File { path: AbsPathBuf, len: u64 },
+}
+
+fn recurse(
+    mut dir_path: AbsPathBuf,
+    node_tx: flume::Sender<Result<Node, ProjectFromFsError>>,
+    ctx: NeovimCtx<'_>,
+) {
+    let ctx_static = ctx.to_static();
+    ctx.spawn(async move {
+        let read_dir = async {
+            let mut entries = match async_fs::read_dir(&dir_path).await {
+                Ok(entries) => entries,
+                Err(io_err) => {
+                    return Err(ProjectFromFsError::CouldntReadDir {
+                        dir_path,
+                        err: io_err,
+                    });
+                },
+            };
+            let mut is_dir_empty = true;
+            while let Some(res) = entries.next().await {
+                is_dir_empty = false;
+                let dir_entry = match res {
+                    Ok(dir_entry) => dir_entry,
+                    Err(io_err) => {
+                        return Err(ProjectFromFsError::CouldntReadDir {
+                            dir_path,
+                            err: io_err,
+                        })
+                    },
+                };
+                let node_name_os = dir_entry.file_name();
+                let node_name = match node_name_os
+                    .to_str()
+                    .and_then(|s| <&FsNodeName>::try_from(s).ok())
+                {
+                    Some(node_name) => node_name,
+                    None => {
+                        return Err(ProjectFromFsError::NodeNameNotUtf8 {
+                            parent_path: dir_path,
+                            fs_node_name: node_name_os,
+                        })
+                    },
+                };
+                let node_type = match dir_entry.file_type().await {
+                    Ok(node_type) => node_type,
+                    Err(io_err) => {
+                        return Err(ProjectFromFsError::CouldntReadType {
+                            fs_node_path: dir_path,
+                            err: io_err,
+                        })
+                    },
+                };
+                dir_path.push(node_name);
+                if node_type.is_file() {
+                    let metadata = match dir_entry.metadata().await {
+                        Ok(metadata) => metadata,
+                        Err(io_err) => {
+                            return Err(
+                                ProjectFromFsError::CouldntReadMetadata {
+                                    fs_node_path: dir_path,
+                                    err: io_err,
+                                },
+                            )
+                        },
+                    };
+                    node_tx.send(Ok(Node::File {
+                        path: dir_path.clone(),
+                        len: metadata.len(),
+                    }));
+                } else if node_type.is_dir() {
+                    recurse(
+                        dir_path.clone(),
+                        node_tx.clone(),
+                        ctx_static.clone(),
+                    );
+                }
+                dir_path.pop();
+            }
+            if is_dir_empty {
+                node_tx.send(Ok(Node::Dir { path: dir_path }));
+            }
+            Ok(())
+        };
+
+        if let Err(err) = read_dir.await {
+            node_tx.send(Err(err));
+        }
+    })
+    .detach();
+}
+
+pub(crate) enum ProjectFromFsError {
+    /// The directory at the given path couldn't be read.
+    CouldntReadDir { dir_path: AbsPathBuf, err: io::Error },
+
+    /// The metadata of the node at the given path couldn't be read.
+    CouldntReadMetadata { fs_node_path: AbsPathBuf, err: io::Error },
+
+    /// The type of the node at the given path couldn't be read.
+    CouldntReadType { fs_node_path: AbsPathBuf, err: io::Error },
+
+    /// A node under the directory at the given path has a non-UTF-8 name.
+    NodeNameNotUtf8 { parent_path: AbsPathBuf, fs_node_name: OsString },
+
+    /// The given path was read twice.
+    ReadDuplicate(AbsPathBuf),
 }
