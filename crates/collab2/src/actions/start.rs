@@ -1,12 +1,17 @@
-use collab_server::message::{GitHubHandle, Message};
+use std::ffi::OsString;
+use std::io;
+
+use collab_server::message::{GitHubHandle, Peer};
 use collab_server::AuthInfos;
+use e31e::fs::{AbsPathBuf, FsNodeName};
+use e31e::{Replica, ReplicaBuilder};
 use futures_util::StreamExt;
 use nomad::ctx::{BufferCtx, NeovimCtx};
 use nomad::diagnostics::DiagnosticMessage;
 use nomad::{action_name, ActionName, AsyncAction, Shared};
 
 use super::UserBusyError;
-use crate::session::Session;
+use crate::session::{NewSessionArgs, Session};
 use crate::session_status::SessionStatus;
 use crate::Collab;
 
@@ -42,10 +47,10 @@ impl AsyncAction for Start {
         Starter::new(self.session_status.clone(), ctx.to_static())?
             .find_project_root().await?
             .confirm_start().await?
-            .read_project().await?
             .connect_to_server().await?
             .authenticate(auth_infos).await?
             .start_session().await?
+            .read_replica().await?
             .run_session().await?;
 
         Ok(())
@@ -54,47 +59,94 @@ impl AsyncAction for Start {
     fn docs(&self) -> Self::Docs {}
 }
 
-struct Starter<State> {
+struct Starter {
+    ctx: NeovimCtx<'static>,
     session_status: Shared<SessionStatus>,
-    state: State,
+}
+
+struct Authenticate {
+    io: collab_server::Io,
+    project_root: AbsPathBuf,
+    starter: Starter,
+}
+
+struct ConfirmStart {
+    starter: Starter,
+}
+
+struct ConnectToServer {
+    project_root: AbsPathBuf,
+    starter: Starter,
 }
 
 struct FindProjectRoot {
-    ctx: NeovimCtx<'static>,
+    starter: Starter,
 }
 
-struct ConfirmStart;
-struct ReadProject;
-struct ConnectToServer;
-struct Authenticate;
-struct StartSession;
-struct RunSession;
+struct ReadReplica {
+    joined: collab_server::client::Joined,
+    local_peer: Peer,
+    project_root: AbsPathBuf,
+    starter: Starter,
+}
+
+struct RunSession {
+    joined: collab_server::client::Joined,
+    local_peer: Peer,
+    project_root: AbsPathBuf,
+    replica: Replica,
+    starter: Starter,
+}
+
+struct StartSession {
+    authenticated: collab_server::client::Authenticated,
+    auth_infos: AuthInfos,
+    project_root: AbsPathBuf,
+    starter: Starter,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum StartError {
     #[error(transparent)]
-    ConfirmStart(#[from] ConfirmStartError),
+    Authenticate(#[from] AuthenticateError),
 
     #[error(transparent)]
-    ReadProject(#[from] ReadProjectError),
+    ConfirmStart(#[from] ConfirmStartError),
 
     #[error(transparent)]
     ConnectToServer(#[from] ConnectToServerError),
 
     #[error(transparent)]
-    Authenticate(#[from] AuthenticateError),
+    FindProjectRoot(#[from] FindProjectRootError),
 
     #[error(transparent)]
-    StartSession(#[from] StartSessionError),
+    ReadReplica(#[from] ReadReplicaError),
 
     #[error(transparent)]
     RunSession(#[from] RunSessionError),
 
     #[error(transparent)]
-    FindProjectRoot(#[from] FindProjectRootError),
+    StartSession(#[from] StartSessionError),
 
     #[error(transparent)]
     UserBusy(#[from] UserBusyError<true>),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("")]
+pub(crate) struct AuthenticateError {
+    inner: (),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("")]
+pub(crate) struct ConfirmStartError;
+
+#[derive(Debug, thiserror::Error)]
+#[error("couldn't connect to the server: {inner}")]
+pub(crate) struct ConnectToServerError {
+    #[from]
+    inner: io::Error,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -104,30 +156,40 @@ pub(crate) enum FindProjectRootError {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("")]
-pub(crate) struct ConfirmStartError;
+pub(crate) enum ReadReplicaError {
+    /// The directory at the given path couldn't be read.
+    #[error("")]
+    CouldntReadDir { dir_path: AbsPathBuf, err: io::Error },
+
+    /// The metadata of the node at the given path couldn't be read.
+    #[error("")]
+    CouldntReadMetadata { fs_node_path: AbsPathBuf, err: io::Error },
+
+    /// The type of the node at the given path couldn't be read.
+    #[error("")]
+    CouldntReadType { fs_node_path: AbsPathBuf, err: io::Error },
+
+    /// A node under the directory at the given path has a non-UTF-8 name.
+    #[error("")]
+    NodeNameNotUtf8 { parent_path: AbsPathBuf, fs_node_name: OsString },
+
+    /// The given path was read twice.
+    #[error("")]
+    ReadDuplicate(AbsPathBuf),
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-pub(crate) struct ReadProjectError;
-
-#[derive(Debug, thiserror::Error)]
-#[error("")]
-pub(crate) struct ConnectToServerError;
-
-#[derive(Debug, thiserror::Error)]
-#[error("")]
-pub(crate) struct AuthenticateError;
-
-#[derive(Debug, thiserror::Error)]
-#[error("")]
-pub(crate) struct StartSessionError;
+pub(crate) struct StartSessionError {
+    #[from]
+    inner: collab_server::client::JoinError,
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
 pub(crate) struct RunSessionError;
 
-impl Starter<FindProjectRoot> {
+impl Starter {
     fn new(
         session_status: Shared<SessionStatus>,
         ctx: NeovimCtx<'static>,
@@ -136,15 +198,15 @@ impl Starter<FindProjectRoot> {
             Some(err) => Err(err),
             None => {
                 session_status.set(SessionStatus::Starting);
-                Ok(Self { session_status, state: FindProjectRoot { ctx } })
+                Ok(Self { ctx, session_status })
             },
         }
     }
 
     async fn find_project_root(
         self,
-    ) -> Result<Starter<ConfirmStart>, FindProjectRootError> {
-        let _file_ctx = BufferCtx::current(self.state.ctx.reborrow())
+    ) -> Result<ConfirmStart, FindProjectRootError> {
+        let _file_ctx = BufferCtx::current(self.ctx.reborrow())
             .into_file()
             .ok_or(FindProjectRootError::NotInFile)?;
 
@@ -152,56 +214,131 @@ impl Starter<FindProjectRoot> {
     }
 }
 
-impl Starter<ConfirmStart> {
+impl ConfirmStart {
     async fn confirm_start(
         self,
-    ) -> Result<Starter<ReadProject>, ConfirmStartError> {
+    ) -> Result<ConnectToServer, ConfirmStartError> {
         todo!();
     }
 }
 
-impl Starter<ReadProject> {
-    async fn read_project(
-        self,
-    ) -> Result<Starter<ConnectToServer>, ReadProjectError> {
-        todo!();
-    }
-}
-
-impl Starter<ConnectToServer> {
+impl ConnectToServer {
     async fn connect_to_server(
         self,
-    ) -> Result<Starter<Authenticate>, ConnectToServerError> {
-        todo!();
+    ) -> Result<Authenticate, ConnectToServerError> {
+        collab_server::Io::connect()
+            .await
+            .map(|io| Authenticate {
+                io,
+                project_root: self.project_root,
+                starter: self.starter,
+            })
+            .map_err(Into::into)
     }
 }
 
-impl Starter<Authenticate> {
+impl Authenticate {
     async fn authenticate(
         self,
-        _auth_infos: AuthInfos,
-    ) -> Result<Starter<StartSession>, AuthenticateError> {
-        todo!();
+        auth_infos: AuthInfos,
+    ) -> Result<StartSession, AuthenticateError> {
+        self.io
+            .authenticate(auth_infos.clone())
+            .await
+            .map(|authenticated| StartSession {
+                authenticated,
+                auth_infos,
+                project_root: self.project_root,
+                starter: self.starter,
+            })
+            .map_err(|_err| todo!())
     }
 }
 
-impl Starter<StartSession> {
-    async fn start_session(
-        self,
-    ) -> Result<Starter<RunSession>, StartSessionError> {
-        todo!();
+impl StartSession {
+    async fn start_session(self) -> Result<ReadReplica, StartSessionError> {
+        self.authenticated
+            .join(collab_server::client::JoinRequest::StartNewSession)
+            .await
+            .map(|joined| ReadReplica {
+                local_peer: Peer::new(
+                    joined.sender.peer_id(),
+                    self.auth_infos.github_handle,
+                ),
+                joined,
+                project_root: self.project_root,
+                starter: self.starter,
+            })
+            .map_err(Into::into)
     }
 }
 
-impl Starter<RunSession> {
+impl ReadReplica {
+    async fn read_replica(self) -> Result<RunSession, ReadReplicaError> {
+        let local_id = self.joined.sender.peer_id();
+        let (node_tx, node_rx) = flume::unbounded();
+        recurse(
+            self.project_root.clone(),
+            node_tx,
+            self.starter.ctx.reborrow(),
+        );
+
+        let mut builder = ReplicaBuilder::new(local_id);
+        while let Ok(res) = node_rx.recv_async().await {
+            let maybe_duplicate_path = match res? {
+                Node::Dir { path } => {
+                    // TODO: strip the prefix.
+                    builder.push_directory(&path).is_err().then_some(path)
+                },
+                Node::File { path, len } => {
+                    // TODO: strip the prefix.
+                    builder.push_file(&path, len).is_err().then_some(path)
+                },
+            };
+            if let Some(path) = maybe_duplicate_path {
+                return Err(ReadReplicaError::ReadDuplicate(path));
+            }
+        }
+
+        Ok(RunSession {
+            joined: self.joined,
+            local_peer: self.local_peer,
+            project_root: self.project_root,
+            replica: builder.build(),
+            starter: self.starter,
+        })
+    }
+}
+
+impl RunSession {
     async fn run_session(self) -> Result<(), RunSessionError> {
-        todo!();
-    }
-}
+        let collab_server::client::Joined {
+            sender,
+            receiver,
+            session_id,
+            peers,
+        } = self.joined;
 
-impl<State> From<State> for Starter<State> {
-    fn from(_state: State) -> Self {
-        todo!();
+        let args = NewSessionArgs {
+            is_host: true,
+            local_peer: self.local_peer,
+            remote_peers: peers,
+            project_root: self.project_root,
+            replica: self.replica,
+            session_id,
+            neovim_ctx: self.starter.ctx.clone(),
+        };
+
+        let session = Session::new(args);
+
+        let status = SessionStatus::InSession(session.project());
+        self.starter.session_status.set(status);
+
+        if let Err(_err) = session.run(sender, receiver).await {
+            todo!();
+        }
+
+        Ok(())
     }
 }
 
@@ -211,13 +348,97 @@ impl From<StartError> for DiagnosticMessage {
     }
 }
 
-// let mut session = Session::start().await;
-// self.session_status.set(SessionStatus::InSession(session.project()));
-// ctx.spawn(async move {
-//     let (tx, rx) = flume::unbounded::<Message>();
-//     let tx = tx.into_sink::<'static>();
-//     let rx = rx
-//         .into_stream::<'static>()
-//         .map(Ok::<_, core::convert::Infallible>);
-//     let _err = session.run(tx, rx).await;
-// });
+enum Node {
+    Dir { path: AbsPathBuf },
+    File { path: AbsPathBuf, len: u64 },
+}
+
+fn recurse(
+    mut dir_path: AbsPathBuf,
+    node_tx: flume::Sender<Result<Node, ReadReplicaError>>,
+    ctx: NeovimCtx<'_>,
+) {
+    let ctx_static = ctx.to_static();
+    ctx.spawn(async move {
+        let read_dir = async {
+            let mut entries = match async_fs::read_dir(&dir_path).await {
+                Ok(entries) => entries,
+                Err(io_err) => {
+                    return Err(ReadReplicaError::CouldntReadDir {
+                        dir_path,
+                        err: io_err,
+                    });
+                },
+            };
+            let mut is_dir_empty = true;
+            while let Some(res) = entries.next().await {
+                is_dir_empty = false;
+                let dir_entry = match res {
+                    Ok(dir_entry) => dir_entry,
+                    Err(io_err) => {
+                        return Err(ReadReplicaError::CouldntReadDir {
+                            dir_path,
+                            err: io_err,
+                        })
+                    },
+                };
+                let node_name_os = dir_entry.file_name();
+                let node_name = match node_name_os
+                    .to_str()
+                    .and_then(|s| <&FsNodeName>::try_from(s).ok())
+                {
+                    Some(node_name) => node_name,
+                    None => {
+                        return Err(ReadReplicaError::NodeNameNotUtf8 {
+                            parent_path: dir_path,
+                            fs_node_name: node_name_os,
+                        })
+                    },
+                };
+                let node_type = match dir_entry.file_type().await {
+                    Ok(node_type) => node_type,
+                    Err(io_err) => {
+                        return Err(ReadReplicaError::CouldntReadType {
+                            fs_node_path: dir_path,
+                            err: io_err,
+                        })
+                    },
+                };
+                dir_path.push(node_name);
+                if node_type.is_file() {
+                    let metadata = match dir_entry.metadata().await {
+                        Ok(metadata) => metadata,
+                        Err(io_err) => {
+                            return Err(
+                                ReadReplicaError::CouldntReadMetadata {
+                                    fs_node_path: dir_path,
+                                    err: io_err,
+                                },
+                            )
+                        },
+                    };
+                    node_tx.send(Ok(Node::File {
+                        path: dir_path.clone(),
+                        len: metadata.len(),
+                    }));
+                } else if node_type.is_dir() {
+                    recurse(
+                        dir_path.clone(),
+                        node_tx.clone(),
+                        ctx_static.clone(),
+                    );
+                }
+                dir_path.pop();
+            }
+            if is_dir_empty {
+                node_tx.send(Ok(Node::Dir { path: dir_path }));
+            }
+            Ok(())
+        };
+
+        if let Err(err) = read_dir.await {
+            node_tx.send(Err(err));
+        }
+    })
+    .detach();
+}

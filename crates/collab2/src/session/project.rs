@@ -1,16 +1,13 @@
 use core::fmt;
-use std::ffi::OsString;
-use std::io;
 
 use collab_server::message::Peer;
-use e31e::fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
+use e31e::fs::{AbsPath, AbsPathBuf};
 use e31e::{
     CursorCreation,
     CursorId,
     CursorRefMut,
     CursorRelocation,
     CursorRemoval,
-    DirectoryId,
     Edit,
     FileId,
     FileRef,
@@ -18,13 +15,11 @@ use e31e::{
     Hunks,
     PeerId,
     Replica,
-    ReplicaBuilder,
     SelectionCreation,
     SelectionId,
     SelectionRelocation,
     SelectionRemoval,
 };
-use futures_util::StreamExt;
 use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
 use nomad::ctx::{BufferCtx, NeovimCtx};
@@ -77,32 +72,6 @@ impl Project {
     /// it be, use [`remote_peers`](Self::remote_peers) instead.
     pub(crate) fn all_peers(&self) -> impl Iterator<Item = &Peer> {
         self.remote_peers.values().chain(core::iter::once(&self.local_peer))
-    }
-
-    /// TODO: docs.
-    pub(crate) async fn local_from_fs(
-        local_peer: Peer,
-        project_root: AbsPathBuf,
-        neovim_ctx: NeovimCtx<'static>,
-    ) -> Result<Self, ProjectFromFsError> {
-        let replica = read_replica(
-            local_peer.id(),
-            project_root.clone(),
-            neovim_ctx.reborrow(),
-        )
-        .await?;
-        Ok(Self {
-            actor_id: neovim_ctx.next_actor_id(),
-            buffer_actions: NoHashMap::default(),
-            local_cursor_id: None,
-            local_peer,
-            neovim_ctx,
-            project_root,
-            remote_peers: NoHashMap::default(),
-            remote_selections: FxHashMap::default(),
-            remote_tooltips: FxHashMap::default(),
-            replica,
-        })
     }
 
     /// Returns an iterator over the remote [`Peer`]s.
@@ -373,146 +342,6 @@ impl Project {
             peer_selection.relocate(selection_range);
         }
     }
-}
-
-async fn read_replica(
-    local_id: PeerId,
-    project_root: AbsPathBuf,
-    ctx: NeovimCtx<'_>,
-) -> Result<Replica, ProjectFromFsError> {
-    let (node_tx, node_rx) = flume::unbounded();
-    recurse(project_root, node_tx, ctx);
-
-    let mut builder = ReplicaBuilder::new(local_id);
-    while let Ok(res) = node_rx.recv_async().await {
-        let maybe_duplicate_path = match res? {
-            Node::Dir { path } => {
-                // TODO: strip the prefix.
-                builder.push_directory(&path).is_err().then_some(path)
-            },
-            Node::File { path, len } => {
-                // TODO: strip the prefix.
-                builder.push_file(&path, len).is_err().then_some(path)
-            },
-        };
-        if let Some(path) = maybe_duplicate_path {
-            return Err(ProjectFromFsError::ReadDuplicate(path));
-        }
-    }
-
-    Ok(builder.build())
-}
-
-enum Node {
-    Dir { path: AbsPathBuf },
-    File { path: AbsPathBuf, len: u64 },
-}
-
-fn recurse(
-    mut dir_path: AbsPathBuf,
-    node_tx: flume::Sender<Result<Node, ProjectFromFsError>>,
-    ctx: NeovimCtx<'_>,
-) {
-    let ctx_static = ctx.to_static();
-    ctx.spawn(async move {
-        let read_dir = async {
-            let mut entries = match async_fs::read_dir(&dir_path).await {
-                Ok(entries) => entries,
-                Err(io_err) => {
-                    return Err(ProjectFromFsError::CouldntReadDir {
-                        dir_path,
-                        err: io_err,
-                    });
-                },
-            };
-            let mut is_dir_empty = true;
-            while let Some(res) = entries.next().await {
-                is_dir_empty = false;
-                let dir_entry = match res {
-                    Ok(dir_entry) => dir_entry,
-                    Err(io_err) => {
-                        return Err(ProjectFromFsError::CouldntReadDir {
-                            dir_path,
-                            err: io_err,
-                        })
-                    },
-                };
-                let node_name_os = dir_entry.file_name();
-                let node_name = match node_name_os
-                    .to_str()
-                    .and_then(|s| <&FsNodeName>::try_from(s).ok())
-                {
-                    Some(node_name) => node_name,
-                    None => {
-                        return Err(ProjectFromFsError::NodeNameNotUtf8 {
-                            parent_path: dir_path,
-                            fs_node_name: node_name_os,
-                        })
-                    },
-                };
-                let node_type = match dir_entry.file_type().await {
-                    Ok(node_type) => node_type,
-                    Err(io_err) => {
-                        return Err(ProjectFromFsError::CouldntReadType {
-                            fs_node_path: dir_path,
-                            err: io_err,
-                        })
-                    },
-                };
-                dir_path.push(node_name);
-                if node_type.is_file() {
-                    let metadata = match dir_entry.metadata().await {
-                        Ok(metadata) => metadata,
-                        Err(io_err) => {
-                            return Err(
-                                ProjectFromFsError::CouldntReadMetadata {
-                                    fs_node_path: dir_path,
-                                    err: io_err,
-                                },
-                            )
-                        },
-                    };
-                    node_tx.send(Ok(Node::File {
-                        path: dir_path.clone(),
-                        len: metadata.len(),
-                    }));
-                } else if node_type.is_dir() {
-                    recurse(
-                        dir_path.clone(),
-                        node_tx.clone(),
-                        ctx_static.clone(),
-                    );
-                }
-                dir_path.pop();
-            }
-            if is_dir_empty {
-                node_tx.send(Ok(Node::Dir { path: dir_path }));
-            }
-            Ok(())
-        };
-
-        if let Err(err) = read_dir.await {
-            node_tx.send(Err(err));
-        }
-    })
-    .detach();
-}
-
-pub(crate) enum ProjectFromFsError {
-    /// The directory at the given path couldn't be read.
-    CouldntReadDir { dir_path: AbsPathBuf, err: io::Error },
-
-    /// The metadata of the node at the given path couldn't be read.
-    CouldntReadMetadata { fs_node_path: AbsPathBuf, err: io::Error },
-
-    /// The type of the node at the given path couldn't be read.
-    CouldntReadType { fs_node_path: AbsPathBuf, err: io::Error },
-
-    /// A node under the directory at the given path has a non-UTF-8 name.
-    NodeNameNotUtf8 { parent_path: AbsPathBuf, fs_node_name: OsString },
-
-    /// The given path was read twice.
-    ReadDuplicate(AbsPathBuf),
 }
 
 impl fmt::Debug for Project {

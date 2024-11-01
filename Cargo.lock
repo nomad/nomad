@@ -288,7 +288,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#3a5234731d5a483557e364a5a729dcc3dc6df614"
+source = "git+ssh://git@github.com/nomad/collab.git#b340335178cdbff27ef3ce904422007b01ca9d5c"
 dependencies = [
  "e31e",
  "futures-util",
@@ -317,7 +317,7 @@ dependencies = [
 [[package]]
 name = "collab-protocol"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#3a5234731d5a483557e364a5a729dcc3dc6df614"
+source = "git+ssh://git@github.com/nomad/collab.git#b340335178cdbff27ef3ce904422007b01ca9d5c"
 dependencies = [
  "bincode",
  "bytes",
@@ -333,7 +333,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#3a5234731d5a483557e364a5a729dcc3dc6df614"
+source = "git+ssh://git@github.com/nomad/collab.git#b340335178cdbff27ef3ce904422007b01ca9d5c"
 dependencies = [
  "async-channel",
  "collab-protocol",
@@ -736,7 +736,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -848,7 +848,7 @@ dependencies = [
 [[package]]
 name = "nomad-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#3a5234731d5a483557e364a5a729dcc3dc6df614"
+source = "git+ssh://git@github.com/nomad/collab.git#b340335178cdbff27ef3ce904422007b01ca9d5c"
 dependencies = [
  "async-net",
  "collab-message",

@@ -18,8 +18,9 @@ use collab_server::message::{
     ProjectResponse,
     ProjectTree,
 };
+use collab_server::SessionId;
 use detach_buffer_actions::DetachBufferActions;
-use e31e::fs::AbsPath;
+use e31e::fs::{AbsPath, AbsPathBuf};
 use futures_util::{
     pin_mut,
     select,
@@ -55,8 +56,38 @@ pub(crate) struct Session {
     project: Shared<Project>,
 }
 
+pub(crate) struct NewSessionArgs {
+    /// Whether the [`local_peer`](Self::local_peer) is the host of the
+    /// session.
+    pub(crate) is_host: bool,
+
+    /// The local [`Peer`].
+    pub(crate) local_peer: Peer,
+
+    /// The remote [`Peers`].
+    pub(crate) remote_peers: Peers,
+
+    /// The absolute path to the directory containing the project.
+    ///
+    /// The contents of the directory are assumed to be in sync with with the
+    /// [`replica`](Self::replica).
+    pub(crate) project_root: AbsPathBuf,
+
+    /// The [`replica`](Self::replica) of the project.
+    ///
+    /// The files and directories in it are assumed to be in sync with the
+    /// contents of the [`project_root`](Self::project_root).
+    pub(crate) replica: e31e::Replica,
+
+    /// The ID of the session.
+    pub(crate) session_id: SessionId,
+
+    /// An instance of the [`NeovimCtx`].
+    pub(crate) neovim_ctx: NeovimCtx<'static>,
+}
+
 impl Session {
-    pub(crate) async fn join() -> Self {
+    pub(crate) fn new(_args: NewSessionArgs) -> Self {
         todo!();
     }
 
@@ -64,12 +95,8 @@ impl Session {
         self.project.clone()
     }
 
-    pub(crate) async fn start() -> Self {
-        todo!();
-    }
-
     pub(crate) async fn run<Tx, Rx, RxError>(
-        &mut self,
+        &self,
         remote_tx: Tx,
         remote_rx: Rx,
     ) -> Result<(), RunSessionError<Tx::Error, RxError>>
