@@ -58,8 +58,9 @@ impl AsyncAction for Join {
             .request_project().await?
             .find_project_root().await?
             .flush_project().await?
-            .jump_to_host().await?
-            .run_session().await?;
+            .jump_to_host()
+            .run_session().await?
+            .remove_project_root().await;
 
         Ok(())
     }
@@ -120,6 +121,10 @@ struct JumpToHost {
     project: collab_server::message::Project,
     project_root: AbsPathBuf,
     joiner: Joiner,
+}
+
+struct RemoveProjectRoot {
+    project_root: AbsPathBuf,
 }
 
 struct RunSession {
@@ -350,13 +355,13 @@ impl FlushProject {
 }
 
 impl JumpToHost {
-    async fn jump_to_host(self) -> Result<RunSession, JumpToHostError> {
+    fn jump_to_host(self) -> RunSession {
         todo!();
     }
 }
 
 impl RunSession {
-    async fn run_session(self) -> Result<(), RunSessionError> {
+    async fn run_session(self) -> Result<RemoveProjectRoot, RunSessionError> {
         let collab_server::client::Joined {
             sender,
             receiver,
@@ -368,7 +373,7 @@ impl RunSession {
             is_host: false,
             local_peer: self.local_peer,
             remote_peers: self.remote_peers,
-            project_root: self.project_root,
+            project_root: self.project_root.clone(),
             replica: self.replica,
             session_id,
             neovim_ctx: self.joiner.ctx,
@@ -376,12 +381,15 @@ impl RunSession {
 
         let status = SessionStatus::InSession(session.project());
         self.joiner.session_status.set(status);
+        session.run(sender, receiver).await.map_err(|_err| todo!())?;
 
-        if let Err(_err) = session.run(sender, receiver).await {
-            todo!();
-        }
+        Ok(RemoveProjectRoot { project_root: self.project_root })
+    }
+}
 
-        Ok(())
+impl RemoveProjectRoot {
+    async fn remove_project_root(self) {
+        let _ = async_fs::remove_dir(self.project_root).await;
     }
 }
 

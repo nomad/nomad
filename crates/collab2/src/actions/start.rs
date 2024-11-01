@@ -326,12 +326,7 @@ impl RunSession {
 
         let status = SessionStatus::InSession(session.project());
         self.starter.session_status.set(status);
-
-        if let Err(_err) = session.run(sender, receiver).await {
-            todo!();
-        }
-
-        Ok(())
+        session.run(sender, receiver).await.map_err(|_err| todo!())
     }
 }
 
