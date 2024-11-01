@@ -281,6 +281,7 @@ dependencies = [
  "serde",
  "smallvec",
  "smol_str",
+ "thiserror",
  "tracing",
 ]
 

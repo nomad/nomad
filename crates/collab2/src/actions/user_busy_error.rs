@@ -9,14 +9,28 @@ use crate::session_status::SessionStatus;
 ///
 /// The generic parameter represents whether the user was trying to start or
 /// join a session when the error occurred.
+#[derive(Debug, thiserror::Error)]
 pub(crate) enum UserBusyError<const WAS_STARTING: bool> {
     /// Another session is being started.
+    #[error(
+        "can't start a new session while another is being {}ed",
+        if WAS_STARTING { "start" } else { "join" }
+    )]
     Starting,
 
     /// Another session is being joined.
+    #[error(
+        "can't join a new session while another is being {}ed",
+        if WAS_STARTING { "start" } else { "join" }
+    )]
     Joining,
 
     /// The user is already in a session.
+    #[error(
+        "can't {} a new session, another is already in progress at `{}`",
+        if WAS_STARTING { "start" } else { "join" },
+        .0.with(|p| p.root().to_string())
+    )]
     InSession(Shared<Project>),
 }
 

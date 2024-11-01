@@ -21,6 +21,7 @@ root-finder = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
 smol_str = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [lints]

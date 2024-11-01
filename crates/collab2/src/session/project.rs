@@ -1,3 +1,4 @@
+use core::fmt;
 use std::ffi::OsString;
 use std::io;
 
@@ -512,4 +513,10 @@ pub(crate) enum ProjectFromFsError {
 
     /// The given path was read twice.
     ReadDuplicate(AbsPathBuf),
+}
+
+impl fmt::Debug for Project {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Project").field(&self.project_root).finish()
+    }
 }

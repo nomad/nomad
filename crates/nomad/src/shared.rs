@@ -1,6 +1,7 @@
 //! TODO: docs
 
 use core::cell::{Cell, UnsafeCell};
+use core::fmt;
 #[cfg(debug_assertions)]
 use core::panic::Location;
 use std::rc::Rc;
@@ -89,6 +90,12 @@ impl<T> Shared<T> {
     #[track_caller]
     pub fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
         self.inner.with_mut(fun)
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Shared<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.with(|field| f.debug_tuple("Shared").field(&field).finish())
     }
 }
 
