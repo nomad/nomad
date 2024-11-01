@@ -71,7 +71,7 @@ struct StartSession;
 struct RunSession;
 
 #[derive(Debug, thiserror::Error)]
-enum StartError {
+pub(crate) enum StartError {
     #[error(transparent)]
     ConfirmStart(#[from] ConfirmStartError),
 
@@ -99,37 +99,31 @@ enum StartError {
 
 #[derive(Debug, thiserror::Error)]
 #[error("failed to find project root")]
-struct FindProjectRootError;
+pub(crate) struct FindProjectRootError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-struct ConfirmStartError;
+pub(crate) struct ConfirmStartError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-struct ReadProjectError;
+pub(crate) struct ReadProjectError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-struct ConnectToServerError;
+pub(crate) struct ConnectToServerError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-struct AuthenticateError;
+pub(crate) struct AuthenticateError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-struct StartSessionError;
+pub(crate) struct StartSessionError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
-struct RunSessionError;
-
-impl<State> From<State> for Starter<State> {
-    fn from(_state: State) -> Self {
-        todo!();
-    }
-}
+pub(crate) struct RunSessionError;
 
 impl Starter<FindProjectRoot> {
     fn new(
@@ -195,6 +189,12 @@ impl Starter<StartSession> {
 
 impl Starter<RunSession> {
     async fn run_session(self) -> Result<(), RunSessionError> {
+        todo!();
+    }
+}
+
+impl<State> From<State> for Starter<State> {
+    fn from(_state: State) -> Self {
         todo!();
     }
 }
