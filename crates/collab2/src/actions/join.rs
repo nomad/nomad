@@ -1,16 +1,19 @@
 use std::io;
+use std::rc::Rc;
 
 use collab_server::message::{
+    FileRef,
     GitHubHandle,
     Message,
     Peer,
     Peers,
     ProjectRequest,
+    ProjectTree,
 };
 use collab_server::AuthInfos;
-use e31e::fs::AbsPathBuf;
-use e31e::Replica;
-use futures_util::{SinkExt, StreamExt};
+use e31e::fs::{AbsPath, AbsPathBuf};
+use e31e::{DirectoryId, Replica};
+use futures_util::{stream, AsyncWriteExt, SinkExt, StreamExt};
 use nomad::ctx::NeovimCtx;
 use nomad::diagnostics::DiagnosticMessage;
 use nomad::{action_name, ActionName, AsyncAction, Shared};
@@ -222,6 +225,9 @@ pub(crate) enum FlushProjectError {
 
     #[error("")]
     CreateFile { file_path: AbsPathBuf, err: io::Error },
+
+    #[error("")]
+    WriteFile { file_path: AbsPathBuf, err: io::Error },
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -381,16 +387,25 @@ impl FlushProject {
         })?;
 
         let (err_tx, err_rx) = flume::unbounded();
+        let tree = self.project.tree;
+        let root_id = tree.root().id();
+        let tree = Rc::new(tree);
         recurse(
-            self.project.tree.root(),
+            Rc::clone(&tree),
+            root_id,
             self.project_root.clone(),
-            ErrTx { inner: err_tx },
+            ErrTx { has_errored: Shared::new(false), inner: err_tx },
             self.joiner.ctx.reborrow(),
         );
 
-        if let Ok(err) = err_rx.recv_async().await {
-            return Err(err);
-        }
+        let tree = match err_rx.recv_async().await {
+            Ok(err) => return Err(err),
+            Err(_all_senders_dropped_err) => {
+                // All the senders have been dropped, so all the other
+                // instances of the tree must have been dropped as well.
+                Rc::into_inner(tree).expect("recursion has ended")
+            },
+        };
 
         let local_peer_id = self.local_peer.id();
 
@@ -400,7 +415,7 @@ impl FlushProject {
             local_peer: self.local_peer,
             project_root: self.project_root,
             remote_peers: self.project.peers,
-            replica: self.project.tree.into_replica(local_peer_id),
+            replica: tree.into_replica(local_peer_id),
             joiner: self.joiner,
         })
     }
@@ -453,23 +468,95 @@ impl RemoveProjectRoot {
     }
 }
 
+#[derive(Clone)]
 struct ErrTx {
+    has_errored: Shared<bool>,
     inner: flume::Sender<FlushProjectError>,
 }
 
 impl ErrTx {
-    fn send(&self, err: FlushProjectError) {
+    fn has_errored(&self) -> bool {
+        self.has_errored.get()
+    }
+
+    fn send(self, err: FlushProjectError) {
+        self.has_errored.set(true);
         self.inner.send(err).expect("receiver hasn't been dropped");
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn recurse(
-    dir: collab_server::message::DirectoryRef<'_>,
-    dir_path: AbsPathBuf,
+    tree: Rc<ProjectTree>,
+    parent_id: DirectoryId,
+    parent_path: AbsPathBuf,
     err_tx: ErrTx,
     ctx: NeovimCtx<'_>,
 ) {
-    todo!();
+    if err_tx.has_errored() {
+        return;
+    }
+
+    ctx.spawn(|ctx| async move {
+        let parent = tree.directory(parent_id);
+
+        // The directories are created sequentially to allow recursion.
+        for dir in parent.directory_children() {
+            let mut dir_path = parent_path.clone();
+            dir_path.push(dir.name().expect("can't be root"));
+            if let Err(err) = create_directory(&dir_path).await {
+                err_tx.send(err);
+                return;
+            }
+            let tree = Rc::clone(&tree);
+            recurse(tree, dir.id(), dir_path, err_tx.clone(), ctx.reborrow());
+        }
+
+        // Within a directory, all the files are created concurrently.
+        let mut create_files = parent
+            .file_children()
+            .map(|file| {
+                let mut file_path = parent_path.clone();
+                file_path.push(file.name());
+                create_file(file, file_path)
+            })
+            .collect::<stream::FuturesUnordered<_>>();
+
+        while let Some(res) = create_files.next().await {
+            if let Err(err) = res {
+                err_tx.send(err);
+                return;
+            }
+        }
+    })
+    .detach();
+}
+
+async fn create_file(
+    file_ref: FileRef<'_>,
+    file_path: AbsPathBuf,
+) -> Result<(), FlushProjectError> {
+    let mut file = match async_fs::File::create(&file_path).await {
+        Ok(file) => file,
+        Err(err) => {
+            return Err(FlushProjectError::CreateFile { file_path, err });
+        },
+    };
+    if let Err(err) = file.write_all(file_ref.contents().as_bytes()).await {
+        return Err(FlushProjectError::WriteFile { file_path, err });
+    }
+    match file.flush().await {
+        Ok(()) => Ok(()),
+        Err(err) => Err(FlushProjectError::WriteFile { file_path, err }),
+    }
+}
+
+async fn create_directory(
+    dir_path: &AbsPath,
+) -> Result<(), FlushProjectError> {
+    async_fs::create_dir(&dir_path).await.map_err(|err| {
+        FlushProjectError::CreateDir { dir_path: dir_path.to_owned(), err }
+    })
 }
 
 impl From<JoinError> for DiagnosticMessage {
