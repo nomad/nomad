@@ -282,12 +282,22 @@ impl ReadReplica {
         while let Ok(res) = node_rx.recv_async().await {
             let maybe_duplicate_path = match res? {
                 Node::Dir { path } => {
-                    // TODO: strip the prefix.
-                    builder.push_directory(&path).is_err().then_some(path)
+                    let path_in_project = path
+                        .strip_prefix(&self.project_root)
+                        .expect("dir is a descendant of the project root");
+                    builder
+                        .push_directory(path_in_project)
+                        .is_err()
+                        .then_some(path)
                 },
                 Node::File { path, len } => {
-                    // TODO: strip the prefix.
-                    builder.push_file(&path, len).is_err().then_some(path)
+                    let path_in_project = path
+                        .strip_prefix(&self.project_root)
+                        .expect("file is a descendant of the project root");
+                    builder
+                        .push_file(path_in_project, len)
+                        .is_err()
+                        .then_some(path)
                 },
             };
             if let Some(path) = maybe_duplicate_path {
