@@ -305,7 +305,11 @@ impl JoinSession {
 
 impl ConfirmJoin {
     async fn confirm_join(self) -> Result<RequestProject, ConfirmJoinError> {
-        todo!();
+        Ok(RequestProject {
+            joined: self.joined,
+            local_peer: self.local_peer,
+            joiner: self.joiner,
+        })
     }
 }
 

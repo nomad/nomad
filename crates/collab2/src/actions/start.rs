@@ -5,10 +5,12 @@ use collab_server::message::{GitHubHandle, Peer, Peers};
 use collab_server::AuthInfos;
 use e31e::fs::{AbsPathBuf, FsNodeName};
 use e31e::{Replica, ReplicaBuilder};
+use fs::os_fs::OsFs;
 use futures_util::StreamExt;
 use nomad::ctx::{BufferCtx, NeovimCtx};
 use nomad::diagnostics::DiagnosticMessage;
 use nomad::{action_name, ActionName, AsyncAction, Shared};
+use root_finder::markers;
 
 use super::UserBusyError;
 use crate::session::{NewSessionArgs, Session};
@@ -71,6 +73,7 @@ struct Authenticate {
 }
 
 struct ConfirmStart {
+    project_root: AbsPathBuf,
     starter: Starter,
 }
 
@@ -147,8 +150,14 @@ pub(crate) struct ConnectToServerError {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum FindProjectRootError {
+    #[error(transparent)]
+    FindRoot(#[from] root_finder::FindRootError<OsFs>),
+
     #[error("current buffer is not a file")]
     NotInFile,
+
+    #[error("couldn't find the root of the project containing `{file_path}`")]
+    UnknownRoot { file_path: AbsPathBuf },
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -202,11 +211,20 @@ impl Starter {
     async fn find_project_root(
         self,
     ) -> Result<ConfirmStart, FindProjectRootError> {
-        let _file_ctx = BufferCtx::current(self.ctx.reborrow())
+        let file_ctx = BufferCtx::current(self.ctx.reborrow())
             .into_file()
             .ok_or(FindProjectRootError::NotInFile)?;
 
-        todo!();
+        let Some(project_root) = root_finder::Finder::new(OsFs)
+            .find_root(file_ctx.path(), markers::Git)
+            .await?
+        else {
+            return Err(FindProjectRootError::UnknownRoot {
+                file_path: file_ctx.path().to_owned(),
+            });
+        };
+
+        Ok(ConfirmStart { project_root, starter: self })
     }
 }
 
@@ -214,7 +232,10 @@ impl ConfirmStart {
     async fn confirm_start(
         self,
     ) -> Result<ConnectToServer, ConfirmStartError> {
-        todo!();
+        Ok(ConnectToServer {
+            project_root: self.project_root,
+            starter: self.starter,
+        })
     }
 }
 
