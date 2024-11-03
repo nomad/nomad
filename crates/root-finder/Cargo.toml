@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-e31e = { workspace = true }
+fs = { workspace = true }
 futures-util = { workspace = true }
 
 [lints]

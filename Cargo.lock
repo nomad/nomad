@@ -271,6 +271,7 @@ dependencies = [
  "async-recursion",
  "e31e",
  "flume",
+ "fs",
  "futures-util",
  "fxhash",
  "nohash",
@@ -457,7 +458,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "e31e"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/e31e.git#a895d4631150e29ac4baa8db15de1e05fee1d5ce"
+source = "git+ssh://git@github.com/nomad/e31e.git#c982ef4f392ed9c0c3e8e86351a9bed0f44635f4"
 dependencies = [
  "cola",
  "compact_str",
@@ -1138,7 +1139,7 @@ dependencies = [
 name = "root-finder"
 version = "0.1.0"
 dependencies = [
- "e31e",
+ "fs",
  "futures-util",
 ]
 
