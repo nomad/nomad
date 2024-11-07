@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use futures_util::{Stream, StreamExt};
+use futures_util::{ready, Stream, StreamExt};
 use fxhash::FxHashMap;
 use nvim_oxi::{
     Dictionary as NvimDictionary,
@@ -173,11 +173,8 @@ impl<M: Module> Stream for ConfigStream<M> {
         self: Pin<&mut Self>,
         ctx: &mut Context,
     ) -> Poll<Option<Self::Item>> {
-        let obj = match self.get_mut().inner.poll_next_unpin(ctx) {
-            Poll::Ready(Some(obj)) => obj,
-            Poll::Ready(None) => return Poll::Ready(None),
-            Poll::Pending => unreachable!(),
-        };
+        let obj = ready!(self.get_mut().inner.poll_next_unpin(ctx))
+            .expect("sender is never dropped");
 
         match crate::serde::deserialize::<M::Config>(obj) {
             Ok(config) => Poll::Ready(Some(config)),
