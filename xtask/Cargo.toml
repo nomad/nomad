@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 anyhow = "1.0"
+cargo_metadata = "0.18"
 clap = { version = "4", features = ["derive"] }
 fs = { workspace = true }
 futures-executor = "0.3"

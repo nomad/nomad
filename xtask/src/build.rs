@@ -1,13 +1,13 @@
 use anyhow::anyhow;
 use fs::os_fs::OsFs;
-use fs::{AbsPath, AbsPathBuf};
+use fs::{AbsPath, AbsPathBuf, FsNodeName};
 use futures_executor::block_on;
 use root_finder::markers;
 
 pub(crate) fn build(_release: bool) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
     let project_root = find_project_root(&sh)?;
-    let package_name = parse_package_name(&project_root, &sh)?;
+    let package_name = parse_package_name(&project_root)?;
     let nvim_version = detect_nvim_version(&sh)?;
     build_plugin(&project_root, &package_name, nvim_version, &sh)?;
     fix_library_name(&project_root, &package_name, &sh)?;
@@ -22,11 +22,22 @@ fn find_project_root(sh: &xshell::Shell) -> anyhow::Result<AbsPathBuf> {
         .ok_or_else(|| anyhow!("Could not find the project root"))
 }
 
-fn parse_package_name(
-    project_root: &AbsPath,
-    sh: &xshell::Shell,
-) -> anyhow::Result<String> {
-    todo!();
+fn parse_package_name(project_root: &AbsPath) -> anyhow::Result<String> {
+    let cargo_dot_toml = {
+        let mut root = project_root.to_owned();
+        #[allow(clippy::unwrap_used)]
+        root.push(<&FsNodeName>::try_from("Cargo.toml").unwrap());
+        root
+    };
+    let metadata = cargo_metadata::MetadataCommand::new()
+        .manifest_path(cargo_dot_toml.clone())
+        .exec()?;
+    metadata.root_package().map(|p| p.name.to_owned()).ok_or_else(|| {
+        anyhow!(
+            "Could not find the root package for manifest at \
+             {cargo_dot_toml:?}"
+        )
+    })
 }
 
 fn detect_nvim_version(sh: &xshell::Shell) -> anyhow::Result<NeovimVersion> {
