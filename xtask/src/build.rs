@@ -9,6 +9,9 @@ use futures_executor::block_on;
 use root_finder::markers;
 use xshell::cmd;
 
+/// The desired name of the library to placed in the `/lua` directory.
+const LIBRARY_NAME: &str = "nomad";
+
 pub(crate) fn build(release: bool) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
     let project_root = find_project_root(&sh)?;
@@ -131,15 +134,16 @@ fn fix_library_name(
         ));
     }
     let source = format!(
-        "{prefix}{library_name}{suffix}",
+        "{prefix}{source_name}{suffix}",
         prefix = env::consts::DLL_PREFIX,
-        library_name = &cdylib_target.name,
+        source_name = &cdylib_target.name,
         suffix = env::consts::DLL_SUFFIX
     )
     .parse::<FsNodeNameBuf>()
     .unwrap();
     let dest = format!(
-        "nomad{suffix}",
+        "{dest_name}{suffix}",
+        dest_name = LIBRARY_NAME,
         suffix = if cfg!(target_os = "windows") { ".dll" } else { ".so" }
     )
     .parse::<FsNodeNameBuf>()
@@ -158,7 +162,7 @@ fn artifact_dir(project_root: &AbsPath) -> AbsPathBuf {
     dir
 }
 
-/// The possible Neovim versions the Nomad plugin can be built for.
+/// The possible Neovim versions our plugin can be built for.
 #[derive(Debug)]
 enum NeovimVersion {
     /// The latest stable version.
