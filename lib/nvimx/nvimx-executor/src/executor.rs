@@ -1,107 +1,141 @@
-use alloc::rc::Rc;
 use core::future::Future;
-use core::marker::PhantomData;
+use std::rc::Rc;
 
 use async_task::{Builder, Runnable};
-use concurrent_queue::ConcurrentQueue;
-use nvim_oxi::libuv;
+use concurrent_queue::{ConcurrentQueue, PopError, PushError};
+use nvim_oxi::{libuv, schedule};
 
-use crate::Task;
+use crate::join_handle::JoinHandle;
 
-/// A single-threaded executor integrated with the Neovim event loop.
-///
-/// See the [crate-level](crate) documentation for more information.
-pub struct Executor<'a> {
-    /// The executor state.
+/// TODO: docs
+pub struct Executor {
+    /// TODO: docs
+    async_handle: libuv::AsyncHandle,
+
+    /// TODO: docs
     state: Rc<ExecutorState>,
-
-    /// A handle to the callback that ticks the executor.
-    callback_handle: libuv::AsyncHandle,
-
-    /// A fake lifetime to avoid having to require a `'static` lifetime for the
-    /// futures given to [`spawn`](Self::spawn).
-    _lifetime: PhantomData<&'a ()>,
 }
 
 struct ExecutorState {
-    /// The queue of tasks that are ready to be polled.
-    woken_queue: ConcurrentQueue<Runnable<()>>,
+    woken_queue: TaskQueue,
 }
 
-impl<'a> Executor<'a> {
-    /// TODO: docs.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called from a non-main thread.
-    #[inline]
-    pub fn register() -> Self {
-        // TODO: assert that it's the main thread.
+/// The queue of tasks that are ready to be polled.
+struct TaskQueue {
+    queue: ConcurrentQueue<Task>,
+}
 
+struct Task {
+    runnable: Runnable<()>,
+}
+
+impl Executor {
+    /// TODO: docs
+    pub fn register() -> Self {
         let state = Rc::new(ExecutorState::new());
 
-        let callback_handle = {
-            let state = Rc::clone(&state);
+        let also_state = Rc::clone(&state);
 
-            libuv::AsyncHandle::new(move || {
-                let state = Rc::clone(&state);
-                // We schedule the poll to avoid `textlock` and other
-                // synchronization issues.
-                nvim_oxi::schedule(move |_| {
-                    state.poll_all_woken();
-                });
-            })
-            .expect("never fails(?)")
-        };
+        // This callback will be registered to be executed on the next tick of
+        // the libuv event loop everytime a future calls `Waker::wake()`.
+        let async_handle = libuv::AsyncHandle::new(move || {
+            let state = Rc::clone(&also_state);
 
-        Self { state, callback_handle, _lifetime: PhantomData }
+            // We schedule the poll to avoid `textlock` and other
+            // synchronization issues.
+            schedule(move |()| {
+                state.tick_all();
+            });
+        })
+        .expect("creating an async handle never fails");
+
+        Self { async_handle, state }
     }
 
-    /// TODO: docs.
-    #[inline]
-    pub fn spawn<F>(&self, future: F) -> Task<F::Output>
+    /// TODO: docs
+    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
-        F: Future<Output = ()> + 'a,
+        F: Future + 'static,
+        F::Output: 'static,
     {
         let builder = Builder::new().propagate_panic(true);
 
         let schedule = {
-            let callback_handle = self.callback_handle.clone();
+            let async_handle = self.async_handle.clone();
             let state = Rc::clone(&self.state);
             move |runnable| {
-                state.woken_queue.push(runnable).expect("unbounded queue");
-                callback_handle.send().expect("never fails(?)");
+                let task = Task::new(runnable);
+                state.woken_queue.push_back(task);
+                async_handle
+                    .send()
+                    .expect("sending an async handle never fails");
             }
         };
 
         // SAFETY:
-        // - future outlives the executor;
-        // - runnables are dropped when `ExecutorState::poll_all_woken` is
-        //   called, and `Self::register` made sure that happens on the main
-        //   thread.
+        //
+        // - the future is not `Send`, but we're dropping the `Runnable` on the
+        // next line, so definitely on this thread;
         let (runnable, task) =
-            unsafe { builder.spawn_unchecked(|_| future, schedule) };
+            unsafe { builder.spawn_unchecked(|()| future, schedule) };
 
-        runnable.schedule();
+        // Poll the future once immediately.
+        Task::new(runnable).poll();
 
-        Task::new(task)
+        JoinHandle::new(task)
     }
 }
 
 impl ExecutorState {
-    /// Creates a new [`ExecutorState`].
-    #[inline]
+    /// TODO: docs
     fn new() -> Self {
-        Self { woken_queue: ConcurrentQueue::unbounded() }
+        Self { woken_queue: TaskQueue::new() }
     }
 
-    /// Polls all the tasks that have awoken since the last poll.
-    ///
-    /// This consumes the task queue in a FIFO manner.
-    #[inline]
-    fn poll_all_woken(&self) {
-        while let Ok(runnable) = self.woken_queue.pop() {
-            runnable.run();
+    /// TODO: docs
+    fn tick_all(&self) {
+        for _ in 0..self.woken_queue.len() {
+            self.woken_queue.pop_front().expect("checked queue length").poll();
         }
+    }
+}
+
+impl TaskQueue {
+    /// TODO: docs
+    fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// TODO: docs
+    fn new() -> Self {
+        Self { queue: ConcurrentQueue::unbounded() }
+    }
+
+    /// TODO: docs
+    fn pop_front(&self) -> Option<Task> {
+        match self.queue.pop() {
+            Ok(task) => Some(task),
+            Err(PopError::Empty) => None,
+            Err(PopError::Closed) => unreachable!(),
+        }
+    }
+
+    /// TODO: docs
+    fn push_back(&self, task: Task) {
+        match self.queue.push(task) {
+            Ok(()) => {},
+            Err(PushError::Full(_)) => unreachable!("queue is unbounded"),
+            Err(PushError::Closed(_)) => unreachable!("queue is never closed"),
+        }
+    }
+}
+
+impl Task {
+    fn new(runnable: Runnable<()>) -> Self {
+        Self { runnable }
+    }
+
+    fn poll(self) {
+        self.runnable.run();
     }
 }

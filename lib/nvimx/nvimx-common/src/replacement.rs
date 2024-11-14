@@ -1,70 +1,49 @@
 use core::ops::Range;
 
-use smol_str::SmolStr;
+use crate::byte_offset::ByteOffset;
+use crate::text::Text;
 
-/// A replacement edit on a buffer.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Replacement<Offset> {
-    start: Offset,
-    end: Offset,
-    replacement: SmolStr,
+/// TODO: docs.
+#[derive(Clone)]
+pub struct Replacement {
+    deleted_range: Range<ByteOffset>,
+    inserted_text: Text,
 }
 
-impl<Offset: Copy> Replacement<Offset> {
-    /// TODO: docs.
-    #[inline]
-    pub fn deletion(range: Range<Offset>) -> Self {
-        Self::new(range, SmolStr::default())
+impl Replacement {
+    /// Returns the range of bytes that were deleted.
+    pub fn deleted_range(&self) -> Range<ByteOffset> {
+        self.deleted_range.clone()
     }
 
-    /// The end of the replaced range.
-    #[inline]
-    pub fn end(&self) -> Offset {
-        self.end
+    /// Returns the text that was inserted.
+    pub fn inserted_text(&self) -> &Text {
+        &self.inserted_text
     }
 
-    /// TODO: docs.
-    #[inline]
-    pub fn insertion(at: Offset, text: impl Into<SmolStr>) -> Self {
-        Self::new(at..at, text.into())
+    /// Creates a new `Replacement`.
+    pub fn new(deleted_range: Range<ByteOffset>, inserted_text: Text) -> Self {
+        Self { deleted_range, inserted_text }
     }
+}
 
-    /// TODO: docs.
-    #[inline]
-    pub fn map_range<NewOffset>(
-        self,
-        f: impl FnOnce(Range<Offset>) -> Range<NewOffset>,
-    ) -> Replacement<NewOffset> {
-        let Self { start, end, replacement } = self;
-        let range = f(start..end);
-        Replacement { start: range.start, end: range.end, replacement }
+impl From<e31e::Hunk> for Replacement {
+    fn from(hunk: e31e::Hunk) -> Self {
+        let deleted_start = hunk.removed_range.start.into();
+        let deleted_end = hunk.removed_range.start.into();
+        let mut inserted_text = Text::new();
+        inserted_text.push_str(hunk.inserted_text.as_str());
+        Self { deleted_range: deleted_start..deleted_end, inserted_text }
     }
+}
 
-    /// TODO: docs.
-    #[inline]
-    pub fn new(range: Range<Offset>, replacement: impl Into<SmolStr>) -> Self {
+impl From<Replacement> for e31e::Hunk {
+    fn from(replacement: Replacement) -> Self {
+        let removed_start = replacement.deleted_range.start.into_u64();
+        let removed_end = replacement.deleted_range.end.into_u64();
         Self {
-            start: range.start,
-            end: range.end,
-            replacement: replacement.into(),
+            removed_range: removed_start..removed_end,
+            inserted_text: e31e::Text::new(replacement.inserted_text),
         }
-    }
-
-    /// The deleted range.
-    #[inline]
-    pub fn range(&self) -> Range<Offset> {
-        self.start..self.end
-    }
-
-    /// The text the range is replaced with.
-    #[inline]
-    pub fn text(&self) -> &str {
-        &self.replacement
-    }
-
-    /// The end of the replaced range.
-    #[inline]
-    pub fn start(&self) -> Offset {
-        self.start
     }
 }

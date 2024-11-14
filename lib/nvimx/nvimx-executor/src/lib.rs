@@ -3,7 +3,7 @@
 extern crate alloc;
 
 mod executor;
-mod task;
+mod join_handle;
 
 pub use executor::Executor;
-pub use task::Task;
+pub use join_handle::JoinHandle;

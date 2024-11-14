@@ -1,14 +1,16 @@
 [package]
-name = "root-finder"
+name = "nvimx-fs"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish.workspace = true
 
 [dependencies]
+async-fs = { workspace = true }
+e31e = { workspace = true }
 futures-util = { workspace = true }
-nvimx = { workspace = true }
+pin-project-lite = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true

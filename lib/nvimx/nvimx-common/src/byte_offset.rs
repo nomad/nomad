@@ -1,70 +1,68 @@
-use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
-
-use crate::{ByteLen, Metric};
+use core::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A byte offset in a buffer.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ByteOffset(usize);
 
 impl ByteOffset {
-    /// Returns the byte offset as a `usize`.
-    #[inline]
-    pub fn as_usize(&self) -> usize {
-        self.0
+    /// Converts the [`ByteOffset`] into a `u64`.
+    pub fn into_u64(self) -> u64 {
+        self.0.try_into().expect("too big to fail")
     }
 
-    /// Creates a new `ByteOffset` with the given offset.
-    #[inline]
+    /// Creates a new [`ByteOffset`] from the given offset.
     pub fn new(offset: usize) -> Self {
         Self(offset)
     }
 }
 
-impl Add<ByteLen> for ByteOffset {
+impl Add<Self> for ByteOffset {
     type Output = Self;
 
     #[inline]
-    fn add(self, len: ByteLen) -> Self {
-        Self(self.as_usize() + len.as_usize())
+    fn add(self, rhs: Self) -> Self {
+        Self(self.0 + rhs.0)
     }
 }
 
-impl AddAssign<ByteLen> for ByteOffset {
+impl AddAssign<Self> for ByteOffset {
     #[inline]
-    fn add_assign(&mut self, len: ByteLen) {
-        self.0 += len.as_usize();
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
     }
 }
 
-impl Sub<ByteLen> for ByteOffset {
+impl Add<usize> for ByteOffset {
     type Output = Self;
 
     #[inline]
-    fn sub(self, len: ByteLen) -> Self {
-        Self(self.as_usize() - len.as_usize())
+    fn add(self, rhs: usize) -> Self {
+        Self(self.0 + rhs)
     }
 }
 
-impl SubAssign<ByteLen> for ByteOffset {
-    #[inline]
-    fn sub_assign(&mut self, len: ByteLen) {
-        self.0 -= len.as_usize();
-    }
-}
-
-impl Mul<usize> for ByteOffset {
+impl Sub<Self> for ByteOffset {
     type Output = Self;
 
     #[inline]
-    fn mul(self, rhs: usize) -> Self {
-        Self(self.0 * rhs)
+    fn sub(self, rhs: Self) -> Self {
+        Self(self.0 - rhs.0)
     }
 }
 
-impl MulAssign<usize> for ByteOffset {
+impl SubAssign<Self> for ByteOffset {
     #[inline]
-    fn mul_assign(&mut self, rhs: usize) {
-        self.0 *= rhs;
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
+    }
+}
+
+impl Sub<usize> for ByteOffset {
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: usize) -> Self {
+        Self(self.0 - rhs)
     }
 }
 
@@ -75,16 +73,23 @@ impl From<usize> for ByteOffset {
     }
 }
 
-impl From<ByteOffset> for usize {
+impl From<u64> for ByteOffset {
     #[inline]
-    fn from(offset: ByteOffset) -> usize {
-        offset.as_usize()
+    fn from(offset: u64) -> Self {
+        Self::new(offset.try_into().expect("too big to fail"))
     }
 }
 
-impl Metric for ByteOffset {
+impl From<ByteOffset> for usize {
     #[inline]
-    fn zero() -> Self {
-        Self(0)
+    fn from(offset: ByteOffset) -> usize {
+        offset.0
+    }
+}
+
+impl From<ByteOffset> for nvim_oxi::Object {
+    #[inline]
+    fn from(offset: ByteOffset) -> Self {
+        (offset.0 as nvim_oxi::Integer).into()
     }
 }

@@ -30,17 +30,19 @@ thiserror = "2.0"
 tracing = "0.1"
 
 nvimx = { path = "./lib/nvimx" }
+nvimx-action = { path = "./lib/nvimx/nvimx-action" }
 nvimx-common = { path = "./lib/nvimx/nvimx-common" }
+nvimx-ctx = { path = "./lib/nvimx/nvimx-ctx" }
+nvimx-diagnostics = { path = "./lib/nvimx/nvimx-diagnostics" }
 nvimx-executor = { path = "./lib/nvimx/nvimx-executor" }
+nvimx-fs = { path = "./lib/nvimx/nvimx-fs" }
 nvimx-macros = { path = "./lib/nvimx/nvimx-macros" }
-nvimx-project = { path = "./lib/nvimx/nvimx-project" }
 nvimx-tests = { path = "./lib/nvimx/nvimx-tests" }
 nvimx-ui = { path = "./lib/nvimx/nvimx-ui" }
 
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
-fs = { path = "./crates/fs" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 version = { path = "./crates/version" }

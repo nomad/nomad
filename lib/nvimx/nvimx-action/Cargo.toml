@@ -1,14 +1,13 @@
 [package]
-name = "root-finder"
+name = "nvimx-action"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish.workspace = true
 
 [dependencies]
-futures-util = { workspace = true }
-nvimx = { workspace = true }
+nvimx-common = { workspace = true }
+nvimx-diagnostics = { workspace = true }
 
 [lints]
 workspace = true

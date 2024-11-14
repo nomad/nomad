@@ -6,19 +6,34 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["neovim-nightly"]
+default = ["neovim-0-10"]
+neovim-0-10 = [
+  "nvim-oxi/neovim-0-10",
+  "nvimx-common/neovim-0-10",
+  "nvimx-ctx/neovim-0-10",
+  "nvimx-diagnostics/neovim-0-10",
+  "nvimx-executor/neovim-0-10",
+  "nvimx-tests/neovim-0-10",
+  "nvimx-ui/neovim-0-10",
+]
 neovim-nightly = [
   "nvim-oxi/neovim-nightly",
+  "nvimx-common/neovim-nightly",
+  "nvimx-ctx/neovim-nightly",
+  "nvimx-diagnostics/neovim-nightly",
   "nvimx-executor/neovim-nightly",
-  "nvimx-project/neovim-nightly",
+  "nvimx-tests/neovim-nightly",
   "nvimx-ui/neovim-nightly",
 ]
 
 [dependencies]
 nvim-oxi = { workspace = true }
+nvimx-action = { workspace = true }
+nvimx-ctx = { workspace = true }
+nvimx-diagnostics = { workspace = true }
 nvimx-executor = { workspace = true }
+nvimx-fs = { workspace = true }
 nvimx-macros = { workspace = true }
-nvimx-project = { workspace = true }
 nvimx-tests = { workspace = true }
 nvimx-ui = { workspace = true }
 

@@ -56,7 +56,7 @@ mod run_async_test {
     use super::*;
 
     thread_local! {
-        static EXECUTOR: OnceCell<Executor<'static>> = const { OnceCell::new() };
+        static EXECUTOR: OnceCell<Executor> = const { OnceCell::new() };
     }
 
     pub(super) fn run<F, R>(terminator: TestTerminator, test_body: F)

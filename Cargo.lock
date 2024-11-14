@@ -415,12 +415,12 @@ dependencies = [
  "clipboard",
  "e31e",
  "flume",
- "fs",
  "futures-util",
  "fxhash",
  "nohash",
  "nomad",
  "nomad-server",
+ "nvimx",
  "pin-project-lite",
  "root-finder",
  "serde",
@@ -659,17 +659,6 @@ dependencies = [
  "futures-sink",
  "nanorand",
  "spin",
-]
-
-[[package]]
-name = "fs"
-version = "0.1.0"
-dependencies = [
- "async-fs",
- "e31e",
- "futures-util",
- "pin-project-lite",
- "thiserror 2.0.3",
 ]
 
 [[package]]
@@ -1143,17 +1132,54 @@ name = "nvimx"
 version = "0.1.0"
 dependencies = [
  "nvim-oxi",
+ "nvimx-action",
+ "nvimx-ctx",
+ "nvimx-diagnostics",
  "nvimx-executor",
+ "nvimx-fs",
  "nvimx-macros",
- "nvimx-project",
  "nvimx-tests",
  "nvimx-ui",
+]
+
+[[package]]
+name = "nvimx-action"
+version = "0.1.0"
+dependencies = [
+ "nvimx-common",
+ "nvimx-diagnostics",
 ]
 
 [[package]]
 name = "nvimx-common"
 version = "0.1.0"
 dependencies = [
+ "compact_str",
+ "e31e",
+ "nvim-oxi",
+ "nvimx-diagnostics",
+ "smol_str",
+]
+
+[[package]]
+name = "nvimx-ctx"
+version = "0.1.0"
+dependencies = [
+ "fxhash",
+ "nohash",
+ "nvim-oxi",
+ "nvimx-action",
+ "nvimx-common",
+ "nvimx-diagnostics",
+ "nvimx-executor",
+ "nvimx-fs",
+]
+
+[[package]]
+name = "nvimx-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "nvim-oxi",
  "smol_str",
 ]
 
@@ -1168,6 +1194,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nvimx-fs"
+version = "0.1.0"
+dependencies = [
+ "async-fs",
+ "e31e",
+ "futures-util",
+ "pin-project-lite",
+ "thiserror 2.0.3",
+]
+
+[[package]]
 name = "nvimx-macros"
 version = "0.1.0"
 dependencies = [
@@ -1175,14 +1212,6 @@ dependencies = [
  "quote",
  "syn 2.0.87",
  "syn-derive-args",
-]
-
-[[package]]
-name = "nvimx-project"
-version = "0.1.0"
-dependencies = [
- "nvim-oxi",
- "nvimx-common",
 ]
 
 [[package]]
@@ -1437,8 +1466,8 @@ dependencies = [
 name = "root-finder"
 version = "0.1.0"
 dependencies = [
- "fs",
  "futures-util",
+ "nvimx",
 ]
 
 [[package]]
@@ -1930,7 +1959,6 @@ name = "version"
 version = "0.1.0"
 dependencies = [
  "nomad",
- "nvimx",
 ]
 
 [[package]]
@@ -2327,8 +2355,8 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap",
- "fs",
  "futures-executor",
+ "nvimx",
  "root-finder",
  "xshell",
 ]

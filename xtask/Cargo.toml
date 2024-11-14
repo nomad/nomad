@@ -10,8 +10,8 @@ publish.workspace = true
 anyhow = "1.0"
 cargo_metadata = "0.18"
 clap = { version = "4", features = ["derive"] }
-fs = { workspace = true }
 futures-executor = "0.3"
+nvimx = { workspace = true }
 root-finder = { workspace = true }
 xshell = "0.2"
 

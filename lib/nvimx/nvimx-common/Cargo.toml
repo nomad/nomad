@@ -5,7 +5,16 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+default = ["neovim-0-10"]
+neovim-0-10 = ["nvim-oxi/neovim-0-10"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
 [dependencies]
+compact_str = { workspace = true }
+e31e = { workspace = true }
+nvim-oxi = { workspace = true }
+nvimx-diagnostics = { workspace = true }
 smol_str = "0.3"
 
 [lints]

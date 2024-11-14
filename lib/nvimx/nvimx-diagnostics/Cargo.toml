@@ -1,5 +1,5 @@
 [package]
-name = "nvimx-tests"
+name = "nvimx-diagnostics"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,8 +11,8 @@ neovim-0-10 = ["nvim-oxi/neovim-0-10"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
-nvim-oxi = { workspace = true, features = ["test-terminator"] }
-nvimx-executor = { workspace = true }
+nvim-oxi = { workspace = true }
+smol_str = { workspace = true }
 
 [lints]
 workspace = true

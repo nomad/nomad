@@ -6,13 +6,13 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["neovim-nightly"]
+default = ["neovim-0-10"]
+neovim-0-10 = ["nvim-oxi/neovim-0-10"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
-nvim-oxi = { workspace = true }
-
 compact_str = "0.8"
+nvim-oxi = { workspace = true }
 str_indices = "0.4"
 
 [dev-dependencies]

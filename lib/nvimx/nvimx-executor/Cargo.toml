@@ -6,14 +6,14 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["neovim-nightly"]
+default = ["neovim-0-10"]
+neovim-0-10 = ["nvim-oxi/neovim-0-10"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
-nvim-oxi = { workspace = true, features = ["libuv"] }
-
 async-task = "4.7"
 concurrent-queue = "2.4"
+nvim-oxi = { workspace = true, features = ["libuv"] }
 pin-project-lite = "0.2"
 
 [lints]
