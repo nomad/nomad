@@ -1212,6 +1212,9 @@ dependencies = [
 [[package]]
 name = "nvimx-plugin"
 version = "0.1.0"
+dependencies = [
+ "nvimx-ctx",
+]
 
 [[package]]
 name = "nvimx-tests"

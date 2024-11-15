@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+nvimx-ctx = { workspace = true }
 
 [lints]
 workspace = true
