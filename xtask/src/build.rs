@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use std::env;
 
 use anyhow::{anyhow, Context};
-use fs::os_fs::OsFs;
-use fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
 use futures_executor::block_on;
+use nvimx::fs::os_fs::OsFs;
+use nvimx::fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
 use root_finder::markers;
 use xshell::cmd;
 

@@ -36,7 +36,7 @@ impl<P: Plugin> PluginCtx<P> {
     /// TODO: docs.
     pub fn with_module<M>(mut self) -> Self
     where
-        M: Module<Plugin = Self>,
+        M: Module<Plugin = P>,
     {
         let config_rx = self.setup.add_module::<M>();
         let module = M::from(config_rx);
