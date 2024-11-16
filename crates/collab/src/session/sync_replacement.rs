@@ -15,11 +15,12 @@ pub(super) struct SyncReplacement {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl Action<Collab> for SyncReplacement {
+impl Action for SyncReplacement {
     const NAME: ActionName = action_name!("synchronize-replacement");
     type Args = OnBytesArgs;
     type Ctx<'a> = TextBufferCtx<'a>;
     type Docs = ();
+    type Module = Collab;
     type Return = ShouldDetach;
 
     fn execute<'a>(

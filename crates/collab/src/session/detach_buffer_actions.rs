@@ -27,11 +27,12 @@ impl DetachBufferActions {
     }
 }
 
-impl Action<Collab> for DetachBufferActions {
+impl Action for DetachBufferActions {
     const NAME: ActionName = action_name!("detach-buffer-actions");
     type Args = BufUnloadArgs;
     type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
+    type Module = Collab;
     type Return = ();
 
     fn execute<'a>(&'a mut self, _: Self::Args, ctx: Self::Ctx<'a>) {
@@ -40,5 +41,3 @@ impl Action<Collab> for DetachBufferActions {
 
     fn docs(&self) {}
 }
-
-// [mad.BufUnload.detach-buffer-actions]

@@ -18,7 +18,7 @@ impl<M: Module> ModuleApi<M> {
     /// TODO: docs.
     pub fn default_subcommand<T>(mut self, command: T) -> Self
     where
-        T: SubCommand<M>,
+        T: SubCommand<Module = M>,
     {
         self.commands.add_default_subcommand(command);
         self
@@ -27,7 +27,7 @@ impl<M: Module> ModuleApi<M> {
     /// TODO: docs.
     pub fn function<T>(mut self, function: T) -> Self
     where
-        T: Function<M>,
+        T: Function<Module = M>,
     {
         if self.dictionary.get(T::NAME.as_str()).is_some() {
             panic!(
@@ -60,7 +60,7 @@ impl<M: Module> ModuleApi<M> {
     /// TODO: docs.
     pub fn subcommand<T>(mut self, command: T) -> Self
     where
-        T: SubCommand<M>,
+        T: SubCommand<Module = M>,
     {
         self.commands.add_subcommand(command);
         self
@@ -71,7 +71,7 @@ impl<M: Module> ModuleApi<M> {
     }
 }
 
-fn callback_of_function<M: Module, T: Function<M>>(
+fn callback_of_function<T: Function>(
     mut function: T,
 ) -> impl for<'ctx> FnMut(oxi::Object, NeovimCtx<'ctx>) -> oxi::Object {
     move |args, ctx| {
@@ -80,7 +80,7 @@ fn callback_of_function<M: Module, T: Function<M>>(
             Err(err) => {
                 let mut source = DiagnosticSource::new();
                 source
-                    .push_segment(M::NAME.as_str())
+                    .push_segment(T::Module::NAME.as_str())
                     .push_segment(T::NAME.as_str());
                 err.into_msg().emit(Level::Warning, source);
                 return oxi::Object::nil();
@@ -91,7 +91,7 @@ fn callback_of_function<M: Module, T: Function<M>>(
             Err(err) => {
                 let mut source = DiagnosticSource::new();
                 source
-                    .push_segment(M::NAME.as_str())
+                    .push_segment(T::Module::NAME.as_str())
                     .push_segment(T::NAME.as_str());
                 err.into().emit(Level::Warning, source);
                 return oxi::Object::nil();

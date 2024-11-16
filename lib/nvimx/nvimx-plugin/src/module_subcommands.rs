@@ -25,16 +25,15 @@ pub(super) struct ModuleSubCommands {
 
 impl ModuleSubCommands {
     #[track_caller]
-    pub(crate) fn add_subcommand<M, T>(&mut self, subcommand: T)
+    pub(crate) fn add_subcommand<T>(&mut self, subcommand: T)
     where
-        M: Module,
-        T: SubCommand<M>,
+        T: SubCommand,
     {
-        if self.module_name != M::NAME {
+        if self.module_name != T::Module::NAME {
             panic!(
                 "trying to register a command for module '{}' in the API for \
                  module '{}'",
-                M::NAME,
+                T::Module::NAME,
                 self.module_name
             );
         }
@@ -55,16 +54,15 @@ impl ModuleSubCommands {
     }
 
     #[track_caller]
-    pub(crate) fn add_default_subcommand<M, T>(&mut self, subcommand: T)
+    pub(crate) fn add_default_subcommand<T>(&mut self, subcommand: T)
     where
-        M: Module,
-        T: SubCommand<M>,
+        T: SubCommand,
     {
-        if self.module_name != M::NAME {
+        if self.module_name != T::Module::NAME {
             panic!(
                 "trying to register a command for module '{}' in the API for \
                  module '{}'",
-                M::NAME,
+                T::Module::NAME,
                 self.module_name
             );
         }
@@ -109,7 +107,7 @@ impl ModuleSubCommands {
     }
 }
 
-fn callback_of_subcommand<M: Module, T: SubCommand<M>>(
+fn callback_of_subcommand<T: SubCommand>(
     mut subcommand: T,
 ) -> impl for<'ctx> FnMut(SubCommandArgs, NeovimCtx<'ctx>) {
     move |mut args, ctx: NeovimCtx<'_>| {
@@ -118,7 +116,7 @@ fn callback_of_subcommand<M: Module, T: SubCommand<M>>(
             Err(err) => {
                 let mut source = DiagnosticSource::new();
                 source
-                    .push_segment(M::NAME.as_str())
+                    .push_segment(T::Module::NAME.as_str())
                     .push_segment(T::NAME.as_str());
                 err.into().emit(Level::Error, source);
                 return;
@@ -127,7 +125,7 @@ fn callback_of_subcommand<M: Module, T: SubCommand<M>>(
         if let Err(err) = subcommand.execute(args, ctx).into_result() {
             let mut source = DiagnosticSource::new();
             source
-                .push_segment(M::NAME.as_str())
+                .push_segment(T::Module::NAME.as_str())
                 .push_segment(T::NAME.as_str());
             err.into().emit(Level::Error, source);
         }

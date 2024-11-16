@@ -7,7 +7,7 @@ use crate::action_name::ActionName;
 use crate::{Action, Module};
 
 /// TODO: docs
-pub trait Function<M: Module>: 'static {
+pub trait Function: 'static {
     /// TODO: docs
     const NAME: ActionName;
 
@@ -16,6 +16,9 @@ pub trait Function<M: Module>: 'static {
 
     /// TODO: docs
     type Docs;
+
+    /// TODO: docs
+    type Module: Module;
 
     /// TODO: docs
     type Return: Serialize;
@@ -31,17 +34,17 @@ pub trait Function<M: Module>: 'static {
     fn docs(&self) -> Self::Docs;
 }
 
-impl<A, M> Function<M> for A
+impl<A> Function for A
 where
-    A: for<'a> Action<M, Ctx<'a> = NeovimCtx<'a>>,
+    A: for<'a> Action<Ctx<'a> = NeovimCtx<'a>>,
     A::Args: DeserializeOwned,
     A::Return: Serialize,
-    M: Module,
 {
     const NAME: ActionName = A::NAME;
     type Args = A::Args;
     type Docs = A::Docs;
     type Return = A::Return;
+    type Module = A::Module;
 
     fn execute<'a>(
         &'a mut self,

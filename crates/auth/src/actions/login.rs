@@ -12,10 +12,11 @@ impl Login {
     }
 }
 
-impl AsyncAction<Auth> for Login {
+impl AsyncAction for Login {
     const NAME: ActionName = action_name!("login");
     type Args = ();
     type Docs = ();
+    type Module = Auth;
 
     async fn execute(&mut self, _: Self::Args, _: NeovimCtx<'_>) {}
 

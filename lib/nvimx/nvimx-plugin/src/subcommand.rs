@@ -7,7 +7,7 @@ use crate::subcommand_args::SubCommandArgs;
 use crate::{Action, Module};
 
 /// TODO: docs
-pub trait SubCommand<M: Module>: 'static {
+pub trait SubCommand: 'static {
     /// TODO: docs
     const NAME: ActionName;
 
@@ -22,6 +22,9 @@ pub trait SubCommand<M: Module>: 'static {
     type Docs;
 
     /// TODO: docs
+    type Module: Module;
+
+    /// TODO: docs
     fn execute<'a>(
         &'a mut self,
         args: Self::Args,
@@ -32,19 +35,19 @@ pub trait SubCommand<M: Module>: 'static {
     fn docs(&self) -> Self::Docs;
 }
 
-impl<A, M> SubCommand<M> for A
+impl<A> SubCommand for A
 where
-    A: for<'a> Action<M, Ctx<'a> = NeovimCtx<'a>, Return = ()>,
+    A: for<'a> Action<Ctx<'a> = NeovimCtx<'a>, Return = ()>,
     A::Args: Clone
         + for<'args> TryFrom<
             &'args mut SubCommandArgs,
             Error: Into<DiagnosticMessage>,
         >,
-    M: Module,
 {
     const NAME: ActionName = A::NAME;
     type Args = A::Args;
     type Docs = A::Docs;
+    type Module = A::Module;
 
     fn execute<'a>(
         &'a mut self,

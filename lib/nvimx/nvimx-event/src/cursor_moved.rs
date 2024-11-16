@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::ops::Deref;
 
 use nvimx_common::oxi::api;
@@ -16,10 +15,9 @@ use nvimx_diagnostics::DiagnosticMessage;
 use nvimx_plugin::{Action, Module};
 
 /// TODO: docs.
-pub struct CursorMoved<A, M> {
+pub struct CursorMoved<A> {
     action: A,
     buffer_id: Option<BufferId>,
-    module_name: PhantomData<M>,
 }
 
 /// TODO: docs.
@@ -31,7 +29,7 @@ pub struct CursorMovedArgs {
     pub moved_to: ByteOffset,
 }
 
-impl<A, M> CursorMoved<A, M> {
+impl<A> CursorMoved<A> {
     /// TODO: docs.
     pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
         self.buffer_id = Some(buffer_id);
@@ -40,21 +38,16 @@ impl<A, M> CursorMoved<A, M> {
 
     /// Creates a new [`CursorMoved`] with the given action.
     pub fn new(action: A) -> Self {
-        Self { action, buffer_id: None, module_name: PhantomData }
+        Self { action, buffer_id: None }
     }
 }
 
-impl<A, M> AutoCommand for CursorMoved<A, M>
+impl<A> AutoCommand for CursorMoved<A>
 where
-    A: for<'ctx> Action<
-        M,
-        Args = CursorMovedArgs,
-        Ctx<'ctx> = BufferCtx<'ctx>,
-    >,
+    A: for<'ctx> Action<Args = CursorMovedArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: Module + 'static,
 {
-    const MODULE_NAME: Option<&'static str> = Some(M::NAME.as_str());
+    const MODULE_NAME: Option<&'static str> = Some(A::Module::NAME.as_str());
     const CALLBACK_NAME: Option<&'static str> = Some(A::NAME.as_str());
 
     fn into_callback(

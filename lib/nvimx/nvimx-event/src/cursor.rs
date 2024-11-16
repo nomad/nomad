@@ -16,9 +16,8 @@ use crate::{
 };
 
 /// TODO: docs.
-pub struct Cursor<A, M> {
+pub struct Cursor<A> {
     action: A,
-    module: PhantomData<M>,
 }
 
 /// TODO: docs.
@@ -64,10 +63,10 @@ struct BufLeaveAction<A> {
     should_detach: Shared<ShouldDetach>,
 }
 
-impl<A, M> Cursor<A, M> {
+impl<A> Cursor<A> {
     /// Creates a new [`Cursor`] with the given action.
     pub fn new(action: A) -> Self {
-        Self { action, module: PhantomData }
+        Self { action }
     }
 }
 
@@ -81,15 +80,13 @@ impl<A: Clone> CursorMovedAction<A> {
     }
 }
 
-impl<A, M> Event for Cursor<A, M>
+impl<A> Event for Cursor<A>
 where
     A: for<'ctx> Action<
-            M,
             Ctx<'ctx> = BufferCtx<'ctx>,
             Args = CursorArgs,
             Return: Into<ShouldDetach>,
         > + Clone,
-    M: Module + 'static,
 {
     type Ctx<'a> = BufferCtx<'a>;
 
@@ -104,7 +101,7 @@ where
             should_detach: should_detach.clone(),
         };
 
-        let buf_enter_action = BufEnterAction::<M> {
+        let buf_enter_action = BufEnterAction::<A::Module> {
             has_just_entered_buf: has_just_entered_buf.clone(),
             should_detach: should_detach.clone(),
             module: PhantomData,
@@ -130,16 +127,16 @@ where
     }
 }
 
-impl<A, M> Action<M> for CursorMovedAction<A>
+impl<A> Action for CursorMovedAction<A>
 where
-    A: for<'ctx> Action<M, Args = CursorArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
+    A: for<'ctx> Action<Args = CursorArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: Module + 'static,
 {
     const NAME: ActionName = A::NAME;
     type Args = CursorMovedArgs;
     type Ctx<'ctx> = BufferCtx<'ctx>;
     type Docs = ();
+    type Module = A::Module;
     type Return = ShouldDetach;
 
     fn execute<'a>(
@@ -166,11 +163,12 @@ where
     fn docs(&self) {}
 }
 
-impl<M: Module> Action<M> for BufEnterAction<M> {
+impl<M: Module> Action for BufEnterAction<M> {
     const NAME: ActionName = ActionName::from_str("");
     type Args = BufEnterArgs;
     type Ctx<'ctx> = BufferCtx<'ctx>;
     type Docs = ();
+    type Module = M;
     type Return = ShouldDetach;
 
     fn execute<'a>(
@@ -185,16 +183,16 @@ impl<M: Module> Action<M> for BufEnterAction<M> {
     fn docs(&self) {}
 }
 
-impl<A, M> Action<M> for BufLeaveAction<A>
+impl<A> Action for BufLeaveAction<A>
 where
-    A: for<'ctx> Action<M, Args = CursorArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
+    A: for<'ctx> Action<Args = CursorArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: Module + 'static,
 {
     const NAME: ActionName = A::NAME;
     type Args = BufLeaveArgs;
     type Ctx<'ctx> = BufferCtx<'ctx>;
     type Docs = ();
+    type Module = A::Module;
     type Return = ShouldDetach;
 
     fn execute<'a>(

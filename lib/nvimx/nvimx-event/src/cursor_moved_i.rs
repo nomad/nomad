@@ -13,12 +13,12 @@ use nvimx_plugin::{Action, Module};
 use crate::cursor_moved::{CursorMoved, CursorMovedArgs};
 
 /// TODO: docs.
-pub struct CursorMovedI<A, M> {
-    inner: CursorMoved<A, M>,
+pub struct CursorMovedI<A> {
+    inner: CursorMoved<A>,
     buffer_id: Option<BufferId>,
 }
 
-impl<A, M> CursorMovedI<A, M> {
+impl<A> CursorMovedI<A> {
     /// TODO: docs.
     pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
         self.buffer_id = Some(buffer_id);
@@ -31,17 +31,12 @@ impl<A, M> CursorMovedI<A, M> {
     }
 }
 
-impl<A, M> AutoCommand for CursorMovedI<A, M>
+impl<A> AutoCommand for CursorMovedI<A>
 where
-    A: for<'ctx> Action<
-        M,
-        Args = CursorMovedArgs,
-        Ctx<'ctx> = BufferCtx<'ctx>,
-    >,
+    A: for<'ctx> Action<Args = CursorMovedArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: Module + 'static,
 {
-    const MODULE_NAME: Option<&'static str> = Some(M::NAME.as_str());
+    const MODULE_NAME: Option<&'static str> = Some(A::Module::NAME.as_str());
     const CALLBACK_NAME: Option<&'static str> = Some(A::NAME.as_str());
 
     fn into_callback(
@@ -62,6 +57,6 @@ where
     }
 
     fn take_actor_id(ctx: &AutoCommandCtx<'_>) -> ActorId {
-        <CursorMoved<A, M>>::take_actor_id(ctx)
+        <CursorMoved<A>>::take_actor_id(ctx)
     }
 }

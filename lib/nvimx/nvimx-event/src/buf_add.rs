@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::ops::Deref;
 
 use nvimx_common::MaybeResult;
@@ -15,10 +14,9 @@ use nvimx_diagnostics::DiagnosticMessage;
 use nvimx_plugin::{Action, Module};
 
 /// TODO: docs.
-pub struct BufAdd<A, M> {
+pub struct BufAdd<A> {
     action: A,
     buffer_id: Option<BufferId>,
-    module: PhantomData<M>,
 }
 
 /// TODO: docs.
@@ -28,7 +26,7 @@ pub struct BufAddArgs {
     pub actor_id: ActorId,
 }
 
-impl<A, M> BufAdd<A, M> {
+impl<A> BufAdd<A> {
     /// TODO: docs.
     pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
         self.buffer_id = Some(buffer_id);
@@ -37,17 +35,16 @@ impl<A, M> BufAdd<A, M> {
 
     /// Creates a new [`BufAdd`] with the given action.
     pub fn new(action: A) -> Self {
-        Self { action, buffer_id: None, module: PhantomData }
+        Self { action, buffer_id: None }
     }
 }
 
-impl<A, M> AutoCommand for BufAdd<A, M>
+impl<A> AutoCommand for BufAdd<A>
 where
-    A: for<'ctx> Action<M, Args = BufAddArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
+    A: for<'ctx> Action<Args = BufAddArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: Module + 'static,
 {
-    const MODULE_NAME: Option<&'static str> = Some(M::NAME.as_str());
+    const MODULE_NAME: Option<&'static str> = Some(A::Module::NAME.as_str());
     const CALLBACK_NAME: Option<&'static str> = Some(A::NAME.as_str());
 
     fn into_callback(

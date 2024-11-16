@@ -29,11 +29,11 @@ impl Start {
     }
 }
 
-impl AsyncAction<Collab> for Start {
+impl AsyncAction for Start {
     const NAME: ActionName = action_name!("start");
-
     type Args = ();
     type Docs = ();
+    type Module = Collab;
 
     async fn execute(
         &mut self,

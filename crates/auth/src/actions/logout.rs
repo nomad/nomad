@@ -12,10 +12,11 @@ impl Logout {
     }
 }
 
-impl AsyncAction<Auth> for Logout {
+impl AsyncAction for Logout {
     const NAME: ActionName = action_name!("logout");
     type Args = ();
     type Docs = ();
+    type Module = Auth;
 
     async fn execute(&mut self, _: Self::Args, _: NeovimCtx<'_>) {}
 

@@ -43,10 +43,11 @@ impl Join {
     }
 }
 
-impl AsyncAction<Collab> for Join {
+impl AsyncAction for Join {
     const NAME: ActionName = action_name!("join");
     type Args = SessionId;
     type Docs = ();
+    type Module = Collab;
 
     async fn execute(
         &mut self,
@@ -61,26 +62,31 @@ impl AsyncAction<Collab> for Join {
 
         let guard = JoinGuard::new(self.session_status.clone(), session_id)?;
 
-        #[rustfmt::skip]
-        let (step, maybe_err) = ConnectToServer { guard }
-            .connect_to_server().emitting(spin::<ConnectToServer>()).await?
-            .authenticate(auth_infos).emitting(spin::<Authenticate>()).await?
-            .join_session(session_id).emitting(spin::<JoinSession>()).await?
-            .confirm_join().await?
-            .request_project().emitting(spin::<RequestProject>()).await?
-            .find_project_root().emitting(spin::<FindProjectRoot>()).await?
-            .flush_project(ctx).emitting(spin::<FlushProject>()).await?
-            .jump_to_host().map_emit_by_ref(JoinedProject)
-            .run_session(ctx.to_static()).await;
-
-        step.remove_project_root()
-            .await
-            .map_err(Into::into)
-            .map_err(|err| maybe_err.map(Into::into).unwrap_or(err))
+        todo!();
+        // #[rustfmt::skip]
+        // let (step, maybe_err) = ConnectToServer { guard }
+        //     .connect_to_server().emitting(spin::<ConnectToServer>()).await?
+        //     .authenticate(auth_infos).emitting(spin::<Authenticate>()).await?
+        //     .join_session(session_id).emitting(spin::<JoinSession>()).await?
+        //     .confirm_join().await?
+        //     .request_project().emitting(spin::<RequestProject>()).await?
+        //     .find_project_root().emitting(spin::<FindProjectRoot>()).await?
+        //     .flush_project(ctx).emitting(spin::<FlushProject>()).await?
+        //     .jump_to_host().map_emit_by_ref(JoinedProject)
+        //     .run_session(ctx.to_static()).await;
+        //
+        // step.remove_project_root()
+        //     .await
+        //     .map_err(Into::into)
+        //     .map_err(|err| maybe_err.map(Into::into).unwrap_or(err))
     }
 
     fn docs(&self) {}
 }
+
+// 1: add a new crate that defines Emit and EmitExt traits;
+// 2: crate depends on Action and DiagnosticMessage;
+// 3:
 
 struct JoinGuard {
     session_status: Shared<SessionStatus>,

@@ -16,11 +16,12 @@ pub(super) struct SyncCursor {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl Action<Collab> for SyncCursor {
+impl Action for SyncCursor {
     const NAME: ActionName = action_name!("synchronize-cursor");
     type Args = CursorArgs;
     type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
+    type Module = Collab;
     type Return = ShouldDetach;
 
     fn execute<'a>(

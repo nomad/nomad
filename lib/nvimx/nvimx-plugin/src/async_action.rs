@@ -7,7 +7,7 @@ use nvimx_diagnostics::{DiagnosticSource, Level};
 use crate::{Action, ActionName, Module};
 
 /// TODO: docs
-pub trait AsyncAction<M: Module>: 'static {
+pub trait AsyncAction: 'static {
     /// TODO: docs
     const NAME: ActionName;
 
@@ -16,6 +16,9 @@ pub trait AsyncAction<M: Module>: 'static {
 
     /// TODO: docs
     type Docs;
+
+    /// TODO: docs
+    type Module: Module;
 
     /// TODO: docs
     fn execute(
@@ -28,15 +31,12 @@ pub trait AsyncAction<M: Module>: 'static {
     fn docs(&self) -> Self::Docs;
 }
 
-impl<M, T> Action<M> for T
-where
-    M: Module,
-    T: AsyncAction<M> + Clone,
-{
+impl<T: AsyncAction + Clone> Action for T {
     const NAME: ActionName = T::NAME;
     type Args = T::Args;
     type Ctx<'a> = NeovimCtx<'a>;
     type Docs = T::Docs;
+    type Module = T::Module;
     type Return = ();
 
     fn execute<'a>(&'a mut self, args: Self::Args, ctx: NeovimCtx<'a>) {
@@ -47,7 +47,7 @@ where
             {
                 let mut source = DiagnosticSource::new();
                 source
-                    .push_segment(M::NAME.as_str())
+                    .push_segment(Self::Module::NAME.as_str())
                     .push_segment(Self::NAME.as_str());
                 message.emit(Level::Warning, source);
             }

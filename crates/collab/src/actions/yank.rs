@@ -17,11 +17,13 @@ impl Yank {
     }
 }
 
-impl Action<Collab> for Yank {
+impl Action for Yank {
     const NAME: ActionName = action_name!("yank");
+
     type Args = ();
     type Ctx<'a> = NeovimCtx<'a>;
     type Docs = ();
+    type Module = Collab;
     type Return = ();
 
     fn execute<'a>(

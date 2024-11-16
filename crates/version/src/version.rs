@@ -29,11 +29,12 @@ impl Module for Version {
     async fn run(self, _: NeovimCtx<'static>) {}
 }
 
-impl Action<Self> for Version {
+impl Action for Version {
     const NAME: ActionName = action_name!("version");
     type Args = ();
     type Ctx<'a> = NeovimCtx<'a>;
     type Docs = ();
+    type Module = Self;
     type Return = ();
 
     fn execute<'a>(&'a mut self, _: Self::Args, _: NeovimCtx<'a>) {

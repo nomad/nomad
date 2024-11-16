@@ -135,11 +135,12 @@ impl RegisterBufferActions {
     }
 }
 
-impl Action<Collab> for RegisterBufferActions {
+impl Action for RegisterBufferActions {
     const NAME: ActionName = action_name!("register-buffer-actions");
     type Args = BufAddArgs;
     type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
+    type Module = Collab;
     type Return = ();
 
     fn execute<'a>(&'a mut self, _: Self::Args, ctx: Self::Ctx<'a>) {
