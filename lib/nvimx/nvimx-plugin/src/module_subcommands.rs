@@ -6,8 +6,8 @@ use nvimx_diagnostics::{DiagnosticSource, Level};
 use crate::action_name::ActionNameStr;
 use crate::module::Module;
 use crate::module_name::ModuleName;
-use crate::subcommand::SubCommand;
-use crate::subcommand_args::SubCommandArgs;
+use crate::subcommand::{CompletionFunc, SubCommand};
+use crate::subcommand_args::{SubCommandArgs, SubCommandCursor};
 
 pub(super) struct ModuleSubCommands {
     /// The name of the module these commands belong to.
@@ -24,9 +24,34 @@ pub(super) struct ModuleSubCommands {
 
 pub(crate) struct SubCommandHandle {
     callback: Box<dyn FnMut(SubCommandArgs)>,
+    completion_func:
+        Box<dyn FnMut(SubCommandArgs, SubCommandCursor) -> Vec<String>>,
 }
 
 impl ModuleSubCommands {
+    #[track_caller]
+    pub(crate) fn add_default_subcommand<T>(&mut self, subcommand: T)
+    where
+        T: SubCommand,
+    {
+        if self.module_name != T::Module::NAME {
+            panic!(
+                "trying to register a command for module '{}' in the API for \
+                 module '{}'",
+                T::Module::NAME,
+                self.module_name
+            );
+        }
+        if self.default_subcommand.is_some() {
+            panic!(
+                "a default command has already been set for module '{}'",
+                self.module_name
+            );
+        }
+        self.default_subcommand =
+            Some(SubCommandHandle::new(subcommand, self.neovim_ctx.clone()));
+    }
+
     #[track_caller]
     pub(crate) fn add_subcommand<T>(&mut self, subcommand: T)
     where
@@ -54,45 +79,13 @@ impl ModuleSubCommands {
         );
     }
 
-    #[track_caller]
-    pub(crate) fn add_default_subcommand<T>(&mut self, subcommand: T)
-    where
-        T: SubCommand,
-    {
-        if self.module_name != T::Module::NAME {
-            panic!(
-                "trying to register a command for module '{}' in the API for \
-                 module '{}'",
-                T::Module::NAME,
-                self.module_name
-            );
-        }
-        if self.default_subcommand.is_some() {
-            panic!(
-                "a default command has already been set for module '{}'",
-                self.module_name
-            );
-        }
-        self.default_subcommand =
-            Some(SubCommandHandle::new(subcommand, self.neovim_ctx.clone()));
-    }
-
     pub(crate) fn default_subcommand(
         &mut self,
     ) -> Option<&mut SubCommandHandle> {
         self.default_subcommand.as_mut()
     }
 
-    pub(crate) fn subcommand<'a>(
-        &'a mut self,
-        subcommand_name: &'a str,
-    ) -> Option<&'a mut SubCommandHandle> {
-        self.subcommands.get_mut(subcommand_name)
-    }
-
-    pub(crate) fn subcommand_names(
-        &self,
-    ) -> impl Iterator<Item = ActionNameStr> + '_ {
+    pub(crate) fn names(&self) -> impl Iterator<Item = ActionNameStr> + '_ {
         self.subcommands.keys().copied()
     }
 
@@ -104,6 +97,13 @@ impl ModuleSubCommands {
             neovim_ctx,
         }
     }
+
+    pub(crate) fn subcommand<'a>(
+        &'a mut self,
+        subcommand_name: &'a str,
+    ) -> Option<&'a mut SubCommandHandle> {
+        self.subcommands.get_mut(subcommand_name)
+    }
 }
 
 impl SubCommandHandle {
@@ -111,10 +111,27 @@ impl SubCommandHandle {
         (self.callback)(args);
     }
 
+    pub(crate) fn complete(
+        &mut self,
+        args: SubCommandArgs,
+        cursor: SubCommandCursor,
+    ) -> Vec<String> {
+        (self.completion_func)(args, cursor)
+    }
+
     fn new<T: SubCommand>(subcommand: T, ctx: NeovimCtx<'static>) -> Self {
+        let completion_func = Box::new({
+            let mut func = subcommand.completion_func();
+            move |args: SubCommandArgs, cursor: SubCommandCursor| {
+                func.call(args, cursor)
+            }
+        });
         let mut callback = callback_of_subcommand(subcommand);
         let ctx = ctx.clone();
-        Self { callback: Box::new(move |args| callback(args, ctx.reborrow())) }
+        Self {
+            callback: Box::new(move |args| callback(args, ctx.reborrow())),
+            completion_func,
+        }
     }
 }
 

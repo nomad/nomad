@@ -1,5 +1,6 @@
 use fxhash::FxHashMap;
 use nvimx_common::oxi::{self, api};
+use nvimx_common::ByteOffset;
 use nvimx_diagnostics::{
     DiagnosticMessage,
     DiagnosticSource,
@@ -11,7 +12,11 @@ use crate::action_name::ActionNameStr;
 use crate::module_name::{ModuleName, ModuleNameStr};
 use crate::module_subcommands::ModuleSubCommands;
 use crate::plugin::Plugin;
-use crate::subcommand_args::{SubCommandArg, SubCommandArgs};
+use crate::subcommand_args::{
+    SubCommandArg,
+    SubCommandArgs,
+    SubCommandCursor,
+};
 
 pub(crate) struct Command {
     command_name: &'static str,
@@ -34,6 +39,9 @@ impl Command {
     pub(crate) fn create(mut self) {
         let opts = api::opts::CreateCommandOpts::builder()
             .nargs(api::types::CommandNArgs::Any)
+            .complete(api::types::CommandComplete::CustomList(
+                self.completion_func(),
+            ))
             .build();
 
         api::create_user_command(
@@ -84,7 +92,7 @@ impl Command {
             } else {
                 Err(CommandError::MissingSubCommand {
                     module_name: module_subcommands.module_name,
-                    valid: module_subcommands.subcommand_names().collect(),
+                    valid: module_subcommands.names().collect(),
                 })
             };
         };
@@ -97,10 +105,118 @@ impl Command {
             None => Err(CommandError::UnknownSubCommand {
                 module_name: module_subcommands.module_name,
                 subcommand_name,
-                valid: module_subcommands.subcommand_names().collect(),
+                valid: module_subcommands.names().collect(),
             }),
         }
     }
+
+    fn completion_func(
+        &self,
+    ) -> oxi::Function<(String, String, usize), Vec<String>> {
+        let command_name = self.command_name;
+        let module_names = {
+            let mut v = self.subcommands.keys().copied().collect::<Vec<_>>();
+            v.sort_unstable();
+            v
+        };
+        let mut this = clone();
+        let func = move |(_, cmd_line, cursor_pos): (_, String, usize)| {
+            use CursorCompletePos::*;
+            let cmd_line = cmd_line.trim_start();
+
+            // The command line must start with "<Command> " for Neovim to
+            // invoke us.
+            let start_from = command_name.len() + 1;
+            debug_assert!(cmd_line.starts_with(&command_name));
+            debug_assert!(cursor_pos >= start_from);
+            let args = SubCommandArgs::new(&cmd_line[start_from..]);
+            let offset = ByteOffset::from(cursor_pos - start_from);
+
+            let names = module_names.iter().copied().map(ToOwned::to_owned);
+            let subcommands: &mut ModuleSubCommands = match pos() {
+                NoArgs { .. } | StartOfArg { .. } | BeforeArg { .. } => {
+                    return names.collect()
+                },
+                EndOfArg { arg } => {
+                    let arg = &*arg;
+                    return names
+                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
+                        .collect();
+                },
+                MiddleOfArg { arg, offset_in_arg } => {
+                    let arg = &arg[..offset_in_arg.into()];
+                    return names
+                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
+                        .collect();
+                },
+                AfterArg { arg } => match this.subcommands.get_mut(&*arg) {
+                    Some(subs) => subs,
+                    None => return Vec::new(),
+                },
+            };
+
+            let names = subcommands.names().map(ToOwned::to_owned);
+            match pos() {
+                NoArgs { .. } | StartOfArg { .. } | BeforeArg { .. } => {
+                    names.collect()
+                },
+                EndOfArg { arg } => {
+                    let arg = &*arg;
+                    names
+                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
+                        .collect()
+                },
+                MiddleOfArg { arg, offset_in_arg } => {
+                    let arg = &arg[..offset_in_arg.into()];
+                    names
+                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
+                        .collect()
+                },
+                AfterArg { arg } => {
+                    drop(names);
+                    match subcommands.subcommand(&*arg) {
+                        Some(sub) => {
+                            let cursor = SubCommandCursor::new(&args, offset);
+                            sub.complete(args, cursor)
+                        },
+                        None => Vec::new(),
+                    }
+                },
+            }
+        };
+        oxi::Function::from_fn_mut(func)
+    }
+}
+
+fn clone() -> Command {
+    todo!();
+}
+
+fn pos() -> CursorCompletePos<'static> {
+    CursorCompletePos::NoArgs
+}
+
+enum CursorCompletePos<'a> {
+    /// `|`.
+    NoArgs,
+
+    /// `|<Arg>`.
+    StartOfArg { arg: SubCommandArg<'a> },
+
+    /// `<Arg>|`.
+    EndOfArg { arg: SubCommandArg<'a> },
+
+    /// `<Ar|g>`.
+    MiddleOfArg { arg: SubCommandArg<'a>, offset_in_arg: ByteOffset },
+
+    /// `| <Arg>`.
+    ///
+    /// `Arg` is interpreted as a subcommand name, and we return the modules
+    /// that have a subcommand with that name.
+    BeforeArg { arg: SubCommandArg<'a> },
+
+    /// `<Arg> |`.
+    AfterArg { arg: SubCommandArg<'a> },
 }
 
 /// The type of error that can occur when [`call`](NomadCommand::call)ing the

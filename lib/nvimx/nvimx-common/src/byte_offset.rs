@@ -1,3 +1,4 @@
+use core::cmp::Ordering;
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A byte offset in a buffer.
@@ -93,5 +94,33 @@ impl From<ByteOffset> for nvim_oxi::Object {
     #[inline]
     fn from(offset: ByteOffset) -> Self {
         (offset.0 as nvim_oxi::Integer).into()
+    }
+}
+
+impl PartialEq<usize> for ByteOffset {
+    #[inline]
+    fn eq(&self, other: &usize) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<ByteOffset> for usize {
+    #[inline]
+    fn eq(&self, other: &ByteOffset) -> bool {
+        *self == other.0
+    }
+}
+
+impl PartialOrd<usize> for ByteOffset {
+    #[inline]
+    fn partial_cmp(&self, other: &usize) -> Option<Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
+impl PartialOrd<ByteOffset> for usize {
+    #[inline]
+    fn partial_cmp(&self, other: &ByteOffset) -> Option<Ordering> {
+        self.partial_cmp(&other.0)
     }
 }

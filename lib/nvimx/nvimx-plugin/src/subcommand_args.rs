@@ -1,3 +1,4 @@
+use core::fmt;
 use core::mem::{self, MaybeUninit};
 use core::ops::Deref;
 
@@ -110,8 +111,36 @@ impl SubCommandArg<'_> {
 }
 
 impl<'a> SubCommandArgsIter<'a> {
+    /// Returns the [`ByteOffset`] of the last yielded argument in the original
+    /// [`SubCommandArgs`], or:
+    ///
+    /// - 0 if [`next`](Self::next) has never been called;
+    /// - the length of the original [`SubCommandArgs`] if [`next`](Self::next)
+    ///   has returned `None`.
+    pub(crate) fn last_offset(&self) -> ByteOffset {
+        self.arg_offset
+    }
+
     fn remainder(self) -> SubCommandArgs<'a> {
         SubCommandArgs { args: self.args }
+    }
+}
+
+impl<'a> SubCommandCursor<'a> {
+    pub(crate) fn new(args: &SubCommandArgs<'a>, offset: ByteOffset) -> Self {
+        todo!();
+    }
+}
+
+impl fmt::Debug for SubCommandArg<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("SubCommandArg").field(&self.arg).finish()
+    }
+}
+
+impl AsRef<str> for SubCommandArg<'_> {
+    fn as_ref(&self) -> &str {
+        self
     }
 }
 
@@ -123,9 +152,27 @@ impl Deref for SubCommandArg<'_> {
     }
 }
 
-impl AsRef<str> for SubCommandArg<'_> {
-    fn as_ref(&self) -> &str {
-        self
+impl PartialEq<str> for SubCommandArg<'_> {
+    fn eq(&self, s: &str) -> bool {
+        &**self == s
+    }
+}
+
+impl PartialEq<&str> for SubCommandArg<'_> {
+    fn eq(&self, s: &&str) -> bool {
+        self == *s
+    }
+}
+
+impl PartialEq<SubCommandArg<'_>> for str {
+    fn eq(&self, arg: &SubCommandArg<'_>) -> bool {
+        arg == self
+    }
+}
+
+impl PartialEq<SubCommandArg<'_>> for &str {
+    fn eq(&self, arg: &SubCommandArg<'_>) -> bool {
+        *self == arg
     }
 }
 
@@ -279,5 +326,30 @@ impl From<SubCommandArgsWrongNumError<'_>> for DiagnosticMessage {
         }
 
         message
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subcommand_args_iter() {
+        let args = SubCommandArgs::new("  foo bar  baz   ");
+
+        let mut iter = args.iter();
+        assert_eq!(iter.last_offset(), 0usize);
+
+        assert_eq!(iter.next().unwrap(), "foo");
+        assert_eq!(iter.last_offset(), 2usize);
+
+        assert_eq!(iter.next().unwrap(), "bar");
+        assert_eq!(iter.last_offset(), 6usize);
+
+        assert_eq!(iter.next().unwrap(), "baz");
+        assert_eq!(iter.last_offset(), 11usize);
+
+        assert!(iter.next().is_none());
+        assert_eq!(iter.last_offset(), 17usize);
     }
 }
