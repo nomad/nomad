@@ -2,6 +2,13 @@ use core::time::Duration;
 use std::io;
 use std::rc::Rc;
 
+use async_net::TcpStream;
+use collab_server::client::{ClientRxError, KnockError, Knocker, Welcome};
+use collab_server::configs::nomad::{
+    NomadAuthenticateInfos,
+    NomadAuthenticator,
+    NomadConfig,
+};
 use collab_server::message::{
     FileContents,
     GitHubHandle,
@@ -11,17 +18,11 @@ use collab_server::message::{
     ProjectRequest,
     ProjectResponse,
 };
-use collab_server::AuthInfos;
+use collab_server::SessionIntent;
 use eerie::fs::AbsPathBuf;
 use eerie::{DirectoryId, DirectoryRef, Replica};
-use futures_util::{
-    future,
-    stream,
-    AsyncWriteExt,
-    SinkExt,
-    Stream,
-    StreamExt,
-};
+use futures_util::io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf};
+use futures_util::{future, stream, SinkExt, Stream, StreamExt};
 use nvimx::ctx::NeovimCtx;
 use nvimx::diagnostics::DiagnosticMessage;
 use nvimx::emit::{Emit, EmitExt, EmitMessage, Severity};
@@ -56,7 +57,7 @@ impl AsyncAction for Join {
         session_id: Self::Args,
         ctx: NeovimCtx<'_>,
     ) -> Result<(), JoinError> {
-        let auth_infos = AuthInfos {
+        let auth_infos = NomadAuthenticateInfos {
             github_handle: "noib3"
                 .parse::<GitHubHandle>()
                 .expect("it's valid"),
@@ -67,8 +68,7 @@ impl AsyncAction for Join {
         #[rustfmt::skip]
         let step = ConnectToServer { guard }
             .connect_to_server().emitting(spin::<ConnectToServer>()).await?
-            .authenticate(auth_infos).emitting(spin::<Authenticate>()).await?
-            .join_session(session_id).emitting(spin::<JoinSession>()).await?
+            .knock(auth_infos, session_id).emitting(spin::<Knock>()).await?
             .confirm_join().await?
             .request_project().emitting(spin::<RequestProject>()).await?
             .find_project_root().emitting(spin::<FindProjectRoot>()).await?
@@ -98,41 +98,35 @@ struct ConnectToServer {
     guard: JoinGuard,
 }
 
-struct Authenticate {
-    io: collab_server::Io,
-    guard: JoinGuard,
-}
-
-struct JoinSession {
-    authenticated: collab_server::client::Authenticated,
-    auth_infos: AuthInfos,
+struct Knock {
+    io: TcpStream,
     guard: JoinGuard,
 }
 
 struct ConfirmJoin {
-    joined: collab_server::client::Joined,
-    local_peer: Peer,
+    local_peer_handle: GitHubHandle,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     guard: JoinGuard,
 }
 
 struct RequestProject {
-    joined: collab_server::client::Joined,
-    local_peer: Peer,
+    local_peer_handle: GitHubHandle,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     guard: JoinGuard,
 }
 
 struct FindProjectRoot {
     buffered: Vec<Message>,
-    local_peer: Peer,
-    joined: collab_server::client::Joined,
+    local_peer_handle: GitHubHandle,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     project_response: Box<ProjectResponse>,
     guard: JoinGuard,
 }
 
 struct FlushProject {
     buffered: Vec<Message>,
-    local_peer: Peer,
-    joined: collab_server::client::Joined,
+    local_peer_handle: GitHubHandle,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     project_response: Box<ProjectResponse>,
     project_root: AbsPathBuf,
     guard: JoinGuard,
@@ -140,8 +134,8 @@ struct FlushProject {
 
 struct JumpToHost {
     buffered: Vec<Message>,
-    joined: collab_server::client::Joined,
-    local_peer: Peer,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
+    local_peer_handle: GitHubHandle,
     project_root: AbsPathBuf,
     remote_peers: Peers,
     replica: Replica,
@@ -154,11 +148,11 @@ struct RemoveProjectRoot {
 
 struct RunSession {
     buffered: Vec<Message>,
-    joined: collab_server::client::Joined,
-    local_peer: Peer,
+    local_peer_handle: GitHubHandle,
     project_root: AbsPathBuf,
     remote_peers: Peers,
     replica: Replica,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     guard: JoinGuard,
 }
 
@@ -170,10 +164,7 @@ pub(crate) enum JoinError {
     ConnectToServer(#[from] ConnectToServerError),
 
     #[error(transparent)]
-    Authenticate(#[from] collab_server::client::AuthError),
-
-    #[error(transparent)]
-    JoinSession(#[from] JoinSessionError),
+    Knock(#[from] KnockError<NomadAuthenticator>),
 
     #[error(transparent)]
     ConfirmJoin(#[from] ConfirmJoinError),
@@ -191,7 +182,7 @@ pub(crate) enum JoinError {
     JumpToHost(#[from] JumpToHostError),
 
     #[error(transparent)]
-    RunSession(#[from] RunSessionError<io::Error, io::Error>),
+    RunSession(#[from] RunSessionError<io::Error, ClientRxError>),
 
     #[error(transparent)]
     RemoveProjectRoot(#[from] RemoveProjectRootError),
@@ -208,13 +199,6 @@ pub(crate) struct ConnectToServerError {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("couldn't join session: {inner}")]
-pub(crate) struct JoinSessionError {
-    #[from]
-    inner: collab_server::client::JoinError,
-}
-
-#[derive(Debug, thiserror::Error)]
 #[error("")]
 pub(crate) struct ConfirmJoinError;
 
@@ -224,7 +208,7 @@ pub(crate) enum RequestProjectError {
     SendRequest(io::Error),
 
     #[error("couldn't read project response: {0}")]
-    ReadResponse(io::Error),
+    ReadResponse(ClientRxError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -280,54 +264,40 @@ impl JoinGuard {
 }
 
 impl ConnectToServer {
-    async fn connect_to_server(
-        self,
-    ) -> Result<Authenticate, ConnectToServerError> {
-        collab_server::Io::connect()
-            .await
-            .map(|io| Authenticate { io, guard: self.guard })
-            .map_err(Into::into)
+    async fn connect_to_server(self) -> Result<Knock, ConnectToServerError> {
+        todo!();
     }
 }
 
-impl Authenticate {
-    async fn authenticate(
+impl Knock {
+    async fn knock(
         self,
-        auth_infos: AuthInfos,
-    ) -> Result<JoinSession, collab_server::client::AuthError> {
-        self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
-            JoinSession { authenticated, auth_infos, guard: self.guard }
-        })
-    }
-}
-
-impl JoinSession {
-    async fn join_session(
-        self,
+        auth_infos: NomadAuthenticateInfos,
         session_id: SessionId,
-    ) -> Result<ConfirmJoin, JoinSessionError> {
-        self.authenticated
-            .join(collab_server::client::JoinRequest::JoinExistingSession(
+    ) -> Result<ConfirmJoin, KnockError<NomadAuthenticator>> {
+        let (reader, writer) = self.io.split();
+        let knock = collab_server::Knock {
+            auth_infos,
+            session_intent: SessionIntent::JoinExisting(
                 session_id.into_inner(),
-            ))
-            .await
-            .map(|joined| ConfirmJoin {
-                local_peer: Peer::new(
-                    joined.sender.peer_id(),
-                    self.auth_infos.github_handle,
-                ),
-                joined,
-                guard: self.guard,
-            })
-            .map_err(Into::into)
+            ),
+        };
+        let welcome = Knocker::<_, _, NomadConfig>::new(reader, writer)
+            .knock(knock)
+            .await?;
+        todo!();
+
+        // self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
+        //     JoinSession { authenticated, auth_infos, guard: self.guard }
+        // })
     }
 }
 
 impl ConfirmJoin {
     async fn confirm_join(self) -> Result<RequestProject, ConfirmJoinError> {
         Ok(RequestProject {
-            joined: self.joined,
-            local_peer: self.local_peer,
+            welcome: self.welcome,
+            local_peer_handle: self.local_peer_handle,
             guard: self.guard,
         })
     }
@@ -338,23 +308,29 @@ impl RequestProject {
         mut self,
     ) -> Result<FindProjectRoot, RequestProjectError> {
         let request_from = self
-            .joined
-            .peers
+            .welcome
+            .other_peers
             .as_slice()
             .first()
             .expect("can't be empty")
-            .clone();
+            .id();
 
-        self.joined
-            .sender
-            .send(Message::ProjectRequest(ProjectRequest { request_from }))
+        let this_peer =
+            Peer::new(self.welcome.peer_id, self.local_peer_handle.clone());
+
+        self.welcome
+            .tx
+            .send(Message::ProjectRequest(ProjectRequest {
+                request_from,
+                requested_by: this_peer,
+            }))
             .await
             .map_err(RequestProjectError::SendRequest)?;
 
         let mut buffered = Vec::new();
 
         let project_response = loop {
-            let res = self.joined.receiver.next().await.expect("never ends");
+            let res = self.welcome.rx.next().await.expect("never ends");
             let message = res.map_err(RequestProjectError::ReadResponse)?;
             match message {
                 Message::ProjectResponse(response) => break response,
@@ -364,9 +340,9 @@ impl RequestProject {
 
         Ok(FindProjectRoot {
             buffered,
-            joined: self.joined,
+            welcome: self.welcome,
             guard: self.guard,
-            local_peer: self.local_peer,
+            local_peer_handle: self.local_peer_handle,
             project_response,
         })
     }
@@ -382,8 +358,8 @@ impl FindProjectRoot {
 
         Ok(FlushProject {
             buffered: self.buffered,
-            joined: self.joined,
-            local_peer: self.local_peer,
+            welcome: self.welcome,
+            local_peer_handle: self.local_peer_handle,
             guard: self.guard,
             project_response: self.project_response,
             project_root,
@@ -416,7 +392,7 @@ impl FlushProject {
 
         let (err_tx, err_rx) = flume::unbounded();
         let encoded_replica = self.project_response.replica;
-        let replica = Replica::decode(self.local_peer.id(), encoded_replica);
+        let replica = Replica::decode(self.welcome.peer_id, encoded_replica);
         let file_contents = self.project_response.file_contents;
         let root_id = replica.root().id();
         let tree = Rc::new(ProjectTree { replica, file_contents });
@@ -439,8 +415,8 @@ impl FlushProject {
 
         Ok(JumpToHost {
             buffered: self.buffered,
-            joined: self.joined,
-            local_peer: self.local_peer,
+            welcome: self.welcome,
+            local_peer_handle: self.local_peer_handle,
             project_root: self.project_root,
             remote_peers: self.project_response.peers,
             replica,
@@ -453,8 +429,8 @@ impl JumpToHost {
     fn jump_to_host(self) -> RunSession {
         RunSession {
             buffered: self.buffered,
-            joined: self.joined,
-            local_peer: self.local_peer,
+            welcome: self.welcome,
+            local_peer_handle: self.local_peer_handle,
             project_root: self.project_root,
             remote_peers: self.remote_peers,
             replica: self.replica,
@@ -467,18 +443,15 @@ impl RunSession {
     async fn run_session(
         self,
         neovim_ctx: NeovimCtx<'static>,
-    ) -> (RemoveProjectRoot, Option<RunSessionError<io::Error, io::Error>>)
+    ) -> (RemoveProjectRoot, Option<RunSessionError<io::Error, ClientRxError>>)
     {
-        let collab_server::client::Joined {
-            sender: tx,
-            receiver: rx,
-            session_id,
-            peers: _,
-        } = self.joined;
+        let Welcome { peer_id, session_id, tx, rx, .. } = self.welcome;
+
+        let local_peer = Peer::new(peer_id, self.local_peer_handle);
 
         let session = Session::new(NewSessionArgs {
             is_host: false,
-            local_peer: self.local_peer,
+            local_peer,
             remote_peers: self.remote_peers,
             project_root: self.project_root.clone(),
             replica: self.replica,
@@ -705,12 +678,8 @@ impl JoinStep for ConnectToServer {
     const MESSAGE: &'static str = "Connecting to server";
 }
 
-impl JoinStep for Authenticate {
+impl JoinStep for Knock {
     const MESSAGE: &'static str = "Authenticating";
-}
-
-impl JoinStep for JoinSession {
-    const MESSAGE: &'static str = "Joining session";
 }
 
 impl JoinStep for ConfirmJoin {

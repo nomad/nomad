@@ -1,11 +1,19 @@
 use std::ffi::OsString;
 use std::io;
 
+use async_net::TcpStream;
+use collab_server::client::{ClientRxError, KnockError, Knocker, Welcome};
+use collab_server::configs::nomad::{
+    NomadAuthenticateInfos,
+    NomadAuthenticator,
+    NomadConfig,
+};
 use collab_server::message::{GitHubHandle, Peer, Peers};
-use collab_server::AuthInfos;
+use collab_server::SessionIntent;
 use eerie::fs::{AbsPathBuf, FsNodeName};
 use eerie::{Replica, ReplicaBuilder};
-use futures_util::StreamExt;
+use futures_util::io::{ReadHalf, WriteHalf};
+use futures_util::{AsyncReadExt, StreamExt};
 use nvimx::ctx::{BufferCtx, NeovimCtx};
 use nvimx::diagnostics::DiagnosticMessage;
 use nvimx::fs::os_fs::OsFs;
@@ -40,7 +48,7 @@ impl AsyncAction for Start {
         _: Self::Args,
         ctx: NeovimCtx<'_>,
     ) -> Result<(), StartError> {
-        let auth_infos = AuthInfos {
+        let auth_infos = NomadAuthenticateInfos {
             github_handle: "noib3"
                 .parse::<GitHubHandle>()
                 .expect("it's valid"),
@@ -51,8 +59,7 @@ impl AsyncAction for Start {
             .find_project_root().await?
             .confirm_start().await?
             .connect_to_server().await?
-            .authenticate(auth_infos).await?
-            .start_session().await?
+            .knock(auth_infos).await?
             .read_replica().await?
             .run_session().await?;
 
@@ -69,8 +76,8 @@ struct Starter {
     session_status: Shared<SessionStatus>,
 }
 
-struct Authenticate {
-    io: collab_server::Io,
+struct Knock {
+    io: TcpStream,
     project_root: AbsPathBuf,
     starter: Starter,
 }
@@ -86,32 +93,22 @@ struct ConnectToServer {
 }
 
 struct ReadReplica {
-    joined: collab_server::client::Joined,
-    local_peer: Peer,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
+    local_peer_handle: GitHubHandle,
     project_root: AbsPathBuf,
     starter: Starter,
 }
 
 struct RunSession {
-    joined: collab_server::client::Joined,
-    local_peer: Peer,
+    welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
+    local_peer_handle: GitHubHandle,
     project_root: AbsPathBuf,
     replica: Replica,
     starter: Starter,
 }
 
-struct StartSession {
-    authenticated: collab_server::client::Authenticated,
-    auth_infos: AuthInfos,
-    project_root: AbsPathBuf,
-    starter: Starter,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum StartError {
-    #[error(transparent)]
-    Authenticate(#[from] collab_server::client::AuthError),
-
     #[error(transparent)]
     ConfirmStart(#[from] ConfirmStartError),
 
@@ -122,13 +119,13 @@ pub(crate) enum StartError {
     FindProjectRoot(#[from] FindProjectRootError),
 
     #[error(transparent)]
+    Knock(#[from] KnockError<NomadAuthenticator>),
+
+    #[error(transparent)]
     ReadReplica(#[from] ReadReplicaError),
 
     #[error(transparent)]
-    RunSession(#[from] RunSessionError<io::Error, io::Error>),
-
-    #[error(transparent)]
-    StartSession(#[from] StartSessionError),
+    RunSession(#[from] RunSessionError<io::Error, ClientRxError>),
 
     #[error(transparent)]
     UserBusy(#[from] UserBusyError<true>),
@@ -180,13 +177,6 @@ pub(crate) enum ReadReplicaError {
     ReadDuplicate(AbsPathBuf),
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("")]
-pub(crate) struct StartSessionError {
-    #[from]
-    inner: collab_server::client::JoinError,
-}
-
 impl Starter {
     fn new(
         session_status: Shared<SessionStatus>,
@@ -233,51 +223,34 @@ impl ConfirmStart {
 }
 
 impl ConnectToServer {
-    async fn connect_to_server(
-        self,
-    ) -> Result<Authenticate, ConnectToServerError> {
-        collab_server::Io::connect()
-            .await
-            .map(|io| Authenticate {
-                io,
-                project_root: self.project_root,
-                starter: self.starter,
-            })
-            .map_err(Into::into)
+    async fn connect_to_server(self) -> Result<Knock, ConnectToServerError> {
+        todo!();
     }
 }
 
-impl Authenticate {
-    async fn authenticate(
+impl Knock {
+    async fn knock(
         self,
-        auth_infos: AuthInfos,
-    ) -> Result<StartSession, collab_server::client::AuthError> {
-        self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
-            StartSession {
-                authenticated,
-                auth_infos,
-                project_root: self.project_root,
-                starter: self.starter,
-            }
-        })
-    }
-}
+        auth_infos: NomadAuthenticateInfos,
+    ) -> Result<ReadReplica, KnockError<NomadAuthenticator>> {
+        let (reader, writer) = self.io.split();
+        let knock = collab_server::Knock {
+            auth_infos,
+            session_intent: SessionIntent::StartNew,
+        };
+        let welcome = Knocker::<_, _, NomadConfig>::new(reader, writer)
+            .knock(knock)
+            .await?;
+        todo!();
 
-impl StartSession {
-    async fn start_session(self) -> Result<ReadReplica, StartSessionError> {
-        self.authenticated
-            .join(collab_server::client::JoinRequest::StartNewSession)
-            .await
-            .map(|joined| ReadReplica {
-                local_peer: Peer::new(
-                    joined.sender.peer_id(),
-                    self.auth_infos.github_handle,
-                ),
-                joined,
-                project_root: self.project_root,
-                starter: self.starter,
-            })
-            .map_err(Into::into)
+        // self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
+        //     StartSession {
+        //         authenticated,
+        //         auth_infos,
+        //         project_root: self.project_root,
+        //         starter: self.starter,
+        //     }
+        // })
     }
 }
 
@@ -290,7 +263,7 @@ impl ReadReplica {
             self.starter.ctx.reborrow(),
         );
 
-        let mut builder = ReplicaBuilder::new(self.local_peer.id());
+        let mut builder = ReplicaBuilder::new(self.welcome.peer_id);
         while let Ok(res) = node_rx.recv_async().await {
             let maybe_duplicate_path = match res? {
                 Node::Dir { path } => {
@@ -318,8 +291,8 @@ impl ReadReplica {
         }
 
         Ok(RunSession {
-            joined: self.joined,
-            local_peer: self.local_peer,
+            welcome: self.welcome,
+            local_peer_handle: self.local_peer_handle,
             project_root: self.project_root,
             replica: builder.build(),
             starter: self.starter,
@@ -330,17 +303,14 @@ impl ReadReplica {
 impl RunSession {
     async fn run_session(
         self,
-    ) -> Result<(), RunSessionError<io::Error, io::Error>> {
-        let collab_server::client::Joined {
-            sender,
-            receiver,
-            session_id,
-            peers: _,
-        } = self.joined;
+    ) -> Result<(), RunSessionError<io::Error, ClientRxError>> {
+        let Welcome { session_id, peer_id, tx, rx, .. } = self.welcome;
+
+        let local_peer = Peer::new(peer_id, self.local_peer_handle);
 
         let session = Session::new(NewSessionArgs {
             is_host: true,
-            local_peer: self.local_peer,
+            local_peer,
             remote_peers: Peers::default(),
             project_root: self.project_root,
             replica: self.replica,
@@ -350,7 +320,7 @@ impl RunSession {
 
         let status = SessionStatus::InSession(session.project());
         self.starter.session_status.set(status);
-        session.run(sender, receiver).await
+        session.run(tx, rx).await
     }
 }
 

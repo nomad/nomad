@@ -195,7 +195,10 @@ impl Session {
         }
     }
 
-    fn integrate_created_cursor(&self, cursor_creation: eerie::CursorCreation) {
+    fn integrate_created_cursor(
+        &self,
+        cursor_creation: eerie::CursorCreation,
+    ) {
         self.project
             .with_mut(|p| p.integrate_cursor_creation(cursor_creation));
     }
@@ -340,7 +343,7 @@ impl Session {
     ) {
         self.neovim_ctx.spawn(|_| {
             let this = self.clone();
-            let respond_to = project_request.request_from;
+            let respond_to = project_request.requested_by;
             async move {
                 let contents = match this.read_file_contents().await {
                     Ok(contents) => contents,

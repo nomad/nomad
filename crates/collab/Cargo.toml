@@ -8,10 +8,11 @@ publish.workspace = true
 
 [dependencies]
 async-fs = { workspace = true }
-async-stream = "0.3"
+async-net = "2.0"
 async-recursion = "1"
+async-stream = "0.3"
 clipboard = { workspace = true }
-collab-server = { git = "ssh://git@github.com/nomad/collab.git" }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
 eerie = { workspace = true }
 flume = { workspace = true }
 futures-util = { workspace = true }
