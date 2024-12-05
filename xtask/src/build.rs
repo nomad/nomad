@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::env;
 
 use anyhow::{anyhow, Context};
+use cargo_metadata::TargetKind;
 use futures_executor::block_on;
 use nvimx::fs::os_fs::OsFs;
 use nvimx::fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
@@ -180,7 +181,7 @@ impl FixLibraryName {
     fn call(&self) -> anyhow::Result<()> {
         let mut cdylib_targets =
             self.package.targets.iter().filter(|target| {
-                target.kind.iter().any(|kind| kind == "cdylib")
+                target.kind.iter().any(|kind| kind == &TargetKind::CDyLib)
             });
         let cdylib_target = cdylib_targets.next().ok_or_else(|| {
             anyhow!(
