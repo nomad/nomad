@@ -104,20 +104,20 @@ struct Knock {
 }
 
 struct ConfirmJoin {
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     guard: JoinGuard,
 }
 
 struct RequestProject {
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     guard: JoinGuard,
 }
 
 struct FindProjectRoot {
     buffered: Vec<Message>,
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     project_response: Box<ProjectResponse>,
     guard: JoinGuard,
@@ -125,7 +125,7 @@ struct FindProjectRoot {
 
 struct FlushProject {
     buffered: Vec<Message>,
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
     project_response: Box<ProjectResponse>,
     project_root: AbsPathBuf,
@@ -135,7 +135,7 @@ struct FlushProject {
 struct JumpToHost {
     buffered: Vec<Message>,
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     project_root: AbsPathBuf,
     remote_peers: Peers,
     replica: Replica,
@@ -148,7 +148,7 @@ struct RemoveProjectRoot {
 
 struct RunSession {
     buffered: Vec<Message>,
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     project_root: AbsPathBuf,
     remote_peers: Peers,
     replica: Replica,
@@ -276,6 +276,7 @@ impl Knock {
         session_id: SessionId,
     ) -> Result<ConfirmJoin, KnockError<NomadAuthenticator>> {
         let (reader, writer) = self.io.split();
+        let github_handle = auth_infos.github_handle.clone();
         let knock = collab_server::Knock {
             auth_infos,
             session_intent: SessionIntent::JoinExisting(
@@ -285,11 +286,11 @@ impl Knock {
         let welcome = Knocker::<_, _, NomadConfig>::new(reader, writer)
             .knock(knock)
             .await?;
-        todo!();
-
-        // self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
-        //     JoinSession { authenticated, auth_infos, guard: self.guard }
-        // })
+        Ok(ConfirmJoin {
+            local_peer: Peer::new(welcome.peer_id, github_handle),
+            welcome,
+            guard: self.guard,
+        })
     }
 }
 
@@ -297,7 +298,7 @@ impl ConfirmJoin {
     async fn confirm_join(self) -> Result<RequestProject, ConfirmJoinError> {
         Ok(RequestProject {
             welcome: self.welcome,
-            local_peer_handle: self.local_peer_handle,
+            local_peer: self.local_peer,
             guard: self.guard,
         })
     }
@@ -315,14 +316,11 @@ impl RequestProject {
             .expect("can't be empty")
             .id();
 
-        let this_peer =
-            Peer::new(self.welcome.peer_id, self.local_peer_handle.clone());
-
         self.welcome
             .tx
             .send(Message::ProjectRequest(ProjectRequest {
                 request_from,
-                requested_by: this_peer,
+                requested_by: self.local_peer.clone(),
             }))
             .await
             .map_err(RequestProjectError::SendRequest)?;
@@ -342,7 +340,7 @@ impl RequestProject {
             buffered,
             welcome: self.welcome,
             guard: self.guard,
-            local_peer_handle: self.local_peer_handle,
+            local_peer: self.local_peer,
             project_response,
         })
     }
@@ -359,7 +357,7 @@ impl FindProjectRoot {
         Ok(FlushProject {
             buffered: self.buffered,
             welcome: self.welcome,
-            local_peer_handle: self.local_peer_handle,
+            local_peer: self.local_peer,
             guard: self.guard,
             project_response: self.project_response,
             project_root,
@@ -416,7 +414,7 @@ impl FlushProject {
         Ok(JumpToHost {
             buffered: self.buffered,
             welcome: self.welcome,
-            local_peer_handle: self.local_peer_handle,
+            local_peer: self.local_peer,
             project_root: self.project_root,
             remote_peers: self.project_response.peers,
             replica,
@@ -430,7 +428,7 @@ impl JumpToHost {
         RunSession {
             buffered: self.buffered,
             welcome: self.welcome,
-            local_peer_handle: self.local_peer_handle,
+            local_peer: self.local_peer,
             project_root: self.project_root,
             remote_peers: self.remote_peers,
             replica: self.replica,
@@ -445,13 +443,11 @@ impl RunSession {
         neovim_ctx: NeovimCtx<'static>,
     ) -> (RemoveProjectRoot, Option<RunSessionError<io::Error, ClientRxError>>)
     {
-        let Welcome { peer_id, session_id, tx, rx, .. } = self.welcome;
-
-        let local_peer = Peer::new(peer_id, self.local_peer_handle);
+        let Welcome { session_id, tx, rx, .. } = self.welcome;
 
         let session = Session::new(NewSessionArgs {
             is_host: false,
-            local_peer,
+            local_peer: self.local_peer,
             remote_peers: self.remote_peers,
             project_root: self.project_root.clone(),
             replica: self.replica,

@@ -94,14 +94,14 @@ struct ConnectToServer {
 
 struct ReadReplica {
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     project_root: AbsPathBuf,
     starter: Starter,
 }
 
 struct RunSession {
     welcome: Welcome<ReadHalf<TcpStream>, WriteHalf<TcpStream>>,
-    local_peer_handle: GitHubHandle,
+    local_peer: Peer,
     project_root: AbsPathBuf,
     replica: Replica,
     starter: Starter,
@@ -234,6 +234,7 @@ impl Knock {
         auth_infos: NomadAuthenticateInfos,
     ) -> Result<ReadReplica, KnockError<NomadAuthenticator>> {
         let (reader, writer) = self.io.split();
+        let github_handle = auth_infos.github_handle.clone();
         let knock = collab_server::Knock {
             auth_infos,
             session_intent: SessionIntent::StartNew,
@@ -241,16 +242,12 @@ impl Knock {
         let welcome = Knocker::<_, _, NomadConfig>::new(reader, writer)
             .knock(knock)
             .await?;
-        todo!();
-
-        // self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
-        //     StartSession {
-        //         authenticated,
-        //         auth_infos,
-        //         project_root: self.project_root,
-        //         starter: self.starter,
-        //     }
-        // })
+        Ok(ReadReplica {
+            local_peer: Peer::new(welcome.peer_id, github_handle),
+            welcome,
+            project_root: self.project_root,
+            starter: self.starter,
+        })
     }
 }
 
@@ -292,7 +289,7 @@ impl ReadReplica {
 
         Ok(RunSession {
             welcome: self.welcome,
-            local_peer_handle: self.local_peer_handle,
+            local_peer: self.local_peer,
             project_root: self.project_root,
             replica: builder.build(),
             starter: self.starter,
@@ -304,13 +301,11 @@ impl RunSession {
     async fn run_session(
         self,
     ) -> Result<(), RunSessionError<io::Error, ClientRxError>> {
-        let Welcome { session_id, peer_id, tx, rx, .. } = self.welcome;
-
-        let local_peer = Peer::new(peer_id, self.local_peer_handle);
+        let Welcome { session_id, tx, rx, .. } = self.welcome;
 
         let session = Session::new(NewSessionArgs {
             is_host: true,
-            local_peer,
+            local_peer: self.local_peer,
             remote_peers: Peers::default(),
             project_root: self.project_root,
             replica: self.replica,
