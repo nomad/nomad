@@ -409,7 +409,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#1c4fac67a7dad59b6018b38a564521fc0afe14fd"
+source = "git+ssh://git@github.com/nomad/collab.git#b84df53d43fb93b06dde1262c90a4047afaaf3da"
 dependencies = [
  "bincode",
  "bytes",
@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#1c4fac67a7dad59b6018b38a564521fc0afe14fd"
+source = "git+ssh://git@github.com/nomad/collab.git#b84df53d43fb93b06dde1262c90a4047afaaf3da"
 dependencies = [
  "codecs",
  "eerie",
@@ -476,10 +476,11 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#1c4fac67a7dad59b6018b38a564521fc0afe14fd"
+source = "git+ssh://git@github.com/nomad/collab.git#b84df53d43fb93b06dde1262c90a4047afaaf3da"
 dependencies = [
  "codecs",
  "collab-message",
+ "derive_more",
  "futures-util",
  "nohash",
  "pin-project-lite",
@@ -581,6 +582,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+ "unicode-xid",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,7 +630,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "eerie"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/eerie.git#6819967999baedeb62e55e1177ff1d993b56317f"
+source = "git+ssh://git@github.com/nomad/eerie.git#aa23cb3d80e749bb71603550986ce8908b153484"
 dependencies = [
  "cola",
  "compact_str",
@@ -1864,6 +1886,12 @@ name = "unicode-ident"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+
+[[package]]
+name = "unicode-xid"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "utf8parse"
