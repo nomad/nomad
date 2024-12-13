@@ -6,7 +6,6 @@ use crate::buffer_ctx::BufferCtx;
 use crate::text_file_ctx::TextFileCtx;
 
 /// TODO: docs.
-#[derive(Clone)]
 pub struct FileCtx<'ctx> {
     pub(super) file_path: AbsPathBuf,
     pub(super) buffer_ctx: BufferCtx<'ctx>,

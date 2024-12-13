@@ -6,7 +6,6 @@ use crate::neovim_ctx::NeovimCtx;
 use crate::pane_id::PaneId;
 
 /// TODO: docs.
-#[derive(Clone)]
 pub struct PaneCtx<'ctx> {
     pane_id: PaneId,
     neovim_ctx: NeovimCtx<'ctx>,

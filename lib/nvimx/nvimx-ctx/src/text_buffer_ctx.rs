@@ -11,7 +11,6 @@ use crate::text_file_ctx::TextFileCtx;
 use crate::ActorId;
 
 /// TODO: docs.
-#[derive(Clone)]
 #[repr(transparent)]
 pub struct TextBufferCtx<'ctx> {
     buffer_ctx: BufferCtx<'ctx>,
@@ -144,12 +143,14 @@ impl<'ctx> TextBufferCtx<'ctx> {
     }
 
     pub(crate) fn new_unchecked(buffer_ctx: BufferCtx<'ctx>) -> Self {
-        debug_assert!(Self::from_buffer(buffer_ctx.clone()).is_some());
+        debug_assert!(
+            TextBufferCtx::from_buffer(buffer_ctx.reborrow()).is_some()
+        );
         Self { buffer_ctx }
     }
 
     pub(crate) fn new_ref_unchecked<'a>(ctx: &'a BufferCtx<'ctx>) -> &'a Self {
-        debug_assert!(Self::from_buffer(ctx.clone()).is_some());
+        debug_assert!(TextBufferCtx::from_buffer(ctx.reborrow()).is_some());
         // SAFETY: `TextBufferCtx` is a `repr(transparent)` newtype over
         // `BufferCtx`.
         unsafe { &*(ctx as *const BufferCtx<'ctx> as *const Self) }

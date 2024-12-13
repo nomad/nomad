@@ -103,7 +103,6 @@ fn attach_to(buffer_id: BufferId, ctx: NeovimCtx<'static>) {
             let text_buffer_ctx = ctx
                 .reborrow()
                 .into_buffer(buffer_id)
-                .clone()
                 .expect(
                     "`on_bytes` is being called, so the buffer ID must still \
                      be valid",

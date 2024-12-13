@@ -2,7 +2,6 @@ use crate::file_ctx::FileCtx;
 use crate::text_buffer_ctx::TextBufferCtx;
 
 /// TODO: docs.
-#[derive(Clone)]
 pub struct TextFileCtx<'ctx> {
     file_ctx: FileCtx<'ctx>,
 }
@@ -19,7 +18,7 @@ impl<'ctx> TextFileCtx<'ctx> {
     }
 
     pub(crate) fn from_file(file_ctx: FileCtx<'ctx>) -> Option<Self> {
-        TextBufferCtx::from_buffer((*file_ctx).clone())
+        TextBufferCtx::from_buffer(file_ctx.reborrow())
             .is_some()
             .then_some(Self { file_ctx })
     }

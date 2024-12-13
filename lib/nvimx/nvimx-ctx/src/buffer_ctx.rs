@@ -13,7 +13,6 @@ use crate::pane_id::PaneId;
 use crate::text_buffer_ctx::TextBufferCtx;
 
 /// TODO: docs.
-#[derive(Clone)]
 pub struct BufferCtx<'ctx> {
     buffer_id: BufferId,
     neovim_ctx: NeovimCtx<'ctx>,
