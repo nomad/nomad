@@ -29,7 +29,7 @@ impl Action for SyncCursor {
         cursor: Self::Args,
         _: Self::Ctx<'a>,
     ) -> Self::Return {
-        let message = self.project.with_mut(|project| {
+        let maybe_message = self.project.with_mut(|project| {
             if cursor.moved_by == project.actor_id {
                 return None;
             }
@@ -72,7 +72,7 @@ impl Action for SyncCursor {
             })
         });
 
-        if let Some(message) = message {
+        if let Some(message) = maybe_message {
             if self.message_tx.send(message).is_err() {
                 self.should_detach.set(ShouldDetach::Yes);
             }

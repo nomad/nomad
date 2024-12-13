@@ -91,8 +91,8 @@ impl AutoCommandMap {
             let mut callback = autocmd.into_callback();
             move |actor_id, autocmd_ctx: &AutoCommandCtx<'_>| {
                 if let Some(buffer_id) = buffer_id {
-                    if BufferId::new(autocmd_ctx.args().buffer.clone())
-                        == buffer_id
+                    if buffer_id
+                        != BufferId::new(autocmd_ctx.args().buffer.clone())
                     {
                         return ShouldDetach::No;
                     }
