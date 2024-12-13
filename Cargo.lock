@@ -409,7 +409,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#7477fe2b04990fadcbb5fa484fc550ad8f45954e"
+source = "git+ssh://git@github.com/nomad/collab.git#375445b5bdb1fb9bd428a6f24a9fa883ae8e2fa9"
 dependencies = [
  "bincode",
  "bytes",
@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#7477fe2b04990fadcbb5fa484fc550ad8f45954e"
+source = "git+ssh://git@github.com/nomad/collab.git#375445b5bdb1fb9bd428a6f24a9fa883ae8e2fa9"
 dependencies = [
  "codecs",
  "eerie",
@@ -476,7 +476,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#7477fe2b04990fadcbb5fa484fc550ad8f45954e"
+source = "git+ssh://git@github.com/nomad/collab.git#375445b5bdb1fb9bd428a6f24a9fa883ae8e2fa9"
 dependencies = [
  "codecs",
  "collab-message",

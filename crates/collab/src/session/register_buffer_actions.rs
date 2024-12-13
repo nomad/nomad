@@ -38,22 +38,14 @@ impl RegisterBufferActions {
             };
 
             // Check if the buffer is in the project root.
-            let Some(mut file) = project.file_mut_of_buffer_id(buffer_id)
-            else {
+            let Some(mut file) = project.file(buffer_id) else {
                 return;
             };
 
             if let Some(byte_offset) = text_file_ctx.as_text_buffer().cursor()
             {
-                let (cursor_id, creation) =
-                    file.sync_created_cursor(byte_offset.into_u64());
-                assert!(
-                    project.local_cursor_id.is_none(),
-                    "creating a new cursor when another already exists, but \
-                     Neovim only supports a single cursor"
-                );
-                project.local_cursor_id = Some(cursor_id);
-                let _ = self.message_tx.send(Message::CreatedCursor(creation));
+                let creation = file.sync_created_cursor(byte_offset);
+                let _ = self.message_tx.send(creation.into());
             }
 
             let should_detach = Shared::new(ShouldDetach::No);

@@ -1,5 +1,3 @@
-use core::any::type_name;
-
 use collab_server::message::Message;
 use nvimx::ctx::{BufferCtx, ShouldDetach};
 use nvimx::event::{CursorArgs, CursorKind};
@@ -18,6 +16,7 @@ pub(super) struct SyncCursor {
 
 impl Action for SyncCursor {
     const NAME: ActionName = action_name!("synchronize-cursor");
+
     type Args = CursorArgs;
     type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
@@ -35,30 +34,17 @@ impl Action for SyncCursor {
             }
 
             Some(match cursor.kind {
-                CursorKind::Created(byte_offset) => {
-                    let Some(mut file) =
-                        proj.file_mut_of_buffer_id(cursor.buffer_id)
-                    else {
-                        panic!(
-                            "couldn't convert BufferId to file in {}",
-                            type_name::<Self>()
-                        );
+                CursorKind::Created(offset) => {
+                    let Some(mut file) = proj.file(cursor.buffer_id) else {
+                        panic!("couldn't get file of {:?}", cursor.buffer_id)
                     };
-                    let (cursor_id, creation) =
-                        file.sync_created_cursor(byte_offset.into_u64());
-                    assert!(
-                        proj.local_cursor_id.is_none(),
-                        "creating a new cursor when another already exists, \
-                         but Neovim only supports a single cursor"
-                    );
-                    proj.local_cursor_id = Some(cursor_id);
-                    Message::CreatedCursor(creation)
+                    file.sync_created_cursor(offset).into()
                 },
-                CursorKind::Moved(byte_offset) => Message::MovedCursor(
-                    proj.local_cursor().sync_relocated(byte_offset)?,
-                ),
+                CursorKind::Moved(offset) => {
+                    proj.local_cursor().sync_relocated(offset)?.into()
+                },
                 CursorKind::Removed => {
-                    Message::RemovedCursor(proj.local_cursor().sync_removed())
+                    proj.local_cursor().sync_removed().into()
                 },
             })
         });

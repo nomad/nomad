@@ -6,7 +6,6 @@ use eerie::fs::{AbsPath, AbsPathBuf};
 use eerie::{
     CursorCreation,
     CursorId,
-    CursorRefMut,
     CursorRelocation,
     CursorRemoval,
     Edit,
@@ -73,6 +72,11 @@ pub(crate) struct LocalCursor<'a> {
     project: &'a mut Project,
 }
 
+pub(crate) struct File<'a> {
+    file_id: FileId,
+    project: &'a mut Project,
+}
+
 impl Project {
     /// Returns an iterator over all the peers [`Peer`]s.
     ///
@@ -113,12 +117,9 @@ impl Project {
         self.neovim_ctx.reborrow().into_buffer(buffer_id)
     }
 
-    /// Returns the [`FileRefMut`] corresponding to the file that's currently
-    /// being edited in the buffer with the given [`BufferId`], if any.
-    pub(super) fn file_of_buffer_id(
-        &mut self,
-        buffer_id: BufferId,
-    ) -> Option<FileRef<'_>> {
+    /// Returns the [`File`] that's currently being edited in the buffer with
+    /// the given [`BufferId`], if any.
+    pub(super) fn file(&mut self, buffer_id: BufferId) -> Option<File<'_>> {
         let file_ctx = self
             .neovim_ctx
             .reborrow()
@@ -128,27 +129,8 @@ impl Project {
         let file_path = file_ctx.path().strip_prefix(&self.project_root)?;
 
         match self.replica.file_at_path(file_path) {
-            Ok(Some(file)) => Some(file),
+            Ok(Some(file)) => Some(File { file_id: file.id(), project: self }),
             _ => None,
-        }
-    }
-
-    /// Same as [`file_of_buffer_id`](Self::file_of_buffer_id), but returns a
-    /// [`FileRefMut`].
-    pub(super) fn file_mut_of_buffer_id(
-        &mut self,
-        buffer_id: BufferId,
-    ) -> Option<FileRefMut<'_>> {
-        match self.file_of_buffer_id(buffer_id) {
-            Some(file) => {
-                let file_id = file.id();
-                Some(
-                    self.replica
-                        .file_mut(file_id)
-                        .expect("we just had a FileRef"),
-                )
-            },
-            None => None,
         }
     }
 
@@ -379,24 +361,51 @@ impl Project {
     }
 }
 
-impl LocalCursor<'_> {
+impl File<'_> {
     #[track_caller]
-    pub(crate) fn create_at(self, byte_offset: ByteOffset) -> CursorCreation {
-        let proj = self.project;
+    pub(crate) fn sync_created_cursor(
+        &mut self,
+        byte_offset: ByteOffset,
+    ) -> CursorCreation {
+        let proj = &mut self.project;
 
         if let Some(cursor_id) = proj.local_cursor_id {
             let cursor = proj.replica.cursor(cursor_id).expect("ID is valid");
             let file_path = cursor.file().path();
             let offset = ByteOffset::new(cursor.byte_offset() as usize);
             panic!(
-                "tried to create cursor in '' at {byte_offset:?}, but \
-                 another one already exists in {file_path:?} at {offset:?}"
+                "tried to create cursor in {:?} at {byte_offset:?}, but \
+                 another one already exists in {file_path:?} at {offset:?}",
+                self.as_ref_mut().path(),
             );
         }
 
-        todo!("get file, etc.")
+        let (cursor_id, creation) =
+            self.as_ref_mut().sync_created_cursor(byte_offset.into_u64());
+
+        self.project.local_cursor_id = Some(cursor_id);
+
+        creation
     }
 
+    #[track_caller]
+    pub(crate) fn sync_replacement(
+        &mut self,
+        replacement: Replacement,
+    ) -> Edit {
+        let edit = self.as_ref_mut().sync_edited_text([replacement.into()]);
+        self.project.refresh_cursors(self.file_id);
+        self.project.refresh_selections(self.file_id);
+        edit
+    }
+
+    #[inline]
+    fn as_ref_mut(&mut self) -> FileRefMut<'_> {
+        self.project.replica.file_mut(self.file_id).expect("ID is valid")
+    }
+}
+
+impl LocalCursor<'_> {
     #[track_caller]
     pub(crate) fn sync_relocated(
         self,
