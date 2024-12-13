@@ -1,7 +1,6 @@
 use core::ops::Deref;
 
-use nvimx_common::oxi::api;
-use nvimx_common::{ByteOffset, MaybeResult, Point};
+use nvimx_common::{ByteOffset, MaybeResult};
 use nvimx_ctx::{
     ActorId,
     AutoCommand,
@@ -63,14 +62,9 @@ where
                 .reborrow()
                 .into_buffer(buffer_id)
                 .expect("autocmd was triggered, so buffer must exist");
-
-            let point = {
-                let (row, col) = api::Window::current()
-                    .get_cursor()
-                    .expect("never fails(?)");
-                Point { line_idx: row - 1, byte_offset: ByteOffset::new(col) }
-            };
-            let byte_offset = buffer_ctx.byte_offset_of_point(point);
+            let byte_offset = buffer_ctx
+                .cursor()
+                .expect("autocmd was triggered, so buffer must be focused");
             let args = CursorMovedArgs { actor_id, moved_to: byte_offset };
             self.action
                 .execute(args, buffer_ctx)

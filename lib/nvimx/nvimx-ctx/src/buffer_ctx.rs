@@ -8,6 +8,8 @@ use crate::buffer_id::BufferId;
 use crate::decoration_provider::Selection;
 use crate::file_ctx::FileCtx;
 use crate::neovim_ctx::NeovimCtx;
+use crate::pane_ctx::PaneCtx;
+use crate::pane_id::PaneId;
 use crate::text_buffer_ctx::TextBufferCtx;
 
 /// TODO: docs.
@@ -59,6 +61,20 @@ impl<'ctx> BufferCtx<'ctx> {
     /// Returns the [`BufferCtx`] of the current buffer.
     pub fn current(neovim_ctx: NeovimCtx<'ctx>) -> Self {
         Self { buffer_id: BufferId::current(), neovim_ctx }
+    }
+
+    /// TODO: docs..
+    pub fn cursor(&self) -> Option<ByteOffset> {
+        self.displayed_in().find_map(|pane_ctx| pane_ctx.cursor())
+    }
+
+    /// TODO: docs..
+    pub fn displayed_in(&self) -> impl Iterator<Item = PaneCtx<'_>> + '_ {
+        PaneId::opened()
+            .map(|pane_id| PaneCtx::new(pane_id, self.neovim_ctx.reborrow()))
+            .filter(|pane_ctx| {
+                pane_ctx.housing().buffer_id() == self.buffer_id()
+            })
     }
 
     /// Consumes `self`, returning a [`FileCtx`] if the buffer is saved on
