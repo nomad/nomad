@@ -1,0 +1,17 @@
+[package]
+name = "collab2"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+editor = { workspace = true }
+
+[dev-dependencies]
+editor-mock = { workspace = true }
+editor-neovim = { workspace = true }
+
+[lints]
+workspace = true

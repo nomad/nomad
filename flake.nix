@@ -12,37 +12,47 @@
     };
   };
 
-  outputs = inputs: with inputs;
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    inputs:
+    with inputs;
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         inherit (nixpkgs.lib) lists;
 
-        mkPkgs = isNightly: (import nixpkgs {
-          inherit system;
-          overlays = lists.optionals isNightly [
-            neovim-nightly-overlay.overlay
-          ];
-        });
-
-        mkShell = { nightly }: (
-          let
-            pkgs = mkPkgs nightly;
-            inherit (pkgs) lib stdenv;
-          in
-          pkgs.mkShell {
-            buildInputs = with pkgs; [
-            ] ++ lib.optional stdenv.isDarwin [
-              # Not sure who needs these
-              darwin.apple_sdk.frameworks.AppKit
-              libiconv
+        mkPkgs =
+          isNightly:
+          (import nixpkgs {
+            inherit system;
+            overlays = lists.optionals isNightly [
+              neovim-nightly-overlay.overlay
             ];
+          });
 
-            packages = with pkgs; [
-              # neovim
-              pkg-config
-            ];
-          }
-        );
+        mkShell =
+          { nightly }:
+          (
+            let
+              pkgs = mkPkgs nightly;
+              inherit (pkgs) lib stdenv;
+            in
+            pkgs.mkShell {
+              buildInputs =
+                with pkgs;
+                [
+                ]
+                ++ lib.optional stdenv.isDarwin [
+                  # Not sure who needs these
+                  darwin.apple_sdk.frameworks.AppKit
+                  libiconv
+                ];
+
+              packages = with pkgs; [
+                # neovim
+                pkg-config
+              ];
+            }
+          );
       in
       {
         devShells = {

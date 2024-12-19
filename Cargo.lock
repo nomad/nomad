@@ -490,6 +490,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "collab2"
+version = "0.1.0"
+dependencies = [
+ "editor",
+ "editor-mock",
+ "editor-neovim",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -626,6 +635,26 @@ name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
+name = "editor"
+version = "0.1.0"
+
+[[package]]
+name = "editor-mock"
+version = "0.1.0"
+dependencies = [
+ "collab2",
+ "editor",
+]
+
+[[package]]
+name = "editor-neovim"
+version = "0.1.0"
+dependencies = [
+ "collab2",
+ "editor",
+]
 
 [[package]]
 name = "eerie"

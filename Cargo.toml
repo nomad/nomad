@@ -45,6 +45,10 @@ nvimx-ui = { path = "./lib/nvimx/nvimx-ui" }
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
+collab2 = { path = "./crates/collab2" }
+editor = { path = "./crates/editor" }
+editor-mock = { path = "./crates/editor-mock" }
+editor-neovim = { path = "./crates/editor-neovim" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 version = { path = "./crates/version" }
