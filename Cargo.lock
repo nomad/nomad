@@ -1268,6 +1268,7 @@ name = "nvimx2"
 version = "0.1.0"
 dependencies = [
  "nvimx2-macros",
+ "serde",
 ]
 
 [[package]]
