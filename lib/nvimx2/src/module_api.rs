@@ -1,4 +1,4 @@
-use crate::{Backend, Command, Module};
+use crate::{Backend, Command, Function, Module};
 
 /// TODO: docs.
 pub struct ModuleApi<M, B> {
@@ -33,7 +33,7 @@ where
     #[inline]
     pub fn with_default_function<F>(self, fun: F) -> Self
     where
-        F: Function<Module = M>,
+        F: Function<B, Module = M>,
     {
         todo!();
     }
@@ -42,7 +42,7 @@ where
     #[inline]
     pub fn with_function<F>(self, fun: F) -> Self
     where
-        F: Function<Module = M>,
+        F: Function<B, Module = M>,
     {
         todo!();
     }

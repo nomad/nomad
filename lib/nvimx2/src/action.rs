@@ -1,4 +1,4 @@
-use crate::{Backend, MaybeResult, Module};
+use crate::{Backend, MaybeResult, Module, NeovimCtx};
 
 /// TODO: docs.
 pub trait Action<B: Backend>: 'static {
@@ -12,9 +12,6 @@ pub trait Action<B: Backend>: 'static {
     type Args;
 
     /// TODO: docs.
-    type Ctx<'a>;
-
-    /// TODO: docs.
     type Return;
 
     /// TODO: docs.
@@ -24,7 +21,7 @@ pub trait Action<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: Self::Ctx<'_>,
+        ctx: NeovimCtx<'_, B>,
     ) -> impl MaybeResult<Self::Return>;
 
     /// TODO: docs.

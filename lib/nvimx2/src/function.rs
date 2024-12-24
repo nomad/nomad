@@ -1,15 +1,10 @@
-use crate::{
-    Action,
-    ActionName,
-    Backend,
-    CommandArgs,
-    MaybeResult,
-    Module,
-    NeovimCtx,
-};
+use serde::de::DeserializeOwned;
+use serde::ser::Serialize;
+
+use crate::{Action, ActionName, Backend, MaybeResult, Module, NeovimCtx};
 
 /// TODO: docs.
-pub trait Command<B: Backend>: 'static {
+pub trait Function<B: Backend>: 'static {
     /// TODO: docs.
     const NAME: &'static ActionName;
 
@@ -17,7 +12,10 @@ pub trait Command<B: Backend>: 'static {
     type Module: Module<B>;
 
     /// TODO: docs.
-    type Args: for<'a> TryFrom<CommandArgs<'a>>;
+    type Args: DeserializeOwned;
+
+    /// TODO: docs.
+    type Return: Serialize;
 
     /// TODO: docs.
     type Docs;
@@ -27,30 +25,32 @@ pub trait Command<B: Backend>: 'static {
         &mut self,
         args: Self::Args,
         ctx: NeovimCtx<'_, B>,
-    ) -> impl MaybeResult<()>;
+    ) -> impl MaybeResult<Self::Return>;
 
     /// TODO: docs.
     fn docs() -> Self::Docs;
 }
 
-impl<A, B> Command<B> for A
+impl<A, B> Function<B> for A
 where
-    A: Action<B, Return = ()>,
-    A::Args: for<'a> TryFrom<CommandArgs<'a>>,
+    A: Action<B>,
+    A::Args: DeserializeOwned,
+    A::Return: Serialize,
     B: Backend,
 {
     const NAME: &'static ActionName = A::NAME;
 
     type Module = A::Module;
     type Args = A::Args;
+    type Return = A::Return;
     type Docs = A::Docs;
 
     #[inline]
     fn call(
         &mut self,
-        args: Self::Args,
+        args: A::Args,
         ctx: NeovimCtx<'_, B>,
-    ) -> impl MaybeResult<()> {
+    ) -> impl MaybeResult<Self::Return> {
         A::call(self, args, ctx)
     }
 
