@@ -1,7 +1,5 @@
 //! TODO: docs.
 
-use core::future::Future;
-
 use crate::Backend;
 
 /// TODO: docs.

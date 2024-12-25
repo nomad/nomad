@@ -1,5 +1,3 @@
-use core::future::Future;
-
 use nvimx_core::executor::BackgroundExecutor;
 
 /// TODO: docs.

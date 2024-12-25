@@ -5,7 +5,7 @@ exclude = ["lib/nvimx2/src"]
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Nomad <hello@nomad.foo>"]
 license = "MIT"
 publish = false
