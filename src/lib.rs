@@ -1,26 +1,30 @@
-use nvimx2::{Backend, Plugin, PluginApi, PluginCtx, PluginName};
+use nvimx2::neovim::{self, Neovim, NeovimVersion};
+use nvimx2::{Plugin, PluginApi, PluginCtx, PluginName};
 
-#[cfg(feature = "neovim-0-10")]
-#[nvimx2::plugin(nvimx2::neovim::ZeroDotTen)]
-pub fn mad() -> Mad {
+#[cfg(not(feature = "neovim-nightly"))]
+#[nvimx2::plugin(neovim::ZeroDotTen)]
+fn mad() -> Mad {
     Mad
 }
 
 #[cfg(feature = "neovim-nightly")]
-#[nvimx2::plugin(nvimx2::neovim::Nightly)]
-pub fn mad() -> Mad {
+#[nvimx2::plugin(neovim::Nightly)]
+fn mad() -> Mad {
     Mad
 }
 
 /// TODO: docs.
-pub struct Mad;
+struct Mad;
 
-impl<B: Backend> Plugin<B> for Mad {
+impl<V: NeovimVersion> Plugin<Neovim<V>> for Mad {
     const NAME: &'static PluginName = PluginName::new("mad");
 
     type Docs = ();
 
-    fn api(&self, _ctx: PluginCtx<'_, B>) -> PluginApi<Self, B> {
+    fn api(
+        &self,
+        _ctx: PluginCtx<'_, Neovim<V>>,
+    ) -> PluginApi<Self, Neovim<V>> {
         // PluginApi::new(ctx)
         //     .with_module(auth::Auth::new())
         //     .with_module(collab::Collab::new())

@@ -85,11 +85,10 @@ authors.workspace = true
 crate-type = ["cdylib"]
 
 [features]
-neovim-0-10 = ["nvimx2/neovim-0-10"]
 neovim-nightly = ["nvimx2/neovim-nightly"]
 
 [dependencies]
 auth = { workspace = true }
 collab = { workspace = true }
-nvimx2 = { workspace = true }
+nvimx2 = { workspace = true, features = ["neovim-0-10"] }
 version = { workspace = true }
