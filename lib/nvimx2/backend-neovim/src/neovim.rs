@@ -23,7 +23,7 @@ impl Backend for Neovim {
     fn api_builder<P: Plugin<Self>>(
         &mut self,
     ) -> <Self::Api<P> as Api<P, Self>>::Builder<'_> {
-        api::NeovimApi::<P>::default()
+        api::NeovimApi::default()
     }
 
     #[inline]
