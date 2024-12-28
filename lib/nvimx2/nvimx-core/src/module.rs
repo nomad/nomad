@@ -1,10 +1,12 @@
 use core::mem::ManuallyDrop;
 
-use serde::de::DeserializeOwned;
+use serde::de::{Deserialize, DeserializeOwned};
+use serde::ser::Serialize;
 
 use crate::api::{Api, ModuleApi};
 use crate::{
     Backend,
+    BackendExt,
     BackendHandle,
     Function,
     MaybeResult,
@@ -68,25 +70,44 @@ where
         Fun: Function<B, Module = M>,
     {
         let backend = self.backend.clone();
-        let callback = move |args| {
+
+        let fun = move |value| {
             let fun = &mut fun;
-            backend.with_mut(move |backend| {
-                fun.call(args, NeovimCtx::new(backend))
+            backend.with_mut(move |mut backend| {
+                let args = Fun::Args::deserialize(backend.deserializer(value))
+                    .map_err(|err| {
+                        backend.emit_err(&err);
+                        FunctionError::Deserialize(err)
+                    })?;
+
+                let ret = fun
+                    .call(args, NeovimCtx::new(backend.reborrow()))
                     .into_result()
-                    // Even though the error is bound to `notify::Error`
-                    // (which itself is bound to `'static`), Rust thinks that
-                    // the error captures some lifetime due to
-                    // `Function::call()` returning an `impl MaybeResult`.
-                    //
-                    // Should be the same problem as
-                    // https://github.com/rust-lang/rust/issues/42940
-                    //
-                    // FIXME: Is there a better way around this than boxing the
-                    // error?
-                    .map_err(|err| Box::new(err) as Box<dyn notify::Error>)
+                    .map_err(|err| {
+                        // Even though the error is bound to `notify::Error`
+                        // (which itself is bound to `'static`), Rust thinks
+                        // that the error captures some lifetime due to
+                        // `Function::call()` returning an `impl MaybeResult`.
+                        //
+                        // Should be the same problem as
+                        // https://github.com/rust-lang/rust/issues/42940
+                        //
+                        // FIXME: Is there a better way around this than boxing
+                        // the error?
+                        Box::new(err) as Box<dyn notify::Error>
+                    })
+                    .map_err(|err| {
+                        backend.emit_err(&err);
+                        FunctionError::Call(err)
+                    })?;
+
+                ret.serialize(backend.serializer()).map_err(|err| {
+                    backend.emit_err(&err);
+                    FunctionError::Serialize(err)
+                })
             })
         };
-        self.api.add_function::<Fun, _, _>(callback);
+        self.api.add_function(Fun::NAME, fun);
         self
     }
 
@@ -126,5 +147,36 @@ where
         // SAFETY: We never use the `ManuallyDrop` again.
         let api = unsafe { ManuallyDrop::take(&mut self.api) };
         api.finish();
+    }
+}
+
+enum FunctionError<D, C, S> {
+    Deserialize(D),
+    Call(C),
+    Serialize(S),
+}
+
+impl<D, C, S> notify::Error for FunctionError<D, C, S>
+where
+    D: notify::Error,
+    C: notify::Error,
+    S: notify::Error,
+{
+    #[inline]
+    fn to_level(&self) -> Option<notify::Level> {
+        match self {
+            Self::Deserialize(err) => err.to_level(),
+            Self::Call(err) => err.to_level(),
+            Self::Serialize(err) => err.to_level(),
+        }
+    }
+
+    #[inline]
+    fn to_message(&self) -> notify::Message {
+        match self {
+            Self::Deserialize(err) => err.to_message(),
+            Self::Call(err) => err.to_message(),
+            Self::Serialize(err) => err.to_message(),
+        }
     }
 }

@@ -19,6 +19,7 @@ mod shared;
 pub use action::{Action, ActionName};
 pub use async_ctx::AsyncCtx;
 pub use backend::Backend;
+use backend::BackendExt;
 use backend_handle::{BackendHandle, BackendMut};
 pub use command::Command;
 pub use command_args::CommandArgs;
