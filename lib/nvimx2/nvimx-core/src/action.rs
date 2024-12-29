@@ -1,4 +1,5 @@
-use crate::{Backend, MaybeResult, Module, NeovimCtx};
+use crate::module::Module;
+use crate::{Backend, MaybeResult, NeovimCtx};
 
 /// TODO: docs.
 pub trait Action<B: Backend>: 'static {

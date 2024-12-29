@@ -68,7 +68,7 @@ impl<B: Backend> BackendExt for B {
         let notification = notify::Notification {
             level,
             source: notify::Source {
-                plugin_name: crate::PluginName::new("yoo"),
+                plugin_name: crate::module::ModuleName::new("yoo"),
                 module_name: None,
                 action_name: None,
             },

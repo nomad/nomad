@@ -1,7 +1,8 @@
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::{Action, ActionName, Backend, MaybeResult, Module, NeovimCtx};
+use crate::module::Module;
+use crate::{Action, ActionName, Backend, MaybeResult, NeovimCtx};
 
 /// TODO: docs.
 pub trait Function<B: Backend>: 'static {

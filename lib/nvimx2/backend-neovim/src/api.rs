@@ -4,7 +4,8 @@ use core::marker::PhantomData;
 
 use nvimx_core::api::{Api, ModuleApi};
 use nvimx_core::command::{CommandArgs, CommandCompletion};
-use nvimx_core::{ActionName, ByteOffset, Module, Plugin, notify};
+use nvimx_core::module::Module;
+use nvimx_core::{ActionName, ByteOffset, Plugin, notify};
 
 use crate::Neovim;
 use crate::oxi::{Dictionary, Function, Object, api};
@@ -17,7 +18,7 @@ pub struct NeovimApi<P> {
 
 /// TODO: docs.
 pub struct NeovimModuleApi<'a, M: Module<Neovim>> {
-    plugin_api: &'a mut NeovimApi<M::Plugin>,
+    plugin_api: &'a mut NeovimApi<M::Namespace>,
     dict: Dictionary,
 }
 
@@ -25,7 +26,8 @@ impl<P> Api<P, Neovim> for NeovimApi<P>
 where
     P: Plugin<Neovim>,
 {
-    type ModuleApi<'a, M: Module<Neovim, Plugin = P>> = NeovimModuleApi<'a, M>;
+    type ModuleApi<'a, M: Module<Neovim, Namespace = P>> =
+        NeovimModuleApi<'a, M>;
 
     #[inline]
     fn add_command<Cmd, CompFun, Comps>(
@@ -90,7 +92,7 @@ where
     #[inline]
     fn with_module<M>(&mut self) -> Self::ModuleApi<'_, M>
     where
-        M: Module<Neovim, Plugin = P>,
+        M: Module<Neovim, Namespace = P>,
     {
         if self.dict.get(M::NAME.as_str()).is_some() {
             panic!(
@@ -118,7 +120,7 @@ where
             panic!(
                 "a field with name '{}' has already been added to {}.{}'s API",
                 fun_name.as_str(),
-                M::Plugin::NAME.as_str(),
+                M::Namespace::NAME.as_str(),
                 M::NAME.as_str(),
             );
         }

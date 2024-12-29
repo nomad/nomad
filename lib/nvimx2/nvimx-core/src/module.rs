@@ -1,9 +1,11 @@
+//! TODO: docs.
+
 use core::mem::ManuallyDrop;
 
-use serde::de::{Deserialize, DeserializeOwned};
-use serde::ser::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::api::{Api, ModuleApi};
+use crate::command::Command;
 use crate::{
     Backend,
     BackendExt,
@@ -21,7 +23,7 @@ pub trait Module<B: Backend>: 'static + Sized {
     const NAME: &'static ModuleName;
 
     /// TODO: docs.
-    type Plugin: Plugin<B>;
+    type Namespace: Plugin<B>;
 
     /// TODO: docs.
     type Config: DeserializeOwned;
@@ -47,7 +49,7 @@ pub trait Module<B: Backend>: 'static + Sized {
 pub struct ModuleApiCtx<'a, M: Module<B>, B: Backend> {
     #[allow(clippy::type_complexity)]
     api: ManuallyDrop<
-        <B::Api<M::Plugin> as Api<M::Plugin, B>>::ModuleApi<'a, M>,
+        <B::Api<M::Namespace> as Api<M::Namespace, B>>::ModuleApi<'a, M>,
     >,
     backend: &'a BackendHandle<B>,
 }
@@ -62,6 +64,15 @@ where
     M: Module<B>,
     B: Backend,
 {
+    /// TODO: docs.
+    #[inline]
+    pub fn with_command<Cmd>(mut self, mut cmd: Cmd) -> Self
+    where
+        Cmd: Command<B, Module = M>,
+    {
+        todo!();
+    }
+
     /// TODO: docs.
     #[track_caller]
     #[inline]
@@ -112,7 +123,7 @@ where
 
     #[inline]
     pub(crate) fn new(
-        api: &'a mut B::Api<M::Plugin>,
+        api: &'a mut B::Api<M::Namespace>,
         backend: &'a BackendHandle<B>,
     ) -> Self {
         Self { api: ManuallyDrop::new(api.with_module::<M>()), backend }
@@ -133,6 +144,12 @@ impl ModuleName {
         assert!(name.len() <= 24);
         // SAFETY: `ModuleName` is a `repr(transparent)` newtype around `str`.
         unsafe { &*(name as *const str as *const Self) }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub const fn uppercase_first(&self) -> &Self {
+        todo!();
     }
 }
 

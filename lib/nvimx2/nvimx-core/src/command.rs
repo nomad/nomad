@@ -2,15 +2,8 @@
 
 use smol_str::SmolStr;
 
-use crate::{
-    Action,
-    ActionName,
-    Backend,
-    MaybeResult,
-    Module,
-    NeovimCtx,
-    notify,
-};
+use crate::module::Module;
+use crate::{Action, ActionName, Backend, MaybeResult, NeovimCtx, notify};
 
 /// TODO: docs.
 pub trait Command<B: Backend>: 'static {
