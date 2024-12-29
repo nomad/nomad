@@ -32,7 +32,7 @@ pub trait Module<B: Backend>: 'static + Sized {
     type Docs;
 
     /// TODO: docs.
-    fn api(&self, ctx: ModuleApiCtx<'_, Self, B>);
+    fn api(&self, ctx: ApiCtx<'_, Self, B>);
 
     /// TODO: docs.
     fn on_config_changed(
@@ -46,7 +46,7 @@ pub trait Module<B: Backend>: 'static + Sized {
 }
 
 /// TODO: docs.
-pub struct ModuleApiCtx<'a, M: Module<B>, B: Backend> {
+pub struct ApiCtx<'a, M: Module<B>, B: Backend> {
     #[allow(clippy::type_complexity)]
     api: ManuallyDrop<
         <B::Api<M::Namespace> as Api<M::Namespace, B>>::ModuleApi<'a, M>,
@@ -59,7 +59,7 @@ pub struct ModuleApiCtx<'a, M: Module<B>, B: Backend> {
 #[repr(transparent)]
 pub struct ModuleName(str);
 
-impl<'a, M, B> ModuleApiCtx<'a, M, B>
+impl<'a, M, B> ApiCtx<'a, M, B>
 where
     M: Module<B>,
     B: Backend,
@@ -153,7 +153,7 @@ impl ModuleName {
     }
 }
 
-impl<M, B> Drop for ModuleApiCtx<'_, M, B>
+impl<M, B> Drop for ApiCtx<'_, M, B>
 where
     M: Module<B>,
     B: Backend,

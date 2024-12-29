@@ -25,5 +25,5 @@ pub use byte_offset::ByteOffset;
 pub use function::Function;
 pub use maybe_result::MaybeResult;
 pub use neovim_ctx::NeovimCtx;
-pub use plugin::{Plugin, PluginApiCtx};
+pub use plugin::{Plugin};
 pub use shared::Shared;

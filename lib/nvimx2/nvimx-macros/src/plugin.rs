@@ -11,10 +11,9 @@ pub(crate) fn plugin(_attr: TokenStream, item: TokenStream) -> TokenStream {
     quote! {
         #[::nvimx2::neovim::oxi::plugin(nvim_oxi = ::nvimx2::neovim::oxi)]
         fn #fun_name() -> ::nvimx2::neovim::oxi::Dictionary {
-            let mut __backend: ::nvimx2::neovim::Neovim = ::nvimx2::Backend::init();
-            let __plugin_ctx = ::nvimx2::PluginApiCtx::new(__backend);
             let __plugin = #fun_body;
-            ::nvimx2::Plugin::api(&__plugin, __plugin_ctx).into()
+            let __backend: ::nvimx2::neovim::Neovim = ::nvimx2::Backend::init();
+            ::nvimx2::Plugin::api(&__plugin, __backend).into()
         }
     }
     .into()
