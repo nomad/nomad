@@ -104,7 +104,7 @@ impl Setup {
         let config = match config.kind() {
             NvimObjectKind::Dictionary => {
                 // SAFETY: the object's kind is a dictionary.
-                unsafe { config.into_dict_unchecked() }
+                unsafe { config.into_dictionary_unchecked() }
             },
             // An empty table is ok, but it could be mistaken for an array, so
             // let's check for that.

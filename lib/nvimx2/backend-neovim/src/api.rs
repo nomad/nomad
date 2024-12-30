@@ -12,22 +12,46 @@ use crate::oxi::{Dictionary, Function, Object, api};
 
 /// TODO: docs.
 pub struct NeovimApi<P> {
-    dict: Dictionary,
-    _phantom: PhantomData<P>,
+    dictionary: Dictionary,
+    _plugin: PhantomData<P>,
 }
 
 /// TODO: docs.
-pub struct NeovimModuleApi<'a, P: Plugin<Neovim>, M: Module<Neovim>> {
-    plugin_api: &'a mut NeovimApi<P>,
-    module: PhantomData<M>,
-    dict: Dictionary,
+pub struct NeovimModuleApi<'a, M> {
+    dictionary: &'a mut Dictionary,
+    _module: PhantomData<M>,
+}
+
+impl<'a, M: Module<Neovim>> NeovimModuleApi<'a, M> {
+    #[track_caller]
+    #[inline]
+    fn insert(
+        &mut self,
+        field_name: &str,
+        value: impl Into<Object>,
+    ) -> &mut Object {
+        if self.dictionary.get(field_name).is_some() {
+            panic!(
+                "a field with name '{}' has already been added to {}'s API",
+                field_name,
+                M::NAME.as_str(),
+            );
+        }
+        self.dictionary.insert(field_name, value.into());
+        self.dictionary.get_mut(field_name).expect("just inserted it")
+    }
+
+    #[inline]
+    fn new(dictionary: &'a mut Dictionary) -> Self {
+        Self { dictionary, _module: PhantomData }
+    }
 }
 
 impl<P> Api<P, Neovim> for NeovimApi<P>
 where
     P: Plugin<Neovim>,
 {
-    type ModuleApi<'a, M: Module<Neovim>> = NeovimModuleApi<'a, P, M>;
+    type ModuleApi<'a, M: Module<Neovim>> = NeovimModuleApi<'a, M>;
 
     #[inline]
     fn add_command<Cmd, CompFun, Comps>(
@@ -90,26 +114,12 @@ where
 
     #[track_caller]
     #[inline]
-    fn with_module<M>(&mut self) -> Self::ModuleApi<'_, M>
-    where
-        M: Module<Neovim>,
-    {
-        if self.dict.get(M::NAME.as_str()).is_some() {
-            panic!(
-                "a module with name '{}' has already been added to {}'s API",
-                M::NAME.as_str(),
-                P::NAME.as_str(),
-            );
-        }
-        NeovimModuleApi {
-            plugin_api: self,
-            module: PhantomData,
-            dict: Dictionary::default(),
-        }
+    fn as_module(&mut self) -> Self::ModuleApi<'_, P> {
+        NeovimModuleApi::new(&mut self.dictionary)
     }
 }
 
-impl<P, M> ModuleApi<M, Neovim> for NeovimModuleApi<'_, P, M>
+impl<P, M> ModuleApi<NeovimApi<P>, P, M, Neovim> for NeovimModuleApi<'_, M>
 where
     P: Plugin<Neovim>,
     M: Module<Neovim>,
@@ -121,26 +131,23 @@ where
         Fun: FnMut(Object) -> Result<Object, Err> + 'static,
         Err: notify::Error,
     {
-        if self.dict.get(fun_name.as_str()).is_some() {
-            panic!(
-                "a field with name '{}' has already been added to {}.{}'s API",
-                fun_name.as_str(),
-                P::NAME.as_str(),
-                M::NAME.as_str(),
-            );
-        }
-
-        self.dict.insert(
+        self.insert(
             fun_name.as_str(),
             Function::from_fn_mut(move |args| fun(args).unwrap_or_default()),
         );
     }
 
+    #[track_caller]
     #[inline]
-    fn finish(self) {
-        self.plugin_api.dict.insert(M::NAME.as_str(), self.dict);
-        todo!()
+    fn as_module<M2: Module<Neovim>>(&mut self) -> NeovimModuleApi<'_, M2> {
+        let obj = self.insert(M2::NAME.as_str(), Dictionary::default());
+        // SAFETY: We just inserted a dictionary.
+        let dictionary = unsafe { obj.as_dictionary_unchecked_mut() };
+        NeovimModuleApi::new(dictionary)
     }
+
+    #[inline]
+    fn finish(self) {}
 }
 
 impl<P> Default for NeovimApi<P>
@@ -149,7 +156,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self { dict: Dictionary::default(), _phantom: PhantomData }
+        Self { dictionary: Dictionary::default(), _plugin: PhantomData }
     }
 }
 
@@ -158,7 +165,7 @@ where
     P: Plugin<Neovim>,
 {
     #[inline]
-    fn from(_api: NeovimApi<P>) -> Self {
-        todo!();
+    fn from(api: NeovimApi<P>) -> Self {
+        api.dictionary
     }
 }

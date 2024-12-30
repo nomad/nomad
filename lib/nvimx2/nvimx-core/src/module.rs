@@ -1,7 +1,5 @@
 //! TODO: docs.
 
-use core::mem::ManuallyDrop;
-
 use serde::de::DeserializeOwned;
 
 use crate::api::{Api, ModuleApi};
@@ -29,7 +27,7 @@ pub trait Module<B: Backend>: 'static + Sized {
     type Docs;
 
     /// TODO: docs.
-    fn api<P: Plugin<B>>(&self, ctx: ApiCtx<'_, Self, P, B>);
+    fn api<P: Plugin<B>>(&self, ctx: ApiCtx<'_, '_, Self, P, B>);
 
     /// TODO: docs.
     fn on_config_changed(
@@ -43,10 +41,9 @@ pub trait Module<B: Backend>: 'static + Sized {
 }
 
 /// TODO: docs.
-pub struct ApiCtx<'a, M: Module<B>, P: Plugin<B>, B: Backend> {
-    #[allow(clippy::type_complexity)]
-    api: ManuallyDrop<<B::Api<P> as Api<P, B>>::ModuleApi<'a, M>>,
-    backend: &'a BackendHandle<B>,
+pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
+    module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
+    backend: &'b BackendHandle<B>,
 }
 
 /// TODO: docs.
@@ -54,7 +51,7 @@ pub struct ApiCtx<'a, M: Module<B>, P: Plugin<B>, B: Backend> {
 #[repr(transparent)]
 pub struct ModuleName(str);
 
-impl<'a, M, P, B> ApiCtx<'a, M, P, B>
+impl<'a, 'b, M, P, B> ApiCtx<'a, 'b, M, P, B>
 where
     M: Module<B>,
     P: Plugin<B>,
@@ -62,7 +59,7 @@ where
 {
     /// TODO: docs.
     #[inline]
-    pub fn with_command<Cmd>(mut self, mut command: Cmd) -> Self
+    pub fn with_command<Cmd>(self, mut command: Cmd) -> Self
     where
         Cmd: Command<B, Module = M>,
     {
@@ -72,7 +69,7 @@ where
     /// TODO: docs.
     #[track_caller]
     #[inline]
-    pub fn with_function<Fun>(mut self, mut function: Fun) -> Self
+    pub fn with_function<Fun>(self, mut function: Fun) -> Self
     where
         Fun: Function<B, Module = M>,
     {
@@ -113,25 +110,29 @@ where
                 })
             })
         };
-        self.api.add_function(Fun::NAME, fun);
+        self.module_api.add_function(Fun::NAME, fun);
         self
     }
 
     /// TODO: docs.
     #[inline]
-    pub fn with_module<Mod>(mut self, mut module: Mod) -> Self
+    pub fn with_module<Mod>(self, module: Mod) -> Self
     where
         Mod: Module<B>,
     {
-        todo!();
+        let mut module_api = self.module_api.as_module::<Mod>();
+        let api_ctx = ApiCtx::new(&mut module_api, self.backend);
+        Module::api(&module, api_ctx);
+        module_api.finish();
+        self
     }
 
     #[inline]
     pub(crate) fn new(
-        api: &'a mut B::Api<P>,
-        backend: &'a BackendHandle<B>,
+        module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
+        backend: &'b BackendHandle<B>,
     ) -> Self {
-        Self { api: ManuallyDrop::new(api.with_module::<M>()), backend }
+        Self { module_api, backend }
     }
 }
 
@@ -155,20 +156,6 @@ impl ModuleName {
     #[inline]
     pub const fn uppercase_first(&self) -> &Self {
         todo!();
-    }
-}
-
-impl<M, P, B> Drop for ApiCtx<'_, M, P, B>
-where
-    M: Module<B>,
-    P: Plugin<B>,
-    B: Backend,
-{
-    #[inline]
-    fn drop(&mut self) {
-        // SAFETY: We never use the `ManuallyDrop` again.
-        let api = unsafe { ManuallyDrop::take(&mut self.api) };
-        api.finish();
     }
 }
 

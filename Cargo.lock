@@ -1038,7 +1038,7 @@ checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 [[package]]
 name = "nvim-oxi"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#a72ad383392c151af8de074c3475276cf5265cf7"
+source = "git+https://github.com/noib3/nvim-oxi#b8393d9a33a386ae9c2f7cec0d593cd5ef1a4f34"
 dependencies = [
  "nvim-oxi-api",
  "nvim-oxi-libuv",
@@ -1051,7 +1051,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-api"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#a72ad383392c151af8de074c3475276cf5265cf7"
+source = "git+https://github.com/noib3/nvim-oxi#b8393d9a33a386ae9c2f7cec0d593cd5ef1a4f34"
 dependencies = [
  "nvim-oxi-luajit",
  "nvim-oxi-macros",
@@ -1064,7 +1064,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-libuv"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#a72ad383392c151af8de074c3475276cf5265cf7"
+source = "git+https://github.com/noib3/nvim-oxi#b8393d9a33a386ae9c2f7cec0d593cd5ef1a4f34"
 dependencies = [
  "nvim-oxi-luajit",
  "thiserror 2.0.4",
@@ -1073,7 +1073,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-luajit"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#a72ad383392c151af8de074c3475276cf5265cf7"
+source = "git+https://github.com/noib3/nvim-oxi#b8393d9a33a386ae9c2f7cec0d593cd5ef1a4f34"
 dependencies = [
  "thiserror 2.0.4",
 ]
@@ -1081,7 +1081,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-macros"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#a72ad383392c151af8de074c3475276cf5265cf7"
+source = "git+https://github.com/noib3/nvim-oxi#b8393d9a33a386ae9c2f7cec0d593cd5ef1a4f34"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1091,7 +1091,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-types"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#a72ad383392c151af8de074c3475276cf5265cf7"
+source = "git+https://github.com/noib3/nvim-oxi#b8393d9a33a386ae9c2f7cec0d593cd5ef1a4f34"
 dependencies = [
  "libc",
  "nvim-oxi-luajit",
