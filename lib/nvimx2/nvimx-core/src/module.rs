@@ -43,7 +43,7 @@ pub trait Module<B: Backend>: 'static + Sized {
 /// TODO: docs.
 pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-    command_builder: &'a mut CommandBuilder,
+    command_builder: &'a mut CommandBuilder<B>,
     backend: &'b BackendHandle<B>,
 }
 
@@ -123,7 +123,7 @@ where
         Mod: Module<B>,
     {
         let mut module_api = self.module_api.as_module::<Mod>();
-        let command_builder = self.command_builder.add_module::<Mod, B>();
+        let command_builder = self.command_builder.add_module::<Mod>();
         let api_ctx =
             ApiCtx::new(&mut module_api, command_builder, self.backend);
         Module::api(&module, api_ctx);
@@ -134,7 +134,7 @@ where
     #[inline]
     pub(crate) fn new(
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-        command_builder: &'a mut CommandBuilder,
+        command_builder: &'a mut CommandBuilder<B>,
         backend: &'b BackendHandle<B>,
     ) -> Self {
         Self { module_api, command_builder, backend }
@@ -201,44 +201,51 @@ mod command_builder {
     use fxhash::FxHashMap;
 
     use super::{Module, ModuleName};
+    use crate::backend_handle::BackendMut;
     use crate::command::{Command, CommandArgs, CommandCompletion};
-    use crate::{Backend, ByteOffset};
+    use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx, notify};
 
-    type CommandHandler = Box<dyn FnMut(CommandArgs)>;
+    type CommandHandler<B> = Box<dyn FnMut(CommandArgs, NeovimCtx<B>)>;
 
     type CommandCompletionFun =
         Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
 
-    pub(crate) struct CommandBuilder {
+    pub(crate) struct CommandBuilder<B: Backend> {
         module_name: &'static str,
-        commands: FxHashMap<&'static str, CommandHandler>,
+        commands: FxHashMap<&'static str, CommandHandler<B>>,
         completions: FxHashMap<&'static str, CommandCompletionFun>,
         submodules: FxHashMap<&'static str, Self>,
     }
 
-    impl CommandBuilder {
+    impl<B: Backend> CommandBuilder<B> {
         #[track_caller]
         #[inline]
-        pub(super) fn add_command<C, B>(&mut self, command: C)
+        pub(super) fn add_command<C>(&mut self, mut command: C)
         where
             C: Command<B>,
-            B: Backend,
         {
             self.assert_namespace_is_available(C::NAME.as_str());
-            todo!();
+            let handler =
+                move |command_args: CommandArgs<'_>, ctx: NeovimCtx<'_, B>| {
+                    let args = match C::Args::try_from(command_args) {
+                        Ok(args) => args,
+                        Err(_err) => todo!(),
+                    };
+                    if let Err(_err) = command.call(args, ctx).into_result() {
+                        todo!();
+                    }
+                };
+            self.commands.insert(C::NAME.as_str(), Box::new(handler));
         }
 
         #[track_caller]
         #[inline]
-        pub(super) fn add_module<M, B>(&mut self) -> &mut Self
+        pub(super) fn add_module<M>(&mut self) -> &mut Self
         where
             M: Module<B>,
-            B: Backend,
         {
             self.assert_namespace_is_available(M::NAME.as_str());
-            self.submodules
-                .entry(M::NAME.as_str())
-                .or_insert(Self::new::<M, B>())
+            self.submodules.entry(M::NAME.as_str()).or_insert(Self::new::<M>())
         }
 
         #[track_caller]
@@ -261,10 +268,9 @@ mod command_builder {
         }
 
         #[inline]
-        pub(crate) fn new<M, B>() -> Self
+        pub(crate) fn new<M>() -> Self
         where
             M: Module<B>,
-            B: Backend,
         {
             Self {
                 module_name: M::NAME.as_str(),

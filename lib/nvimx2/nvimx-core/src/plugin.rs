@@ -16,7 +16,7 @@ pub trait Plugin<B: Backend>: Module<B> {
         let mut api = B::api::<Self>(&mut backend);
         let backend = BackendHandle::new(backend);
         let mut module_api = api.as_module();
-        let mut command_builder = CommandBuilder::new::<Self, B>();
+        let mut command_builder = CommandBuilder::new::<Self>();
         let api_ctx = ApiCtx::<Self, _, _>::new(
             &mut module_api,
             &mut command_builder,
