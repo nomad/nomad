@@ -31,13 +31,23 @@ impl<B> BackendHandle<B> {
 
 impl<B> BackendMut<'_, B> {
     #[inline]
+    pub(crate) fn as_mut(&mut self) -> BackendMut<'_, B> {
+        BackendMut { backend: self.backend, handle: self.handle }
+    }
+
+    #[inline]
     pub(crate) fn handle(&self) -> BackendHandle<B> {
         self.handle.clone()
     }
 
     #[inline]
-    pub(crate) fn reborrow(&mut self) -> BackendMut<'_, B> {
-        BackendMut { backend: self.backend, handle: self.handle }
+    pub(crate) fn inner(&self) -> &B {
+        self.backend
+    }
+
+    #[inline]
+    pub(crate) fn inner_mut(&mut self) -> &mut B {
+        self.backend
     }
 }
 

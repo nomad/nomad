@@ -65,7 +65,7 @@ where
     where
         Cmd: Command<B>,
     {
-        self.command_builder.add_command(command);
+        self.command_builder.add_command(self.namespace.clone(), command);
         self
     }
 
@@ -91,7 +91,7 @@ where
                 )?;
 
                 let ret = fun
-                    .call(args, NeovimCtx::new(backend.reborrow()))
+                    .call(args, NeovimCtx::new(backend.as_mut()))
                     .into_result()
                     .map_err(|err| {
                         // Even though the error is bound to 'static, Rust
@@ -122,7 +122,7 @@ where
 
     /// TODO: docs.
     #[inline]
-    pub fn with_module<Mod>(mut self, module: Mod) -> Self
+    pub fn with_module<Mod>(self, module: Mod) -> Self
     where
         Mod: Module<B>,
     {
@@ -132,7 +132,7 @@ where
         let api_ctx = ApiCtx::new(
             &mut module_api,
             command_builder,
-            &mut self.namespace,
+            self.namespace,
             self.backend,
         );
         Module::api(&module, api_ctx);
@@ -211,9 +211,10 @@ pub(crate) use command_builder::CommandBuilder;
 mod command_builder {
     use fxhash::FxHashMap;
 
-    use super::{Module, ModuleName};
+    use super::Module;
+    use crate::backend::BackendExt;
     use crate::command::{Command, CommandArgs, CommandCompletion};
-    use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx};
+    use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx, notify};
 
     type CommandHandler<B> = Box<dyn FnMut(CommandArgs, NeovimCtx<B>)>;
 
@@ -230,22 +231,31 @@ mod command_builder {
     impl<B: Backend> CommandBuilder<B> {
         #[track_caller]
         #[inline]
-        pub(super) fn add_command<C>(&mut self, mut command: C)
-        where
-            C: Command<B>,
+        pub(super) fn add_command<Cmd>(
+            &mut self,
+            mut namespace: notify::Namespace,
+            mut command: Cmd,
+        ) where
+            Cmd: Command<B>,
         {
-            self.assert_namespace_is_available(C::NAME.as_str());
+            self.assert_namespace_is_available(Cmd::NAME.as_str());
+            namespace.set_action(Cmd::NAME);
             let handler =
-                move |command_args: CommandArgs<'_>, ctx: NeovimCtx<'_, B>| {
-                    let args = match C::Args::try_from(command_args) {
+                move |args: CommandArgs<'_>, mut ctx: NeovimCtx<'_, B>| {
+                    let args = match Cmd::Args::try_from(args) {
                         Ok(args) => args,
-                        Err(_err) => todo!(),
+                        Err(err) => {
+                            ctx.backend_mut().emit_err(&namespace, &err);
+                            return;
+                        },
                     };
-                    if let Err(_err) = command.call(args, ctx).into_result() {
-                        todo!();
+                    if let Err(err) =
+                        command.call(args, ctx.as_mut()).into_result()
+                    {
+                        ctx.backend_mut().emit_err(&namespace, &err);
                     }
                 };
-            self.commands.insert(C::NAME.as_str(), Box::new(handler));
+            self.commands.insert(Cmd::NAME.as_str(), Box::new(handler));
         }
 
         #[track_caller]

@@ -1,10 +1,6 @@
 //! TODO: docs.
 
-use core::fmt::Write;
-use core::{fmt, iter};
-
 use nvimx_core::notify::{Emitter, Level, Notification, NotificationId};
-use smallvec::SmallVec;
 
 use crate::convert::Convert;
 use crate::oxi;
