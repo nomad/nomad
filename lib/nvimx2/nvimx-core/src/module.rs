@@ -65,7 +65,7 @@ where
     where
         Cmd: Command<B>,
     {
-        self.command_builder.add_command(self.namespace.clone(), command);
+        self.command_builder.add_command(command);
         self
     }
 
@@ -221,7 +221,8 @@ mod command_builder {
     use crate::command::{Command, CommandArgs, CommandCompletion};
     use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx, notify};
 
-    type CommandHandler<B> = Box<dyn FnMut(CommandArgs, NeovimCtx<B>)>;
+    type CommandHandler<B> =
+        Box<dyn FnMut(CommandArgs, &mut notify::Namespace, NeovimCtx<B>)>;
 
     type CommandCompletionFn =
         Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
@@ -229,10 +230,10 @@ mod command_builder {
     pub(crate) struct CommandBuilder<'a, B> {
         pub(crate) handlers: &'a mut CommandHandlers<B>,
         pub(crate) completions: &'a mut CommandCompletionFns,
-        module_name: &'static ModuleName,
     }
 
     pub(crate) struct CommandHandlers<B> {
+        module_name: &'static ModuleName,
         inner: FxHashMap<&'static str, CommandHandler<B>>,
         submodules: FxHashMap<&'static str, Self>,
     }
@@ -243,6 +244,10 @@ mod command_builder {
         submodules: FxHashMap<&'static str, Self>,
     }
 
+    struct MissingCommandError<'a, B>(&'a CommandHandlers<B>);
+
+    struct UnknownCommandError<'a, B>(&'a CommandHandlers<B>, &'a str);
+
     impl<'a, B: Backend> CommandBuilder<'a, B> {
         #[inline]
         pub(crate) fn new<M>(
@@ -252,20 +257,17 @@ mod command_builder {
         where
             M: Module<B>,
         {
-            Self { handlers, completions, module_name: M::NAME }
+            Self { handlers, completions }
         }
 
         #[track_caller]
         #[inline]
-        pub(super) fn add_command<Cmd>(
-            &mut self,
-            namespace: notify::Namespace,
-            command: Cmd,
-        ) where
+        pub(super) fn add_command<Cmd>(&mut self, command: Cmd)
+        where
             Cmd: Command<B>,
         {
             self.assert_namespace_is_available(Cmd::NAME.as_str());
-            self.handlers.add_command(namespace, command);
+            self.handlers.add_command(command);
         }
 
         #[track_caller]
@@ -276,8 +278,7 @@ mod command_builder {
         {
             self.assert_namespace_is_available(M::NAME.as_str());
             CommandBuilder {
-                module_name: M::NAME,
-                handlers: self.handlers.add_module(M::NAME),
+                handlers: self.handlers.add_module::<M>(),
                 completions: self.completions.add_module(M::NAME),
             }
         }
@@ -285,20 +286,17 @@ mod command_builder {
         #[track_caller]
         #[inline]
         fn assert_namespace_is_available(&self, namespace: &str) {
+            let module_name = self.handlers.module_name.as_str();
             if self.handlers.inner.contains_key(&namespace) {
                 panic!(
-                    "a command with name {:?} was already registered on \
-                     {:?}'s API",
-                    namespace,
-                    self.module_name.as_str()
+                    "a command with name {namespace:?} was already \
+                     registered on {module_name:?}'s API",
                 );
             }
             if self.completions.inner.contains_key(&namespace) {
                 panic!(
-                    "a submodule with name {:?} was already registered on \
-                     {:?}'s API",
-                    namespace,
-                    self.module_name.as_str()
+                    "a submodule with name {namespace:?} was already \
+                     registered on {module_name:?}'s API",
                 );
             }
         }
@@ -307,47 +305,77 @@ mod command_builder {
     impl<B: Backend> CommandHandlers<B> {
         #[inline]
         pub(crate) fn build(
-            self,
+            mut self,
             backend: BackendHandle<B>,
         ) -> impl FnMut(CommandArgs) + 'static {
             move |args: CommandArgs| {
-                todo!();
+                backend.with_mut(|backend| {
+                    let mut namespace = notify::Namespace::default();
+                    self.handle(args, &mut namespace, NeovimCtx::new(backend));
+                })
             }
         }
 
         #[inline]
-        fn add_command<Cmd>(
-            &mut self,
-            mut namespace: notify::Namespace,
-            mut command: Cmd,
-        ) where
+        pub(crate) fn new<M: Module<B>>() -> Self {
+            Self {
+                module_name: M::NAME,
+                inner: Default::default(),
+                submodules: Default::default(),
+            }
+        }
+
+        #[inline]
+        fn add_command<Cmd>(&mut self, mut command: Cmd)
+        where
             Cmd: Command<B>,
         {
-            namespace.set_action(Cmd::NAME);
-            let handler =
-                move |args: CommandArgs<'_>, mut ctx: NeovimCtx<'_, B>| {
+            let handler: CommandHandler<B> =
+                Box::new(move |args, namespace, mut ctx| {
+                    namespace.set_action(Cmd::NAME);
                     let args = match Cmd::Args::try_from(args) {
                         Ok(args) => args,
                         Err(err) => {
-                            ctx.backend_mut().emit_err(&namespace, &err);
+                            ctx.backend_mut().emit_err(namespace, &err);
                             return;
                         },
                     };
                     if let Err(err) =
                         command.call(args, ctx.as_mut()).into_result()
                     {
-                        ctx.backend_mut().emit_err(&namespace, &err);
+                        ctx.backend_mut().emit_err(namespace, &err);
                     }
-                };
-            self.inner.insert(Cmd::NAME.as_str(), Box::new(handler));
+                });
+            self.inner.insert(Cmd::NAME.as_str(), handler);
         }
 
         #[inline]
-        fn add_module(
+        fn add_module<M: Module<B>>(&mut self) -> &mut Self {
+            self.submodules.entry(M::NAME.as_str()).or_insert(Self::new::<M>())
+        }
+
+        #[inline]
+        fn handle(
             &mut self,
-            module_name: &'static ModuleName,
-        ) -> &mut Self {
-            self.submodules.entry(module_name.as_str()).or_default()
+            mut args: CommandArgs,
+            namespace: &mut notify::Namespace,
+            mut ctx: NeovimCtx<B>,
+        ) {
+            namespace.push_module(self.module_name);
+
+            let Some(arg) = args.next() else {
+                let err = MissingCommandError(self);
+                return ctx.backend_mut().emit_err(namespace, &err);
+            };
+
+            if let Some(handler) = self.inner.get_mut(arg) {
+                (handler)(args, namespace, ctx);
+            } else if let Some(module) = self.submodules.get_mut(arg) {
+                module.handle(args, namespace, ctx);
+            } else {
+                let err = UnknownCommandError(self, arg);
+                ctx.backend_mut().emit_err(namespace, &err);
+            }
         }
     }
 
@@ -362,6 +390,7 @@ mod command_builder {
                 todo!();
             }
         }
+
         #[inline]
         fn add_module(
             &mut self,
@@ -371,10 +400,27 @@ mod command_builder {
         }
     }
 
-    impl<B> Default for CommandHandlers<B> {
+    impl<B> notify::Error for MissingCommandError<'_, B> {
         #[inline]
-        fn default() -> Self {
-            Self { inner: Default::default(), submodules: Default::default() }
+        fn to_level(&self) -> Option<notify::Level> {
+            Some(notify::Level::Error)
+        }
+
+        #[inline]
+        fn to_message(&self) -> notify::Message {
+            todo!()
+        }
+    }
+
+    impl<B> notify::Error for UnknownCommandError<'_, B> {
+        #[inline]
+        fn to_level(&self) -> Option<notify::Level> {
+            Some(notify::Level::Error)
+        }
+
+        #[inline]
+        fn to_message(&self) -> notify::Message {
+            todo!()
         }
     }
 }

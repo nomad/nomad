@@ -27,7 +27,7 @@ pub trait Command<B: Backend>: 'static {
 }
 
 /// TODO: docs.
-pub struct CommandArgs<'a>(&'a [&'a str]);
+pub struct CommandArgs<'a>(&'a str);
 
 /// TODO: docs.
 pub struct CommandCompletion {
@@ -38,6 +38,12 @@ impl<'a> CommandArgs<'a> {
     /// TODO: docs.
     #[inline]
     pub fn new(_command_str: &'a str) -> Self {
+        todo!()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn next(&mut self) -> Option<&'a str> {
         todo!()
     }
 }

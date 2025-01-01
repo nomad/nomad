@@ -17,14 +17,14 @@ impl Module<Neovim> for Mad {
     type Config = ();
     type Docs = ();
 
-    fn api<P: Plugin<Neovim>>(&self, _ctx: ApiCtx<'_, '_, Self, P, Neovim>) {
+    fn api<P: Plugin<Neovim>>(&self, _ctx: ApiCtx<Self, P, Neovim>) {
         // ctx.with_module(auth::Auth::new())
         //     .with_module(collab::Collab::new())
         //     .with_module(version::Version::new())
         todo!()
     }
 
-    fn on_config_changed(&mut self, _: (), _: NeovimCtx<'_, Neovim>) {}
+    fn on_config_changed(&mut self, _: (), _: NeovimCtx<Neovim>) {}
 
     fn docs() {}
 }
