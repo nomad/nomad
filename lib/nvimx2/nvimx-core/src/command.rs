@@ -2,7 +2,15 @@
 
 use smol_str::SmolStr;
 
-use crate::{Action, ActionName, Backend, MaybeResult, NeovimCtx, notify};
+use crate::{
+    Action,
+    ActionName,
+    Backend,
+    ByteOffset,
+    MaybeResult,
+    NeovimCtx,
+    notify,
+};
 
 /// TODO: docs.
 pub trait Command<B: Backend>: 'static {
@@ -23,7 +31,31 @@ pub trait Command<B: Backend>: 'static {
     ) -> impl MaybeResult<()>;
 
     /// TODO: docs.
+    fn to_completion_fn(&self) -> impl CompletionFn {
+        |_: CommandArgs, _: ByteOffset| core::iter::empty()
+    }
+
+    /// TODO: docs.
     fn docs() -> Self::Docs;
+}
+
+/// TODO: docs.
+pub trait CompletionFn: 'static {
+    /// TODO: docs.
+    type Completions: IntoIterator<Item = CommandCompletion>;
+
+    /// TODO: docs.
+    fn call(
+        &mut self,
+        args: CommandArgs,
+        offset: ByteOffset,
+    ) -> Self::Completions;
+}
+
+/// TODO: docs.
+pub trait ToCompletionFn {
+    /// TODO: docs.
+    fn to_completion_fn(&self) -> impl CompletionFn;
 }
 
 /// TODO: docs.
@@ -58,7 +90,7 @@ impl CommandCompletion {
 
 impl<A, B> Command<B> for A
 where
-    A: Action<B, Return = ()>,
+    A: Action<B, Return = ()> + ToCompletionFn,
     A::Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>,
     B: Backend,
 {
@@ -77,7 +109,29 @@ where
     }
 
     #[inline]
+    fn to_completion_fn(&self) -> impl CompletionFn {
+        ToCompletionFn::to_completion_fn(self)
+    }
+
+    #[inline]
     fn docs() -> Self::Docs {
         A::docs()
+    }
+}
+
+impl<F, R> CompletionFn for F
+where
+    F: FnMut(CommandArgs, ByteOffset) -> R + 'static,
+    R: IntoIterator<Item = CommandCompletion>,
+{
+    type Completions = R;
+
+    #[inline]
+    fn call(
+        &mut self,
+        args: CommandArgs,
+        offset: ByteOffset,
+    ) -> Self::Completions {
+        (self)(args, offset)
     }
 }
