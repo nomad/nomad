@@ -1,11 +1,6 @@
 use crate::api::{Api, ModuleApi};
-use crate::module::{
-    ApiCtx,
-    CommandBuilder,
-    CommandCompletionFns,
-    CommandHandlers,
-    Module,
-};
+use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
+use crate::module::{ApiCtx, Module};
 use crate::{ActionName, Backend, BackendHandle, notify};
 
 /// TODO: docs.
