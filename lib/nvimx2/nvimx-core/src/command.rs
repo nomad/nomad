@@ -124,7 +124,13 @@ pub enum CommandCursor<'a> {
 /// TODO: docs.
 #[derive(Debug, Clone)]
 pub struct CommandCompletion {
-    inner: SmolStr,
+    kind: CommandCompletionKind,
+}
+
+#[derive(Debug, Clone)]
+enum CommandCompletionKind {
+    Str(SmolStr),
+    StaticStr(&'static str),
 }
 
 /// TODO: docs.
@@ -283,13 +289,23 @@ impl CommandCompletion {
     /// TODO: docs.
     #[inline]
     pub fn as_str(&self) -> &str {
-        self.inner.as_str()
+        match &self.kind {
+            CommandCompletionKind::Str(s) => s.as_str(),
+            CommandCompletionKind::StaticStr(s) => s,
+        }
     }
 
     /// TODO: docs.
     #[inline]
     pub fn from_static_str(s: &'static str) -> Self {
-        todo!()
+        Self { kind: CommandCompletionKind::StaticStr(s) }
+    }
+
+    /// TODO: docs.
+    #[allow(clippy::should_implement_trait)]
+    #[inline]
+    pub fn from_str(s: &str) -> Self {
+        Self { kind: CommandCompletionKind::Str(s.into()) }
     }
 }
 
