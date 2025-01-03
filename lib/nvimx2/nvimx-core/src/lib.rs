@@ -20,7 +20,7 @@ mod util;
 pub use action::{Action, ActionName};
 pub use async_ctx::AsyncCtx;
 use backend::BackendExt;
-pub use backend::{Backend, Key, KeyValuePair, MapAccess, Value};
+pub use backend::{Backend, Key, MapAccess, Value};
 use backend_handle::{BackendHandle, BackendMut};
 pub use byte_offset::ByteOffset;
 pub use function::Function;

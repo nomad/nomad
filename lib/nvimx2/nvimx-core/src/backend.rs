@@ -60,7 +60,7 @@ pub trait Backend: 'static + Sized {
 /// TODO: docs.
 pub trait Value: Default + 'static {
     /// TODO: docs.
-    type MapAccess<'a>: MapAccess<Pair: KeyValuePair<Value = Self>>;
+    type MapAccess<'a>: MapAccess<Value = Self>;
 
     /// TODO: docs.
     type MapAccessError<'a>: notify::Error
@@ -76,15 +76,6 @@ pub trait Value: Default + 'static {
 /// TODO: docs.
 pub trait MapAccess {
     /// TODO: docs.
-    type Pair: KeyValuePair;
-
-    /// TODO: docs.
-    fn next_pair(&mut self) -> Option<Self::Pair>;
-}
-
-/// TODO: docs.
-pub trait KeyValuePair {
-    /// TODO: docs.
     type Key<'a>: Key
     where
         Self: 'a;
@@ -93,10 +84,10 @@ pub trait KeyValuePair {
     type Value;
 
     /// TODO: docs.
-    fn key(&self) -> Self::Key<'_>;
+    fn next_key(&mut self) -> Option<Self::Key<'_>>;
 
     /// TODO: docs.
-    fn take_value(self) -> Self::Value;
+    fn take_next_value(&mut self) -> Self::Value;
 }
 
 /// TODO: docs.

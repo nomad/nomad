@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use nvimx_core::{Key, KeyValuePair, MapAccess, Value, notify};
+use nvimx_core::{Key, MapAccess, Value, notify};
 
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
 
@@ -26,10 +26,7 @@ pub struct NeovimMapPair<'a> {
 
 /// TODO: docs.
 #[derive(Copy, Clone)]
-pub struct NeovimMapKey<'a> {
-    dict_key: &'a oxi::String,
-    dict_idx: usize,
-}
+pub struct NeovimMapKey<'a>(&'a oxi::String);
 
 /// TODO: docs.
 pub struct NeovimMapAccessError(ObjectKind);
@@ -87,35 +84,28 @@ impl lua::Pushable for NeovimValue {
     }
 }
 
-impl<'a> MapAccess for NeovimMapAccess<'a> {
-    type Pair = NeovimMapPair<'a>;
-
-    #[inline]
-    fn next_pair(&mut self) -> Option<Self::Pair> {
-        todo!()
-    }
-}
-
-impl KeyValuePair for NeovimMapPair<'_> {
+impl MapAccess for NeovimMapAccess<'_> {
     type Key<'a>
         = NeovimMapKey<'a>
     where
         Self: 'a;
-
     type Value = NeovimValue;
 
     #[inline]
-    fn key(&self) -> Self::Key<'_> {
-        // let (dict_key, _) = self.dict.get_by_index(self.dict_idx).unwrap();
-        // NeovimMapKey { dict_key, dict_idx: self.dict_idx }
+    fn next_key(&mut self) -> Option<Self::Key<'_>> {
+        if self.dict_idx == self.dict.len() {
+            return None;
+        }
         todo!();
+        // let (key, _) = self.dict.get_by_index(self.dict_idx).unwrap();
+        // self.dict_idx += 1;
+        // Some(NeovimMapKey(key))
     }
 
     #[inline]
-    fn take_value(self) -> Self::Value {
-        // let idx = self.dict_idx;
-        // let (_, value) = self.dict.swap_remove_by_index(idx).unwrap();
-        // value
+    fn take_next_value(&mut self) -> NeovimValue {
+        // self.dict_idx -= 1;
+        // self.dict.swap_remove_by_index(self.dict_idx).unwrap().1
         todo!();
     }
 }

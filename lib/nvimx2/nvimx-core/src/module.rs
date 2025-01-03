@@ -3,7 +3,7 @@
 use serde::de::DeserializeOwned;
 
 use crate::api::{Api, ModuleApi};
-use crate::backend::{Key, KeyValuePair, MapAccess, Value};
+use crate::backend::{Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder};
 use crate::util::OrderedMap;
 use crate::{
@@ -257,8 +257,8 @@ impl<B: Backend> ConfigFnBuilder<B> {
             },
         };
         namespace.push_module(self.module_name);
-        while let Some(pair) = map_access.next_pair() {
-            let key = pair.key();
+        loop {
+            let Some(key) = map_access.next_key() else { break };
             let key_str = match key.as_str() {
                 Ok(key) => key,
                 Err(err) => {
@@ -268,11 +268,12 @@ impl<B: Backend> ConfigFnBuilder<B> {
                     return;
                 },
             };
-            if let Some(submodule) = self.submodules.get_mut(key_str) {
-                drop(key);
-                let value = pair.take_value();
-                submodule.handle(value, namespace, ctx);
-            }
+            let Some(submodule) = self.submodules.get_mut(key_str) else {
+                continue;
+            };
+            drop(key);
+            let value = map_access.take_next_value();
+            submodule.handle(value, namespace, ctx);
         }
         drop(map_access);
         (self.config_handler)(value, namespace, ctx);
