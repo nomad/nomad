@@ -53,6 +53,13 @@ struct SpanInner {
     kind: SpanKind,
 }
 
+#[derive(Clone)]
+enum SpansState {
+    InGap { gap_offset: usize, byte_range: Range<ByteOffset> },
+    InSpan { idx: usize },
+    Done,
+}
+
 impl Message {
     /// TODO: docs.
     #[inline]
@@ -79,10 +86,25 @@ impl Message {
     }
 }
 
-impl fmt::Display for Message {
+impl<'a> Span<'a> {
+    /// TODO: docs.
     #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
+    pub fn as_str(&self) -> &'a str {
+        let br = &self.byte_range;
+        let range: Range<usize> = br.start.into()..br.end.into();
+        &self.message.as_str()[range]
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn byte_range(&self) -> Range<ByteOffset> {
+        self.byte_range.clone()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn kind(&self) -> Option<&'a SpanKind> {
+        self.kind
     }
 }
 
@@ -91,13 +113,6 @@ impl<'a> Spans<'a> {
     fn new(message: &'a Message) -> Self {
         Self { message, state: SpansState::new(message) }
     }
-}
-
-#[derive(Clone)]
-enum SpansState {
-    InGap { gap_offset: usize, byte_range: Range<ByteOffset> },
-    InSpan { idx: usize },
-    Done,
 }
 
 impl SpansState {
@@ -167,6 +182,13 @@ impl SpansState {
         } else {
             Self::InSpan { idx: 0 }
         }
+    }
+}
+
+impl fmt::Display for Message {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
     }
 }
 
