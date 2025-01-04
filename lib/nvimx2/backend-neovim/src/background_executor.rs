@@ -14,6 +14,7 @@ pin_project_lite::pin_project! {
     pub struct NeovimBackgroundTask<T> {
         #[pin]
         inner: async_oneshot::Receiver<T>,
+        is_forever_pending: bool,
     }
 }
 
@@ -43,7 +44,14 @@ impl NeovimBackgroundExecutor {
             // The task might've been detached, and that's ok.
             let _ = tx.send(future.await);
         });
-        NeovimBackgroundTask { inner: rx }
+        NeovimBackgroundTask::new(rx)
+    }
+}
+
+impl<T> NeovimBackgroundTask<T> {
+    #[inline]
+    pub(crate) fn new(inner: async_oneshot::Receiver<T>) -> Self {
+        Self { inner, is_forever_pending: false }
     }
 }
 
@@ -70,11 +78,18 @@ impl<T> Future for NeovimBackgroundTask<T> {
 
     #[inline]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<T> {
-        match ready!(self.project().inner.poll(ctx)) {
+        let this = self.project();
+        if *this.is_forever_pending {
+            return Poll::Pending;
+        }
+        match ready!(this.inner.poll(ctx)) {
             Ok(value) => Poll::Ready(value),
-            // This only happens if the background executor is dropped, which
-            // should only happen when Neovim is shutting down.
-            Err(_closed) => Poll::Pending,
+            Err(_closed) => {
+                // This only happens if the background executor is dropped,
+                // which should only happen when Neovim is shutting down.
+                *this.is_forever_pending = true;
+                Poll::Pending
+            },
         }
     }
 }
