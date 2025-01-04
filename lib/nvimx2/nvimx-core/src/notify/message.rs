@@ -23,7 +23,10 @@ pub enum SpanKind {
     Actual,
 
     /// TODO: docs.
-    Unknown,
+    Invalid,
+
+    /// TODO: docs.
+    Info,
 
     /// TODO: docs.
     Warning,
@@ -134,6 +137,18 @@ impl Message {
     #[inline]
     pub fn push_expected<S: AsRef<str>>(&mut self, s: S) -> &mut Self {
         self.push_span(s, SpanKind::Expected)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn push_info<S: AsRef<str>>(&mut self, s: S) -> &mut Self {
+        self.push_span(s, SpanKind::Info)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn push_invalid<S: AsRef<str>>(&mut self, s: S) -> &mut Self {
+        self.push_span(s, SpanKind::Invalid)
     }
 
     /// TODO: docs.

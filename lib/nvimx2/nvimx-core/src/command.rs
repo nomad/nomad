@@ -770,7 +770,7 @@ impl<B> notify::Error for InvalidCommandError<'_, B> {
             .push_str("invalid ")
             .push_str(invalid)
             .push_str(" ")
-            .push_actual(arg.as_str())
+            .push_invalid(arg.as_str())
             .push_str(", ");
 
         let levenshtein_threshold = 2;

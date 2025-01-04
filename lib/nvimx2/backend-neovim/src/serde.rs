@@ -48,7 +48,13 @@ impl notify::Error for NeovimSerializeError {
 
     #[inline]
     fn to_message(&self) -> notify::Message {
-        todo!()
+        let mut message = notify::Message::new();
+        message.push_str("couldn't serialize value");
+        if self.inner.path().iter().len() > 1 {
+            message.push_str(" at ").push_info(self.inner.path().to_string());
+        }
+        message.push_str(": ").push_str(self.inner.inner().to_string());
+        message
     }
 }
 
