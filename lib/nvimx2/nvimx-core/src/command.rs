@@ -4,6 +4,7 @@ use core::fmt;
 use core::mem::{self, MaybeUninit};
 use core::ops::Deref;
 
+use smallvec::SmallVec;
 use smol_str::{SmolStr, ToSmolStr};
 
 use crate::backend::BackendExt;
@@ -170,7 +171,7 @@ pub(crate) struct CommandCompletionFns {
 
 struct MissingCommandError<'a, B>(&'a CommandHandlers<B>);
 
-struct UnknownCommandError<'a, B>(&'a CommandHandlers<B>, CommandArg<'a>);
+struct InvalidCommandError<'a, B>(&'a CommandHandlers<B>, CommandArg<'a>);
 
 impl<'a> CommandArgs<'a> {
     /// TODO: docs.
@@ -633,7 +634,7 @@ impl<B: Backend> CommandHandlers<B> {
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
             module.handle(args, namespace, ctx);
         } else {
-            let err = UnknownCommandError(self, arg);
+            let err = InvalidCommandError(self, arg);
             ctx.backend_mut().emit_err(namespace, &err);
         }
     }
@@ -746,7 +747,7 @@ impl<B> notify::Error for MissingCommandError<'_, B> {
     }
 }
 
-impl<B> notify::Error for UnknownCommandError<'_, B> {
+impl<B> notify::Error for InvalidCommandError<'_, B> {
     #[inline]
     fn to_level(&self) -> Option<notify::Level> {
         Some(notify::Level::Error)
@@ -754,7 +755,49 @@ impl<B> notify::Error for UnknownCommandError<'_, B> {
 
     #[inline]
     fn to_message(&self) -> notify::Message {
-        todo!()
+        let Self(handlers, arg) = self;
+        let mut message = notify::Message::new();
+        let invalid = match (
+            handlers.inner.is_empty(),
+            handlers.submodules.is_empty(),
+        ) {
+            (false, false) => "argument",
+            (false, true) => "command",
+            (true, false) => "submodule",
+            (true, true) => unreachable!(),
+        };
+        message
+            .push_str("invalid ")
+            .push_str(invalid)
+            .push_str(" ")
+            .push_actual(arg.as_str())
+            .push_str(", ");
+
+        let levenshtein_threshold = 2;
+
+        let mut guesses = handlers
+            .inner
+            .keys()
+            .chain(handlers.submodules.keys())
+            .map(|candidate| {
+                let distance = strsim::levenshtein(candidate, arg);
+                (candidate, distance)
+            })
+            .filter(|&(_, distance)| distance <= levenshtein_threshold)
+            .collect::<SmallVec<[_; 2]>>();
+
+        guesses.sort_by_key(|&(_, distance)| distance);
+
+        if let Some((best_guess, _)) = guesses.first() {
+            message
+                .push_str("did you mean ")
+                .push_expected(best_guess)
+                .push_str("?");
+        } else {
+            handlers.push_valid(&mut message);
+        }
+
+        message
     }
 }
 

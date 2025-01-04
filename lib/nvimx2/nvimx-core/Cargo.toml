@@ -12,6 +12,7 @@ fxhash = { workspace = true }
 serde = { workspace = true }
 smallvec = { workspace = true }
 smol_str = { workspace = true }
+strsim = "0.11"
 thiserror = { workspace = true }
 
 [lints]

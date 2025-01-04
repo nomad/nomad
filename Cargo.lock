@@ -1136,6 +1136,7 @@ dependencies = [
  "serde",
  "smallvec",
  "smol_str",
+ "strsim",
  "thiserror 2.0.4",
 ]
 
