@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 compact_str = { workspace = true }
 fxhash = { workspace = true }
+pin-project-lite = { workspace = true }
 serde = { workspace = true }
 smallvec = { workspace = true }
 smol_str = { workspace = true }

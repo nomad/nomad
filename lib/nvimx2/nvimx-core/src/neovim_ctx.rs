@@ -1,5 +1,10 @@
 use crate::backend_handle::BackendMut;
-use crate::executor::{LocalExecutor, Task};
+use crate::executor::{
+    BackgroundExecutor,
+    LocalExecutor,
+    Task,
+    TaskBackground,
+};
 use crate::{AsyncCtx, Backend};
 
 /// TODO: docs.
@@ -23,6 +28,21 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     #[inline]
     pub(crate) fn new(handle: BackendMut<'a, B>) -> Self {
         Self { backend: handle }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_background<Fut>(
+        &mut self,
+        fut: Fut,
+    ) -> TaskBackground<Fut::Output, B>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
+    {
+        TaskBackground::new(
+            self.backend_mut().background_executor().spawn(fut),
+        )
     }
 
     /// TODO: docs.

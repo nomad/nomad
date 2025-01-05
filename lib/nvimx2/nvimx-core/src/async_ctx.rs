@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 
+use crate::executor::{BackgroundExecutor, TaskBackground};
 use crate::{Backend, BackendHandle, NeovimCtx};
 
 /// TODO: docs.
@@ -12,6 +13,22 @@ impl<B> AsyncCtx<'_, B>
 where
     B: Backend,
 {
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_background<Fut>(
+        &self,
+        fut: Fut,
+    ) -> TaskBackground<Fut::Output, B>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
+    {
+        let task = self
+            .backend
+            .with_mut(|mut backend| backend.background_executor().spawn(fut));
+        TaskBackground::new(task)
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn with_ctx<Fun, Out>(&self, fun: Fun) -> Out

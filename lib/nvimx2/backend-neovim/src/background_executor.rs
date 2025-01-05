@@ -36,8 +36,8 @@ impl NeovimBackgroundExecutor {
         future: Fut,
     ) -> NeovimBackgroundTask<Fut::Output>
     where
-        Fut: Future + Send + Sync + 'static,
-        Fut::Output: Send + Sync + 'static,
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
     {
         let (mut tx, rx) = async_oneshot::oneshot();
         self.thread_pool.spawn_ok(async move {
@@ -61,8 +61,8 @@ impl BackgroundExecutor for NeovimBackgroundExecutor {
     #[inline]
     fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
     where
-        Fut: Future + Send + Sync + 'static,
-        Fut::Output: Send + Sync + 'static,
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
     {
         self.spawn_inner(future)
     }
