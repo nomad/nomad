@@ -4,15 +4,15 @@ use crate::action_ctx::ModulePath;
 use crate::api::{Api, ModuleApi};
 use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
 use crate::module::{ApiCtx, ConfigFnBuilder, Module};
-use crate::{ActionName, Backend, BackendHandle};
+use crate::{Backend, BackendHandle, Name};
 
 /// TODO: docs.
 pub trait Plugin<B: Backend>: Module<Self, B> {
     /// TODO: docs.
-    const COMMAND_NAME: ActionName = panic!();
+    const COMMAND_NAME: Name = panic!();
 
     /// TODO: docs.
-    const CONFIG_FN_NAME: ActionName = ActionName::new("setup");
+    const CONFIG_FN_NAME: Name = "setup";
 
     #[doc(hidden)]
     #[track_caller]

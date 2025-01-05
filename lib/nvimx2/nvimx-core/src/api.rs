@@ -2,7 +2,7 @@
 
 use crate::command::{CommandArgs, CommandCompletion};
 use crate::module::Module;
-use crate::{ActionName, Backend, ByteOffset, Plugin, notify};
+use crate::{Backend, ByteOffset, Name, Plugin, notify};
 
 /// TODO: docs.
 pub trait Api<P, B>: 'static + Sized
@@ -36,10 +36,10 @@ where
     B: Backend,
 {
     /// TODO: docs.
-    fn add_constant(&mut self, constant_name: ActionName, value: B::ApiValue);
+    fn add_constant(&mut self, constant_name: Name, value: B::ApiValue);
 
     /// TODO: docs.
-    fn add_function<Fun, Err>(&mut self, fun_name: ActionName, fun: Fun)
+    fn add_function<Fun, Err>(&mut self, fun_name: Name, fun: Fun)
     where
         Fun: FnMut(B::ApiValue) -> Result<B::ApiValue, Err> + 'static,
         Err: notify::Error;

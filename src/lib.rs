@@ -1,6 +1,6 @@
-use nvimx2::module::{ApiCtx, Module, ModuleName};
+use nvimx2::module::{ApiCtx, Module};
 use nvimx2::neovim::{self, Neovim};
-use nvimx2::{ActionName, NeovimCtx, Plugin};
+use nvimx2::{Name, NeovimCtx, Plugin};
 
 #[neovim::plugin]
 fn mad() -> Mad {
@@ -11,11 +11,11 @@ fn mad() -> Mad {
 struct Mad;
 
 impl Plugin<Neovim> for Mad {
-    const COMMAND_NAME: ActionName = ActionName::new("Mad");
+    const COMMAND_NAME: Name = "Mad";
 }
 
 impl Module<Self, Neovim> for Mad {
-    const NAME: ModuleName = ModuleName::new("mad");
+    const NAME: Name = "mad";
 
     type Config = ();
 

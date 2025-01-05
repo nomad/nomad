@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use nvimx_core::api::{Api, ModuleApi};
 use nvimx_core::command::{CommandArgs, CommandCompletion};
 use nvimx_core::module::Module;
-use nvimx_core::{ActionName, ByteOffset, Plugin, notify};
+use nvimx_core::{ByteOffset, Name, Plugin, notify};
 
 use crate::Neovim;
 use crate::oxi::{Dictionary, Function, Object, api};
@@ -39,7 +39,7 @@ where
             panic!(
                 "a field with name '{}' has already been added to {}'s API",
                 field_name,
-                M::NAME.as_str(),
+                M::NAME,
             );
         }
         let len = self.dictionary.len();
@@ -69,7 +69,7 @@ where
         CompFun: FnMut(CommandArgs, ByteOffset) -> Comps + 'static,
         Comps: IntoIterator<Item = CommandCompletion>,
     {
-        let command_name = P::COMMAND_NAME.as_str();
+        let command_name = P::COMMAND_NAME;
 
         let command =
             Function::from_fn_mut(move |args: api::types::CommandArgs| {
@@ -131,19 +131,19 @@ where
 {
     #[track_caller]
     #[inline]
-    fn add_constant(&mut self, constant_name: ActionName, value: NeovimValue) {
-        self.insert(constant_name.as_str(), value.into_inner());
+    fn add_constant(&mut self, constant_name: Name, value: NeovimValue) {
+        self.insert(constant_name, value.into_inner());
     }
 
     #[track_caller]
     #[inline]
-    fn add_function<Fun, Err>(&mut self, fun_name: ActionName, mut fun: Fun)
+    fn add_function<Fun, Err>(&mut self, fun_name: Name, mut fun: Fun)
     where
         Fun: FnMut(NeovimValue) -> Result<NeovimValue, Err> + 'static,
         Err: notify::Error,
     {
         self.insert(
-            fun_name.as_str(),
+            fun_name,
             Function::from_fn_mut(move |args| fun(args).unwrap_or_default()),
         );
     }
@@ -153,7 +153,7 @@ where
     fn as_module<M2: Module<P, Neovim>>(
         &mut self,
     ) -> NeovimModuleApi<'_, M2, P> {
-        let obj = self.insert(M2::NAME.as_str(), Dictionary::default());
+        let obj = self.insert(M2::NAME, Dictionary::default());
         // SAFETY: We just inserted a dictionary.
         let dictionary = unsafe { obj.as_dictionary_unchecked_mut() };
         NeovimModuleApi::new(dictionary)

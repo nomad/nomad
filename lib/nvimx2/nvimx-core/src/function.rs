@@ -1,12 +1,12 @@
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::{Action, ActionCtx, ActionName, Backend, MaybeResult};
+use crate::{Action, ActionCtx, Backend, MaybeResult, Name};
 
 /// TODO: docs.
 pub trait Function<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: ActionName;
+    const NAME: Name;
 
     /// TODO: docs.
     type Args: DeserializeOwned;
@@ -29,7 +29,7 @@ where
     A::Return: Serialize,
     B: Backend,
 {
-    const NAME: ActionName = A::NAME;
+    const NAME: Name = A::NAME;
 
     type Args = A::Args;
     type Return = A::Return;

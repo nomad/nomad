@@ -19,7 +19,7 @@ mod plugin;
 mod shared;
 mod util;
 
-pub use action::{Action, ActionCtx, ActionName};
+pub use action::{Action, ActionCtx};
 pub use async_ctx::AsyncCtx;
 use backend::BackendExt;
 pub use backend::{Backend, Key, MapAccess, Value};
@@ -31,3 +31,6 @@ pub use maybe_result::MaybeResult;
 pub use neovim_ctx::NeovimCtx;
 pub use plugin::Plugin;
 pub use shared::Shared;
+
+/// TODO: docs.
+pub type Name = &'static str;

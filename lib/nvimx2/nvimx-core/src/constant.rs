@@ -1,10 +1,9 @@
 use serde::Serialize;
 
-use crate::ActionName;
+use crate::Name;
 
 /// TODO: docs.
 pub trait Constant: Serialize + 'static {
     /// TODO: docs.
-    const NAME: ActionName;
+    const NAME: Name;
 }
-

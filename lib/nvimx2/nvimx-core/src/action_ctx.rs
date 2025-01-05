@@ -3,8 +3,7 @@ use core::ops::{Deref, DerefMut};
 use smallvec::{SmallVec, smallvec};
 
 use crate::backend::BackendExt;
-use crate::module::ModuleName;
-use crate::{ActionName, Backend, NeovimCtx, notify};
+use crate::{Backend, Name, NeovimCtx, notify};
 
 /// TODO: docs.
 pub struct ActionCtx<'a, B> {
@@ -15,16 +14,13 @@ pub struct ActionCtx<'a, B> {
 /// TODO: docs.
 #[derive(Clone)]
 pub(crate) struct ModulePath {
-    names: SmallVec<[ModuleName; 2]>,
+    names: SmallVec<[Name; 2]>,
 }
 
 impl<'a, B: Backend> ActionCtx<'a, B> {
     #[inline]
-    pub(crate) fn emit_action_err<Err>(
-        &mut self,
-        action_name: ActionName,
-        err: Err,
-    ) where
+    pub(crate) fn emit_action_err<Err>(&mut self, action_name: Name, err: Err)
+    where
         Err: notify::Error,
     {
         self.neovim_ctx.backend_mut().emit_action_err(
@@ -52,21 +48,19 @@ impl<'a, B: Backend> ActionCtx<'a, B> {
 impl ModulePath {
     /// TODO: docs.
     #[inline]
-    pub(crate) fn names(
-        &self,
-    ) -> impl ExactSizeIterator<Item = ModuleName> + '_ {
+    pub(crate) fn names(&self) -> impl ExactSizeIterator<Item = Name> + '_ {
         self.names.iter().copied()
     }
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn new(base_module: ModuleName) -> Self {
+    pub(crate) fn new(base_module: Name) -> Self {
         Self { names: smallvec![base_module] }
     }
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn push(&mut self, module_name: ModuleName) {
+    pub(crate) fn push(&mut self, module_name: Name) {
         self.names.push(module_name);
     }
 

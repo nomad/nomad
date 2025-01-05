@@ -16,6 +16,7 @@ use crate::{
     Constant,
     Function,
     MaybeResult,
+    Name,
     NeovimCtx,
     Plugin,
     notify,
@@ -24,7 +25,7 @@ use crate::{
 /// TODO: docs.
 pub trait Module<P: Plugin<B>, B: Backend>: 'static + Sized {
     /// TODO: docs.
-    const NAME: ModuleName;
+    const NAME: Name;
 
     /// TODO: docs.
     type Config: DeserializeOwned;
@@ -49,12 +50,8 @@ pub struct ApiCtx<'a, 'b, M: Module<P, B>, P: Plugin<B>, B: Backend> {
     backend: &'b BackendHandle<B>,
 }
 
-/// TODO: docs.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ModuleName(&'static str);
-
 pub(crate) struct ConfigFnBuilder<B: Backend> {
-    module_name: ModuleName,
+    module_name: Name,
     config_handler:
         Box<dyn FnMut(B::ApiValue, &ModulePath, &mut NeovimCtx<B>) + 'static>,
     submodules: OrderedMap<&'static str, Self>,
@@ -192,27 +189,6 @@ where
     }
 }
 
-impl ModuleName {
-    /// TODO: docs.
-    #[inline]
-    pub const fn as_str(&self) -> &'static str {
-        self.0
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub const fn new(name: &'static str) -> Self {
-        assert!(!name.is_empty());
-        Self(name)
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub const fn uppercase_first(&self) -> &Self {
-        todo!();
-    }
-}
-
 impl<B: Backend> ConfigFnBuilder<B> {
     #[inline]
     pub(crate) fn build(
@@ -259,8 +235,7 @@ impl<B: Backend> ConfigFnBuilder<B> {
 
     #[inline]
     fn add_module<P: Plugin<B>, M: Module<P, B>>(&mut self) -> &mut Self {
-        self.submodules
-            .insert(M::NAME.as_str(), ConfigFnBuilder::new::<P, M>())
+        self.submodules.insert(M::NAME, ConfigFnBuilder::new::<P, M>())
     }
 
     #[inline]

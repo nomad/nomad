@@ -1,11 +1,11 @@
 pub use crate::action_ctx::ActionCtx;
 use crate::backend::BackendExt;
-use crate::{AsyncCtx, Backend, MaybeResult};
+use crate::{AsyncCtx, Backend, MaybeResult, Name};
 
 /// TODO: docs.
 pub trait Action<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: ActionName;
+    const NAME: Name;
 
     /// TODO: docs.
     type Args;
@@ -24,7 +24,7 @@ pub trait Action<B: Backend>: 'static {
 /// TODO: docs.
 pub trait AsyncAction<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: ActionName;
+    const NAME: Name;
 
     /// TODO: docs.
     type Args;
@@ -37,31 +37,12 @@ pub trait AsyncAction<B: Backend>: 'static {
     ) -> impl Future<Output = impl MaybeResult<()>>;
 }
 
-/// TODO: docs.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ActionName(&'static str);
-
-impl ActionName {
-    /// TODO: docs.
-    #[inline]
-    pub const fn as_str(self) -> &'static str {
-        self.0
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub const fn new(name: &'static str) -> Self {
-        assert!(!name.is_empty());
-        Self(name)
-    }
-}
-
 impl<T, B> Action<B> for T
 where
     T: AsyncAction<B> + Clone,
     B: Backend,
 {
-    const NAME: ActionName = T::NAME;
+    const NAME: Name = T::NAME;
     type Args = T::Args;
     type Return = ();
 

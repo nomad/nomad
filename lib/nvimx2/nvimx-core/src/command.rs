@@ -10,15 +10,15 @@ use smol_str::{SmolStr, ToSmolStr};
 use crate::action_ctx::ModulePath;
 use crate::backend::BackendExt;
 use crate::backend_handle::BackendHandle;
-use crate::module::{Module, ModuleName};
+use crate::module::Module;
 use crate::util::OrderedMap;
 use crate::{
     Action,
     ActionCtx,
-    ActionName,
     Backend,
     ByteOffset,
     MaybeResult,
+    Name,
     NeovimCtx,
     Plugin,
     notify,
@@ -32,7 +32,7 @@ type CommandCompletionFn =
 /// TODO: docs.
 pub trait Command<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: ActionName;
+    const NAME: Name;
 
     /// TODO: docs.
     type Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>;
@@ -153,7 +153,7 @@ pub(crate) struct CommandBuilder<'a, B> {
 }
 
 pub(crate) struct CommandHandlers<B> {
-    module_name: ModuleName,
+    module_name: Name,
     inner: OrderedMap<&'static str, CommandHandler<B>>,
     submodules: OrderedMap<&'static str, Self>,
 }
@@ -524,7 +524,7 @@ impl<'a, B: Backend> CommandBuilder<'a, B> {
     where
         Cmd: Command<B>,
     {
-        self.assert_namespace_is_available(Cmd::NAME.as_str());
+        self.assert_namespace_is_available(Cmd::NAME);
         *self.command_has_been_added = true;
         self.completions.add_command(&command);
         self.handlers.add_command(command);
@@ -537,7 +537,7 @@ impl<'a, B: Backend> CommandBuilder<'a, B> {
         P: Plugin<B>,
         M: Module<P, B>,
     {
-        self.assert_namespace_is_available(M::NAME.as_str());
+        self.assert_namespace_is_available(M::NAME);
         CommandBuilder {
             command_has_been_added: self.command_has_been_added,
             handlers: self.handlers.add_module::<P, M>(),
@@ -548,7 +548,7 @@ impl<'a, B: Backend> CommandBuilder<'a, B> {
     #[track_caller]
     #[inline]
     fn assert_namespace_is_available(&self, namespace: &str) {
-        let module_name = self.handlers.module_name.as_str();
+        let module_name = self.handlers.module_name;
         if self.handlers.inner.contains_key(namespace) {
             panic!(
                 "a command with name {namespace:?} was already registered on \
@@ -604,7 +604,7 @@ impl<B: Backend> CommandHandlers<B> {
                 ctx.emit_action_err(Cmd::NAME, err);
             }
         });
-        self.inner.insert(Cmd::NAME.as_str(), handler);
+        self.inner.insert(Cmd::NAME, handler);
     }
 
     #[inline]
@@ -613,7 +613,7 @@ impl<B: Backend> CommandHandlers<B> {
         P: Plugin<B>,
         M: Module<P, B>,
     {
-        self.submodules.insert(M::NAME.as_str(), Self::new::<P, M>())
+        self.submodules.insert(M::NAME, Self::new::<P, M>())
     }
 
     #[inline]
@@ -663,12 +663,12 @@ impl CommandCompletionFns {
             Box::new(move |args, offset| {
                 completion_fn.call(args, offset).into_iter().collect()
             });
-        self.inner.insert(Cmd::NAME.as_str(), completion_fn);
+        self.inner.insert(Cmd::NAME, completion_fn);
     }
 
     #[inline]
-    fn add_module(&mut self, module_name: ModuleName) -> &mut Self {
-        self.submodules.insert(module_name.as_str(), Default::default())
+    fn add_module(&mut self, module_name: Name) -> &mut Self {
+        self.submodules.insert(module_name, Default::default())
     }
 
     #[inline]
@@ -808,7 +808,7 @@ where
     A::Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>,
     B: Backend,
 {
-    const NAME: ActionName = A::NAME;
+    const NAME: Name = A::NAME;
 
     type Args = A::Args;
 

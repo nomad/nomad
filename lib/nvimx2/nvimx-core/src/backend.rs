@@ -6,8 +6,7 @@ use serde::de::DeserializeOwned;
 use crate::action_ctx::ModulePath;
 use crate::api::Api;
 use crate::executor::{BackgroundExecutor, LocalExecutor};
-use crate::notify::Emitter;
-use crate::{ActionName, Plugin, notify};
+use crate::{Name, Plugin, notify};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
@@ -114,7 +113,7 @@ pub(crate) trait BackendExt: Backend {
     fn emit_action_err<Err: notify::Error>(
         &mut self,
         _module_path: &ModulePath,
-        _action_name: ActionName,
+        _action_name: Name,
         _err: Err,
     ) {
         todo!();

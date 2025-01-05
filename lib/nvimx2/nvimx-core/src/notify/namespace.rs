@@ -1,33 +1,30 @@
 use smallvec::SmallVec;
 
-use crate::ActionName;
-use crate::module::ModuleName;
+use crate::Name;
 
 /// TODO: docs.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
-    action: Option<&'static ActionName>,
-    modules: SmallVec<[&'static ModuleName; 2]>,
+    action: Option<Name>,
+    modules: SmallVec<[Name; 2]>,
 }
 
 impl Namespace {
     /// TODO: docs.
     #[inline]
-    pub fn action(&self) -> Option<&'static ActionName> {
+    pub fn action(&self) -> Option<Name> {
         self.action
     }
 
     /// TODO: docs.
     #[inline]
-    pub fn components(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.modules()
-            .map(|name| name.as_str())
-            .chain(self.action.map(|name| name.as_str()))
+    pub fn components(&self) -> impl Iterator<Item = Name> + '_ {
+        self.modules().chain(self.action)
     }
 
     /// TODO: docs.
     #[inline]
-    pub fn modules(&self) -> impl Iterator<Item = &'static ModuleName> + '_ {
+    pub fn modules(&self) -> impl Iterator<Item = Name> + '_ {
         self.modules.iter().copied()
     }
 
@@ -39,13 +36,13 @@ impl Namespace {
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn push_module(&mut self, module_name: &'static ModuleName) {
+    pub(crate) fn push_module(&mut self, module_name: Name) {
         self.modules.push(module_name);
     }
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn set_action(&mut self, action_name: &'static ActionName) {
+    pub(crate) fn set_action(&mut self, action_name: Name) {
         debug_assert!(self.action.is_none());
         self.action = Some(action_name);
     }
