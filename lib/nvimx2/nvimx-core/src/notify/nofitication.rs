@@ -1,4 +1,5 @@
-use super::{Level, Message, Namespace, NotificationId};
+use super::{Level, Message, NotificationId};
+use crate::action_ctx::ModulePath;
 
 /// TODO: docs.
 pub struct Notification<'ns> {
@@ -6,7 +7,7 @@ pub struct Notification<'ns> {
     pub level: Level,
 
     /// TODO: docs.
-    pub namespace: &'ns Namespace,
+    pub namespace: &'ns ModulePath,
 
     /// TODO: docs.
     pub message: Message,

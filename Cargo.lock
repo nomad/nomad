@@ -1988,8 +1988,8 @@ dependencies = [
 name = "version"
 version = "0.1.0"
 dependencies = [
- "nomad",
- "nvimx",
+ "nvimx2",
+ "serde",
 ]
 
 [[package]]
