@@ -104,7 +104,7 @@ where
 
                 let mut action_ctx = ActionCtx::new(
                     NeovimCtx::new(backend.as_mut()),
-                    &module_path,
+                    module_path,
                 );
 
                 let ret = fun
@@ -258,7 +258,7 @@ impl<B: Backend> ConfigFnBuilder<B> {
             Err(err) => {
                 // TODO: the namespace should just be the plugin and the
                 // config fn name.
-                ctx.backend_mut().emit_err(module_path, &err);
+                ctx.backend_mut().emit_err(module_path, err);
                 return;
             },
         };
@@ -269,7 +269,7 @@ impl<B: Backend> ConfigFnBuilder<B> {
                 Ok(key) => key,
                 Err(err) => {
                     // TODO: same as above.
-                    ctx.backend_mut().emit_err(module_path, &err);
+                    ctx.backend_mut().emit_err(module_path, err);
                     module_path.push(self.module_name);
                     return;
                 },

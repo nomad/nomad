@@ -598,12 +598,12 @@ impl<B: Backend> CommandHandlers<B> {
             let args = match Cmd::Args::try_from(args) {
                 Ok(args) => args,
                 Err(err) => {
-                    ctx.emit_action_err(Cmd::NAME, &err);
+                    ctx.emit_action_err(Cmd::NAME, err);
                     return;
                 },
             };
             if let Err(err) = command.call(args, ctx).into_result() {
-                ctx.emit_action_err(Cmd::NAME, &err);
+                ctx.emit_action_err(Cmd::NAME, err);
             }
         });
         self.inner.insert(Cmd::NAME.as_str(), handler);
@@ -623,7 +623,7 @@ impl<B: Backend> CommandHandlers<B> {
     ) {
         let Some(arg) = args.pop_front() else {
             let err = MissingCommandError(self);
-            return ctx.backend_mut().emit_err(module_path, &err);
+            return ctx.backend_mut().emit_err(module_path, err);
         };
 
         if let Some(handler) = self.inner.get_mut(arg.as_str()) {
@@ -634,7 +634,7 @@ impl<B: Backend> CommandHandlers<B> {
             module.handle(args, module_path, ctx);
         } else {
             let err = InvalidCommandError(self, arg);
-            ctx.backend_mut().emit_err(module_path, &err);
+            ctx.backend_mut().emit_err(module_path, err);
         }
     }
 }
