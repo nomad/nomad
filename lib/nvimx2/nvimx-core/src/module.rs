@@ -6,12 +6,14 @@ use crate::action_ctx::ModulePath;
 use crate::api::{Api, ModuleApi};
 use crate::backend::{Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder};
+use crate::notify::Error;
 use crate::util::OrderedMap;
 use crate::{
     ActionCtx,
     Backend,
     BackendExt,
     BackendHandle,
+    Constant,
     Function,
     MaybeResult,
     NeovimCtx,
@@ -148,6 +150,27 @@ where
         module_api.finish();
         self.module_path.pop();
         self.config_builder.finish(module);
+        self
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn with_constant<Const>(&mut self, value: Const) -> &mut Self
+    where
+        Const: Constant,
+    {
+        let value = self.backend.with_mut(|mut backend| {
+            match backend.serialize(&value) {
+                Ok(value) => value,
+                Err(err) => panic!(
+                    "couldn't serialize {:?}: {:?}",
+                    Const::NAME,
+                    err.to_message().as_str()
+                ),
+            }
+        });
+        self.module_api.add_constant(Const::NAME, value);
         self
     }
 

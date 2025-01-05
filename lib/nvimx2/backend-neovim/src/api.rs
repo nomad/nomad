@@ -131,6 +131,12 @@ where
 {
     #[track_caller]
     #[inline]
+    fn add_constant(&mut self, constant_name: ActionName, value: NeovimValue) {
+        self.insert(constant_name.as_str(), value.into_inner());
+    }
+
+    #[track_caller]
+    #[inline]
     fn add_function<Fun, Err>(&mut self, fun_name: ActionName, mut fun: Fun)
     where
         Fun: FnMut(NeovimValue) -> Result<NeovimValue, Err> + 'static,
