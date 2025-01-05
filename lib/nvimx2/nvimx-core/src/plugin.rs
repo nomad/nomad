@@ -1,9 +1,10 @@
 use core::convert::Infallible;
 
+use crate::action_ctx::ModulePath;
 use crate::api::{Api, ModuleApi};
 use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
 use crate::module::{ApiCtx, ConfigFnBuilder, Module};
-use crate::{ActionName, Backend, BackendHandle, notify};
+use crate::{ActionName, Backend, BackendHandle};
 
 /// TODO: docs.
 pub trait Plugin<B: Backend>: Module<B> {
@@ -27,13 +28,12 @@ pub trait Plugin<B: Backend>: Module<B> {
             &mut command_completions,
         );
         let mut config_builder = ConfigFnBuilder::new::<Self>();
-        let mut namespace = notify::Namespace::default();
-        namespace.push_module(Self::NAME);
+        let mut module_path = ModulePath::new(Self::NAME);
         let mut api_ctx = ApiCtx::<Self, _, _>::new(
             &mut module_api,
             command_builder,
             &mut config_builder,
-            &mut namespace,
+            &mut module_path,
             &backend,
         );
         Module::api(&self, &mut api_ctx);

@@ -1,4 +1,5 @@
-use crate::{Backend, MaybeResult, NeovimCtx};
+pub use crate::action_ctx::ActionCtx;
+use crate::{AsyncCtx, Backend, MaybeResult, NeovimCtx, notify};
 
 /// TODO: docs.
 pub trait Action<B: Backend>: 'static {
@@ -18,7 +19,7 @@ pub trait Action<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<Self::Return>;
 
     /// TODO: docs.

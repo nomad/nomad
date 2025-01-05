@@ -1,7 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::{Action, ActionName, Backend, MaybeResult, NeovimCtx};
+use crate::{Action, ActionCtx, ActionName, Backend, MaybeResult};
 
 /// TODO: docs.
 pub trait Function<B: Backend>: 'static {
@@ -21,7 +21,7 @@ pub trait Function<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<Self::Return>;
 
     /// TODO: docs.
@@ -45,7 +45,7 @@ where
     fn call(
         &mut self,
         args: A::Args,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<Self::Return> {
         A::call(self, args, ctx)
     }

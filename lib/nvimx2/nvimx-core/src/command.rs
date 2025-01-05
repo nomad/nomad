@@ -7,12 +7,14 @@ use core::ops::Deref;
 use smallvec::SmallVec;
 use smol_str::{SmolStr, ToSmolStr};
 
+use crate::action_ctx::ModulePath;
 use crate::backend::BackendExt;
 use crate::backend_handle::BackendHandle;
 use crate::module::{Module, ModuleName};
 use crate::util::OrderedMap;
 use crate::{
     Action,
+    ActionCtx,
     ActionName,
     Backend,
     ByteOffset,
@@ -21,8 +23,7 @@ use crate::{
     notify,
 };
 
-type CommandHandler<B> =
-    Box<dyn FnMut(CommandArgs, &mut notify::Namespace, NeovimCtx<B>)>;
+type CommandHandler<B> = Box<dyn FnMut(CommandArgs, &mut ActionCtx<B>)>;
 
 type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
@@ -42,7 +43,7 @@ pub trait Command<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<()>;
 
     /// TODO: docs.
@@ -573,8 +574,8 @@ impl<B: Backend> CommandHandlers<B> {
     ) -> impl FnMut(CommandArgs) + 'static {
         move |args: CommandArgs| {
             backend.with_mut(|backend| {
-                let mut namespace = notify::Namespace::default();
-                self.handle(args, &mut namespace, NeovimCtx::new(backend));
+                let mut module_path = ModulePath::new(self.module_name);
+                self.handle(args, &mut module_path, NeovimCtx::new(backend));
             })
         }
     }
@@ -593,20 +594,18 @@ impl<B: Backend> CommandHandlers<B> {
     where
         Cmd: Command<B>,
     {
-        let handler: CommandHandler<B> =
-            Box::new(move |args, namespace, mut ctx| {
-                namespace.set_action(Cmd::NAME);
-                let args = match Cmd::Args::try_from(args) {
-                    Ok(args) => args,
-                    Err(err) => {
-                        ctx.backend_mut().emit_err(namespace, &err);
-                        return;
-                    },
-                };
-                if let Err(err) = command.call(args, &mut ctx).into_result() {
-                    ctx.backend_mut().emit_err(namespace, &err);
-                }
-            });
+        let handler: CommandHandler<B> = Box::new(move |args, ctx| {
+            let args = match Cmd::Args::try_from(args) {
+                Ok(args) => args,
+                Err(err) => {
+                    ctx.emit_action_err(Cmd::NAME, &err);
+                    return;
+                },
+            };
+            if let Err(err) = command.call(args, ctx).into_result() {
+                ctx.emit_action_err(Cmd::NAME, &err);
+            }
+        });
         self.inner.insert(Cmd::NAME.as_str(), handler);
     }
 
@@ -619,23 +618,23 @@ impl<B: Backend> CommandHandlers<B> {
     fn handle(
         &mut self,
         mut args: CommandArgs,
-        namespace: &mut notify::Namespace,
+        module_path: &mut ModulePath,
         mut ctx: NeovimCtx<B>,
     ) {
-        namespace.push_module(self.module_name);
-
         let Some(arg) = args.pop_front() else {
             let err = MissingCommandError(self);
-            return ctx.backend_mut().emit_err(namespace, &err);
+            return ctx.backend_mut().emit_err(module_path, &err);
         };
 
         if let Some(handler) = self.inner.get_mut(arg.as_str()) {
-            (handler)(args, namespace, ctx);
+            let mut action_ctx = ActionCtx::new(ctx, module_path);
+            (handler)(args, &mut action_ctx);
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
-            module.handle(args, namespace, ctx);
+            module_path.push(module.module_name);
+            module.handle(args, module_path, ctx);
         } else {
             let err = InvalidCommandError(self, arg);
-            ctx.backend_mut().emit_err(namespace, &err);
+            ctx.backend_mut().emit_err(module_path, &err);
         }
     }
 }
@@ -816,7 +815,7 @@ where
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<()> {
         A::call(self, args, ctx)
     }

@@ -2,11 +2,13 @@
 
 use serde::de::DeserializeOwned;
 
+use crate::action_ctx::ModulePath;
 use crate::api::{Api, ModuleApi};
 use crate::backend::{Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder};
 use crate::util::OrderedMap;
 use crate::{
+    ActionCtx,
     Backend,
     BackendExt,
     BackendHandle,
@@ -47,7 +49,7 @@ pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
     command_builder: CommandBuilder<'a, B>,
     config_builder: &'a mut ConfigFnBuilder<B>,
-    namespace: &'a mut notify::Namespace,
+    module_path: &'a mut ModulePath,
     backend: &'b BackendHandle<B>,
 }
 
@@ -59,8 +61,7 @@ pub struct ModuleName(str);
 pub(crate) struct ConfigFnBuilder<B: Backend> {
     module_name: &'static ModuleName,
     config_handler: Box<
-        dyn FnMut(B::ApiValue, &mut notify::Namespace, &mut NeovimCtx<B>)
-            + 'static,
+        dyn FnMut(B::ApiValue, &mut ModulePath, &mut NeovimCtx<B>) + 'static,
     >,
     submodules: OrderedMap<&'static str, Self>,
 }
@@ -89,21 +90,25 @@ where
         Fun: Function<B>,
     {
         let backend = self.backend.clone();
-        let mut namespace = self.namespace.clone();
-        namespace.set_action(Fun::NAME);
+        let module_path = self.module_path.clone();
         let fun = move |value| {
             let fun = &mut function;
-            let namespace = &namespace;
+            let module_path = &module_path;
             backend.with_mut(move |mut backend| {
                 let args = backend.deserialize::<Fun::Args>(value).map_err(
                     |err| {
-                        backend.emit_err(namespace, &err);
+                        backend.emit_action_err(module_path, Fun::NAME, &err);
                         FunctionError::Deserialize(err)
                     },
                 )?;
 
+                let mut action_ctx = ActionCtx::new(
+                    NeovimCtx::new(backend.as_mut()),
+                    &module_path,
+                );
+
                 let ret = fun
-                    .call(args, &mut NeovimCtx::new(backend.as_mut()))
+                    .call(args, &mut action_ctx)
                     .into_result()
                     .map_err(|err| {
                         // Even though the error is bound to 'static, Rust
@@ -118,12 +123,12 @@ where
                         Box::new(err) as Box<dyn notify::Error>
                     })
                     .map_err(|err| {
-                        backend.emit_err(namespace, &err);
+                        backend.emit_action_err(module_path, Fun::NAME, &err);
                         FunctionError::Call(err)
                     })?;
 
                 backend.serialize(&ret).map_err(|err| {
-                    backend.emit_err(namespace, &err);
+                    backend.emit_action_err(module_path, Fun::NAME, &err);
                     FunctionError::Serialize(err)
                 })
             })
@@ -139,17 +144,17 @@ where
         Mod: Module<B>,
     {
         let mut module_api = self.module_api.as_module::<Mod>();
-        self.namespace.push_module(Mod::NAME);
+        self.module_path.push(Mod::NAME);
         let mut api_ctx = ApiCtx::new(
             &mut module_api,
             self.command_builder.add_module::<Mod>(),
             self.config_builder.add_module::<Mod>(),
-            self.namespace,
+            self.module_path,
             self.backend,
         );
         Module::api(&module, &mut api_ctx);
         module_api.finish();
-        self.namespace.pop();
+        self.module_path.pop();
         self.config_builder.finish(module);
         self
     }
@@ -159,14 +164,14 @@ where
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
         command_builder: CommandBuilder<'a, B>,
         config_builder: &'a mut ConfigFnBuilder<B>,
-        namespace: &'a mut notify::Namespace,
+        module_path: &'a mut ModulePath,
         backend: &'b BackendHandle<B>,
     ) -> Self {
         Self {
             module_api,
             command_builder,
             config_builder,
-            namespace,
+            module_path,
             backend,
         }
     }
@@ -203,9 +208,10 @@ impl<B: Backend> ConfigFnBuilder<B> {
     ) -> impl FnMut(B::ApiValue) + 'static {
         move |value| {
             backend.with_mut(|backend| {
+                let mut module_path = ModulePath::new(self.module_name);
                 self.handle(
                     value,
-                    &mut notify::Namespace::default(),
+                    &mut module_path,
                     &mut NeovimCtx::new(backend),
                 )
             });
@@ -214,13 +220,13 @@ impl<B: Backend> ConfigFnBuilder<B> {
 
     #[inline]
     pub(crate) fn finish<M: Module<B>>(&mut self, mut module: M) {
-        self.config_handler = Box::new(move |value, namespace, ctx| {
+        self.config_handler = Box::new(move |value, module_path, ctx| {
             let backend = ctx.backend_mut();
             match backend.deserialize(value) {
                 Ok(config) => module.on_config_changed(config, ctx),
                 Err(err) => {
                     // backend.emit_deserialize_config_error(namespace, err)
-                    backend.emit_err(namespace, err)
+                    backend.emit_err(module_path, err)
                 },
             }
         });
@@ -244,7 +250,7 @@ impl<B: Backend> ConfigFnBuilder<B> {
     fn handle(
         &mut self,
         mut value: B::ApiValue,
-        namespace: &mut notify::Namespace,
+        module_path: &mut ModulePath,
         ctx: &mut NeovimCtx<B>,
     ) {
         let mut map_access = match value.map_access() {
@@ -252,19 +258,19 @@ impl<B: Backend> ConfigFnBuilder<B> {
             Err(err) => {
                 // TODO: the namespace should just be the plugin and the
                 // config fn name.
-                ctx.backend_mut().emit_err(namespace, &err);
+                ctx.backend_mut().emit_err(module_path, &err);
                 return;
             },
         };
-        namespace.push_module(self.module_name);
+        module_path.push(self.module_name);
         loop {
             let Some(key) = map_access.next_key() else { break };
             let key_str = match key.as_str() {
                 Ok(key) => key,
                 Err(err) => {
                     // TODO: same as above.
-                    ctx.backend_mut().emit_err(namespace, &err);
-                    namespace.push_module(self.module_name);
+                    ctx.backend_mut().emit_err(module_path, &err);
+                    module_path.push(self.module_name);
                     return;
                 },
             };
@@ -273,11 +279,11 @@ impl<B: Backend> ConfigFnBuilder<B> {
             };
             drop(key);
             let value = map_access.take_next_value();
-            submodule.handle(value, namespace, ctx);
+            submodule.handle(value, module_path, ctx);
         }
         drop(map_access);
-        (self.config_handler)(value, namespace, ctx);
-        namespace.pop();
+        (self.config_handler)(value, module_path, ctx);
+        module_path.pop();
     }
 }
 

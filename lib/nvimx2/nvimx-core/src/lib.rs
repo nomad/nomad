@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 mod action;
+mod action_ctx;
 pub mod api;
 mod async_ctx;
 mod backend;
@@ -17,7 +18,7 @@ mod plugin;
 mod shared;
 mod util;
 
-pub use action::{Action, ActionName};
+pub use action::{Action, ActionCtx, ActionName};
 pub use async_ctx::AsyncCtx;
 use backend::BackendExt;
 pub use backend::{Backend, Key, MapAccess, Value};

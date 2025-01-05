@@ -3,10 +3,11 @@ use core::fmt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::action_ctx::ModulePath;
 use crate::api::Api;
 use crate::executor::{BackgroundExecutor, LocalExecutor};
 use crate::notify::Emitter;
-use crate::{Plugin, notify};
+use crate::{ActionName, Plugin, notify};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
@@ -103,29 +104,34 @@ pub trait Key: fmt::Debug {
 
 /// TODO: docs.
 pub(crate) trait BackendExt: Backend {
-    fn emit_err<Err: notify::Error>(
+    #[inline]
+    fn emit_action_err<Err: notify::Error>(
         &mut self,
-        namespace: &notify::Namespace,
-        err: Err,
-    );
-}
+        _module_path: &ModulePath,
+        _action_name: &'static ActionName,
+        _err: Err,
+    ) {
+        todo!();
+    }
 
-impl<B: Backend> BackendExt for B {
     #[inline]
     fn emit_err<Err: notify::Error>(
         &mut self,
-        namespace: &notify::Namespace,
-        err: Err,
+        _module_path: &ModulePath,
+        _err: Err,
     ) {
-        let Some(level) = err.to_level() else { return };
-
-        let notification = notify::Notification {
-            level,
-            namespace,
-            message: err.to_message(),
-            updates_prev: None,
-        };
-
-        self.emitter().emit(notification);
+        todo!();
+        // let Some(level) = err.to_level() else { return };
+        //
+        // let notification = notify::Notification {
+        //     level,
+        //     namespace,
+        //     message: err.to_message(),
+        //     updates_prev: None,
+        // };
+        //
+        // self.emitter().emit(notification);
     }
 }
+
+impl<B: Backend> BackendExt for B {}
