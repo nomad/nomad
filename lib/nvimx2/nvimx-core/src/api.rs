@@ -36,7 +36,7 @@ where
     B: Backend,
 {
     /// TODO: docs.
-    fn add_function<Fun, Err>(&mut self, fun_name: &ActionName, fun: Fun)
+    fn add_function<Fun, Err>(&mut self, fun_name: ActionName, fun: Fun)
     where
         Fun: FnMut(B::ApiValue) -> Result<B::ApiValue, Err> + 'static,
         Err: notify::Error;

@@ -22,7 +22,7 @@ impl<'a, B: Backend> ActionCtx<'a, B> {
     #[inline]
     pub(crate) fn emit_action_err<Err>(
         &mut self,
-        action_name: &'static ActionName,
+        action_name: ActionName,
         err: Err,
     ) where
         Err: notify::Error,

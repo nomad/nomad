@@ -60,9 +60,8 @@ pub struct ModuleName(str);
 
 pub(crate) struct ConfigFnBuilder<B: Backend> {
     module_name: &'static ModuleName,
-    config_handler: Box<
-        dyn FnMut(B::ApiValue, &mut ModulePath, &mut NeovimCtx<B>) + 'static,
-    >,
+    config_handler:
+        Box<dyn FnMut(B::ApiValue, &ModulePath, &mut NeovimCtx<B>) + 'static>,
     submodules: OrderedMap<&'static str, Self>,
 }
 

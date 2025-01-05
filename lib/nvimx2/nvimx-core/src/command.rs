@@ -31,7 +31,7 @@ type CommandCompletionFn =
 /// TODO: docs.
 pub trait Command<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: &'static ActionName;
+    const NAME: ActionName;
 
     /// TODO: docs.
     type Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>;
@@ -804,7 +804,7 @@ where
     A::Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>,
     B: Backend,
 {
-    const NAME: &'static ActionName = A::NAME;
+    const NAME: ActionName = A::NAME;
 
     type Args = A::Args;
     type Docs = A::Docs;

@@ -114,7 +114,7 @@ pub(crate) trait BackendExt: Backend {
     fn emit_action_err<Err: notify::Error>(
         &mut self,
         _module_path: &ModulePath,
-        _action_name: &'static ActionName,
+        _action_name: ActionName,
         _err: Err,
     ) {
         todo!();

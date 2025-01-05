@@ -5,7 +5,7 @@ use crate::{AsyncCtx, Backend, MaybeResult};
 /// TODO: docs.
 pub trait Action<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: &'static ActionName;
+    const NAME: ActionName;
 
     /// TODO: docs.
     type Args;
@@ -30,7 +30,7 @@ pub trait Action<B: Backend>: 'static {
 /// TODO: docs.
 pub trait AsyncAction<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: &'static ActionName;
+    const NAME: ActionName;
 
     /// TODO: docs.
     type Args;
@@ -50,24 +50,21 @@ pub trait AsyncAction<B: Backend>: 'static {
 }
 
 /// TODO: docs.
-#[derive(Debug, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct ActionName(str);
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct ActionName(&'static str);
 
 impl ActionName {
     /// TODO: docs.
     #[inline]
-    pub const fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_str(self) -> &'static str {
+        self.0
     }
 
     /// TODO: docs.
     #[inline]
-    pub const fn new(name: &str) -> &Self {
+    pub const fn new(name: &'static str) -> Self {
         assert!(!name.is_empty());
-        assert!(name.len() <= 24);
-        // SAFETY: `ActionName` is a `repr(transparent)` newtype around `str`.
-        unsafe { &*(name as *const str as *const Self) }
+        Self(name)
     }
 }
 
@@ -76,7 +73,7 @@ where
     T: AsyncAction<B> + Clone,
     B: Backend,
 {
-    const NAME: &'static ActionName = T::NAME;
+    const NAME: ActionName = T::NAME;
     type Args = T::Args;
     type Return = ();
     type Docs = T::Docs;

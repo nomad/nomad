@@ -127,7 +127,7 @@ where
 {
     #[track_caller]
     #[inline]
-    fn add_function<Fun, Err>(&mut self, fun_name: &ActionName, mut fun: Fun)
+    fn add_function<Fun, Err>(&mut self, fun_name: ActionName, mut fun: Fun)
     where
         Fun: FnMut(NeovimValue) -> Result<NeovimValue, Err> + 'static,
         Err: notify::Error,

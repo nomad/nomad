@@ -9,11 +9,11 @@ use crate::{ActionName, Backend, BackendHandle};
 /// TODO: docs.
 pub trait Plugin<B: Backend>: Module<B> {
     /// TODO: docs.
-    const COMMAND_NAME: &'static ActionName =
+    const COMMAND_NAME: ActionName =
         ActionName::new(Self::NAME.uppercase_first().as_str());
 
     /// TODO: docs.
-    const CONFIG_FN_NAME: &'static ActionName = ActionName::new("setup");
+    const CONFIG_FN_NAME: ActionName = ActionName::new("setup");
 
     #[doc(hidden)]
     #[track_caller]

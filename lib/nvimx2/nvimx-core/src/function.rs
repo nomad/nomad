@@ -6,7 +6,7 @@ use crate::{Action, ActionCtx, ActionName, Backend, MaybeResult};
 /// TODO: docs.
 pub trait Function<B: Backend>: 'static {
     /// TODO: docs.
-    const NAME: &'static ActionName;
+    const NAME: ActionName;
 
     /// TODO: docs.
     type Args: DeserializeOwned;
@@ -35,7 +35,7 @@ where
     A::Return: Serialize,
     B: Backend,
 {
-    const NAME: &'static ActionName = A::NAME;
+    const NAME: ActionName = A::NAME;
 
     type Args = A::Args;
     type Return = A::Return;
