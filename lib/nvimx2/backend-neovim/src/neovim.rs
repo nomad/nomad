@@ -5,6 +5,8 @@ use crate::{api, executor, notify, serde, value};
 /// TODO: docs.
 pub struct Neovim {
     emitter: notify::NeovimEmitter,
+    local_executor: executor::NeovimLocalExecutor,
+    background_executor: executor::NeovimBackgroundExecutor,
 }
 
 impl Backend for Neovim {
@@ -18,7 +20,11 @@ impl Backend for Neovim {
 
     #[inline]
     fn init() -> Self {
-        Self { emitter: notify::NeovimEmitter::default() }
+        Self {
+            emitter: notify::NeovimEmitter::default(),
+            local_executor: executor::NeovimLocalExecutor::init(),
+            background_executor: executor::NeovimBackgroundExecutor::init(),
+        }
     }
 
     #[inline]
@@ -29,6 +35,16 @@ impl Backend for Neovim {
     #[inline]
     fn emitter(&mut self) -> Self::Emitter<'_> {
         &mut self.emitter
+    }
+
+    #[inline]
+    fn local_executor(&mut self) -> &mut Self::LocalExecutor {
+        &mut self.local_executor
+    }
+
+    #[inline]
+    fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
+        &mut self.background_executor
     }
 
     #[inline]

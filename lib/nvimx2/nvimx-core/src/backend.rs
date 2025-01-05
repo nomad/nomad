@@ -42,6 +42,12 @@ pub trait Backend: 'static + Sized {
     fn emitter(&mut self) -> Self::Emitter<'_>;
 
     /// TODO: docs.
+    fn local_executor(&mut self) -> &mut Self::LocalExecutor;
+
+    /// TODO: docs.
+    fn background_executor(&mut self) -> &mut Self::BackgroundExecutor;
+
+    /// TODO: docs.
     fn serialize<T>(
         &mut self,
         value: &T,
