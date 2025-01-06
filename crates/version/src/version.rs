@@ -6,34 +6,28 @@ use crate::generated;
 
 /// TODO: docs.
 pub const VERSION: Version = Version {
-    commit: generated::COMMIT_HASH,
+    commit: generated::COMMIT_SHORT_HASH,
     date: Date {
         year: generated::COMMIT_YEAR,
         month: generated::COMMIT_MONTH,
         day: generated::COMMIT_DAY,
     },
-    is_nightly: generated::IS_NIGHTLY,
     semantic: SemanticVersion {
         major: generated::MAJOR,
         minor: generated::MINOR,
         patch: generated::PATCH,
+        pre_release: generated::PRE_RELEASE_LABEL,
     },
 };
 
 /// TODO: docs.
 #[derive(serde::Serialize)]
 pub struct Version {
+    /// The short hash of the current commit.
     commit: &'static str,
+    /// The commit date in the UTC+0 timezone.
     date: Date,
-    is_nightly: bool,
     semantic: SemanticVersion,
-}
-
-#[derive(serde::Serialize)]
-struct SemanticVersion {
-    major: u8,
-    minor: u8,
-    patch: u8,
 }
 
 #[derive(serde::Serialize)]
@@ -41,6 +35,15 @@ struct Date {
     year: u16,
     month: u8,
     day: u8,
+}
+
+#[derive(serde::Serialize)]
+struct SemanticVersion {
+    major: u8,
+    minor: u8,
+    patch: u8,
+    /// A pre-release label, like `dev`.
+    pre_release: Option<&'static str>,
 }
 
 impl Constant for Version {
@@ -51,9 +54,8 @@ impl fmt::Debug for Version {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "mad.nvim {semantic:?}{maybe_nightly} ({commit} {date:?})",
+            "mad.nvim {semantic:?} ({commit} {date:?})",
             semantic = self.semantic,
-            maybe_nightly = if self.is_nightly { "-nightly" } else { "" },
             commit = self.commit,
             date = self.date,
         )
@@ -68,7 +70,11 @@ impl fmt::Debug for SemanticVersion {
             major = self.major,
             minor = self.minor,
             patch = self.patch,
-        )
+        )?;
+        if let Some(pre) = self.pre_release {
+            write!(f, "-{pre}")?;
+        }
+        Ok(())
     }
 }
 
