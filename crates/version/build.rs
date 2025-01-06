@@ -6,6 +6,9 @@ use std::fmt::Write;
 use std::fs::File;
 use std::path::Path;
 
+use chrono::{DateTime, Datelike, FixedOffset, TimeZone};
+use git2::Repository;
+
 fn main() {
     let mut file = GeneratedFile::default();
     add_commit_infos(&mut file);
@@ -14,10 +17,25 @@ fn main() {
 }
 
 fn add_commit_infos(file: &mut GeneratedFile) {
-    file.add_const("COMMIT_SHORT_HASH", "c26db43")
-        .add_const("COMMIT_YEAR", 2025u16)
-        .add_const("COMMIT_MONTH", 1u8)
-        .add_const("COMMIT_DAY", 17u8);
+    let repo = Repository::discover(".").expect("couldn't find repo");
+
+    let head_commit = repo
+        .head()
+        .expect("couldn't get HEAD")
+        .peel_to_commit()
+        .expect("couldn't get HEAD commit");
+
+    let commit_time = head_commit.time();
+
+    let date = FixedOffset::east_opt(commit_time.offset_minutes())
+        .expect("minutes out of bounds")
+        .timestamp_opt(commit_time.seconds(), 0)
+        .unwrap();
+
+    file.add_const("COMMIT_SHORT_HASH", &head_commit.id().to_string()[..7])
+        .add_const("COMMIT_YEAR", date.year() as u16)
+        .add_const("COMMIT_MONTH", date.month() as u8)
+        .add_const("COMMIT_DAY", date.day() as u8);
 }
 
 fn add_version_infos(file: &mut GeneratedFile) {
