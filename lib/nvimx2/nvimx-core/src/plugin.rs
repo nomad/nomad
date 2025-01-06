@@ -14,6 +14,16 @@ pub trait Plugin<B: Backend>: Module<Self, B> {
     /// TODO: docs.
     const CONFIG_FN_NAME: Name = "setup";
 
+    /// TODO: docs.
+    fn panic_handler(&self) -> Option<Box<dyn FnMut() + 'static>> {
+        todo!()
+    }
+
+    /// TODO: docs.
+    fn tracing_subscriber(&self) -> Option<Box<dyn FnMut() + 'static>> {
+        todo!()
+    }
+
     #[doc(hidden)]
     #[track_caller]
     fn api(self, mut backend: B) -> B::Api<Self> {

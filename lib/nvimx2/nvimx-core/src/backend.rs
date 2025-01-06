@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use crate::action_ctx::ModulePath;
 use crate::api::Api;
 use crate::executor::{BackgroundExecutor, LocalExecutor};
+use crate::notify::Emitter;
 use crate::{Name, Plugin, notify};
 
 /// TODO: docs.
@@ -112,30 +113,29 @@ pub(crate) trait BackendExt: Backend {
     #[inline]
     fn emit_action_err<Err: notify::Error>(
         &mut self,
-        _module_path: &ModulePath,
+        module_path: &ModulePath,
         _action_name: Name,
-        _err: Err,
+        err: Err,
     ) {
-        todo!();
+        self.emit_err(module_path, err);
     }
 
     #[inline]
     fn emit_err<Err: notify::Error>(
         &mut self,
-        _module_path: &ModulePath,
-        _err: Err,
+        module_path: &ModulePath,
+        err: Err,
     ) {
-        todo!();
-        // let Some(level) = err.to_level() else { return };
-        //
-        // let notification = notify::Notification {
-        //     level,
-        //     namespace,
-        //     message: err.to_message(),
-        //     updates_prev: None,
-        // };
-        //
-        // self.emitter().emit(notification);
+        let Some(level) = err.to_level() else { return };
+
+        let notification = notify::Notification {
+            level,
+            namespace: module_path,
+            message: err.to_message(),
+            updates_prev: None,
+        };
+
+        self.emitter().emit(notification);
     }
 }
 
