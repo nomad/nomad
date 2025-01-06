@@ -21,10 +21,15 @@ fn add_commit_infos(file: &mut GeneratedFile) {
 }
 
 fn add_version_infos(file: &mut GeneratedFile) {
-    file.add_const("MAJOR", 0u8)
-        .add_const("MINOR", 1u8)
-        .add_const("PATCH", 0u8)
-        .add_const("PRE_RELEASE_LABEL", Some("dev"));
+    let major = env::var("CARGO_PKG_VERSION_MAJOR").unwrap();
+    let minor = env::var("CARGO_PKG_VERSION_MINOR").unwrap();
+    let patch = env::var("CARGO_PKG_VERSION_PATCH").unwrap();
+    let pre = env::var("CARGO_PKG_VERSION_PRE").unwrap();
+
+    file.add_const("MAJOR", major.parse::<u8>().unwrap())
+        .add_const("MINOR", minor.parse::<u8>().unwrap())
+        .add_const("PATCH", patch.parse::<u8>().unwrap())
+        .add_const("PRE", (!pre.is_empty()).then_some(&*pre));
 }
 
 #[derive(Default)]
@@ -35,11 +40,10 @@ struct GeneratedFile {
 impl GeneratedFile {
     const NAME: &'static str = "generated.rs";
 
-    fn add_const<T: DisplayType>(
-        &mut self,
-        name: &str,
-        value: T,
-    ) -> &mut Self {
+    fn add_const<T>(&mut self, name: &str, value: T) -> &mut Self
+    where
+        T: DisplayType,
+    {
         write!(&mut self.contents, "pub(crate) const {name}: ").unwrap();
         T::display_type(&mut self.contents);
         self.contents.push_str(" = ");
@@ -50,7 +54,7 @@ impl GeneratedFile {
 
     fn create(self) {
         use std::io::Write;
-        write!(out_file(Self::NAME), "{}", self.contents).unwrap()
+        out_file(Self::NAME).write_all(self.contents.as_bytes()).unwrap();
     }
 }
 

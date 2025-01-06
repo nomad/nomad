@@ -16,7 +16,7 @@ pub const VERSION: Version = Version {
         major: generated::MAJOR,
         minor: generated::MINOR,
         patch: generated::PATCH,
-        pre_release: generated::PRE_RELEASE_LABEL,
+        pre: generated::PRE,
     },
 };
 
@@ -43,7 +43,7 @@ struct SemanticVersion {
     minor: u8,
     patch: u8,
     /// A pre-release label, like `dev`.
-    pre_release: Option<&'static str>,
+    pre: Option<&'static str>,
 }
 
 impl Constant for Version {
@@ -71,7 +71,7 @@ impl fmt::Debug for SemanticVersion {
             minor = self.minor,
             patch = self.patch,
         )?;
-        if let Some(pre) = self.pre_release {
+        if let Some(pre) = self.pre {
             write!(f, "-{pre}")?;
         }
         Ok(())
