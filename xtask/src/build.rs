@@ -10,9 +10,6 @@ use nvimx::fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
 use root_finder::markers;
 use xshell::cmd;
 
-/// The desired name of the library to placed in the `/lua` directory.
-const LIBRARY_NAME: &str = "nomad";
-
 #[derive(Debug, Copy, Clone, clap::Args)]
 pub(crate) struct BuildArgs {
     /// Build the plugin in release mode.
@@ -196,16 +193,16 @@ impl FixLibraryName {
             ));
         }
         let source = format!(
-            "{prefix}{source_name}{suffix}",
+            "{prefix}{lib_name}{suffix}",
             prefix = env::consts::DLL_PREFIX,
-            source_name = &cdylib_target.name,
+            lib_name = &cdylib_target.name,
             suffix = env::consts::DLL_SUFFIX
         )
         .parse::<FsNodeNameBuf>()
         .unwrap();
         let dest = format!(
-            "{dest_name}{suffix}",
-            dest_name = LIBRARY_NAME,
+            "{lib_name}{suffix}",
+            lib_name = &cdylib_target.name,
             suffix = if cfg!(target_os = "windows") { ".dll" } else { ".so" }
         )
         .parse::<FsNodeNameBuf>()
