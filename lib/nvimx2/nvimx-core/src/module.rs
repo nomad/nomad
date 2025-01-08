@@ -95,7 +95,7 @@ where
                     panic!(
                         "couldn't serialize {:?}{colon}{reason:?}",
                         Const::NAME,
-                        colon = msg.is_some().then_some(": ").unwrap_or(""),
+                        colon = if msg.is_some() { ": " } else { "" },
                         reason =
                             msg.as_ref().map(|msg| msg.as_str()).unwrap_or(""),
                     );
@@ -217,6 +217,7 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
         move |value| {
             backend.with_mut(|backend| {
                 let mut module_path = ModulePath::new(self.module_name);
+
                 self.handle(
                     value,
                     &mut module_path,
@@ -233,8 +234,10 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
             match backend.deserialize(value) {
                 Ok(config) => module.on_new_config(config, ctx),
                 Err(err) => {
-                    let source =
-                        notify::Source { module_path, action_name: None };
+                    let source = notify::Source {
+                        module_path,
+                        action_name: Some(P::CONFIG_FN_NAME),
+                    };
                     backend.emit_err::<P, _>(source, err);
                 },
             }
@@ -273,7 +276,6 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
                 return;
             },
         };
-        module_path.push(self.module_name);
         loop {
             let Some(key) = map_access.next_key() else { break };
             let key_str = match key.as_str() {
@@ -284,7 +286,6 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
                         action_name: Some(P::CONFIG_FN_NAME),
                     };
                     ctx.backend_mut().emit_err::<P, _>(source, err);
-                    module_path.push(self.module_name);
                     return;
                 },
             };
@@ -293,11 +294,12 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
             };
             drop(key);
             let value = map_access.take_next_value();
+            module_path.push(submodule.module_name);
             submodule.handle(value, module_path, ctx);
+            module_path.pop();
         }
         drop(map_access);
         (self.config_handler)(value, module_path, ctx);
-        module_path.pop();
     }
 }
 
