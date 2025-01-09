@@ -1,15 +1,15 @@
 use core::marker::PhantomData;
 
-use crate::backend::BackendExt;
-use crate::backend_handle::BackendMut;
+use crate::AsyncCtx;
+use crate::backend::{Backend, BackendExt, BackendMut};
 use crate::executor::{
     BackgroundExecutor,
     LocalExecutor,
     Task,
     TaskBackground,
 };
-use crate::notify::{self, Emitter, NotificationId, Source};
-use crate::{AsyncCtx, Backend, ModulePath, Name, Plugin};
+use crate::notify::{self, Emitter, ModulePath, Name, NotificationId, Source};
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub struct NeovimCtx<'a, P, B> {

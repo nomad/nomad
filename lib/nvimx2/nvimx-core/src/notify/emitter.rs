@@ -1,4 +1,4 @@
-use super::{Notification, NotificationId};
+use crate::notify::{Notification, NotificationId};
 
 /// TODO: docs.
 pub trait Emitter {

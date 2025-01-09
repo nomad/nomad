@@ -1,5 +1,8 @@
+use nvimx2::action::AsyncAction;
+use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::{AsyncAction, AsyncCtx, Backend, Name, Plugin};
+use nvimx2::notify::Name;
+use nvimx2::{AsyncCtx, Plugin};
 
 /// TODO: docs.
 #[derive(Clone, Default)]

@@ -4,26 +4,22 @@ use core::convert::Infallible;
 
 use serde::de::DeserializeOwned;
 
-use crate::action_ctx::ModulePath;
+use crate::action::ActionCtx;
 use crate::api::{Api, ModuleApi};
-use crate::backend::{Key, MapAccess, Value};
-use crate::backend_handle::BackendMut;
-use crate::command::{Command, CommandBuilder};
-use crate::notify::Error;
-use crate::util::OrderedMap;
-use crate::{
-    ActionCtx,
+use crate::backend::{
     Backend,
     BackendExt,
     BackendHandle,
-    Constant,
-    Function,
-    MaybeResult,
-    Name,
-    NeovimCtx,
-    Plugin,
-    notify,
+    BackendMut,
+    Key,
+    MapAccess,
+    Value,
 };
+use crate::command::{Command, CommandBuilder};
+use crate::notify::{self, Error, MaybeResult, ModulePath, Name};
+use crate::plugin::Plugin;
+use crate::util::OrderedMap;
+use crate::{Constant, Function, NeovimCtx};
 
 /// TODO: docs.
 pub trait Module<P: Plugin<B>, B: Backend>: 'static + Sized {

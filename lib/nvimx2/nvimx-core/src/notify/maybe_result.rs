@@ -1,6 +1,7 @@
 use core::convert::Infallible;
 
-use crate::{Backend, notify};
+use crate::backend::Backend;
+use crate::notify;
 
 /// TODO: docs
 pub trait MaybeResult<T, B: Backend> {

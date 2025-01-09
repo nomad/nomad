@@ -1,12 +1,15 @@
+//! TODO: docs.
+
 use core::fmt;
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::api::Api;
+pub(crate) use crate::backend_handle::{BackendHandle, BackendMut};
 use crate::executor::{BackgroundExecutor, LocalExecutor};
-use crate::notify::Emitter;
-use crate::{Plugin, notify};
+use crate::notify::{self, Emitter};
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {

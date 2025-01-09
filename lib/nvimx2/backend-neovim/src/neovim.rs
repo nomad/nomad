@@ -1,4 +1,5 @@
-use nvimx_core::{Backend, Plugin};
+use nvimx_core::Plugin;
+use nvimx_core::backend::Backend;
 
 use crate::{api, executor, notify, serde, value};
 

@@ -1,29 +1,8 @@
-pub use crate::action_ctx::ActionCtx;
-use crate::backend::BackendExt;
-use crate::{AsyncCtx, Backend, MaybeResult, Name, Plugin, notify};
-
-/// TODO: docs.
-pub trait Action<P, B>: 'static
-where
-    P: Plugin<B>,
-    B: Backend,
-{
-    /// TODO: docs.
-    const NAME: Name;
-
-    /// TODO: docs.
-    type Args;
-
-    /// TODO: docs.
-    type Return;
-
-    /// TODO: docs.
-    fn call(
-        &mut self,
-        args: Self::Args,
-        ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B>;
-}
+use crate::AsyncCtx;
+use crate::action::{Action, ActionCtx};
+use crate::backend::{Backend, BackendExt};
+use crate::notify::{self, MaybeResult, Name};
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub trait AsyncAction<P, B>: 'static

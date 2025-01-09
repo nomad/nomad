@@ -1,7 +1,8 @@
 use core::convert::Infallible;
 
-use super::{Level, Message, Source};
-use crate::{Backend, Plugin};
+use crate::backend::Backend;
+use crate::notify::{Level, Message, Source};
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub trait Error<B: Backend> {

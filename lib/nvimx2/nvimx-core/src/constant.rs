@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::Name;
+use crate::notify::Name;
 
 /// TODO: docs.
 pub trait Constant: Serialize + 'static {

@@ -3,7 +3,7 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use crate::Backend;
+use crate::backend::Backend;
 
 /// TODO: docs.
 pub trait LocalExecutor {

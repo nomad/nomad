@@ -1,8 +1,11 @@
 //! TODO: docs.
 
+use crate::ByteOffset;
+use crate::backend::Backend;
 use crate::command::{CommandArgs, CommandCompletion};
 use crate::module::Module;
-use crate::{Backend, ByteOffset, Name, Plugin, notify};
+use crate::notify::{self, Name};
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub trait Api<P, B>: 'static + Sized

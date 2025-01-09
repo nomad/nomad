@@ -1,6 +1,8 @@
+use nvimx2::Plugin;
+use nvimx2::action::{Action, ActionCtx};
+use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::notify::Message;
-use nvimx2::{Action, ActionCtx, Backend, Name, Plugin};
+use nvimx2::notify::{Message, Name};
 
 use crate::VERSION;
 

@@ -7,22 +7,13 @@ use core::ops::Deref;
 use smallvec::SmallVec;
 use smol_str::{SmolStr, ToSmolStr};
 
-use crate::action_ctx::ModulePath;
-use crate::backend::BackendExt;
-use crate::backend_handle::{BackendHandle, BackendMut};
+use crate::action::{Action, ActionCtx};
+use crate::backend::{Backend, BackendExt, BackendHandle, BackendMut};
 use crate::module::Module;
+use crate::notify::{self, MaybeResult, ModulePath, Name};
+use crate::plugin::Plugin;
 use crate::util::OrderedMap;
-use crate::{
-    Action,
-    ActionCtx,
-    Backend,
-    ByteOffset,
-    MaybeResult,
-    Name,
-    NeovimCtx,
-    Plugin,
-    notify,
-};
+use crate::{ByteOffset, NeovimCtx};
 
 type CommandHandler<P, B> = Box<dyn FnMut(CommandArgs, &mut ActionCtx<P, B>)>;
 
@@ -130,7 +121,7 @@ enum CommandCompletionKind {
 
 /// TODO: docs.
 #[derive(Debug, Copy, Clone)]
-pub enum CommandArgsIntoSliceError<'a, T> {
+pub enum CommandArgsIntoSeqError<'a, T> {
     /// TODO: docs.
     Item(T),
 
@@ -456,7 +447,7 @@ impl<'a, const N: usize, T> TryFrom<CommandArgs<'a>> for [T; N]
 where
     T: TryFrom<CommandArg<'a>>,
 {
-    type Error = CommandArgsIntoSliceError<'a, T::Error>;
+    type Error = CommandArgsIntoSeqError<'a, T::Error>;
 
     #[inline]
     fn try_from(args: CommandArgs<'a>) -> Result<Self, Self::Error> {
@@ -871,7 +862,7 @@ where
 }
 
 impl<T: notify::Error<B>, B: Backend> notify::Error<B>
-    for CommandArgsIntoSliceError<'_, T>
+    for CommandArgsIntoSeqError<'_, T>
 {
     #[inline]
     fn to_message<P>(

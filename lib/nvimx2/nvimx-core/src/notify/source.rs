@@ -1,4 +1,4 @@
-use crate::{ModulePath, Name};
+use crate::notify::{ModulePath, Name};
 
 /// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

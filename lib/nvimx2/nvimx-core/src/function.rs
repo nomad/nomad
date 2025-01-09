@@ -1,7 +1,10 @@
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::{Action, ActionCtx, Backend, MaybeResult, Name, Plugin};
+use crate::action::{Action, ActionCtx};
+use crate::backend::Backend;
+use crate::notify::{MaybeResult, Name};
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub trait Function<P: Plugin<B>, B: Backend>: 'static {

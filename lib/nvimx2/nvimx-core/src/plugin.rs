@@ -1,10 +1,10 @@
 use core::convert::Infallible;
 
-use crate::action_ctx::ModulePath;
 use crate::api::{Api, ModuleApi};
+use crate::backend::{Backend, BackendHandle};
 use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
 use crate::module::{ApiCtx, ConfigFnBuilder, Module};
-use crate::{Backend, BackendHandle, Name};
+use crate::notify::{ModulePath, Name};
 
 const NO_COMMAND_NAME: &str = "�";
 

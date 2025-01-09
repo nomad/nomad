@@ -1,6 +1,8 @@
+use nvimx2::backend::Backend;
 use nvimx2::module::{ApiCtx, Module};
 use nvimx2::neovim::{self, Neovim};
-use nvimx2::{Backend, Name, NeovimCtx, Plugin};
+use nvimx2::notify::Name;
+use nvimx2::{NeovimCtx, Plugin};
 
 #[neovim::plugin]
 fn mad() -> Mad {

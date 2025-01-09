@@ -5,7 +5,8 @@ use core::marker::PhantomData;
 use nvimx_core::api::{Api, ModuleApi};
 use nvimx_core::command::{CommandArgs, CommandCompletion};
 use nvimx_core::module::Module;
-use nvimx_core::{ByteOffset, Name, Plugin, notify};
+use nvimx_core::notify::{self, Name};
+use nvimx_core::{ByteOffset, Plugin};
 
 use crate::Neovim;
 use crate::oxi::{Dictionary, Function, Object, api};

@@ -1,7 +1,10 @@
 use core::marker::PhantomData;
 
+use crate::NeovimCtx;
+use crate::backend::{Backend, BackendHandle};
 use crate::executor::{BackgroundExecutor, TaskBackground};
-use crate::{Backend, BackendHandle, ModulePath, NeovimCtx, Plugin};
+use crate::notify::ModulePath;
+use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, P, B> {

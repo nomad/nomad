@@ -2,7 +2,8 @@
 
 use core::fmt;
 
-use nvimx_core::{Key, MapAccess, Plugin, Value, notify};
+use nvimx_core::backend::{Key, MapAccess, Value};
+use nvimx_core::{Plugin, notify};
 
 use crate::Neovim;
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};

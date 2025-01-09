@@ -1,4 +1,4 @@
-use super::{Level, Message, NotificationId, Source};
+use crate::notify::{Level, Message, NotificationId, Source};
 
 /// TODO: docs.
 pub struct Notification<'src> {
