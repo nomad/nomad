@@ -27,11 +27,11 @@ where
     ) -> impl MaybeResult<(), B>;
 
     /// TODO: docs.
-    fn to_completion_fn(&self) -> impl CompletionFn {}
+    fn to_completion_fn(&self) -> impl CompletionFn + 'static {}
 }
 
 /// TODO: docs.
-pub trait CompletionFn: 'static {
+pub trait CompletionFn {
     /// TODO: docs.
     fn call(
         &mut self,
@@ -43,7 +43,7 @@ pub trait CompletionFn: 'static {
 /// TODO: docs.
 pub trait ToCompletionFn<B: Backend> {
     /// TODO: docs.
-    fn to_completion_fn(&self) -> impl CompletionFn;
+    fn to_completion_fn(&self) -> impl CompletionFn + 'static;
 }
 
 /// TODO: docs.
@@ -103,7 +103,7 @@ where
     }
 
     #[inline]
-    fn to_completion_fn(&self) -> impl CompletionFn {
+    fn to_completion_fn(&self) -> impl CompletionFn + 'static {
         ToCompletionFn::to_completion_fn(self)
     }
 }
@@ -121,7 +121,7 @@ impl CompletionFn for () {
 
 impl<F, R> CompletionFn for F
 where
-    F: FnMut(CommandArgs, ByteOffset) -> R + 'static,
+    F: FnMut(CommandArgs, ByteOffset) -> R,
     R: IntoIterator<Item = CommandCompletion>,
 {
     #[inline]
