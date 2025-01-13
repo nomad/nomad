@@ -51,11 +51,11 @@ impl Constant for Version {
     const NAME: Name = "version";
 }
 
-impl fmt::Debug for Version {
+impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "mad.nvim {semantic:?} ({commit} {date:?})",
+            "mad.nvim {semantic} ({commit} {date})",
             semantic = self.semantic,
             commit = self.commit,
             date = self.date,
@@ -63,7 +63,7 @@ impl fmt::Debug for Version {
     }
 }
 
-impl fmt::Debug for SemanticVersion {
+impl fmt::Display for SemanticVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -79,7 +79,7 @@ impl fmt::Debug for SemanticVersion {
     }
 }
 
-impl fmt::Debug for Date {
+impl fmt::Display for Date {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

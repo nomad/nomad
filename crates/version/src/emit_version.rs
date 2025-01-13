@@ -33,7 +33,7 @@ where
         _: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
     ) {
-        ctx.emit_info(Message::from_debug(VERSION));
+        ctx.emit_info(Message::from_display(VERSION));
     }
 }
 
