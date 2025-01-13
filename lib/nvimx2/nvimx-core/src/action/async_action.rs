@@ -35,11 +35,11 @@ where
     type Return = ();
 
     #[inline]
-    fn call<'this, 'args>(
-        &'this mut self,
-        args: Self::Args<'args>,
+    fn call<'s: 's, 'a: 'a>(
+        &mut self,
+        args: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B> + use<'this, 'args, T, P, B> {
+    ) {
         let mut this = self.clone();
         let module_path = ctx.module_path().clone();
         ctx.spawn_local(async move |ctx| {

@@ -2,7 +2,7 @@ use nvimx2::Plugin;
 use nvimx2::action::{Action, ActionCtx};
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::notify::{MaybeResult, Message, Name};
+use nvimx2::notify::{Message, Name};
 
 use crate::VERSION;
 
@@ -28,11 +28,11 @@ where
     type Args<'args> = ();
     type Return = ();
 
-    fn call<'this, 'args>(
-        &'this mut self,
-        _: Self::Args<'args>,
+    fn call<'s: 's, 'a: 'a>(
+        &mut self,
+        _: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<(), B> + use<'this, 'args, P, B> {
+    ) {
         ctx.emit_info(Message::from_debug(VERSION));
     }
 }
