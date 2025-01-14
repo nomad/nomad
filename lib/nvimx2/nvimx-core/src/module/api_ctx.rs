@@ -43,7 +43,7 @@ where
     let mut plugin_api = api_ctx.module_api;
     plugin_api.add_function(
         P::CONFIG_FN_NAME,
-        config_builder.build(backend.handle()),
+        config_builder.build::<P>(backend.handle()),
     );
     if P::COMMAND_NAME != plugin::NO_COMMAND_NAME
         && !command_builder.is_empty()
@@ -209,30 +209,31 @@ impl<B: Backend> ConfigBuilder<B> {
     }
 
     #[inline]
-    fn build(
+    fn build<P: Plugin<B>>(
         mut self,
         backend: BackendHandle<B>,
     ) -> impl FnMut(ApiValue<B>) -> Option<ApiValue<B>> {
         move |config| {
             backend.with_mut(|backend| {
-                let mut module_path = ModulePath::new(self.module_name);
-                self.handle(config, &mut module_path, backend);
+                let mut config_path = ModulePath::new(self.module_name);
+                self.handle::<P>(config, &mut config_path, backend);
             });
             None
         }
     }
 
     #[inline]
-    fn handle(
+    fn handle<P: Plugin<B>>(
         &mut self,
         mut config: ApiValue<B>,
-        module_path: &mut ModulePath,
+        config_path: &mut ModulePath,
         mut backend: BackendMut<B>,
     ) {
         let mut map_access = match config.map_access() {
             Ok(map_access) => map_access,
             Err(err) => {
-                todo!();
+                backend.emit_map_access_error_in_config::<P>(config_path, err);
+                return;
             },
         };
         loop {
@@ -240,7 +241,11 @@ impl<B: Backend> ConfigBuilder<B> {
             let key_str = match key.as_str() {
                 Ok(key) => key,
                 Err(err) => {
-                    todo!();
+                    backend.emit_key_as_str_error_in_config::<P>(
+                        config_path,
+                        err,
+                    );
+                    return;
                 },
             };
             let Some(submodule) = self.submodules.get_mut(key_str) else {
@@ -248,12 +253,12 @@ impl<B: Backend> ConfigBuilder<B> {
             };
             drop(key);
             let config = map_access.take_next_value();
-            module_path.push(submodule.module_name);
-            submodule.handle(config, module_path, backend.as_mut());
-            module_path.pop();
+            config_path.push(submodule.module_name);
+            submodule.handle::<P>(config, config_path, backend.as_mut());
+            config_path.pop();
         }
         drop(map_access);
-        (self.handler)(config, &mut NeovimCtx::new(backend, module_path));
+        (self.handler)(config, &mut NeovimCtx::new(backend, config_path));
     }
 
     #[inline]

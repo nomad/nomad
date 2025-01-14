@@ -17,6 +17,6 @@ impl Error for Infallible {
 impl<T: Error> Error for &T {
     #[inline]
     fn to_message(&self, source: Source) -> Option<(Level, Message)> {
-        (&**self).to_message(source)
+        (**self).to_message(source)
     }
 }
