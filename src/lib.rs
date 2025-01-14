@@ -29,5 +29,5 @@ impl<B: Backend> Module<B> for Mad {
         // .with_module(collab::Collab::new());
     }
 
-    fn on_new_config(&self, _: (), _: &mut NeovimCtx<Self, B>) {}
+    fn on_new_config(&self, _: (), _: &mut NeovimCtx<B>) {}
 }

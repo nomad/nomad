@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use crate::AsyncCtx;
 use crate::backend::{
     Backend,
@@ -10,24 +8,18 @@ use crate::backend::{
     Task,
     TaskBackground,
 };
-use crate::module::Module;
 use crate::notify::{self, Emitter, ModulePath, Name, NotificationId, Source};
 
 /// TODO: docs.
-pub struct NeovimCtx<'a, M, B> {
+pub struct NeovimCtx<'a, B> {
     backend: BackendMut<'a, B>,
     module_path: &'a ModulePath,
-    module: PhantomData<M>,
 }
 
-impl<'a, M, B> NeovimCtx<'a, M, B>
-where
-    M: Module<B>,
-    B: Backend,
-{
+impl<'a, B: Backend> NeovimCtx<'a, B> {
     /// TODO: docs.
     #[inline]
-    pub fn as_mut(&mut self) -> NeovimCtx<'_, M, B> {
+    pub fn as_mut(&mut self) -> NeovimCtx<'_, B> {
         NeovimCtx::new(self.backend.as_mut(), self.module_path)
     }
 
@@ -62,9 +54,9 @@ where
     #[inline]
     pub fn spawn_local<Fun>(&mut self, fun: Fun)
     where
-        Fun: AsyncFnOnce(&mut AsyncCtx<M, B>) + 'static,
+        Fun: AsyncFnOnce(&mut AsyncCtx<B>) + 'static,
     {
-        let mut async_ctx = AsyncCtx::<'static, _, _>::new(
+        let mut async_ctx = AsyncCtx::<'static, _>::new(
             self.backend.handle(),
             self.module_path.clone(),
         );
@@ -109,6 +101,6 @@ where
         backend: BackendMut<'a, B>,
         module_path: &'a ModulePath,
     ) -> Self {
-        Self { backend, module_path, module: PhantomData }
+        Self { backend, module_path }
     }
 }

@@ -2,20 +2,15 @@ use core::ops::{Deref, DerefMut};
 
 use crate::NeovimCtx;
 use crate::backend::Backend;
-use crate::module::Module;
 use crate::notify::{self, Name, NotificationId};
 
 /// TODO: docs.
-pub struct ActionCtx<'a, M, B> {
-    neovim_ctx: NeovimCtx<'a, M, B>,
+pub struct ActionCtx<'a, B> {
+    neovim_ctx: NeovimCtx<'a, B>,
     action_name: Name,
 }
 
-impl<'a, M, B> ActionCtx<'a, M, B>
-where
-    M: Module<B>,
-    B: Backend,
-{
+impl<'a, B: Backend> ActionCtx<'a, B> {
     /// TODO: docs.
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
@@ -32,15 +27,15 @@ where
 
     #[inline]
     pub(crate) fn new(
-        neovim_ctx: NeovimCtx<'a, M, B>,
+        neovim_ctx: NeovimCtx<'a, B>,
         action_name: Name,
     ) -> Self {
         Self { neovim_ctx, action_name }
     }
 }
 
-impl<'a, M, B> Deref for ActionCtx<'a, M, B> {
-    type Target = NeovimCtx<'a, M, B>;
+impl<'a, B> Deref for ActionCtx<'a, B> {
+    type Target = NeovimCtx<'a, B>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -48,7 +43,7 @@ impl<'a, M, B> Deref for ActionCtx<'a, M, B> {
     }
 }
 
-impl<M, B> DerefMut for ActionCtx<'_, M, B> {
+impl<B> DerefMut for ActionCtx<'_, B> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.neovim_ctx

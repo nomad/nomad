@@ -1,7 +1,6 @@
 use nvimx2::action::{Action, ActionCtx};
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::module::Module;
 use nvimx2::notify::{Message, Name};
 
 use crate::VERSION;
@@ -18,11 +17,7 @@ impl EmitVersion {
     }
 }
 
-impl<M, B> Action<M, B> for EmitVersion
-where
-    M: Module<B>,
-    B: Backend,
-{
+impl<B: Backend> Action<B> for EmitVersion {
     const NAME: Name = "version";
 
     type Args<'args> = ();
@@ -31,7 +26,7 @@ where
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         _: Self::Args<'_>,
-        ctx: &mut ActionCtx<M, B>,
+        ctx: &mut ActionCtx<B>,
     ) {
         ctx.emit_info(Message::from_display(VERSION));
     }

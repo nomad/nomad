@@ -17,9 +17,5 @@ pub trait Module<B: Backend>: 'static + Sized {
     fn api(&self, ctx: &mut ApiCtx<Self, B>);
 
     /// TODO: docs.
-    fn on_new_config(
-        &self,
-        new_config: Self::Config,
-        ctx: &mut NeovimCtx<Self, B>,
-    );
+    fn on_new_config(&self, new_config: Self::Config, ctx: &mut NeovimCtx<B>);
 }

@@ -1,15 +1,10 @@
 use crate::AsyncCtx;
 use crate::action::{Action, ActionCtx};
 use crate::backend::{Backend, BackendExt};
-use crate::module::Module;
 use crate::notify::{self, MaybeResult, Name};
 
 /// TODO: docs.
-pub trait AsyncAction<M, B>: 'static
-where
-    M: Module<B>,
-    B: Backend,
-{
+pub trait AsyncAction<B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -20,14 +15,13 @@ where
     fn call<'this>(
         &'this mut self,
         args: Self::Args,
-        ctx: &mut AsyncCtx<M, B>,
+        ctx: &mut AsyncCtx<B>,
     ) -> impl Future<Output = impl MaybeResult<()> + 'this>;
 }
 
-impl<T, M, B> Action<M, B> for T
+impl<T, B> Action<B> for T
 where
-    T: AsyncAction<M, B> + Clone,
-    M: Module<B>,
+    T: AsyncAction<B> + Clone,
     B: Backend,
 {
     const NAME: Name = T::NAME;
@@ -38,7 +32,7 @@ where
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         args: Self::Args<'_>,
-        ctx: &mut ActionCtx<M, B>,
+        ctx: &mut ActionCtx<B>,
     ) {
         let mut this = self.clone();
         let module_path = ctx.module_path().clone();

@@ -2,7 +2,6 @@ use nvimx2::AsyncCtx;
 use nvimx2::action::AsyncAction;
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::module::Module;
 use nvimx2::notify::Name;
 
 /// TODO: docs.
@@ -16,16 +15,12 @@ impl Logout {
     }
 }
 
-impl<M, B> AsyncAction<M, B> for Logout
-where
-    M: Module<B>,
-    B: Backend,
-{
+impl<B: Backend> AsyncAction<B> for Logout {
     const NAME: Name = "logout";
 
     type Args = ();
 
-    async fn call(&mut self, _: Self::Args, _: &mut AsyncCtx<'_, M, B>) {}
+    async fn call(&mut self, _: Self::Args, _: &mut AsyncCtx<'_, B>) {}
 }
 
 impl<B: Backend> ToCompletionFn<B> for Logout {

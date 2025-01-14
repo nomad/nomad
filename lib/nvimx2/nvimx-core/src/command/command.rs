@@ -4,15 +4,10 @@ use crate::ByteOffset;
 use crate::action::{Action, ActionCtx};
 use crate::backend::Backend;
 use crate::command::CommandArgs;
-use crate::module::Module;
 use crate::notify::{self, MaybeResult, Name};
 
 /// TODO: docs.
-pub trait Command<M, B>: 'static
-where
-    M: Module<B>,
-    B: Backend,
-{
+pub trait Command<B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -23,8 +18,8 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<M, B>,
-    ) -> impl MaybeResult<()> + use<'this, 'args, Self, M, B>;
+        ctx: &mut ActionCtx<B>,
+    ) -> impl MaybeResult<()> + use<'this, 'args, Self, B>;
 
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn + 'static {}
@@ -82,11 +77,10 @@ impl CommandCompletion {
     }
 }
 
-impl<A, M, B> Command<M, B> for A
+impl<A, B> Command<B> for A
 where
-    A: Action<M, B, Return = ()> + ToCompletionFn<B>,
+    A: Action<B, Return = ()> + ToCompletionFn<B>,
     for<'a> A::Args<'a>: TryFrom<CommandArgs<'a>, Error: notify::Error>,
-    M: Module<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
@@ -97,8 +91,8 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<M, B>,
-    ) -> impl MaybeResult<()> + use<'this, 'args, A, M, B> {
+        ctx: &mut ActionCtx<B>,
+    ) -> impl MaybeResult<()> + use<'this, 'args, A, B> {
         A::call(self, args, ctx)
     }
 

@@ -1,14 +1,9 @@
 use crate::action::ActionCtx;
 use crate::backend::Backend;
-use crate::module::Module;
 use crate::notify::{MaybeResult, Name};
 
 /// TODO: docs.
-pub trait Action<M, B>: 'static
-where
-    M: Module<B>,
-    B: Backend,
-{
+pub trait Action<B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -28,10 +23,10 @@ where
     //
     // - https://github.com/rust-lang/rust/issues/87803
     // - https://github.com/rust-lang/rust/issues/109476
-    // - https://rustc-dev-guide.rust-lang.org/early_late_parameters.html#must-be-constrained-by-argument-types
+    // - https://rustc-dev-guide.rust-lang.org/early_late_parameters.html
     fn call<'slf: 'slf, 'args: 'args>(
         &'slf mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<M, B>,
-    ) -> impl MaybeResult<Self::Return> + use<'slf, 'args, Self, M, B>;
+        ctx: &mut ActionCtx<B>,
+    ) -> impl MaybeResult<Self::Return> + use<'slf, 'args, Self, B>;
 }

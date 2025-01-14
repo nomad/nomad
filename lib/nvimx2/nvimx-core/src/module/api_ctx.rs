@@ -86,7 +86,7 @@ where
     #[inline]
     pub fn with_command<Cmd>(&mut self, command: Cmd) -> &mut Self
     where
-        Cmd: Command<M, B>,
+        Cmd: Command<B>,
     {
         self.completions_builder.add_command(&command);
         self.command_builder.add_command(command);
@@ -126,7 +126,7 @@ where
     #[inline]
     pub fn with_function<Fun>(&mut self, mut function: Fun) -> &mut Self
     where
-        Fun: Function<M, B>,
+        Fun: Function<B>,
     {
         let backend = self.backend.handle();
         let module_path = self.module_path.clone();
@@ -274,7 +274,7 @@ impl<B: Backend> ConfigBuilder<B> {
                     Ok(config) => {
                         module.on_new_config(
                             config,
-                            &mut NeovimCtx::<M, _>::new(backend, module_path),
+                            &mut NeovimCtx::<B>::new(backend, module_path),
                         );
                     },
                     Err(_err) => todo!(),

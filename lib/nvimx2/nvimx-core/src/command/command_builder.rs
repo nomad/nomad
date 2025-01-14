@@ -41,10 +41,9 @@ struct InvalidCommandError<'a, B>(&'a CommandBuilder<B>, CommandArg<'a>);
 impl<B: Backend> CommandBuilder<B> {
     #[track_caller]
     #[inline]
-    pub(crate) fn add_command<Cmd, M>(&mut self, mut command: Cmd)
+    pub(crate) fn add_command<Cmd>(&mut self, mut command: Cmd)
     where
-        Cmd: Command<M, B>,
-        M: Module<B>,
+        Cmd: Command<B>,
     {
         self.assert_namespace_is_available(Cmd::NAME);
         let handler: CommandHandler<B> =
@@ -179,10 +178,9 @@ impl<B: Backend> CommandBuilder<B> {
 
 impl CommandCompletionsBuilder {
     #[inline]
-    pub(crate) fn add_command<Cmd, M, B>(&mut self, command: &Cmd)
+    pub(crate) fn add_command<Cmd, B>(&mut self, command: &Cmd)
     where
-        Cmd: Command<M, B>,
-        M: Module<B>,
+        Cmd: Command<B>,
         B: Backend,
     {
         let mut completion_fn = command.to_completion_fn();
