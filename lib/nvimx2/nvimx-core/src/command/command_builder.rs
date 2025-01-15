@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 
 use crate::action::ActionCtx;
-use crate::backend::{Backend, BackendHandle, BackendMut};
+use crate::backend::Backend;
 use crate::command::{
     Command,
     CommandArg,
@@ -11,6 +11,7 @@ use crate::command::{
 };
 use crate::module::Module;
 use crate::notify::{self, MaybeResult, ModulePath, Name};
+use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
 use crate::{ByteOffset, NeovimCtx};
 
@@ -74,12 +75,12 @@ impl<B: Backend> CommandBuilder<B> {
     #[inline]
     pub(crate) fn build(
         mut self,
-        backend: BackendHandle<B>,
+        state: StateHandle<B>,
     ) -> impl FnMut(CommandArgs) {
         move |args: CommandArgs| {
-            backend.with_mut(|backend| {
+            state.with_mut(|state| {
                 let mut module_path = ModulePath::new(self.module_name);
-                self.handle(args, &mut module_path, backend);
+                self.handle(args, &mut module_path, state);
             })
         }
     }
@@ -121,24 +122,24 @@ impl<B: Backend> CommandBuilder<B> {
         &mut self,
         mut args: CommandArgs,
         module_path: &mut ModulePath,
-        mut backend: BackendMut<B>,
+        mut state: StateMut<B>,
     ) {
         let Some(arg) = args.pop_front() else {
             let err = MissingCommandError(self);
             let src = notify::Source { module_path, action_name: None };
-            backend.emit_err(src, err);
+            state.emit_err(src, err);
             return;
         };
 
         if let Some(handler) = self.handlers.get_mut(arg.as_str()) {
-            (handler)(args, NeovimCtx::new(backend, module_path));
+            (handler)(args, NeovimCtx::new(module_path, state));
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
             module_path.push(module.module_name);
-            module.handle(args, module_path, backend);
+            module.handle(args, module_path, state);
         } else {
             let err = InvalidCommandError(self, arg);
             let src = notify::Source { module_path, action_name: None };
-            backend.emit_err(src, err);
+            state.emit_err(src, err);
         }
     }
 

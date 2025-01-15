@@ -1,7 +1,6 @@
 use crate::AsyncCtx;
 use crate::backend::{
     Backend,
-    BackendMut,
     BackgroundExecutor,
     LocalExecutor,
     Task,
@@ -9,24 +8,19 @@ use crate::backend::{
 };
 use crate::module::Module;
 use crate::notify::{self, Emitter, ModulePath, Name, NotificationId, Source};
+use crate::state::StateMut;
 
 /// TODO: docs.
 pub struct NeovimCtx<'a, B> {
-    backend: BackendMut<'a, B>,
     module_path: &'a ModulePath,
+    state: StateMut<'a, B>,
 }
 
 impl<'a, B: Backend> NeovimCtx<'a, B> {
     /// TODO: docs.
     #[inline]
-    pub fn as_mut(&mut self) -> NeovimCtx<'_, B> {
-        NeovimCtx::new(self.backend.as_mut(), self.module_path)
-    }
-
-    /// TODO: docs.
-    #[inline]
     pub fn backend_mut(&mut self) -> &mut B {
-        &mut self.backend
+        &mut self.state
     }
 
     /// TODO: docs.
@@ -89,7 +83,7 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     where
         Err: notify::Error,
     {
-        self.backend.emit_err(
+        self.state.emit_err(
             Source { module_path: self.module_path, action_name },
             err,
         );
@@ -101,7 +95,7 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
         message: notify::Message,
         action_name: Option<Name>,
     ) -> NotificationId {
-        self.backend.emitter().emit(notify::Notification {
+        self.state.emitter().emit(notify::Notification {
             level: notify::Level::Info,
             source: Source { module_path: self.module_path, action_name },
             message,
@@ -111,19 +105,19 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
     #[inline]
     pub(crate) fn local_executor(&mut self) -> &mut B::LocalExecutor {
-        self.backend.local_executor()
+        self.state.local_executor()
     }
 
     #[inline]
     pub(crate) fn new(
-        backend: BackendMut<'a, B>,
         module_path: &'a ModulePath,
+        state: StateMut<'a, B>,
     ) -> Self {
-        Self { backend, module_path }
+        Self { state, module_path }
     }
 
     #[inline]
     pub(crate) fn to_async(&self) -> AsyncCtx<'static, B> {
-        AsyncCtx::new(self.backend.handle(), self.module_path.clone())
+        AsyncCtx::new(self.module_path.clone(), self.state.handle())
     }
 }

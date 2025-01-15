@@ -1,18 +1,14 @@
 use core::marker::PhantomData;
 
-use crate::backend::{
-    Backend,
-    BackendHandle,
-    BackgroundExecutor,
-    TaskBackground,
-};
+use crate::backend::{Backend, BackgroundExecutor, TaskBackground};
 use crate::notify::{ModulePath, Name};
+use crate::state::StateHandle;
 use crate::{NeovimCtx, notify};
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, B> {
-    backend: BackendHandle<B>,
     module_path: ModulePath,
+    state: StateHandle<B>,
     _non_static: PhantomData<&'a ()>,
 }
 
@@ -37,8 +33,8 @@ impl<B: Backend> AsyncCtx<'_, B> {
         Fut::Output: Send + 'static,
     {
         let task = self
-            .backend
-            .with_mut(|mut backend| backend.background_executor().spawn(fut));
+            .state
+            .with_mut(|mut state| state.background_executor().spawn(fut));
         TaskBackground::new(task)
     }
 
@@ -48,8 +44,8 @@ impl<B: Backend> AsyncCtx<'_, B> {
     where
         Fun: FnOnce(&mut NeovimCtx<B>) -> Out,
     {
-        self.backend.with_mut(|backend| {
-            let mut ctx = NeovimCtx::new(backend, &self.module_path);
+        self.state.with_mut(|state| {
+            let mut ctx = NeovimCtx::new(&self.module_path, state);
             fun(&mut ctx)
         })
     }
@@ -67,10 +63,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn new(
-        backend: BackendHandle<B>,
-        module_path: ModulePath,
-    ) -> Self {
-        Self { backend, module_path, _non_static: PhantomData }
+    pub(crate) fn new(module_path: ModulePath, state: StateHandle<B>) -> Self {
+        Self { module_path, state, _non_static: PhantomData }
     }
 }

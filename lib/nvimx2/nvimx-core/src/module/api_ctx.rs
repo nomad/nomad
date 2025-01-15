@@ -2,24 +2,16 @@ use core::marker::PhantomData;
 
 use crate::NeovimCtx;
 use crate::action::ActionCtx;
-use crate::backend::{
-    Api,
-    ApiValue,
-    Backend,
-    BackendHandle,
-    BackendMut,
-    Key,
-    MapAccess,
-    Value,
-};
+use crate::backend::{Api, ApiValue, Backend, Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder, CommandCompletionsBuilder};
 use crate::module::{Constant, Function, Module};
 use crate::notify::{self, Error, MaybeResult, ModulePath, Name};
 use crate::plugin::{self, Plugin};
+use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
 
 /// TODO: docs.
-pub(crate) fn build_api<P, B>(plugin: P, mut backend: BackendMut<B>) -> B::Api
+pub(crate) fn build_api<P, B>(plugin: P, mut state: StateMut<B>) -> B::Api
 where
     P: Plugin<B>,
     B: Backend,
@@ -30,25 +22,25 @@ where
     let mut config_builder = ConfigBuilder::new(plugin);
     let mut module_path = ModulePath::new(P::NAME);
     let mut api_ctx = ApiCtx {
-        module_api: backend.api::<P>(),
-        backend: backend.as_mut(),
+        module_api: state.api::<P>(),
         command_builder: &mut command_builder,
         completions_builder: &mut command_completions_builder,
         config_builder: &mut config_builder,
         module_path: &mut module_path,
         module: PhantomData,
+        state: state.as_mut(),
     };
     Module::api(plugin, &mut api_ctx);
     let mut plugin_api = api_ctx.module_api;
     plugin_api.add_function(
         P::CONFIG_FN_NAME,
-        config_builder.build::<P>(backend.handle()),
+        config_builder.build::<P>(state.handle()),
     );
     if P::COMMAND_NAME != plugin::NO_COMMAND_NAME
         && !command_builder.is_empty()
     {
         plugin_api.add_command::<P, _, _, _>(
-            command_builder.build(backend.handle()),
+            command_builder.build(state.handle()),
             command_completions_builder.build(),
         );
     }
@@ -61,13 +53,13 @@ where
     M: Module<B>,
     B: Backend,
 {
-    backend: BackendMut<'a, B>,
     command_builder: &'a mut CommandBuilder<B>,
     completions_builder: &'a mut CommandCompletionsBuilder,
     config_builder: &'a mut ConfigBuilder<B>,
     module_api: B::Api,
     module_path: &'a mut ModulePath,
     module: PhantomData<M>,
+    state: StateMut<'a, B>,
 }
 
 type ConfigHandler<B> = Box<
@@ -106,7 +98,7 @@ where
     where
         Const: Constant,
     {
-        let value = match self.backend.serialize(&value).into_result() {
+        let value = match self.state.serialize(&value).into_result() {
             Ok(value) => value,
             Err(err) => {
                 let source = notify::Source {
@@ -134,41 +126,41 @@ where
     where
         Fun: Function<B>,
     {
-        let backend = self.backend.handle();
+        let state = self.state.handle();
         let module_path = self.module_path.clone();
         let fun = move |value| {
             let fun = &mut function;
             let module_path = &module_path;
-            backend.with_mut(move |mut backend| {
+            state.with_mut(move |mut state| {
                 let source = notify::Source {
                     module_path,
                     action_name: Some(Fun::NAME),
                 };
-                let args = match backend
+                let args = match state
                     .deserialize::<Fun::Args<'_>>(value)
                     .into_result()
                 {
                     Ok(args) => args,
                     Err(err) => {
-                        backend.emit_err(source, err);
+                        state.emit_err(source, err);
                         return None;
                     },
                 };
                 let mut action_ctx = ActionCtx::new(
-                    NeovimCtx::new(backend.as_mut(), module_path),
+                    NeovimCtx::new(module_path, state.as_mut()),
                     Fun::NAME,
                 );
                 let ret = match fun.call(args, &mut action_ctx).into_result() {
                     Ok(ret) => ret,
                     Err(err) => {
-                        backend.emit_err(source, err);
+                        state.emit_err(source, err);
                         return None;
                     },
                 };
-                match backend.serialize(&ret).into_result() {
+                match state.serialize(&ret).into_result() {
                     Ok(ret) => Some(ret),
                     Err(err) => {
-                        backend.emit_err(source, err);
+                        state.emit_err(source, err);
                         None
                     },
                 }
@@ -195,13 +187,13 @@ where
     fn add_submodule<S: Module<B>>(&mut self, sub: S) -> B::Api {
         let sub = Box::leak(Box::new(sub));
         let mut ctx = ApiCtx {
-            module_api: self.backend.api::<S>(),
-            backend: self.backend.as_mut(),
+            module_api: self.state.api::<S>(),
             command_builder: self.command_builder.add_module::<S>(),
             completions_builder: self.completions_builder.add_module::<S, _>(),
             config_builder: self.config_builder.add_module(sub),
             module_path: self.module_path,
             module: PhantomData,
+            state: self.state.as_mut(),
         };
         sub.api(&mut ctx);
         ctx.module_api
@@ -217,17 +209,17 @@ impl<B: Backend> ConfigBuilder<B> {
     #[inline]
     fn build<P: Plugin<B>>(
         mut self,
-        backend: BackendHandle<B>,
+        state: StateHandle<B>,
     ) -> impl FnMut(ApiValue<B>) -> Option<ApiValue<B>> {
         move |config| {
-            backend.with_mut(|backend| {
+            state.with_mut(|state| {
                 let mut config_path = ModulePath::new(self.module_name);
                 let module_path = notify::ModulePath::new(P::NAME);
                 let source = notify::Source {
                     module_path: &module_path,
                     action_name: Some(P::CONFIG_FN_NAME),
                 };
-                self.handle::<P>(config, source, &mut config_path, backend);
+                self.handle::<P>(config, source, &mut config_path, state);
             });
             None
         }
@@ -240,12 +232,12 @@ impl<B: Backend> ConfigBuilder<B> {
         mut config: ApiValue<B>,
         source: notify::Source,
         config_path: &mut ModulePath,
-        mut backend: BackendMut<B>,
+        mut state: StateMut<B>,
     ) {
         let mut map_access = match config.map_access() {
             Ok(map_access) => map_access,
             Err(err) => {
-                backend.emit_map_access_error_in_config::<P>(
+                state.emit_map_access_error_in_config::<P>(
                     config_path,
                     source,
                     err,
@@ -258,7 +250,7 @@ impl<B: Backend> ConfigBuilder<B> {
             let key_str = match key.as_str() {
                 Ok(key) => key,
                 Err(err) => {
-                    backend.emit_key_as_str_error_in_config::<P>(
+                    state.emit_key_as_str_error_in_config::<P>(
                         config_path,
                         source,
                         err,
@@ -272,20 +264,15 @@ impl<B: Backend> ConfigBuilder<B> {
             drop(key);
             let config = map_access.take_next_value();
             config_path.push(submodule.module_name);
-            submodule.handle::<P>(
-                config,
-                source,
-                config_path,
-                backend.as_mut(),
-            );
+            submodule.handle::<P>(config, source, config_path, state.as_mut());
             config_path.pop();
         }
         drop(map_access);
-        let mut ctx = NeovimCtx::new(backend.as_mut(), source.module_path);
+        let mut ctx = NeovimCtx::new(source.module_path, state.as_mut());
         match (self.handler)(config, &mut ctx) {
             Ok(()) => {},
             Err(err) => {
-                backend.emit_deserialize_error_in_config::<P>(
+                state.emit_deserialize_error_in_config::<P>(
                     config_path,
                     source,
                     err,

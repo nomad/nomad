@@ -1,6 +1,7 @@
-use crate::backend::{Backend, BackendHandle};
+use crate::backend::Backend;
 use crate::module::{self, Module};
 use crate::notify::Name;
+use crate::state::StateHandle;
 
 pub(crate) const NO_COMMAND_NAME: &str = "�";
 
@@ -25,6 +26,6 @@ pub trait Plugin<B: Backend>: Module<B> {
     #[doc(hidden)]
     #[track_caller]
     fn api(self, backend: B) -> B::Api {
-        BackendHandle::new(backend).with_mut(|b| module::build_api(self, b))
+        StateHandle::new(backend).with_mut(|s| module::build_api(self, s))
     }
 }
