@@ -168,7 +168,7 @@ impl notify::Error for NeovimMapAccessError {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         let Self(kind) = self;
         let mut msg = notify::Message::new();
         let kind_article = match kind {
@@ -182,7 +182,7 @@ impl notify::Error for NeovimMapAccessError {
             .push_str(kind_article)
             .push_actual(kind.as_static())
             .push_str(" instead");
-        Some((notify::Level::Error, msg))
+        (notify::Level::Error, msg)
     }
 }
 
@@ -198,11 +198,11 @@ impl notify::Error for NeovimMapKeyAsStrError<'_> {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         let mut msg = notify::Message::new();
         msg.push_str("'")
             .push_str(self.0.to_string_lossy())
             .push_str("' is not a valid UTF-8 string");
-        Some((notify::Level::Error, msg))
+        (notify::Level::Error, msg)
     }
 }

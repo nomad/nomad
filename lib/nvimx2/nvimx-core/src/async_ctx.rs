@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::backend::{Backend, BackgroundExecutor, TaskBackground};
-use crate::notify::Namespace;
+use crate::notify::{Namespace, NotificationId};
 use crate::state::StateHandle;
 use crate::{NeovimCtx, notify};
 
@@ -15,11 +15,11 @@ pub struct AsyncCtx<'a, B> {
 impl<B: Backend> AsyncCtx<'_, B> {
     /// TODO: docs.
     #[inline]
-    pub fn emit_err<Err>(&mut self, err: Err)
+    pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
     where
         Err: notify::Error,
     {
-        self.with_ctx(move |ctx| ctx.emit_err(err));
+        self.with_ctx(move |ctx| ctx.emit_err(err))
     }
 
     /// TODO: docs.

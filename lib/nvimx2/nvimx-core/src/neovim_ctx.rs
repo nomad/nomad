@@ -25,11 +25,11 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn emit_err<Err>(&mut self, err: Err)
+    pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
     where
         Err: notify::Error,
     {
-        self.state.emit_err(self.namespace, err);
+        self.state.emit_err(self.namespace, err)
     }
 
     /// TODO: docs.

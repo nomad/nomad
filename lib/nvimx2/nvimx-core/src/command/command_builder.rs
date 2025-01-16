@@ -262,7 +262,7 @@ impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         let Self(handlers) = self;
         let mut message = notify::Message::new();
         let missing = match (
@@ -279,7 +279,7 @@ impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
             .push_str(missing)
             .push_str(", ")
             .push_with(|message| handlers.push_valid(message));
-        Some((notify::Level::Error, message))
+        (notify::Level::Error, message)
     }
 }
 
@@ -288,7 +288,7 @@ impl<B: Backend> notify::Error for InvalidCommandError<'_, B> {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         let Self(handlers, arg) = self;
         let mut message = notify::Message::new();
         let invalid = match (
@@ -331,6 +331,6 @@ impl<B: Backend> notify::Error for InvalidCommandError<'_, B> {
             handlers.push_valid(&mut message);
         }
 
-        Some((notify::Level::Error, message))
+        (notify::Level::Error, message)
     }
 }

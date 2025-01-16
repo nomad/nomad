@@ -95,14 +95,14 @@ impl notify::Error for NeovimSerializeError {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         let mut message = notify::Message::new();
         message
             .push_str("couldn't serialize value")
             .push_with(|message| self.path().push_at(message))
             .push_str(": ")
             .push_str(self.inner.inner().to_string());
-        Some((notify::Level::Error, message))
+        (notify::Level::Error, message)
     }
 }
 
@@ -112,7 +112,7 @@ impl notify::Error for NeovimDeserializeError {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         let mut message = notify::Message::new();
 
         message
@@ -128,15 +128,15 @@ impl notify::Error for NeovimDeserializeError {
         let (actual, &expected) = match self.inner.inner() {
             oxi::serde::DeserializeError::Custom { msg } => {
                 message.push_str(msg);
-                return Some((notify::Level::Error, message));
+                return (notify::Level::Error, message);
             },
             oxi::serde::DeserializeError::DuplicateField { field } => {
                 message.push_str("duplicate field ").push_info(field);
-                return Some((notify::Level::Error, message));
+                return (notify::Level::Error, message);
             },
             oxi::serde::DeserializeError::MissingField { field } => {
                 message.push_str("missing field ").push_info(field);
-                return Some((notify::Level::Error, message));
+                return (notify::Level::Error, message);
             },
             oxi::serde::DeserializeError::UnknownField { field, expected } => {
                 message
@@ -181,7 +181,7 @@ impl notify::Error for NeovimDeserializeError {
                 .push_comma_separated(expected, notify::SpanKind::Expected);
         }
 
-        Some((notify::Level::Error, message))
+        (notify::Level::Error, message)
     }
 }
 

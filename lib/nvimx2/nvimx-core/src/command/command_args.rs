@@ -362,7 +362,7 @@ impl<T: notify::Error> notify::Error for CommandArgsIntoSeqError<'_, T> {
     fn to_message(
         &self,
         namespace: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         match self {
             Self::Item(err) => err.to_message(namespace),
             Self::WrongNum(err) => err.to_message(namespace),
@@ -375,7 +375,7 @@ impl notify::Error for CommandArgsWrongNumError<'_> {
     fn to_message(
         &self,
         _: &notify::Namespace,
-    ) -> Option<(notify::Level, notify::Message)> {
+    ) -> (notify::Level, notify::Message) {
         debug_assert_ne!(self.args.len(), self.expected_num);
 
         let mut message = notify::Message::new();
@@ -394,7 +394,7 @@ impl notify::Error for CommandArgsWrongNumError<'_> {
             );
         }
 
-        Some((notify::Level::Error, message))
+        (notify::Level::Error, message)
     }
 }
 

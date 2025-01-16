@@ -110,13 +110,15 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     #[inline]
-    fn emit_err<Err>(&mut self, namespace: &notify::Namespace, err: Err)
+    fn emit_err<Err>(
+        &mut self,
+        namespace: &notify::Namespace,
+        err: Err,
+    ) -> notify::NotificationId
     where
         Err: notify::Error,
     {
-        let Some((level, message)) = err.to_message(namespace) else {
-            return;
-        };
+        let (level, message) = err.to_message(namespace);
 
         let notification = notify::Notification {
             level,
@@ -125,6 +127,6 @@ pub trait Backend: 'static + Sized {
             updates_prev: None,
         };
 
-        self.emitter().emit(notification);
+        self.emitter().emit(notification)
     }
 }

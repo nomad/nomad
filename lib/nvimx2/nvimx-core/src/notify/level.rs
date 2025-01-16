@@ -2,6 +2,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Level {
     /// TODO: docs.
+    Off,
+
+    /// TODO: docs.
     Trace,
 
     /// TODO: docs.

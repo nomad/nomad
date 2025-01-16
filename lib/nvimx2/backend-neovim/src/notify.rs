@@ -137,6 +137,7 @@ impl Convert<oxi::api::types::LogLevel> for Level {
     #[inline]
     fn convert(self) -> oxi::api::types::LogLevel {
         match self {
+            Self::Off => oxi::api::types::LogLevel::Off,
             Self::Trace => oxi::api::types::LogLevel::Trace,
             Self::Debug => oxi::api::types::LogLevel::Debug,
             Self::Info => oxi::api::types::LogLevel::Info,

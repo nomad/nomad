@@ -101,13 +101,11 @@ where
         let value = match self.state.serialize(&value).into_result() {
             Ok(value) => value,
             Err(err) => {
-                let msg = err.to_message(self.namespace).map(|(_, msg)| msg);
+                let (_, msg) = err.to_message(self.namespace);
                 panic!(
-                    "couldn't serialize {:?}{colon}{reason:?}",
+                    "couldn't serialize {:?}: {:?}",
                     Const::NAME,
-                    colon = if msg.is_some() { ": " } else { "" },
-                    reason =
-                        msg.as_ref().map(|msg| msg.as_str()).unwrap_or(""),
+                    msg.as_str(),
                 );
             },
         };
