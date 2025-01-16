@@ -140,7 +140,7 @@ where
                 let res = state.with_ctx(namespace, |ctx| {
                     fun.call(args, ctx).into_result()
                 });
-                let ret = match res {
+                let ret = match res? {
                     Ok(ret) => ret,
                     Err(err) => {
                         state.emit_err(namespace, err);
@@ -262,15 +262,14 @@ impl<B: Backend> ConfigBuilder<B> {
             config_path.pop();
         }
         drop(map_access);
-        match state.with_ctx(namespace, |ctx| (self.handler)(config, ctx)) {
-            Ok(()) => {},
-            Err(err) => {
-                state.emit_deserialize_error_in_config::<P>(
-                    config_path,
-                    namespace,
-                    err,
-                );
-            },
+        if let Some(Err(err)) =
+            state.with_ctx(namespace, |ctx| (self.handler)(config, ctx))
+        {
+            state.emit_deserialize_error_in_config::<P>(
+                config_path,
+                namespace,
+                err,
+            );
         }
     }
 

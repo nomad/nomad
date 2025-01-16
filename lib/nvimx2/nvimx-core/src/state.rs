@@ -1,6 +1,7 @@
 use core::any::{self, Any, TypeId};
 use core::ops::{Deref, DerefMut};
 use std::collections::hash_map::Entry;
+use std::panic;
 
 use fxhash::FxHashMap;
 
@@ -91,13 +92,20 @@ impl<B: Backend> StateMut<'_, B> {
     }
 
     #[inline]
-    pub(crate) fn with_ctx<F, R>(&mut self, namespace: &Namespace, fun: F) -> R
+    pub(crate) fn with_ctx<F, R>(
+        &mut self,
+        namespace: &Namespace,
+        fun: F,
+    ) -> Option<R>
     where
         F: FnOnce(&mut NeovimCtx<B>) -> R,
     {
         #[allow(deprecated)]
         let mut ctx = NeovimCtx::new(namespace, self.as_mut());
-        fun(&mut ctx)
+        match panic::catch_unwind(panic::AssertUnwindSafe(|| fun(&mut ctx))) {
+            Ok(ret) => Some(ret),
+            Err(_payload) => todo!(),
+        }
     }
 }
 

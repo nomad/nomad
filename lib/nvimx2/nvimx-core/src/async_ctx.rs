@@ -44,7 +44,13 @@ impl<B: Backend> AsyncCtx<'_, B> {
     where
         Fun: FnOnce(&mut NeovimCtx<B>) -> Out,
     {
-        self.state.with_mut(|mut state| state.with_ctx(&self.namespace, fun))
+        self.state.with_mut(|state| {
+            // We're running inside a call to `NeovimCtx::spawn_local()`, so
+            // panics are already being caught and we don't need to do anything
+            // special here.
+            #[allow(deprecated)]
+            fun(&mut NeovimCtx::new(&self.namespace, state))
+        })
     }
 
     /// TODO: docs.
