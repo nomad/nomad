@@ -28,12 +28,17 @@ pub(crate) struct StateMut<'a, B: Backend> {
     handle: &'a StateHandle<B>,
 }
 
-type PanicHandler<B> =
-    &'static dyn Fn(Box<dyn Any + Send + 'static>, &mut NeovimCtx<B>);
-
 struct ModuleState<B: Backend> {
     module: &'static dyn Any,
-    panic_handler: Option<PanicHandler<B>>,
+    panic_handler: Option<&'static dyn PanicHandler<B>>,
+}
+
+trait PanicHandler<B: Backend> {
+    fn handle_panic(
+        &self,
+        payload: Box<dyn Any + Send + 'static>,
+        ctx: &mut NeovimCtx<B>,
+    );
 }
 
 impl<B: Backend> State<B> {
@@ -64,14 +69,11 @@ impl<B: Backend> State<B> {
     {
         match self.modules.entry(TypeId::of::<P>()) {
             Entry::Vacant(entry) => {
-                let plugin = &*Box::leak(Box::new(plugin));
-                let handler: Box<
-                    dyn Fn(Box<dyn Any + Send>, &mut NeovimCtx<B>),
-                > = Box::new(move |payload, ctx| {
-                    plugin.handle_panic(payload, ctx);
+                let plugin = Box::leak(Box::new(plugin));
+                entry.insert(ModuleState {
+                    module: plugin,
+                    panic_handler: Some(plugin),
                 });
-                let panic_handler = Some(&*Box::leak(handler));
-                entry.insert(ModuleState { module: plugin, panic_handler });
                 plugin
             },
             Entry::Occupied(_) => unreachable!(
@@ -148,7 +150,7 @@ impl<B: Backend> StateMut<'_, B> {
                     .expect("TypeId is of a Module, not a Plugin");
                 #[allow(deprecated)]
                 let mut ctx = NeovimCtx::new(namespace, self.as_mut());
-                handler(payload, &mut ctx);
+                handler.handle_panic(payload, &mut ctx);
                 None
             },
         }
@@ -199,5 +201,20 @@ impl<B: Backend> DerefMut for StateMut<'_, B> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.state
+    }
+}
+
+impl<P, B> PanicHandler<B> for P
+where
+    P: Plugin<B>,
+    B: Backend,
+{
+    #[inline]
+    fn handle_panic(
+        &self,
+        payload: Box<dyn Any + Send + 'static>,
+        ctx: &mut NeovimCtx<B>,
+    ) {
+        Plugin::handle_panic(self, payload, ctx);
     }
 }
