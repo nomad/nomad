@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::backend::{Backend, BackgroundExecutor, TaskBackground};
-use crate::notify::{Name, Namespace};
+use crate::notify::Namespace;
 use crate::state::StateHandle;
 use crate::{NeovimCtx, notify};
 
@@ -19,7 +19,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
     where
         Err: notify::Error,
     {
-        self.emit_err_inner(None, err);
+        self.with_ctx(move |ctx| ctx.emit_err(err));
     }
 
     /// TODO: docs.
@@ -45,17 +45,6 @@ impl<B: Backend> AsyncCtx<'_, B> {
         Fun: FnOnce(&mut NeovimCtx<B>) -> Out,
     {
         self.state.with_mut(|mut state| state.with_ctx(&self.namespace, fun))
-    }
-
-    #[inline]
-    pub(crate) fn emit_err_inner<Err>(
-        &mut self,
-        action_name: Option<Name>,
-        err: Err,
-    ) where
-        Err: notify::Error,
-    {
-        self.with_ctx(move |ctx| ctx.emit_err(action_name, err));
     }
 
     /// TODO: docs.

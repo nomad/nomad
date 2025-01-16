@@ -1,6 +1,5 @@
 use smallvec::SmallVec;
 
-use crate::action::ActionCtx;
 use crate::backend::Backend;
 use crate::command::{
     Command,
@@ -15,7 +14,7 @@ use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
 use crate::{ByteOffset, NeovimCtx};
 
-type CommandHandler<B> = Box<dyn FnMut(CommandArgs, NeovimCtx<B>)>;
+type CommandHandler<B> = Box<dyn FnMut(CommandArgs, &mut NeovimCtx<B>)>;
 
 type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
@@ -47,7 +46,6 @@ impl<B: Backend> CommandBuilder<B> {
     {
         self.assert_namespace_is_available(Cmd::NAME);
         let handler: CommandHandler<B> = Box::new(move |args, ctx| {
-            let mut ctx = ActionCtx::new(ctx, Cmd::NAME);
             let args = match Cmd::Args::try_from(args) {
                 Ok(args) => args,
                 Err(err) => {
@@ -55,7 +53,7 @@ impl<B: Backend> CommandBuilder<B> {
                     return;
                 },
             };
-            if let Err(err) = command.call(args, &mut ctx).into_result() {
+            if let Err(err) = command.call(args, ctx).into_result() {
                 ctx.emit_err(err);
             }
         });
@@ -130,8 +128,12 @@ impl<B: Backend> CommandBuilder<B> {
             return;
         };
 
-        if let Some(handler) = self.handlers.get_mut(arg.as_str()) {
-            state.with_ctx(namespace, |ctx| handler(args, ctx.as_mut()));
+        if let Some((command_name, handler)) =
+            self.handlers.get_key_value_mut(arg.as_str())
+        {
+            namespace.push(command_name);
+            state.with_ctx(namespace, |ctx| handler(args, ctx));
+            namespace.pop();
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
             namespace.push(module.module_name);
             module.handle(args, namespace, state);

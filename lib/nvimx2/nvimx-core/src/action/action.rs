@@ -1,4 +1,4 @@
-use crate::action::ActionCtx;
+use crate::NeovimCtx;
 use crate::backend::Backend;
 use crate::notify::{MaybeResult, Name};
 
@@ -27,6 +27,6 @@ pub trait Action<B: Backend>: 'static {
     fn call<'slf: 'slf, 'args: 'args>(
         &'slf mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<B>,
+        ctx: &mut NeovimCtx<B>,
     ) -> impl MaybeResult<Self::Return> + use<'slf, 'args, Self, B>;
 }

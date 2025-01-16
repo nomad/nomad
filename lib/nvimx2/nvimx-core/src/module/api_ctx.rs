@@ -1,7 +1,6 @@
 use core::marker::PhantomData;
 
 use crate::NeovimCtx;
-use crate::action::ActionCtx;
 use crate::backend::{Api, ApiValue, Backend, Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder, CommandCompletionsBuilder};
 use crate::module::{Constant, Function, Module};
@@ -128,7 +127,7 @@ where
         namespace.push(Fun::NAME);
         let fun = move |value| {
             let fun = &mut function;
-            let namespace = &namespace;
+            let namespace = &mut namespace;
             state.with_mut(move |mut state| {
                 let args = match state
                     .deserialize::<Fun::Args<'_>>(value)
@@ -141,8 +140,7 @@ where
                     },
                 };
                 let res = state.with_ctx(namespace, |ctx| {
-                    let mut ctx = ActionCtx::new(ctx.as_mut(), Fun::NAME);
-                    fun.call(args, &mut ctx).into_result()
+                    fun.call(args, ctx).into_result()
                 });
                 let ret = match res {
                     Ok(ret) => ret,

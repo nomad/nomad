@@ -11,6 +11,20 @@ impl<K: Ord, V> OrderedMap<K, V> {
     }
 
     #[inline]
+    pub(crate) fn get_key_value_mut<Q>(
+        &mut self,
+        key: &Q,
+    ) -> Option<(&K, &mut V)>
+    where
+        K: Borrow<Q>,
+        Q: ?Sized + Ord,
+    {
+        let idx = self.get_idx(key).ok()?;
+        let (key, value) = &mut self.inner[idx];
+        Some((key, value))
+    }
+
+    #[inline]
     pub(crate) fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,

@@ -7,7 +7,7 @@ use crate::backend::{
     TaskBackground,
 };
 use crate::module::Module;
-use crate::notify::{self, Emitter, Name, Namespace, NotificationId};
+use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::state::StateMut;
 
 /// TODO: docs.
@@ -25,8 +25,22 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
+    pub fn emit_err<Err>(&mut self, err: Err)
+    where
+        Err: notify::Error,
+    {
+        self.state.emit_err(self.namespace, err);
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
-        self.emit_info_inner(message, None)
+        self.state.emitter().emit(notify::Notification {
+            level: notify::Level::Info,
+            namespace: self.namespace,
+            message,
+            updates_prev: None,
+        })
     }
 
     /// TODO: docs.
@@ -76,33 +90,6 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
         M: Module<B>,
     {
         self.state.get_module::<M>()
-    }
-
-    #[inline]
-    pub(crate) fn as_mut(&mut self) -> NeovimCtx<'_, B> {
-        NeovimCtx { namespace: self.namespace, state: self.state.as_mut() }
-    }
-
-    #[inline]
-    pub(crate) fn emit_err<Err>(&mut self, action_name: Option<Name>, err: Err)
-    where
-        Err: notify::Error,
-    {
-        self.state.emit_err(self.namespace, err);
-    }
-
-    #[inline]
-    pub(crate) fn emit_info_inner(
-        &mut self,
-        message: notify::Message,
-        action_name: Option<Name>,
-    ) -> NotificationId {
-        self.state.emitter().emit(notify::Notification {
-            level: notify::Level::Info,
-            namespace: self.namespace,
-            message,
-            updates_prev: None,
-        })
     }
 
     #[inline]
