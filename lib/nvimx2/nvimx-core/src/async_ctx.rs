@@ -41,6 +41,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
     }
 
     /// TODO: docs.
+    #[track_caller]
     #[inline]
     pub fn with_ctx<Fun, Out>(&self, fun: Fun) -> Out
     where

@@ -1,7 +1,9 @@
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
+use core::panic::AssertUnwindSafe;
 #[cfg(debug_assertions)]
 use core::panic::Location;
+use std::panic;
 use std::rc::Rc;
 
 /// TODO: docs
@@ -131,11 +133,9 @@ impl<T> WithCell<T> {
                 // safe.
                 let value = unsafe { &*self.value.get() };
 
-                let res = fun(value);
-
+                let res = panic::catch_unwind(AssertUnwindSafe(|| fun(value)));
                 self.borrow.set(prev);
-
-                Ok(res)
+                res.map_err(|payload| panic::resume_unwind(payload))
             },
             Borrow::Exclusive(excl) => Err(BorrowError::new_exclusive(excl)),
         }
@@ -154,11 +154,9 @@ impl<T> WithCell<T> {
                 // reference is safe.
                 let value = unsafe { &mut *self.value.get() };
 
-                let res = fun(value);
-
+                let res = panic::catch_unwind(AssertUnwindSafe(|| fun(value)));
                 self.borrow.set(Borrow::None);
-
-                Ok(res)
+                res.map_err(|payload| panic::resume_unwind(payload))
             },
             Borrow::Shared(shrd) => Err(BorrowError::new_shared(shrd)),
             Borrow::Exclusive(excl) => Err(BorrowError::new_exclusive(excl)),
@@ -377,5 +375,14 @@ mod tests {
         shared.with_mut(|_value| {
             shared.with_mut(|_also_value| {});
         });
+    }
+
+    #[test]
+    fn borrow_is_reset_even_if_closure_panics() {
+        let shared = Shared::new(0);
+        let _ = panic::catch_unwind(AssertUnwindSafe(|| {
+            shared.with_mut(|_| panic!())
+        }));
+        assert!(shared.try_with_mut(|_| ()).is_ok());
     }
 }
