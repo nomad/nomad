@@ -225,7 +225,7 @@ impl CommandCompletionsBuilder {
     fn complete(
         &mut self,
         mut args: CommandArgs,
-        offset: ByteOffset,
+        mut offset: ByteOffset,
     ) -> Vec<CommandCompletion> {
         debug_assert!(offset <= args.byte_len());
 
@@ -253,15 +253,12 @@ impl CommandCompletionsBuilder {
                 .copied()
                 .map(CommandCompletion::from_static_str)
                 .collect();
+        } else {
+            offset -= arg.end();
         }
 
-        let start_from = arg.end();
-        let s = &args.as_str()[start_from.into()..];
-        let args = CommandArgs::new(s);
-        let offset = offset - start_from;
-
         if let Some(command) = self.handlers.get_mut(arg.as_str()) {
-            (command)(args, offset - start_from)
+            (command)(args, offset)
         } else if let Some(submodule) = self.submodules.get_mut(arg.as_str()) {
             submodule.complete(args, offset)
         } else {

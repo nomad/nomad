@@ -85,6 +85,12 @@ impl<'a> CommandArgs<'a> {
 
     /// TODO: docs.
     #[inline]
+    pub fn as_str(&self) -> &'a str {
+        self.inner
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn byte_len(&self) -> ByteOffset {
         self.as_str().len().into()
     }
@@ -133,11 +139,6 @@ impl<'a> CommandArgs<'a> {
             prev = Some(arg);
         }
         CommandCursor::BetweenArgs { prev, next: None }
-    }
-
-    #[inline]
-    pub(crate) fn as_str(&self) -> &'a str {
-        self.inner
     }
 
     #[inline]
