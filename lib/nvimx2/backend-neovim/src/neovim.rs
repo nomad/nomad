@@ -1,8 +1,8 @@
 use ::serde::{Deserialize, Serialize};
-use nvimx_core::Plugin;
 use nvimx_core::backend::Backend;
 use nvimx_core::module::Module;
 use nvimx_core::notify::Namespace;
+use nvimx_core::plugin::Plugin;
 
 use crate::{api, executor, notify, serde, value};
 

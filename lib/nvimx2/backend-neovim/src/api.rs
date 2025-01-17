@@ -1,10 +1,11 @@
 //! TODO: docs.
 
+use nvimx_core::ByteOffset;
 use nvimx_core::backend::Api;
 use nvimx_core::command::{CommandArgs, CommandCompletion};
 use nvimx_core::module::Module;
 use nvimx_core::notify::Name;
-use nvimx_core::{ByteOffset, Plugin};
+use nvimx_core::plugin::Plugin;
 
 use crate::Neovim;
 use crate::oxi::{Dictionary, Function, Object, api};
