@@ -1,7 +1,7 @@
 use core::any::TypeId;
 use core::panic;
 
-use futures_util::FutureExt;
+use futures_lite::FutureExt;
 
 use crate::AsyncCtx;
 use crate::backend::{
@@ -56,17 +56,14 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn spawn_background<Fut>(
-        &mut self,
-        fut: Fut,
-    ) -> TaskBackground<Fut::Output, B>
+    pub fn spawn_background<Fut>(&mut self, fut: Fut)
     where
-        Fut: Future + Send + 'static,
-        Fut::Output: Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
     {
-        TaskBackground::new(
+        TaskBackground::<(), B>::new(
             self.backend_mut().background_executor().spawn(fut),
         )
+        .detach();
     }
 
     /// TODO: docs.
