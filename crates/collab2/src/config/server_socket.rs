@@ -10,14 +10,12 @@ pub(crate) struct ServerSocket {
 }
 
 impl Default for ServerSocket {
-    #[inline]
     fn default() -> Self {
         Self { inner: "collab.nomad.foo:64420".to_owned().into() }
     }
 }
 
 impl fmt::Debug for ServerSocket {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("ServerSocket").field(&self.inner).finish()
     }
@@ -26,14 +24,12 @@ impl fmt::Debug for ServerSocket {
 impl Deref for ServerSocket {
     type Target = str;
 
-    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
 impl<'de> Deserialize<'de> for ServerSocket {
-    #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

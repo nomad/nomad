@@ -12,7 +12,6 @@ pub struct EmitVersion {}
 
 impl EmitVersion {
     /// Creates a new [`EmitVersion`].
-    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
