@@ -23,11 +23,14 @@ impl<B: Backend> Module<B> for Mad {
     type Config = Empty;
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
+        let collab = collab2::Collab::default();
+
         ctx.with_command(auth::Login::new())
             .with_command(auth::Logout::new())
             .with_command(version::EmitVersion::new())
+            .with_command(collab.start())
             .with_constant(version::VERSION)
-            .with_module(collab2::Collab::default());
+            .with_module(collab);
     }
 
     fn on_new_config(&self, _: Self::Config, _: &mut NeovimCtx<B>) {}
