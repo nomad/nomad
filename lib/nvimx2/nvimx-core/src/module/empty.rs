@@ -43,7 +43,7 @@ impl<'de> de::Deserialize<'de> for Empty {
                     .is_none()
                     .then_some(Empty)
                     .ok_or_else(|| {
-                        de::Error::invalid_type(
+                        de::Error::invalid_value(
                             de::Unexpected::Map,
                             &"an empty map",
                         )
@@ -60,7 +60,7 @@ impl<'de> de::Deserialize<'de> for Empty {
                     .is_none()
                     .then_some(Empty)
                     .ok_or_else(|| {
-                        de::Error::invalid_type(
+                        de::Error::invalid_value(
                             de::Unexpected::Seq,
                             &"an empty sequence",
                         )
