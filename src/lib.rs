@@ -23,13 +23,15 @@ impl<B: Backend> Module<B> for Mad {
     type Config = Empty;
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
+        let auth = auth::Auth::default();
         let collab = collab2::Collab::default();
 
-        ctx.with_command(auth::Login::new())
-            .with_command(auth::Logout::new())
-            .with_command(version::EmitVersion::new())
+        ctx.with_command(auth.login())
+            .with_command(auth.logout())
             .with_command(collab.start())
+            .with_command(version::EmitVersion::new())
             .with_constant(version::VERSION)
+            .with_module(auth)
             .with_module(collab);
     }
 
