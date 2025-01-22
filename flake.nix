@@ -40,6 +40,9 @@
               buildInputs =
                 with pkgs;
                 [
+                  # Needed to build mlua's vendored version of LuaJIT.
+                  gcc
+                  make
                 ]
                 ++ lib.optional stdenv.isDarwin [
                   # Not sure who needs these

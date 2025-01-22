@@ -7,6 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
+neovim-mlua = ["backend-neovim/mlua"]
 neovim-0-10 = ["__neovim", "backend-neovim/neovim-0-10"]
 neovim-nightly = ["__neovim", "backend-neovim/neovim-nightly"]
 __neovim = ["dep:backend-neovim", "nvimx2-macros/plugin"]

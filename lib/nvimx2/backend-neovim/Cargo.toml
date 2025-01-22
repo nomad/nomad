@@ -8,6 +8,7 @@ publish.workspace = true
 
 [features]
 default = ["neovim-nightly"]
+mlua = ["nvim-oxi/mlua", "nvim-oxi/__vendored_luajit"]
 neovim-0-10 = ["nvim-oxi/neovim-0-10"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
