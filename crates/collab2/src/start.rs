@@ -3,7 +3,7 @@ use nvimx2::action::AsyncAction;
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::{self, Name};
-use nvimx2::{AsyncCtx, Shared};
+use nvimx2::{AsyncCtx, Shared, fs};
 
 use crate::Collab;
 use crate::config::Config;
@@ -16,6 +16,8 @@ pub struct Start {
 }
 
 pub enum StartError {
+    InvalidBufferPath(String),
+    NoBufferFocused,
     UserNotLoggedIn,
 }
 
@@ -27,12 +29,24 @@ impl<B: Backend> AsyncAction<B> for Start {
     async fn call(
         &mut self,
         _: Self::Args,
-        _: &mut AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), StartError> {
         let _auth_infos = self
             .auth_infos
             .with(|infos| infos.as_ref().cloned())
             .ok_or(StartError::UserNotLoggedIn)?;
+
+        let _buffer_path: fs::AbsPathBuf = ctx.with_ctx(|ctx| {
+            ctx.current_buffer().ok_or(StartError::NoBufferFocused).and_then(
+                |buffer| {
+                    buffer.name().parse().map_err(|_| {
+                        StartError::InvalidBufferPath(
+                            buffer.name().into_owned(),
+                        )
+                    })
+                },
+            )
+        })?;
 
         Ok(())
     }
