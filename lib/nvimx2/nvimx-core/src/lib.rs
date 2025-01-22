@@ -8,6 +8,7 @@ mod async_ctx;
 pub mod backend;
 mod byte_offset;
 pub mod command;
+pub mod fs;
 pub mod module;
 mod neovim_ctx;
 pub mod notify;

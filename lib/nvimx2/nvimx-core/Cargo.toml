@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 compact_str = { workspace = true }
+eerie = { workspace = true }
 futures-lite = { workspace = true, features = ["std"] }
 fxhash = { workspace = true }
 pin-project-lite = { workspace = true }
