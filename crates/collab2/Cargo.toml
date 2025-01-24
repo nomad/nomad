@@ -7,13 +7,14 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-neovim = ["nvimx2/neovim-0-10", "nvimx2/neovim-mlua"]
+neovim = ["nvimx2/neovim-0-10", "nvimx2/neovim-mlua", "dep:home"]
 
 [dependencies]
 auth = { workspace = true }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
+
+home = { version = "0.5", optional = true }
 
 [lints]
 workspace = true

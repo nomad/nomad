@@ -46,6 +46,7 @@ mod neovim {
 
     pub enum NeovimHomeDirError {
         CouldntFindHome,
+        InvalidHomeDir(fs::AbsPathFromPathError),
     }
 
     impl CollabBackend for Neovim {
@@ -103,7 +104,12 @@ mod neovim {
         async fn home_dir(
             &mut self,
         ) -> Result<AbsPathBuf, Self::HomeDirError> {
-            todo!()
+            match home::home_dir() {
+                Some(home_dir) if !home_dir.as_os_str().is_empty() => home_dir
+                    .try_into()
+                    .map_err(NeovimHomeDirError::InvalidHomeDir),
+                _ => Err(NeovimHomeDirError::CouldntFindHome),
+            }
         }
     }
 

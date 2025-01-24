@@ -537,9 +537,9 @@ name = "collab2"
 version = "0.1.0-dev"
 dependencies = [
  "auth",
+ "home",
  "nvimx2",
  "serde",
- "thiserror 2.0.4",
 ]
 
 [[package]]
@@ -694,7 +694,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "eerie"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/eerie.git#931f523eccfdc1a2be56940378fac2758f69bead"
+source = "git+ssh://git@github.com/nomad/eerie.git#02dc5816e161f2f813265ceb24df76ab4f8a457d"
 dependencies = [
  "cola",
  "compact_str",
