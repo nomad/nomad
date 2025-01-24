@@ -7,13 +7,19 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-neovim = ["nvimx2/neovim-0-10", "nvimx2/neovim-mlua", "dep:home"]
+neovim = [
+  "nvimx2/neovim-0-10",
+  "nvimx2/neovim-mlua",
+  "dep:futures-util",
+  "dep:home",
+]
 
 [dependencies]
 auth = { workspace = true }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
+futures-util = { workspace = true, optional = true, features = ["async-await-macro"] }
 home = { version = "0.5", optional = true }
 
 [lints]

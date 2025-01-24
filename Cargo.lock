@@ -537,6 +537,7 @@ name = "collab2"
 version = "0.1.0-dev"
 dependencies = [
  "auth",
+ "futures-util",
  "home",
  "nvimx2",
  "serde",
