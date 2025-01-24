@@ -539,6 +539,7 @@ dependencies = [
  "auth",
  "nvimx2",
  "serde",
+ "thiserror 2.0.4",
 ]
 
 [[package]]
