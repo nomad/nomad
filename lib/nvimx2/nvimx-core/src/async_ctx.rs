@@ -26,6 +26,12 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     /// TODO: docs.
     #[inline]
+    pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
+        self.emit_message(notify::Level::Info, message)
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn spawn_background<Fut>(
         &self,
         fut: Fut,
@@ -54,6 +60,15 @@ impl<B: Backend> AsyncCtx<'_, B> {
             #[allow(deprecated)]
             fun(&mut NeovimCtx::new(&self.namespace, self.plugin_id, state))
         })
+    }
+
+    #[inline]
+    pub(crate) fn emit_message(
+        &mut self,
+        level: notify::Level,
+        message: notify::Message,
+    ) -> NotificationId {
+        self.with_ctx(move |ctx| ctx.emit_message(level, message))
     }
 
     #[inline]
