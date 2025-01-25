@@ -185,7 +185,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auth"
 version = "0.1.0-dev"
 dependencies = [
- "collab-message",
+ "collab-server",
  "nvimx2",
 ]
 
@@ -453,7 +453,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#540d69c8997c25075aead7cf8c5fab0bf84fb945"
+source = "git+ssh://git@github.com/nomad/collab.git#cda097467ea66a699e1084b01436bf1a3583e1ef"
 dependencies = [
  "bincode",
  "bytes",
@@ -507,7 +507,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#540d69c8997c25075aead7cf8c5fab0bf84fb945"
+source = "git+ssh://git@github.com/nomad/collab.git#cda097467ea66a699e1084b01436bf1a3583e1ef"
 dependencies = [
  "codecs",
  "eerie",
@@ -520,7 +520,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#540d69c8997c25075aead7cf8c5fab0bf84fb945"
+source = "git+ssh://git@github.com/nomad/collab.git#cda097467ea66a699e1084b01436bf1a3583e1ef"
 dependencies = [
  "codecs",
  "collab-message",

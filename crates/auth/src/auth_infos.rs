@@ -1,7 +1,13 @@
-use collab_message::GitHubHandle;
+use collab_server::configs::nomad::NomadAuthenticateInfos;
 
 /// TODO: docs.
 #[derive(Debug, Clone)]
 pub struct AuthInfos {
-    _github_handle: GitHubHandle,
+    inner: NomadAuthenticateInfos,
+}
+
+impl From<AuthInfos> for NomadAuthenticateInfos {
+    fn from(auth_infos: AuthInfos) -> Self {
+        auth_infos.inner
+    }
 }

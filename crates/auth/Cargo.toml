@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-collab-message = { git = "ssh://git@github.com/nomad/collab.git" }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
 nvimx2 = { workspace = true }
 
 [lints]
