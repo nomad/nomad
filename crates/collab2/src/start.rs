@@ -8,7 +8,7 @@ use nvimx2::notify::{self, Name};
 use nvimx2::{AsyncCtx, Shared};
 
 use crate::Collab;
-use crate::collab_backend::{CollabBackend, StartArgs};
+use crate::backend::{CollabBackend, StartArgs};
 use crate::config::Config;
 
 /// The [`Action`] used to start a new collaborative editing session.
