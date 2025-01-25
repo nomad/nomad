@@ -18,6 +18,7 @@ neovim = [
 [dependencies]
 async-channel = "2.3"
 auth = { workspace = true }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client"] }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 

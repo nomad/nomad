@@ -7,14 +7,15 @@ use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::{self, Name};
 use nvimx2::{AsyncCtx, Shared};
 
+use crate::Collab;
+use crate::collab_backend::{CollabBackend, StartArgs};
 use crate::config::Config;
-use crate::{Collab, CollabBackend};
 
 /// The [`Action`] used to start a new collaborative editing session.
 #[derive(Clone)]
 pub struct Start {
     auth_infos: Shared<Option<AuthInfos>>,
-    _config: Shared<Config>,
+    config: Shared<Config>,
     _session_tx: Sender<()>,
 }
 
@@ -22,6 +23,7 @@ pub struct Start {
 pub enum StartError<B: CollabBackend> {
     NoBufferFocused(NoBufferFocusedError<B>),
     SearchProjectRoot(B::SearchProjectRootError),
+    StartSession(B::StartSessionError),
     UserNotLoggedIn(UserNotLoggedInError<B>),
 }
 
@@ -38,7 +40,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start {
         _: Self::Args,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), StartError<B>> {
-        let _auth_infos = self
+        let auth_infos = self
             .auth_infos
             .with(|infos| infos.as_ref().cloned())
             .ok_or_else(StartError::user_not_logged_in)?;
@@ -57,6 +59,16 @@ impl<B: CollabBackend> AsyncAction<B> for Start {
             return Ok(());
         }
 
+        let start_args = StartArgs {
+            _auth_infos: &auth_infos,
+            _project_root: &project_root,
+            _server_address: &self.config.with(|c| c.server_address.clone()),
+        };
+
+        let _start_infos = B::start_session(start_args, ctx)
+            .await
+            .map_err(StartError::StartSession)?;
+
         Ok(())
     }
 }
@@ -69,7 +81,7 @@ impl From<&Collab> for Start {
     fn from(collab: &Collab) -> Self {
         Self {
             auth_infos: collab.auth_infos.clone(),
-            _config: collab.config.clone(),
+            config: collab.config.clone(),
             _session_tx: collab.session_tx.clone(),
         }
     }
@@ -90,6 +102,7 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
         match self {
             StartError::NoBufferFocused(err) => err.to_message(),
             StartError::SearchProjectRoot(err) => err.to_message(),
+            StartError::StartSession(err) => err.to_message(),
             StartError::UserNotLoggedIn(err) => err.to_message(),
         }
     }

@@ -1,6 +1,10 @@
+use collab_server::message::{Message, PeerId};
+use futures_util::{Sink, Stream};
 use nvimx2::backend::{Backend, Buffer, BufferId};
 use nvimx2::fs::{self, AbsPathBuf};
 use nvimx2::{AsyncCtx, notify};
+
+use crate::config;
 
 /// A [`Backend`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -10,6 +14,22 @@ pub trait CollabBackend:
     /// The type of error returned by
     /// [`search_project_root`](CollabBackend::search_project_root).
     type SearchProjectRootError: notify::Error;
+
+    /// TODO: docs.
+    type ServerTx: Sink<Message, Error = Self::ServerTxError>;
+
+    /// TODO: docs.
+    type ServerRx: Stream<Item = Result<Message, Self::ServerRxError>>;
+
+    /// TODO: docs.
+    type ServerTxError: notify::Error;
+
+    /// TODO: docs.
+    type ServerRxError: notify::Error;
+
+    /// The type of error returned by
+    /// [`start_session`](CollabBackend::start_session).
+    type StartSessionError: notify::Error;
 
     /// Asks the user to confirm starting a new collaborative editing session
     /// rooted at the given path.
@@ -24,6 +44,12 @@ pub trait CollabBackend:
         buffer_id: BufferId<Self>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::SearchProjectRootError>>;
+
+    /// TODO: docs.
+    fn start_session(
+        args: StartArgs<'_>,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Result<StartInfos<Self>, Self::StartSessionError>>;
 }
 
 /// A [`Buffer`] subtrait defining additional capabilities needed by the
@@ -51,6 +77,30 @@ pub trait CollabFs: fs::Fs {
     fn home_dir(
         &mut self,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
+}
+
+/// TODO: docs.
+pub struct StartArgs<'a> {
+    /// TODO: docs.
+    pub(crate) _server_address: &'a config::ServerAddress,
+
+    /// TODO: docs.
+    pub(crate) _auth_infos: &'a auth::AuthInfos,
+
+    /// TODO: docs.
+    pub(crate) _project_root: &'a fs::AbsPath,
+}
+
+/// TODO: docs.
+pub struct StartInfos<B: CollabBackend> {
+    /// TODO: docs.
+    pub(crate) _peer_id: PeerId,
+
+    /// TODO: docs.
+    pub(crate) _server_tx: B::ServerTx,
+
+    /// TODO: docs.
+    pub(crate) _server_rx: B::ServerRx,
 }
 
 #[cfg(feature = "neovim")]
@@ -119,6 +169,7 @@ mod neovim {
     use core::fmt;
     use std::path::PathBuf;
 
+    use collab_server::message;
     use mlua::{Function, Table};
     use nvimx2::fs::{self, AbsPath};
     use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua, oxi};
@@ -144,6 +195,13 @@ mod neovim {
 
     impl CollabBackend for Neovim {
         type SearchProjectRootError = NeovimSearchProjectRootError;
+        type ServerTx = futures_util::sink::Drain<message::Message>;
+        type ServerRx = futures_util::stream::Pending<
+            Result<message::Message, Self::ServerRxError>,
+        >;
+        type ServerTxError = core::convert::Infallible;
+        type ServerRxError = core::convert::Infallible;
+        type StartSessionError = core::convert::Infallible;
 
         async fn confirm_start(
             project_root: &fs::AbsPath,
@@ -180,6 +238,13 @@ mod neovim {
             default_search_project_root::search(buffer, ctx)
                 .await
                 .map_err(|inner| NeovimSearchProjectRootError { inner })
+        }
+
+        async fn start_session(
+            _args: StartArgs<'_>,
+            _: &mut AsyncCtx<'_, Self>,
+        ) -> Result<StartInfos<Self>, Self::StartSessionError> {
+            todo!()
         }
     }
 

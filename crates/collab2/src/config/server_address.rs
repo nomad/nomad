@@ -5,7 +5,7 @@ use std::rc::Rc;
 use serde::de::{Deserialize, Deserializer};
 
 #[derive(Clone)]
-pub(crate) struct ServerAddress {
+pub struct ServerAddress {
     inner: Rc<str>,
 }
 
