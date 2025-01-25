@@ -11,6 +11,13 @@ pub trait CollabBackend:
     /// [`search_project_root`](CollabBackend::search_project_root).
     type SearchProjectRootError: notify::Error;
 
+    /// Asks the user to confirm starting a new collaborative editing session
+    /// rooted at the given path.
+    fn confirm_start(
+        project_root: &fs::AbsPath,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = bool>;
+
     /// Searches for the root of the project containing the buffer with the
     /// given ID.
     fn search_project_root(
@@ -129,6 +136,13 @@ mod neovim {
 
     impl CollabBackend for Neovim {
         type SearchProjectRootError = NeovimSearchProjectRootError;
+
+        async fn confirm_start(
+            _project_root: &fs::AbsPath,
+            _: &mut AsyncCtx<'_, Self>,
+        ) -> bool {
+            todo!()
+        }
 
         async fn search_project_root(
             buffer: NeovimBuffer,

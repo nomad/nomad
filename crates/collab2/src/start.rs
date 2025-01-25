@@ -49,9 +49,13 @@ impl<B: CollabBackend> AsyncAction<B> for Start {
                 .ok_or_else(StartError::no_buffer_focused)
         })?;
 
-        let _project_root = B::search_project_root(buffer_id, ctx)
+        let project_root = B::search_project_root(buffer_id, ctx)
             .await
             .map_err(StartError::SearchProjectRoot)?;
+
+        if !B::confirm_start(&project_root, ctx).await {
+            return Ok(());
+        }
 
         Ok(())
     }
