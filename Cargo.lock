@@ -544,6 +544,7 @@ dependencies = [
  "futures-util",
  "home",
  "nvimx2",
+ "pin-project-lite",
  "serde",
  "smol_str",
 ]

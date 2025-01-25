@@ -10,6 +10,7 @@ publish.workspace = true
 neovim = [
   "dep:async-net",
   "dep:home",
+  "dep:pin-project-lite",
   "dep:smol_str",
   "futures-util/async-await-macro",
   "nvimx2/neovim-0-10",
@@ -26,6 +27,7 @@ serde = { workspace = true, features = ["derive"] }
 
 async-net = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }
+pin-project-lite = { workspace = true, optional = true }
 smol_str = { workspace = true, optional = true }
 
 [lints]

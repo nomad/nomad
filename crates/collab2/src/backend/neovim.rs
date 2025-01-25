@@ -1,11 +1,14 @@
 use core::fmt;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use std::io;
 use std::path::PathBuf;
 
 use async_net::TcpStream;
 use collab_server::configs::nomad;
 use collab_server::{SessionIntent, client, message};
-use futures_util::AsyncReadExt;
+use futures_util::io::{ReadHalf, WriteHalf};
+use futures_util::{AsyncReadExt, Sink, Stream};
 use mlua::{Function, Table};
 use nvimx2::fs::{self, AbsPath};
 use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua, oxi};
@@ -13,11 +16,34 @@ use smol_str::ToSmolStr;
 
 use crate::backend::*;
 
+pin_project_lite::pin_project! {
+    pub struct NeovimServerTx {
+        #[pin]
+        inner: client::ClientTx<WriteHalf<TcpStream>>,
+    }
+}
+
+pin_project_lite::pin_project! {
+    pub struct NeovimServerRx {
+        #[pin]
+        inner: client::ClientRx<ReadHalf<TcpStream>>,
+    }
+}
+
+pub struct NeovimServerTxError {
+    inner: io::Error,
+}
+
+pub struct NeovimServerRxError {
+    inner: client::ClientRxError,
+}
+
 pub struct NeovimSearchProjectRootError {
     inner: default_search_project_root::Error<Neovim>,
 }
 
 pub enum NeovimStartSessionError {
+    Knock(client::KnockError<nomad::NomadAuthenticator>),
     TcpConnect(io::Error),
 }
 
@@ -35,12 +61,10 @@ struct TildePath<'a> {
 
 impl CollabBackend for Neovim {
     type SearchProjectRootError = NeovimSearchProjectRootError;
-    type ServerTx = futures_util::sink::Drain<message::Message>;
-    type ServerRx = futures_util::stream::Pending<
-        Result<message::Message, Self::ServerRxError>,
-    >;
-    type ServerTxError = core::convert::Infallible;
-    type ServerRxError = core::convert::Infallible;
+    type ServerTx = NeovimServerTx;
+    type ServerRx = NeovimServerRx;
+    type ServerTxError = NeovimServerTxError;
+    type ServerRxError = NeovimServerRxError;
     type StartSessionError = NeovimStartSessionError;
 
     async fn confirm_start(
@@ -94,12 +118,17 @@ impl CollabBackend for Neovim {
             session_intent: SessionIntent::StartNew,
         };
 
-        let _welcome =
+        let welcome =
             client::Knocker::<_, _, nomad::NomadConfig>::new(reader, writer)
                 .knock(knock)
-                .await;
+                .await
+                .map_err(NeovimStartSessionError::Knock)?;
 
-        todo!()
+        Ok(StartInfos {
+            peer_id: welcome.peer_id,
+            server_tx: NeovimServerTx { inner: welcome.tx },
+            server_rx: NeovimServerRx { inner: welcome.rx },
+        })
     }
 }
 
@@ -156,6 +185,56 @@ impl CollabFs for NeovimFs {
             },
             _ => Err(NeovimHomeDirError::CouldntFindHome),
         }
+    }
+}
+
+impl Sink<message::Message> for NeovimServerTx {
+    type Error = NeovimServerTxError;
+
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Sink::<message::Message>::poll_ready(self.project().inner, ctx)
+            .map_err(|err| NeovimServerTxError { inner: err })
+    }
+
+    fn start_send(
+        self: Pin<&mut Self>,
+        item: message::Message,
+    ) -> Result<(), Self::Error> {
+        Sink::<message::Message>::start_send(self.project().inner, item)
+            .map_err(|err| NeovimServerTxError { inner: err })
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Sink::<message::Message>::poll_flush(self.project().inner, ctx)
+            .map_err(|err| NeovimServerTxError { inner: err })
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Sink::<message::Message>::poll_close(self.project().inner, ctx)
+            .map_err(|err| NeovimServerTxError { inner: err })
+    }
+}
+
+impl Stream for NeovimServerRx {
+    type Item = Result<message::Message, NeovimServerRxError>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        self.project()
+            .inner
+            .poll_next(ctx)
+            .map_err(|err| NeovimServerRxError { inner: err })
     }
 }
 
@@ -230,6 +309,18 @@ impl notify::Error for NeovimHomeDirError {
         }
 
         (notify::Level::Error, msg)
+    }
+}
+
+impl notify::Error for NeovimServerTxError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        todo!();
+    }
+}
+
+impl notify::Error for NeovimServerRxError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        todo!();
     }
 }
 
