@@ -2,11 +2,13 @@ use nvimx2::backend::{Backend, Buffer, BufferId};
 use nvimx2::fs::{self, AbsPathBuf};
 use nvimx2::{AsyncCtx, notify};
 
-/// TODO: docs.
+/// A [`Backend`] subtrait defining additional capabilities needed by the
+/// actions in this crate.
 pub trait CollabBackend:
     Backend<Buffer: CollabBuffer<Self>, Fs: CollabFs>
 {
-    /// TODO: docs.
+    /// The type of error returned by
+    /// [`search_project_root`](CollabBackend::search_project_root).
     type SearchProjectRootError: notify::Error;
 
     /// Searches for the root of the project containing the buffer with the
@@ -17,24 +19,28 @@ pub trait CollabBackend:
     ) -> impl Future<Output = Result<AbsPathBuf, Self::SearchProjectRootError>>;
 }
 
-/// TODO: docs.
+/// A [`Buffer`] subtrait defining additional capabilities needed by the
+/// actions in this crate.
 pub trait CollabBuffer<B: CollabBackend>: Buffer<B> {
-    /// TODO: docs.
+    /// The type of error returned by [`lsp_root`](CollabBuffer::lsp_root).
     type LspRootError;
 
-    /// TODO: docs.
+    /// Returns the path to the root of the workspace containing the buffer
+    /// with the given ID, or `None` if there's no language server attached to
+    /// it.
     fn lsp_root(
         buffer_id: BufferId<B>,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
 }
 
-/// TODO: docs.
+/// A [`Fs`](fs::Fs) subtrait defining additional capabilities needed by the
+/// actions in this crate.
 pub trait CollabFs: fs::Fs {
-    /// TODO: docs.
+    /// The type of error returned by [`CollabFs`](CollabFs::home_dir).
     type HomeDirError;
 
-    /// TODO: docs.
+    /// Returns the absolute path to the user's home directory.
     fn home_dir(
         &mut self,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
@@ -82,7 +88,7 @@ mod default_search_project_root {
         };
 
         if let Some(res) = args.find(&mut fs).await.transpose() {
-            return res.map_err(Error::MarkedRoot);
+            return res.map_err(Error::FindRoot);
         }
 
         buffer_path
@@ -91,24 +97,13 @@ mod default_search_project_root {
             .ok_or(Error::CouldntFindRoot(buffer_path))
     }
 
-    pub(crate) enum Error<B: CollabBackend> {
-        /// The buffer's name is not an absolute path.
+    pub(super) enum Error<B: CollabBackend> {
         BufNameNotAbsolutePath(String),
-
-        /// TODO: docs.
-        Lsp(<B::Buffer as CollabBuffer<B>>::LspRootError),
-
-        /// TODO: docs.
-        MarkedRoot(root_markers::FindRootError<B::Fs, Markers>),
-
-        /// An error occured while searching for the home directory.
-        HomeDir(<B::Fs as CollabFs>::HomeDirError),
-
-        /// There's no buffer with the given ID.
-        InvalidBufId(BufferId<B>),
-
-        /// TODO: docs.
         CouldntFindRoot(fs::AbsPathBuf),
+        FindRoot(root_markers::FindRootError<B::Fs, Markers>),
+        HomeDir(<B::Fs as CollabFs>::HomeDirError),
+        InvalidBufId(BufferId<B>),
+        Lsp(<B::Buffer as CollabBuffer<B>>::LspRootError),
     }
 }
 
@@ -220,7 +215,7 @@ mod neovim {
                         .push_invalid(lsp_root)
                         .push_str(" is not an absolute path");
                 },
-                MarkedRoot(err) => return err.to_message(),
+                FindRoot(err) => return err.to_message(),
                 HomeDir(err) => return err.to_message(),
                 InvalidBufId(buf) => {
                     msg.push_str("there's no buffer whose handle is ")
@@ -307,27 +302,18 @@ mod root_markers {
     }
 
     pub struct FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
-        /// TODO: docs.
+        /// The path to the file or directory at which the error occurred.
         pub path: fs::AbsPathBuf,
 
-        /// TODO: docs.
+        /// The kind of error that occurred.
         pub kind: FindRootErrorKind<Fs, M>,
     }
 
     pub enum FindRootErrorKind<Fs: fs::Fs, M: RootMarker<Fs>> {
-        /// TODO: docs.
         DirEntry(DirEntryError<Fs>),
-
-        /// TODO: docs.
         Marker { dir_entry_name: Option<fs::FsNodeNameBuf>, err: M::Error },
-
-        /// TODO: docs.
         NodeAtStartPath(Fs::NodeAtPathError),
-
-        /// TODO: docs.
         ReadDir(Fs::ReadDirError),
-
-        /// TODO: docs.
         StartPathNotFound,
     }
 
