@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 
+use async_channel::Sender;
 use auth::AuthInfos;
 use nvimx2::action::AsyncAction;
 use nvimx2::command::ToCompletionFn;
@@ -14,6 +15,7 @@ use crate::{Collab, CollabBackend};
 pub struct Start {
     auth_infos: Shared<Option<AuthInfos>>,
     _config: Shared<Config>,
+    _session_tx: Sender<()>,
 }
 
 /// The type of error that can occur when [`Start`]ing a new session fails.
@@ -64,6 +66,7 @@ impl From<&Collab> for Start {
         Self {
             auth_infos: collab.auth_infos.clone(),
             _config: collab.config.clone(),
+            _session_tx: collab.session_tx.clone(),
         }
     }
 }

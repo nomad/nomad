@@ -537,6 +537,7 @@ dependencies = [
 name = "collab2"
 version = "0.1.0-dev"
 dependencies = [
+ "async-channel",
  "auth",
  "futures-util",
  "home",

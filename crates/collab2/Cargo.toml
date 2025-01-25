@@ -16,6 +16,7 @@ neovim = [
 ]
 
 [dependencies]
+async-channel = "2.3"
 auth = { workspace = true }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
