@@ -8,6 +8,7 @@ use crate::backend::{
     ApiValue,
     BackgroundExecutor,
     Buffer,
+    BufferId,
     Key,
     LocalExecutor,
     MapAccess,
@@ -49,6 +50,9 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     fn init() -> Self;
+
+    /// TODO: docs.
+    fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer>;
 
     /// TODO: docs.
     fn current_buffer(&mut self) -> Option<Self::Buffer>;

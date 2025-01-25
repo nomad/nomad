@@ -6,6 +6,7 @@ use futures_lite::FutureExt;
 use crate::backend::{
     Backend,
     BackgroundExecutor,
+    BufferId,
     LocalExecutor,
     Task,
     TaskBackground,
@@ -27,6 +28,15 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     #[inline]
     pub fn backend_mut(&mut self) -> &mut B {
         &mut self.state
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn buffer(
+        &mut self,
+        buffer_id: BufferId<B>,
+    ) -> Option<BufferCtx<'_, B>> {
+        self.backend_mut().buffer(buffer_id).map(BufferCtx::new)
     }
 
     /// TODO: docs.

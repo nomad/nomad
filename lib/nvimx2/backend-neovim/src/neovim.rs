@@ -38,6 +38,11 @@ impl Backend for Neovim {
     }
 
     #[inline]
+    fn buffer(&mut self, buf: NeovimBuffer) -> Option<Self::Buffer> {
+        buf.exists().then_some(buf)
+    }
+
+    #[inline]
     fn fs(&mut self) -> Self::Fs {
         Self::Fs::default()
     }
