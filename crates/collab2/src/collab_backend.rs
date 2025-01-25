@@ -116,11 +116,12 @@ mod default_search_project_root {
 
 #[cfg(feature = "neovim")]
 mod neovim {
+    use core::fmt;
     use std::path::PathBuf;
 
     use mlua::{Function, Table};
-    use nvimx2::fs;
-    use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua};
+    use nvimx2::fs::{self, AbsPath};
+    use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua, oxi};
     use smol_str::ToSmolStr;
 
     use super::*;
@@ -134,14 +135,42 @@ mod neovim {
         InvalidHomeDir(PathBuf, fs::AbsPathFromPathError),
     }
 
+    /// An [`AbsPath`] wrapper whose `Display` impl replaces the path's home
+    /// directory with `~`.
+    struct TildePath<'a> {
+        path: &'a AbsPath,
+        home_dir: Option<&'a AbsPath>,
+    }
+
     impl CollabBackend for Neovim {
         type SearchProjectRootError = NeovimSearchProjectRootError;
 
         async fn confirm_start(
-            _project_root: &fs::AbsPath,
-            _: &mut AsyncCtx<'_, Self>,
+            project_root: &fs::AbsPath,
+            ctx: &mut AsyncCtx<'_, Self>,
         ) -> bool {
-            todo!()
+            let prompt = format!(
+                "Start collaborating on the project at \"{}\"?",
+                TildePath {
+                    path: project_root,
+                    home_dir: ctx.fs().home_dir().await.ok().as_deref(),
+                }
+            );
+
+            let options = ["Yes", "No"];
+
+            let Ok(choice) = oxi::api::call_function::<_, u8>(
+                "confirm",
+                (prompt, options.join("\n")),
+            ) else {
+                return false;
+            };
+
+            match choice {
+                0 | 2 => false,
+                1 => true,
+                _ => unreachable!("only provided {} options", options.len()),
+            }
         }
 
         async fn search_project_root(
@@ -273,6 +302,20 @@ mod neovim {
             }
 
             (notify::Level::Error, msg)
+        }
+    }
+
+    impl fmt::Display for TildePath<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Some(home_dir) = self.home_dir else {
+                return self.path.fmt(f);
+            };
+
+            if self.path.starts_with(home_dir) && self.path != home_dir {
+                write!(f, "~{}", &self.path[home_dir.len()..])
+            } else {
+                self.path.fmt(f)
+            }
         }
     }
 }
