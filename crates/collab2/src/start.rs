@@ -88,13 +88,13 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
     }
 }
 
-impl<B: CollabBackend> notify::Error for NoBufferFocusedError<B> {
+impl<B> notify::Error for NoBufferFocusedError<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         (notify::Level::Off, notify::Message::new())
     }
 }
 
-impl<B: CollabBackend> notify::Error for UserNotLoggedInError<B> {
+impl<B> notify::Error for UserNotLoggedInError<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         (notify::Level::Off, notify::Message::new())
     }
@@ -108,13 +108,20 @@ mod neovim_error_impls {
 
     impl notify::Error for NoBufferFocusedError<Neovim> {
         fn to_message(&self) -> (notify::Level, notify::Message) {
-            todo!();
+            let msg = "couldn't determine path to project root. Either move \
+                       the cursor to a text buffer, or pass one explicitly";
+            (notify::Level::Error, notify::Message::from_str(msg))
         }
     }
 
     impl notify::Error for UserNotLoggedInError<Neovim> {
         fn to_message(&self) -> (notify::Level, notify::Message) {
-            todo!();
+            let mut msg = notify::Message::from_str(
+                "need to be logged in to collaborate. You can log in by \
+                 executing ",
+            );
+            msg.push_expected(":Mad login");
+            (notify::Level::Error, msg)
         }
     }
 }
