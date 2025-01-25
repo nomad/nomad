@@ -39,7 +39,7 @@ mod neovim {
 
     pub type Markers = root_markers::GitDirectory;
 
-    pub enum NeovimFindProjectRootError {
+    pub enum NeovimSearchProjectRootError {
         LspRootDirNotAbsolute(fs::AbsPathNotAbsoluteError),
         CouldntFindRoot,
         HomeDir(NeovimHomeDirError),
@@ -54,7 +54,7 @@ mod neovim {
     }
 
     impl CollabBackend for Neovim {
-        type SearchProjectRootError = NeovimFindProjectRootError;
+        type SearchProjectRootError = NeovimSearchProjectRootError;
 
         async fn search_project_root(
             buffer: NeovimBuffer,
@@ -62,13 +62,13 @@ mod neovim {
         ) -> Result<AbsPathBuf, Self::SearchProjectRootError> {
             if let Some(lsp_root) = lsp_root(buffer) {
                 return lsp_root.as_str().try_into().map_err(
-                    NeovimFindProjectRootError::LspRootDirNotAbsolute,
+                    NeovimSearchProjectRootError::LspRootDirNotAbsolute,
                 );
             }
 
             let buffer_path =
                 buffer.name().parse::<AbsPathBuf>().map_err(|_| {
-                    NeovimFindProjectRootError::InvalidBufferPath(
+                    NeovimSearchProjectRootError::InvalidBufferPath(
                         buffer.name().into_owned(),
                     )
                 })?;
@@ -78,7 +78,7 @@ mod neovim {
             let home_dir = fs
                 .home_dir()
                 .await
-                .map_err(NeovimFindProjectRootError::HomeDir)?;
+                .map_err(NeovimSearchProjectRootError::HomeDir)?;
 
             let args = root_markers::FindRootArgs {
                 marker: MARKERS,
@@ -87,18 +87,18 @@ mod neovim {
             };
 
             if let Some(res) = args.find(&mut fs).await.transpose() {
-                return res.map_err(NeovimFindProjectRootError::MarkedRoot);
+                return res.map_err(NeovimSearchProjectRootError::MarkedRoot);
             }
 
             let buffer_parent = buffer_path
                 .parent()
-                .ok_or(NeovimFindProjectRootError::CouldntFindRoot)?;
+                .ok_or(NeovimSearchProjectRootError::CouldntFindRoot)?;
 
             fs.is_dir(buffer_parent)
                 .await
-                .map_err(NeovimFindProjectRootError::IsParentDir)?
+                .map_err(NeovimSearchProjectRootError::IsParentDir)?
                 .then(|| buffer_parent.to_owned())
-                .ok_or(NeovimFindProjectRootError::CouldntFindRoot)
+                .ok_or(NeovimSearchProjectRootError::CouldntFindRoot)
         }
     }
 
@@ -145,7 +145,7 @@ mod neovim {
             .ok()
     }
 
-    impl notify::Error for NeovimFindProjectRootError {
+    impl notify::Error for NeovimSearchProjectRootError {
         fn to_message(&self) -> (notify::Level, notify::Message) {
             todo!()
         }
