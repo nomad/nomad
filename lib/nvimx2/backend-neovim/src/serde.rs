@@ -169,9 +169,10 @@ impl notify::Error for NeovimDeserializeError {
                 .push_str("did you mean ")
                 .push_expected(best_guess)
                 .push_str("?");
-        } else {
+        } else if !expected.is_empty() {
             message
-                .push_str("expected one of ")
+                .push_str("expected ")
+                .push_str(if expected.len() > 1 { "one of " } else { "" })
                 .push_comma_separated(expected, notify::SpanKind::Expected);
         }
 
