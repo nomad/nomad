@@ -114,6 +114,8 @@ mod default_search_project_root {
 
 #[cfg(feature = "neovim")]
 mod neovim {
+    use std::path::PathBuf;
+
     use mlua::{Function, Table};
     use nvimx2::fs;
     use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua};
@@ -127,7 +129,7 @@ mod neovim {
 
     pub enum NeovimHomeDirError {
         CouldntFindHome,
-        InvalidHomeDir(fs::AbsPathFromPathError),
+        InvalidHomeDir(PathBuf, fs::AbsPathFromPathError),
     }
 
     impl CollabBackend for Neovim {
@@ -191,9 +193,11 @@ mod neovim {
             &mut self,
         ) -> Result<AbsPathBuf, Self::HomeDirError> {
             match home::home_dir() {
-                Some(home_dir) if !home_dir.as_os_str().is_empty() => home_dir
-                    .try_into()
-                    .map_err(NeovimHomeDirError::InvalidHomeDir),
+                Some(home_dir) if !home_dir.as_os_str().is_empty() => {
+                    home_dir.as_path().try_into().map_err(|err| {
+                        NeovimHomeDirError::InvalidHomeDir(home_dir, err)
+                    })
+                },
                 _ => Err(NeovimHomeDirError::CouldntFindHome),
             }
         }
@@ -216,7 +220,7 @@ mod neovim {
                         .push_invalid(lsp_root)
                         .push_str(" is not an absolute path");
                 },
-                MarkedRoot(_err) => todo!(),
+                MarkedRoot(err) => return err.to_message(),
                 HomeDir(err) => return err.to_message(),
                 InvalidBufId(buf) => {
                     msg.push_str("there's no buffer whose handle is ")
@@ -235,14 +239,37 @@ mod neovim {
 
     impl notify::Error for NeovimHomeDirError {
         fn to_message(&self) -> (notify::Level, notify::Message) {
-            todo!();
+            let mut msg = notify::Message::new();
+
+            match self {
+                NeovimHomeDirError::CouldntFindHome => {
+                    msg.push_str("couldn't find home directory");
+                },
+                NeovimHomeDirError::InvalidHomeDir(
+                    home_dir,
+                    fs::AbsPathFromPathError::NotAbsolute,
+                ) => {
+                    msg.push_str("found home directory at ")
+                        .push_str(home_dir.display().to_smolstr())
+                        .push_str(", but it's not an absolute path");
+                },
+                NeovimHomeDirError::InvalidHomeDir(
+                    home_dir,
+                    fs::AbsPathFromPathError::NotUtf8,
+                ) => {
+                    msg.push_str("found home directory at ")
+                        .push_str(home_dir.display().to_smolstr())
+                        .push_str(", but it's not a valid UTF-8 string");
+                },
+            }
+
+            (notify::Level::Error, msg)
         }
     }
 }
 
 #[cfg(feature = "neovim")]
 mod root_markers {
-    use core::error::Error;
     use core::fmt;
     use std::borrow::Cow;
 
@@ -443,7 +470,7 @@ mod root_markers {
     where
         Fs: fs::Fs,
         M: RootMarker<Fs>,
-        M::Error: Error,
+        M::Error: fmt::Display,
     {
         fn to_message(&self) -> (notify::Level, notify::Message) {
             let mut message = notify::Message::new();
