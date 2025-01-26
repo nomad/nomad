@@ -20,7 +20,6 @@ pub(crate) struct SessionGuard {
 #[derive(Copy, Clone)]
 pub(crate) enum SessionState {
     Active(SessionId),
-    Joining,
     Starting,
 }
 
@@ -60,12 +59,27 @@ impl SessionGuard {
         &self.root
     }
 
-    pub(crate) fn set_to_active(&self, _session_id: SessionId) {
-        todo!();
+    pub(crate) fn set_to_active(&self, session_id: SessionId) {
+        self.with_state(|state| *state = SessionState::Active(session_id));
+    }
+
+    pub(crate) fn with_state<R>(
+        &self,
+        fun: impl FnOnce(&mut SessionState) -> R,
+    ) -> R {
+        self.sessions.inner.with_mut(|inner| fun(inner.state_mut(&self.root)))
     }
 }
 
 impl SessionsInner {
+    #[track_caller]
+    fn idx_of(&self, root: &fs::AbsPath) -> usize {
+        self.sessions
+            .iter()
+            .position(|(existing_root, _)| &**existing_root == root)
+            .unwrap_or_else(|| panic!("no session at {root:?}"))
+    }
+
     fn insert(
         &mut self,
         root: fs::AbsPathBuf,
@@ -88,14 +102,14 @@ impl SessionsInner {
 
     #[track_caller]
     fn remove(&mut self, root: &fs::AbsPath) {
-        let Some(session_idx) = self
-            .sessions
-            .iter()
-            .position(|(existing_root, _)| &**existing_root == root)
-        else {
-            panic!("no session at {root:?}");
-        };
-        self.sessions.swap_remove(session_idx);
+        self.sessions.swap_remove(self.idx_of(root));
+    }
+
+    #[track_caller]
+    fn state_mut(&mut self, root: &fs::AbsPath) -> &mut SessionState {
+        let session_idx = self.idx_of(root);
+        let (_, state) = &mut self.sessions[session_idx];
+        state
     }
 }
 
