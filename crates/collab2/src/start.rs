@@ -77,14 +77,14 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .map_err(StartError::ReadReplica)?;
 
         let session = Session::new(NewSessionArgs {
-            is_host: true,
-            local_peer: start_infos.local_peer,
-            project_root,
-            remote_peers: start_infos.remote_peers,
-            replica,
+            _is_host: true,
+            _local_peer: start_infos.local_peer,
+            _project_root: project_root,
+            _remote_peers: start_infos.remote_peers,
+            _replica: replica,
             server_rx: start_infos.server_rx,
             server_tx: start_infos.server_tx,
-            session_id: start_infos.session_id,
+            _session_id: start_infos.session_id,
         });
 
         self.session_tx

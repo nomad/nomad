@@ -17,28 +17,28 @@ pub(crate) struct Session<B: CollabBackend> {
 pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// Whether the [`local_peer`](Self::local_peer) is the host of the
     /// session.
-    pub(crate) is_host: bool,
+    pub(crate) _is_host: bool,
 
     /// The local [`Peer`].
-    pub(crate) local_peer: Peer,
+    pub(crate) _local_peer: Peer,
 
     /// The remote [`Peers`].
-    pub(crate) remote_peers: Peers,
+    pub(crate) _remote_peers: Peers,
 
     /// The absolute path to the directory containing the project.
     ///
     /// The contents of the directory are assumed to be in sync with with the
     /// [`replica`](Self::replica).
-    pub(crate) project_root: AbsPathBuf,
+    pub(crate) _project_root: AbsPathBuf,
 
     /// The [`replica`](Self::replica) of the project.
     ///
     /// The files and directories in it are assumed to be in sync with the
     /// contents of the [`project_root`](Self::project_root).
-    pub(crate) replica: Replica,
+    pub(crate) _replica: Replica,
 
     /// The ID of the session.
-    pub(crate) session_id: SessionId,
+    pub(crate) _session_id: SessionId,
 
     /// TODO: docs..
     pub(crate) server_tx: B::ServerTx,
