@@ -16,8 +16,17 @@ pub(crate) struct SessionGuard {
 }
 
 /// TODO: docs.
+#[derive(Copy, Clone)]
+pub(crate) enum SessionState {
+    Active(SessionId),
+    Joining,
+    Starting,
+}
+
+/// TODO: docs.
 pub struct OverlappingSessionError {
     pub(crate) existing_root: fs::AbsPathBuf,
+    pub(crate) existing_state: SessionState,
     pub(crate) new_root: fs::AbsPathBuf,
 }
 
@@ -26,19 +35,22 @@ struct SessionsInner {
     sessions: SmallVec<[(fs::AbsPathBuf, SessionState); 2]>,
 }
 
-/// TODO: docs.
-enum SessionState {
-    Active(SessionId),
-    Joining,
-    Starting,
-}
-
 impl Sessions {
     pub(crate) fn start_guard(
         &self,
-        _root: fs::AbsPathBuf,
+        root: fs::AbsPathBuf,
     ) -> Result<SessionGuard, OverlappingSessionError> {
-        todo!();
+        self.insert(root, SessionState::Starting)
+    }
+
+    fn insert(
+        &self,
+        root: fs::AbsPathBuf,
+        session_state: SessionState,
+    ) -> Result<SessionGuard, OverlappingSessionError> {
+        self.inner
+            .with_mut(|inner| inner.insert(root.clone(), session_state))
+            .map(|()| SessionGuard { root, sessions: self.clone() })
     }
 }
 
@@ -49,11 +61,24 @@ impl SessionGuard {
 }
 
 impl SessionsInner {
-    fn ancestor_or_descendant_of(
-        &self,
-        _path: &fs::AbsPath,
-    ) -> Option<&fs::AbsPath> {
-        todo!();
+    fn insert(
+        &mut self,
+        root: fs::AbsPathBuf,
+        state: SessionState,
+    ) -> Result<(), OverlappingSessionError> {
+        for &(ref existing_root, existing_state) in &self.sessions {
+            if root.starts_with(existing_root)
+                || existing_root.starts_with(&root)
+            {
+                return Err(OverlappingSessionError {
+                    existing_root: existing_root.clone(),
+                    existing_state,
+                    new_root: root.clone(),
+                });
+            }
+        }
+        self.sessions.push((root, state));
+        Ok(())
     }
 }
 
@@ -62,7 +87,13 @@ impl notify::Error for OverlappingSessionError {
         let mut msg = notify::Message::new();
         msg.push_str("cannot start a new session at ")
             .push_info(self.new_root.to_smolstr())
-            .push_str(", another one is already running at ")
+            .push_str(", another one is already ")
+            .push_str(if let SessionState::Active(_) = self.existing_state {
+                "running"
+            } else {
+                "starting"
+            })
+            .push_str(" at ")
             .push_info(self.existing_root.to_smolstr())
             .push_str(" (sessions cannot overlap)");
         (notify::Level::Error, msg)
