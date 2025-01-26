@@ -9,7 +9,8 @@ pub(crate) struct Sessions {
     inner: Shared<SessionsInner>,
 }
 
-/// TODO: docs.
+/// A guard making sure no new session is started whose root would overlap
+/// (i.e. be either an ancestor or a descendant of) its [`root`](Self::root).
 pub(crate) struct SessionGuard {
     root: fs::AbsPathBuf,
     sessions: Sessions,
@@ -55,6 +56,10 @@ impl Sessions {
 }
 
 impl SessionGuard {
+    pub(crate) fn root(&self) -> &fs::AbsPath {
+        &self.root
+    }
+
     pub(crate) fn set_to_active(&self, _session_id: SessionId) {
         todo!();
     }

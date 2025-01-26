@@ -4,7 +4,6 @@ use collab_server::SessionId;
 use collab_server::message::{Peer, Peers};
 use eerie::Replica;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
-use nvimx2::fs::AbsPathBuf;
 use nvimx2::{AsyncCtx, notify};
 
 use crate::CollabBackend;
@@ -27,16 +26,10 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// The remote [`Peers`].
     pub(crate) _remote_peers: Peers,
 
-    /// The absolute path to the directory containing the project.
-    ///
-    /// The contents of the directory are assumed to be in sync with with the
-    /// [`replica`](Self::replica).
-    pub(crate) _project_root: AbsPathBuf,
-
     /// The [`replica`](Self::replica) of the project.
     ///
     /// The files and directories in it are assumed to be in sync with the
-    /// contents of the [`project_root`](Self::project_root).
+    /// ones under the project root.
     pub(crate) _replica: Replica,
 
     /// TODO: docs.
