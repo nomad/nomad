@@ -40,7 +40,8 @@ impl<B: CollabBackend> Module<B> for Collab<B> {
     type Config = Config;
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
-        ctx.with_command(self.yank())
+        ctx.with_command(self.start())
+            .with_command(self.yank())
             .with_function(self.start())
             .with_function(self.yank());
     }

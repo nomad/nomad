@@ -1,7 +1,9 @@
-use nvimx2::AsyncCtx;
+use core::marker::PhantomData;
+
 use nvimx2::action::AsyncAction;
 use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::Name;
+use nvimx2::{AsyncCtx, notify};
 
 use crate::backend::CollabBackend;
 use crate::collab::Collab;
@@ -28,6 +30,14 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
     }
 }
 
+/// The type of error that can occur when [`Yank`]ing fails.
+pub enum YankError<B: CollabBackend> {
+    NoActiveSession(NoActiveSessionError<B>),
+    PasteSessionId(B::PasteSessionIdError),
+}
+
+pub struct NoActiveSessionError<B>(PhantomData<B>);
+
 impl<B: CollabBackend> ToCompletionFn<B> for Yank {
     fn to_completion_fn(&self) {}
 }
@@ -35,5 +45,27 @@ impl<B: CollabBackend> ToCompletionFn<B> for Yank {
 impl<B: CollabBackend> From<&Collab<B>> for Yank {
     fn from(collab: &Collab<B>) -> Self {
         Self { _sessions: collab.sessions.clone() }
+    }
+}
+
+impl<B: CollabBackend> YankError<B> {
+    fn no_active_session() -> Self {
+        Self::NoActiveSession(NoActiveSessionError(PhantomData))
+    }
+}
+
+impl<B: CollabBackend> notify::Error for YankError<B> {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        match self {
+            YankError::NoActiveSession(err) => err.to_message(),
+            YankError::PasteSessionId(err) => err.to_message(),
+        }
+    }
+}
+
+impl<B> notify::Error for NoActiveSessionError<B> {
+    default fn to_message(&self) -> (notify::Level, notify::Message) {
+        let msg = "there's no active collaborative editing session";
+        (notify::Level::Error, notify::Message::from_str(msg))
     }
 }
