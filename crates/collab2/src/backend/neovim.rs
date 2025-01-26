@@ -130,6 +130,7 @@ impl CollabBackend for Neovim {
         _action: ActionForSelectedSession,
         _ctx: &mut AsyncCtx<'_, Self>,
     ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
+        let _select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
         todo!()
     }
 
@@ -177,19 +178,10 @@ impl CollabBuffer<Neovim> for NeovimBuffer {
         fn inner(buffer: NeovimBuffer) -> Option<String> {
             let lua = mlua::lua();
 
-            let get_clients = lua
-                .globals()
-                .get::<Table>("vim")
-                .ok()?
-                .get::<Table>("lsp")
-                .ok()?
-                .get::<Function>("get_clients")
-                .ok()?;
-
             let opts = lua.create_table().ok()?;
             opts.set("bufnr", buffer).ok()?;
 
-            get_clients
+            get_lua_value::<Function>(&["vim", "lsp", "get_clients"])?
                 .call::<Table>(opts)
                 .ok()?
                 .get::<Table>(1)
@@ -268,6 +260,22 @@ impl Stream for NeovimServerRx {
             .inner
             .poll_next(ctx)
             .map_err(|err| NeovimServerRxError { inner: err })
+    }
+}
+
+#[track_caller]
+fn get_lua_value<T: mlua::FromLua>(namespace: &[&str]) -> Option<T> {
+    assert!(!namespace.is_empty());
+    let lua = mlua::lua();
+    let mut table = lua.globals();
+    let mut keys = namespace.iter();
+    loop {
+        let key = keys.next().expect("not done");
+        if keys.as_slice().is_empty() {
+            return table.get::<T>(*key).ok();
+        } else {
+            table = table.get::<Table>(*key).ok()?;
+        }
     }
 }
 
