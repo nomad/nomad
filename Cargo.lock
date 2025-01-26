@@ -537,11 +537,11 @@ dependencies = [
 name = "collab2"
 version = "0.1.0-dev"
 dependencies = [
- "async-channel",
  "async-net",
  "auth",
  "collab-server",
  "eerie",
+ "flume",
  "futures-util",
  "home",
  "nvimx2",

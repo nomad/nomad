@@ -1,9 +1,10 @@
 use core::marker::PhantomData;
 
+use collab_server::SessionId;
 use nvimx2::action::AsyncAction;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::notify::Name;
-use nvimx2::{AsyncCtx, notify};
+use nvimx2::notify::{self, Name};
+use nvimx2::{AsyncCtx, fs};
 use smallvec::SmallVec;
 
 use crate::backend::{ActionForSelectedSession, CollabBackend};
@@ -14,6 +15,11 @@ use crate::sessions::{SessionState, Sessions};
 /// user's clipboard.
 #[derive(Clone)]
 pub struct Yank {
+    session_selector: SessionSelector,
+}
+
+#[derive(Clone)]
+pub(crate) struct SessionSelector {
     sessions: Sessions,
 }
 
@@ -27,6 +33,31 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
         _: Self::Args,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), YankError<B>> {
+        let Some((_, session_id)) = self
+            .session_selector
+            .select(ctx)
+            .await
+            .map_err(YankError::NoActiveSession)?
+        else {
+            return Ok(());
+        };
+
+        B::copy_session_id(session_id, ctx)
+            .await
+            .map_err(YankError::PasteSessionId)
+    }
+}
+
+impl SessionSelector {
+    pub(crate) fn new(sessions: Sessions) -> Self {
+        Self { sessions }
+    }
+
+    pub(crate) async fn select<B: CollabBackend>(
+        &self,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<Option<(fs::AbsPathBuf, SessionId)>, NoActiveSessionError<B>>
+    {
         let active_sessions = self
             .sessions
             .iter()
@@ -36,9 +67,9 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
             })
             .collect::<SmallVec<[_; 1]>>();
 
-        let session_id = match &*active_sessions {
-            [] => return Err(YankError::no_active_session()),
-            [(_, id)] => *id,
+        let session = match &*active_sessions {
+            [] => return Err(NoActiveSessionError::new()),
+            [single] => single,
             sessions => match B::select_session(
                 sessions,
                 ActionForSelectedSession::CopySessionId,
@@ -46,14 +77,12 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
             )
             .await
             {
-                Some(&(_, id)) => id,
-                None => return Ok(()),
+                Some(session) => session,
+                None => return Ok(None),
             },
         };
 
-        B::copy_session_id(session_id, ctx)
-            .await
-            .map_err(YankError::PasteSessionId)
+        Ok(Some(session.clone()))
     }
 }
 
@@ -71,13 +100,21 @@ impl<B: CollabBackend> ToCompletionFn<B> for Yank {
 
 impl<B: CollabBackend> From<&Collab<B>> for Yank {
     fn from(collab: &Collab<B>) -> Self {
-        Self { sessions: collab.sessions.clone() }
+        Self {
+            session_selector: SessionSelector::new(collab.sessions.clone()),
+        }
     }
 }
 
 impl<B: CollabBackend> YankError<B> {
     fn no_active_session() -> Self {
-        Self::NoActiveSession(NoActiveSessionError(PhantomData))
+        Self::NoActiveSession(NoActiveSessionError::new())
+    }
+}
+
+impl<B> NoActiveSessionError<B> {
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
