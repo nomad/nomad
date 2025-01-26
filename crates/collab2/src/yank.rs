@@ -4,16 +4,17 @@ use nvimx2::action::AsyncAction;
 use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, notify};
+use smallvec::SmallVec;
 
 use crate::backend::CollabBackend;
 use crate::collab::Collab;
-use crate::sessions::Sessions;
+use crate::sessions::{SessionState, Sessions};
 
 /// An `Action` that pastes the [`SessionId`] of any active session to the
 /// user's clipboard.
 #[derive(Clone)]
 pub struct Yank {
-    _sessions: Sessions,
+    sessions: Sessions,
 }
 
 impl<B: CollabBackend> AsyncAction<B> for Yank {
@@ -25,7 +26,20 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
         &mut self,
         _: Self::Args,
         _ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<(), B::PasteSessionIdError> {
+    ) -> Result<(), YankError<B>> {
+        let active_sessions = self
+            .sessions
+            .iter()
+            .filter_map(|(root, state)| match state {
+                SessionState::Active(session_id) => Some((root, session_id)),
+                _ => None,
+            })
+            .collect::<SmallVec<[_; 1]>>();
+
+        if active_sessions.is_empty() {
+            return Err(YankError::no_active_session());
+        }
+
         todo!();
     }
 }
@@ -44,7 +58,7 @@ impl<B: CollabBackend> ToCompletionFn<B> for Yank {
 
 impl<B: CollabBackend> From<&Collab<B>> for Yank {
     fn from(collab: &Collab<B>) -> Self {
-        Self { _sessions: collab.sessions.clone() }
+        Self { sessions: collab.sessions.clone() }
     }
 }
 

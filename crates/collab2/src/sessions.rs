@@ -31,7 +31,7 @@ pub(crate) struct Starting;
 
 #[derive(Default)]
 struct SessionsInner {
-    sessions: SmallVec<[(fs::AbsPathBuf, SessionState); 2]>,
+    sessions: SmallVec<[(fs::AbsPathBuf, SessionState); 1]>,
 }
 
 struct SessionsGuardInner {
@@ -47,6 +47,12 @@ pub struct OverlappingSessionError {
 }
 
 impl Sessions {
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = (fs::AbsPathBuf, SessionState)> {
+        self.inner.with(|inner| inner.sessions.clone()).into_iter()
+    }
+
     pub(crate) fn start_guard(
         &self,
         root: fs::AbsPathBuf,
