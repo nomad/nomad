@@ -11,6 +11,7 @@ use crate::config::Config;
 use crate::session::Session;
 use crate::sessions::Sessions;
 use crate::start::Start;
+use crate::yank::Yank;
 
 /// TODO: docs.
 pub struct Collab<B: CollabBackend> {
@@ -26,6 +27,11 @@ impl<B: CollabBackend> Collab<B> {
     pub fn start(&self) -> Start<B> {
         self.into()
     }
+
+    /// Returns a new instance of the [`Yank`] action.
+    pub fn yank(&self) -> Yank {
+        self.into()
+    }
 }
 
 impl<B: CollabBackend> Module<B> for Collab<B> {
@@ -34,7 +40,9 @@ impl<B: CollabBackend> Module<B> for Collab<B> {
     type Config = Config;
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
-        ctx.with_function(self.start());
+        ctx.with_command(self.yank())
+            .with_function(self.start())
+            .with_function(self.yank());
     }
 
     fn on_init(&self, ctx: &mut NeovimCtx<B>) {

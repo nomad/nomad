@@ -17,6 +17,10 @@ pub trait CollabBackend:
     Backend<Buffer: CollabBuffer<Self>, Fs: CollabFs>
 {
     /// The type of error returned by
+    /// [`paste_session_id`](CollabBackend::paste_session_id).
+    type PasteSessionIdError: notify::Error;
+
+    /// The type of error returned by
     /// [`read_replica`](CollabBackend::read_replica).
     type ReadReplicaError: notify::Error;
 
@@ -46,6 +50,12 @@ pub trait CollabBackend:
         project_root: &fs::AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = bool>;
+
+    /// Pastes the given [`SessionId`] to the user's clipboard.
+    fn paste_session_id(
+        session_id: SessionId,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Result<(), Self::PasteSessionIdError>>;
 
     /// TODO: docs.
     fn read_replica(

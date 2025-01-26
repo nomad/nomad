@@ -144,10 +144,9 @@ impl notify::Error for OverlappingSessionError {
         msg.push_str("cannot start a new session at ")
             .push_info(self.new_root.to_smolstr())
             .push_str(", another one is already ")
-            .push_str(if let SessionState::Active(_) = self.existing_state {
-                "running"
-            } else {
-                "starting"
+            .push_str(match self.existing_state {
+                SessionState::Active(_) => "running",
+                SessionState::Starting => "starting",
             })
             .push_str(" at ")
             .push_info(self.existing_root.to_smolstr())

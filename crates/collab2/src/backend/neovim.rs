@@ -17,6 +17,8 @@ use smol_str::ToSmolStr;
 
 use crate::backend::*;
 
+pub struct NeovimPasteSessionIdError {}
+
 pub struct NeovimReadReplicaError {}
 
 pin_project_lite::pin_project! {
@@ -63,6 +65,7 @@ struct TildePath<'a> {
 }
 
 impl CollabBackend for Neovim {
+    type PasteSessionIdError = NeovimPasteSessionIdError;
     type ReadReplicaError = NeovimReadReplicaError;
     type SearchProjectRootError = NeovimSearchProjectRootError;
     type ServerTx = NeovimServerTx;
@@ -97,6 +100,13 @@ impl CollabBackend for Neovim {
             1 => true,
             _ => unreachable!("only provided {} options", options.len()),
         }
+    }
+
+    async fn paste_session_id(
+        _session_id: SessionId,
+        _ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<(), Self::PasteSessionIdError> {
+        todo!();
     }
 
     async fn read_replica(
@@ -250,6 +260,12 @@ impl Stream for NeovimServerRx {
             .inner
             .poll_next(ctx)
             .map_err(|err| NeovimServerRxError { inner: err })
+    }
+}
+
+impl notify::Error for NeovimPasteSessionIdError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        todo!();
     }
 }
 
