@@ -2,16 +2,16 @@ use core::marker::PhantomData;
 
 use collab_server::message::{Peer, Peers};
 use eerie::Replica;
+use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
 use nvimx2::{AsyncCtx, notify};
 
 use crate::CollabBackend;
+use crate::leave::LeaveSession;
 use crate::sessions::{Active, SessionGuard};
 
 pub(crate) struct Session<B: CollabBackend> {
-    server_rx: B::ServerRx,
-    server_tx: B::ServerTx,
-    session_guard: SessionGuard<Active>,
+    args: NewSessionArgs<B>,
 }
 
 pub(crate) struct NewSessionArgs<B: CollabBackend> {
@@ -30,6 +30,9 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// The files and directories in it are assumed to be in sync with the
     /// ones under the project root.
     pub(crate) _replica: Replica,
+
+    /// TODO: docs.
+    pub(crate) leave_rx: Receiver<LeaveSession>,
 
     /// TODO: docs.
     pub(crate) session_guard: SessionGuard<Active>,
@@ -51,18 +54,21 @@ pub(crate) struct RxExhaustedError<B>(PhantomData<B>);
 
 impl<B: CollabBackend> Session<B> {
     pub(crate) fn new(args: NewSessionArgs<B>) -> Self {
-        Self {
-            server_tx: args.server_tx,
-            server_rx: args.server_rx,
-            session_guard: args.session_guard,
-        }
+        Self { args }
     }
 
     pub(crate) async fn run(
         self,
         _ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), RunSessionError<B>> {
-        let Self { session_guard: _guard, server_rx, server_tx, .. } = self;
+        let NewSessionArgs {
+            leave_rx,
+            server_rx,
+            server_tx,
+            session_guard: _guard,
+            ..
+        } = self.args;
+
         pin_mut!(server_rx);
         pin_mut!(server_tx);
 
@@ -78,6 +84,10 @@ impl<B: CollabBackend> Session<B> {
                         .send(msg)
                         .await
                         .map_err(RunSessionError::Tx)?;
+                },
+
+                _ = leave_rx.recv_async() => {
+                    return Ok(());
                 },
             }
         }

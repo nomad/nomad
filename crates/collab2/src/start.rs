@@ -10,6 +10,7 @@ use nvimx2::{AsyncCtx, Shared};
 use crate::backend::{CollabBackend, StartArgs};
 use crate::collab::Collab;
 use crate::config::Config;
+use crate::leave::LeaveChannels;
 use crate::session::{NewSessionArgs, Session};
 use crate::sessions::{OverlappingSessionError, Sessions};
 
@@ -17,6 +18,7 @@ use crate::sessions::{OverlappingSessionError, Sessions};
 pub struct Start<B: CollabBackend> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
+    leave_channels: LeaveChannels,
     sessions: Sessions,
     session_tx: Sender<Session<B>>,
 }
@@ -74,6 +76,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             _local_peer: start_infos.local_peer,
             _remote_peers: start_infos.remote_peers,
             _replica: replica,
+            leave_rx: self.leave_channels.insert(start_infos.session_id),
             server_rx: start_infos.server_rx,
             server_tx: start_infos.server_tx,
             session_guard: guard.into_active(start_infos.session_id),
@@ -108,6 +111,7 @@ impl<B: CollabBackend> Clone for Start<B> {
         Self {
             auth_infos: self.auth_infos.clone(),
             config: self.config.clone(),
+            leave_channels: self.leave_channels.clone(),
             sessions: self.sessions.clone(),
             session_tx: self.session_tx.clone(),
         }
@@ -123,6 +127,7 @@ impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
         Self {
             auth_infos: collab.auth_infos.clone(),
             config: collab.config.clone(),
+            leave_channels: collab.leave_channels.clone(),
             sessions: collab.sessions.clone(),
             session_tx: collab.session_tx.clone(),
         }

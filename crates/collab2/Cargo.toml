@@ -23,6 +23,7 @@ collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-feature
 eerie = { workspace = true }
 flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }
+fxhash = { workspace = true }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }

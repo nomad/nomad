@@ -543,6 +543,7 @@ dependencies = [
  "eerie",
  "flume",
  "futures-util",
+ "fxhash",
  "home",
  "nvimx2",
  "pin-project-lite",
