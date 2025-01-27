@@ -8,6 +8,9 @@ use crate::fs::{AbsPath, DirEntry, FsNode};
 /// TODO: docs.
 pub trait Fs {
     /// TODO: docs.
+    type Timestamp: Clone + Ord;
+
+    /// TODO: docs.
     type DirEntry: DirEntry;
 
     /// TODO: docs.
@@ -33,6 +36,9 @@ pub trait Fs {
         &mut self,
         path: P,
     ) -> impl Future<Output = Result<Option<FsNode<Self, P>>, Self::NodeAtPathError>>;
+
+    /// TODO: docs.
+    fn now(&self) -> Self::Timestamp;
 
     /// TODO: docs.
     fn read_dir<P: AsRef<AbsPath>>(

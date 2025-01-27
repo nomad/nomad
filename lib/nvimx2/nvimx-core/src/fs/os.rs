@@ -5,6 +5,7 @@ use core::task::{Context, Poll};
 use std::borrow::Cow;
 use std::ffi::OsString;
 use std::io;
+use std::time::SystemTime;
 
 use futures_lite::{Stream, ready};
 
@@ -60,6 +61,7 @@ pub enum OsNameError {
 }
 
 impl Fs for OsFs {
+    type Timestamp = SystemTime;
     type DirEntry = OsDirEntry;
     type Directory<Path> = OsDirectory<Path>;
     type File<Path> = OsFile<Path>;
@@ -88,6 +90,11 @@ impl Fs for OsFs {
             }),
             FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
         }))
+    }
+
+    #[inline]
+    fn now(&self) -> Self::Timestamp {
+        SystemTime::now()
     }
 
     #[inline]
