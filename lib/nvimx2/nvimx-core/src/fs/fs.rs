@@ -3,7 +3,7 @@ use core::future::Future;
 
 use futures_lite::Stream;
 
-use crate::fs::{AbsPath, DirEntry, FsNode};
+use crate::fs::{AbsPath, DirEntry, FsNode, Watcher};
 
 /// TODO: docs.
 pub trait Fs {
@@ -32,6 +32,12 @@ pub trait Fs {
     type ReadDirError: Error;
 
     /// TODO: docs.
+    type Watcher: Watcher<Self>;
+
+    /// TODO: docs.
+    type WatchError: Error;
+
+    /// TODO: docs.
     fn node_at_path<P: AsRef<AbsPath>>(
         &mut self,
         path: P,
@@ -45,6 +51,12 @@ pub trait Fs {
         &mut self,
         dir_path: P,
     ) -> impl Future<Output = Result<Self::ReadDir, Self::ReadDirError>>;
+
+    /// TODO: docs.
+    fn watch<P: AsRef<AbsPath>>(
+        &mut self,
+        path: P,
+    ) -> impl Future<Output = Result<Self::Watcher, Self::WatchError>>;
 
     /// TODO: docs.
     fn exists<P: AsRef<AbsPath>>(
