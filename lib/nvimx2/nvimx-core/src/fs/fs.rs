@@ -6,7 +6,7 @@ use futures_lite::Stream;
 use crate::fs::{AbsPath, DirEntry, FsNode, Watcher};
 
 /// TODO: docs.
-pub trait Fs {
+pub trait Fs: Sized + 'static {
     /// TODO: docs.
     type Timestamp: Clone + Ord;
 

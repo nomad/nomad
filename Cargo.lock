@@ -1442,6 +1442,7 @@ dependencies = [
  "async-fs",
  "compact_str",
  "eerie",
+ "flume",
  "futures-lite",
  "fxhash",
  "pin-project-lite",
