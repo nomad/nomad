@@ -174,18 +174,12 @@ where
         pin_mut!(filter_2);
 
         loop {
-            select! {
-                res = filter_1 => {
-                    if res.map_err(Either::Left)? {
-                        return Ok(true);
-                    }
-                },
-                res = filter_2 => {
-                    if res.map_err(Either::Right)? {
-                        return Ok(true);
-                    }
-                },
+            if select! {
+                res = filter_1 => res.map_err(Either::Left)?,
+                res = filter_2 => res.map_err(Either::Right)?,
                 complete => return Ok(false),
+            } {
+                return Ok(true);
             }
         }
     }
