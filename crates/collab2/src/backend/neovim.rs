@@ -110,6 +110,7 @@ impl CollabBackend for Neovim {
     }
 
     async fn read_replica(
+        _peer_id: PeerId,
         _project_root: &fs::AbsPath,
         _ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Replica, Self::ReadReplicaError> {

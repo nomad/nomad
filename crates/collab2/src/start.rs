@@ -67,9 +67,10 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::StartSession)?;
 
-        let replica = B::read_replica(guard.root(), ctx)
-            .await
-            .map_err(StartError::ReadReplica)?;
+        let replica =
+            B::read_replica(start_infos.local_peer.id(), guard.root(), ctx)
+                .await
+                .map_err(StartError::ReadReplica)?;
 
         let session = Session::new(NewSessionArgs {
             _is_host: true,

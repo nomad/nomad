@@ -3,7 +3,7 @@ mod neovim;
 
 use collab_server::SessionId;
 use collab_server::message::{Message, Peer, Peers};
-use eerie::Replica;
+use eerie::{PeerId, Replica};
 use futures_util::{Sink, Stream};
 use nvimx2::backend::{Backend, Buffer, BufferId};
 use nvimx2::fs::{self, AbsPathBuf};
@@ -59,6 +59,7 @@ pub trait CollabBackend:
 
     /// TODO: docs.
     fn read_replica(
+        peer_id: PeerId,
         project_root: &fs::AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<Replica, Self::ReadReplicaError>>;
@@ -148,6 +149,26 @@ pub struct StartInfos<B: CollabBackend> {
 
     /// TODO: docs.
     pub(crate) session_id: SessionId,
+}
+
+#[cfg(feature = "neovim")]
+mod default_read_replica {
+    use super::*;
+
+    pub(super) async fn read_replica<B>(
+        _peer_id: PeerId,
+        _project_root: &fs::AbsPath,
+        _ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<Replica, Error<B>>
+    where
+        B: CollabBackend,
+    {
+        todo!();
+    }
+
+    pub(super) enum Error<B: CollabBackend> {
+        Todo(B),
+    }
 }
 
 #[cfg(feature = "neovim")]
