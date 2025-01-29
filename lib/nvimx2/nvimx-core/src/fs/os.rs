@@ -4,6 +4,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 use std::borrow::Cow;
 use std::ffi::OsString;
+use std::fs::Metadata;
 use std::io;
 use std::time::SystemTime;
 
@@ -145,8 +146,14 @@ impl Stream for OsReadDir {
 }
 
 impl DirEntry for OsDirEntry {
+    type MetadataError = io::Error;
     type NameError = OsNameError;
     type NodeKindError = io::Error;
+
+    #[inline]
+    async fn metadata(&self) -> Result<Metadata, Self::MetadataError> {
+        self.inner.metadata().await
+    }
 
     #[inline]
     async fn name(&self) -> Result<Cow<'_, FsNodeName>, Self::NameError> {
