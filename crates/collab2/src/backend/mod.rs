@@ -158,7 +158,7 @@ mod default_read_replica {
     use concurrent_queue::{ConcurrentQueue, PushError};
     use eerie::ReplicaBuilder;
     use fs::{DirEntry, FsNodeKind};
-    use walkdir::{WalkDir, WalkError};
+    use walkdir::{Either, WalkDir, WalkError, WalkErrorKind};
 
     use super::*;
 
@@ -179,14 +179,14 @@ mod default_read_replica {
             let handler = async move |entry: walkdir::DirEntry<'_, _>| {
                 let op = match entry.node_kind() {
                     FsNodeKind::File => {
-                        let meta = entry.metadata().await.expect("");
-                        Op::PushFile(entry.path(), meta.len())
+                        let meta = entry.metadata().await?;
+                        PushNode::File(entry.path(), meta.len())
                     },
-                    FsNodeKind::Directory => Op::PushDirectory(entry.path()),
+                    FsNodeKind::Directory => PushNode::Directory(entry.path()),
                     FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
                 };
                 match op_queue2.push(op) {
-                    Ok(()) => (),
+                    Ok(()) => Ok(()),
                     Err(PushError::Full(_)) => unreachable!("unbounded"),
                     Err(PushError::Closed(_)) => unreachable!("never closed"),
                 }
@@ -195,8 +195,8 @@ mod default_read_replica {
             let mut builder = ReplicaBuilder::new(peer_id);
             while let Ok(op) = op_queue.pop() {
                 let _ = match op {
-                    Op::PushFile(path, len) => builder.push_file(path, len),
-                    Op::PushDirectory(path) => builder.push_directory(path),
+                    PushNode::File(path, len) => builder.push_file(path, len),
+                    PushNode::Directory(path) => builder.push_directory(path),
                 };
             }
             Ok(builder)
@@ -205,12 +205,12 @@ mod default_read_replica {
     }
 
     pub(super) enum Error<B: CollabBackend> {
-        Walk(WalkError<B::Fs>),
+        Walk(WalkError<Either<WalkErrorKind<B::Fs>, <<B::Fs as fs::Fs>::DirEntry as fs::DirEntry>::MetadataError>>),
     }
 
-    enum Op {
-        PushFile(AbsPathBuf, u64),
-        PushDirectory(AbsPathBuf),
+    enum PushNode {
+        File(AbsPathBuf, u64),
+        Directory(AbsPathBuf),
     }
 }
 

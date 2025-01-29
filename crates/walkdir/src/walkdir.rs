@@ -40,6 +40,7 @@ pub trait WalkDir: Sized {
     }
 
     /// TODO: docs.
+    #[allow(clippy::type_complexity)]
     #[inline]
     fn for_each<'a, H, E>(
         &'a self,
@@ -116,11 +117,10 @@ pub trait WalkDir: Sized {
         })
         .map(|res| {
             res.map_err(|err| {
-                let kind = match err.kind {
+                err.map_kind(|kind| match kind {
                     Either::Left(res) => res,
                     Either::Right(_infallible) => unreachable!(),
-                };
-                WalkError { dir_path: err.dir_path, kind }
+                })
             })
         })
     }
@@ -192,6 +192,16 @@ pub enum WalkErrorKind<W: WalkDir> {
 
     /// TODO: docs.
     ReadDir(W::ReadDirError),
+}
+
+impl<K> WalkError<K> {
+    /// TODO: docs.
+    pub fn map_kind<F, K2>(self, f: F) -> WalkError<K2>
+    where
+        F: FnOnce(K) -> K2,
+    {
+        WalkError { dir_path: self.dir_path, kind: f(self.kind) }
+    }
 }
 
 impl<Fs: fs::Fs> WalkDir for Fs {

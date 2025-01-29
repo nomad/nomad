@@ -40,7 +40,9 @@ pub struct And<F1, F2> {
 
 /// TODO: docs.
 pub enum Either<L, R> {
+    /// TODO: docs.
     Left(L),
+    /// TODO: docs.
     Right(R),
 }
 
