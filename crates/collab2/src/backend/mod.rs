@@ -206,13 +206,12 @@ mod default_read_replica {
 
         // Update the lengths of the open buffers.
         //
-        // FIXME: what if a buffer was edited and already closed.
-        ctx.with_ctx(|ctx| {
-            let mut buffers = ctx.buffers();
-            while let Some(mut buffer) = buffers.next() {
-                let Some(mut file) = builder.file_mut(buffer.name()) else {
-                    continue;
-                };
+        // FIXME: what if a buffer was edited and already closed?
+        ctx.for_each_buffer(|buffer| {
+            if let Some(mut file) = <&fs::AbsPath>::try_from(&*buffer.name())
+                .ok()
+                .and_then(|buffer_path| builder.file_mut(buffer_path))
+            {
                 file.set_len(buffer.byte_len().into());
             }
         });

@@ -96,8 +96,15 @@ impl From<u64> for ByteOffset {
 
 impl From<ByteOffset> for usize {
     #[inline]
-    fn from(offset: ByteOffset) -> usize {
+    fn from(offset: ByteOffset) -> Self {
         offset.0
+    }
+}
+
+impl From<ByteOffset> for u64 {
+    #[inline]
+    fn from(offset: ByteOffset) -> Self {
+        offset.into_u64()
     }
 }
 
