@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use crate::backend::{Backend, BackgroundExecutor, TaskBackground};
 use crate::notify::{Namespace, NotificationId};
 use crate::state::StateHandle;
-use crate::{NeovimCtx, notify};
+use crate::{BufferCtx, NeovimCtx, notify};
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, B: Backend> {
@@ -28,6 +28,12 @@ impl<B: Backend> AsyncCtx<'_, B> {
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Info, message)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn for_each_buffer(&mut self, fun: impl FnMut(BufferCtx<'_, B>)) {
+        self.with_ctx(move |ctx| ctx.for_each_buffer(fun))
     }
 
     /// TODO: docs.
