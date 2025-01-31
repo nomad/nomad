@@ -89,7 +89,7 @@ impl SessionSelector {
 /// The type of error that can occur when [`Yank`]ing fails.
 pub enum YankError<B: CollabBackend> {
     NoActiveSession(NoActiveSessionError<B>),
-    PasteSessionId(B::PasteSessionIdError),
+    PasteSessionId(B::CopySessionIdError),
 }
 
 pub struct NoActiveSessionError<B>(PhantomData<B>);

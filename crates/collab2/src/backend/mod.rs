@@ -20,8 +20,8 @@ pub trait CollabBackend:
     type BufferLspRootError;
 
     /// The type of error returned by
-    /// [`paste_session_id`](CollabBackend::paste_session_id).
-    type PasteSessionIdError: notify::Error;
+    /// [`copy_session_id`](CollabBackend::copy_session_id).
+    type CopySessionIdError: notify::Error;
 
     /// The type of error returned by
     /// [`read_replica`](CollabBackend::read_replica).
@@ -58,7 +58,7 @@ pub trait CollabBackend:
     fn copy_session_id(
         session_id: SessionId,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<Output = Result<(), Self::PasteSessionIdError>>;
+    ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
 
     /// TODO: docs.
     fn read_replica(

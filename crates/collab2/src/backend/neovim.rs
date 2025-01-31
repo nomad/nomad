@@ -17,7 +17,7 @@ use smol_str::ToSmolStr;
 
 use crate::backend::*;
 
-pub struct NeovimPasteSessionIdError {}
+pub struct NeovimCopySessionIdError {}
 
 pub struct NeovimReadReplicaError {
     inner: default_read_replica::Error<Neovim>,
@@ -68,7 +68,7 @@ struct TildePath<'a> {
 
 impl CollabBackend for Neovim {
     type BufferLspRootError = String;
-    type PasteSessionIdError = NeovimPasteSessionIdError;
+    type CopySessionIdError = NeovimCopySessionIdError;
     type ReadReplicaError = NeovimReadReplicaError;
     type SearchProjectRootError = NeovimSearchProjectRootError;
     type ServerTx = NeovimServerTx;
@@ -108,7 +108,7 @@ impl CollabBackend for Neovim {
     async fn copy_session_id(
         _session_id: SessionId,
         _ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<(), Self::PasteSessionIdError> {
+    ) -> Result<(), Self::CopySessionIdError> {
         todo!();
     }
 
@@ -329,7 +329,7 @@ fn get_lua_value<T: mlua::FromLua>(namespace: &[&str]) -> Option<T> {
     }
 }
 
-impl notify::Error for NeovimPasteSessionIdError {
+impl notify::Error for NeovimCopySessionIdError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         todo!();
     }
@@ -402,7 +402,33 @@ impl notify::Error for NeovimSearchProjectRootError {
 
 impl notify::Error for NeovimStartSessionError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        let mut msg = notify::Message::new();
+        match self {
+            Self::Knock(err) => match err {
+                client::KnockError::SendKnock(err) => {
+                    msg.push_str("couldn't send start request to server: ")
+                        .push_str(err.to_smolstr());
+                },
+                client::KnockError::RecvWelcome(err) => {
+                    msg.push_str(
+                        "couldn't receive start response from server: ",
+                    )
+                    .push_str(err.to_smolstr());
+                },
+                client::KnockError::Bouncer(err) => {
+                    msg.push_str("authentication failed: ")
+                        .push_str(err.to_smolstr());
+                },
+                client::KnockError::SessionEndedBeforeJoining => {
+                    unreachable!();
+                },
+            },
+            Self::TcpConnect(err) => {
+                msg.push_str("couldn't connect to the server: ")
+                    .push_str(err.to_smolstr());
+            },
+        }
+        (notify::Level::Error, msg)
     }
 }
 
