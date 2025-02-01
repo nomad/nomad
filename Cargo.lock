@@ -218,6 +218,7 @@ dependencies = [
 name = "backend-test"
 version = "0.1.0-dev"
 dependencies = [
+ "crop",
  "indexmap",
  "nvimx-core",
  "serde",
@@ -613,6 +614,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "crop"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0c36a21e864b7accff2cf3bef09af553704556ff2fb704ebee242bfc5c89f10"
+dependencies = [
+ "str_indices",
 ]
 
 [[package]]
