@@ -217,6 +217,10 @@ dependencies = [
 [[package]]
 name = "backend-test"
 version = "0.1.0-dev"
+dependencies = [
+ "nvimx-core",
+ "serde",
+]
 
 [[package]]
 name = "bincode"

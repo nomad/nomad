@@ -9,6 +9,8 @@ publish.workspace = true
 [features]
 
 [dependencies]
+nvimx-core = { path = "../nvimx-core" }
+serde = { workspace = true }
 
 [lints]
 workspace = true
