@@ -17,7 +17,6 @@ use nvimx_core::fs::{
     FsNodeKind,
     FsNodeName,
     FsNodeNameBuf,
-    Watcher,
 };
 
 /// TODO: docs.
@@ -315,17 +314,13 @@ impl Stream for TestReadDir {
     }
 }
 
-impl Watcher<TestFs> for TestWatcher {
-    type Error = Infallible;
+impl Stream for TestWatcher {
+    type Item = Result<FsEvent<TestFs>, Infallible>;
 
-    fn register_handler<F>(&mut self, _callback: F)
-    where
-        F: FnMut(Result<FsEvent<TestFs>, Self::Error>) -> bool + 'static,
-    {
-        todo!()
-    }
-
-    fn watched_path(&self) -> &AbsPath {
+    fn poll_next(
+        self: Pin<&mut Self>,
+        _ctx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
         todo!()
     }
 }

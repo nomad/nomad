@@ -6,7 +6,6 @@ mod fs_node;
 mod fs_node_kind;
 #[cfg(feature = "os-fs")]
 pub mod os;
-mod watcher;
 
 pub use dir_entry::DirEntry;
 #[doc(inline)]
@@ -20,7 +19,6 @@ pub use eerie::fs::{
     FsNodeNameBuf,
     InvalidFsNodeNameError,
 };
-pub use fs::Fs;
+pub use fs::{Fs, FsEvent, FsEventKind};
 pub use fs_node::FsNode;
 pub use fs_node_kind::FsNodeKind;
-pub use watcher::{EventStream, FsEvent, Watcher};

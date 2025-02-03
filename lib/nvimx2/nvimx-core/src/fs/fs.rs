@@ -3,7 +3,7 @@ use core::future::Future;
 
 use futures_lite::Stream;
 
-use crate::fs::{AbsPath, DirEntry, FsNode, Watcher};
+use crate::fs::{AbsPath, AbsPathBuf, DirEntry, FsNode};
 
 /// TODO: docs.
 pub trait Fs: Sized + 'static {
@@ -32,7 +32,7 @@ pub trait Fs: Sized + 'static {
     type ReadDirError: Error;
 
     /// TODO: docs.
-    type Watcher: Watcher<Self>;
+    type Watcher: Stream<Item = Result<FsEvent<Self>, Self::WatchError>>;
 
     /// TODO: docs.
     type WatchError: Error;
@@ -89,4 +89,24 @@ pub trait Fs: Sized + 'static {
             })
         }
     }
+}
+
+/// TODO: docs.
+#[derive(Debug)]
+pub struct FsEvent<Fs: self::Fs> {
+    /// TODO: docs.
+    pub kind: FsEventKind,
+
+    /// TODO: docs.
+    pub path: AbsPathBuf,
+
+    /// TODO: docs.
+    pub timestamp: Fs::Timestamp,
+}
+
+/// TODO: docs.
+#[derive(Debug)]
+pub enum FsEventKind {
+    /// TODO: docs.
+    CreatedDir,
 }

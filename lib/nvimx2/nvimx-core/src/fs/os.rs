@@ -8,11 +8,11 @@ use std::fs::Metadata;
 use std::io;
 use std::time::SystemTime;
 
+use futures_lite::stream::Pending;
 use futures_lite::{Stream, ready};
 
 use crate::fs::{
     AbsPath,
-    AbsPathBuf,
     DirEntry,
     Fs,
     FsEvent,
@@ -20,7 +20,6 @@ use crate::fs::{
     FsNodeKind,
     FsNodeName,
     InvalidFsNodeNameError,
-    Watcher,
 };
 
 /// TODO: docs.
@@ -53,11 +52,6 @@ pin_project_lite::pin_project! {
 }
 
 /// TODO: docs.
-pub struct OsWatcher {
-    watched_path: AbsPathBuf,
-}
-
-/// TODO: docs.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum OsNameError {
     /// TODO: docs.
@@ -79,7 +73,7 @@ impl Fs for OsFs {
     type ReadDirError = io::Error;
     type Timestamp = SystemTime;
     type WatchError = core::convert::Infallible;
-    type Watcher = OsWatcher;
+    type Watcher = Pending<Result<FsEvent<Self>, Self::WatchError>>;
 
     #[inline]
     async fn node_at_path<P: AsRef<AbsPath>>(
@@ -121,9 +115,9 @@ impl Fs for OsFs {
     #[inline]
     async fn watch<P: AsRef<AbsPath>>(
         &self,
-        path: P,
+        _path: P,
     ) -> Result<Self::Watcher, Self::WatchError> {
-        Ok(OsWatcher { watched_path: path.as_ref().to_owned() })
+        todo!();
     }
 }
 
@@ -168,22 +162,5 @@ impl DirEntry for OsDirEntry {
     #[inline]
     async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
         self.inner.file_type().await.map(Into::into)
-    }
-}
-
-impl Watcher<OsFs> for OsWatcher {
-    type Error = core::convert::Infallible;
-
-    #[inline]
-    fn register_handler<F>(&mut self, _callback: F)
-    where
-        F: FnMut(Result<FsEvent<OsFs>, Self::Error>) -> bool + 'static,
-    {
-        todo!()
-    }
-
-    #[inline]
-    fn watched_path(&self) -> &AbsPath {
-        &self.watched_path
     }
 }

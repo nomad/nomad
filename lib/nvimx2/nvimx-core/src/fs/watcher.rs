@@ -30,26 +30,6 @@ pub trait Watcher<Fs: fs::Fs<Watcher = Self>> {
     }
 }
 
-/// TODO: docs.
-#[derive(Debug)]
-pub struct FsEvent<Fs: fs::Fs> {
-    /// TODO: docs.
-    pub kind: FsEventKind,
-
-    /// TODO: docs.
-    pub path: fs::AbsPathBuf,
-
-    /// TODO: docs.
-    pub timestamp: Fs::Timestamp,
-}
-
-/// TODO: docs.
-#[derive(Debug)]
-pub enum FsEventKind {
-    /// TODO: docs.
-    CreatedDir,
-}
-
 pin_project_lite::pin_project! {
     /// TODO: docs.
     #[derive(Debug)]
