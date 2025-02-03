@@ -44,7 +44,10 @@ pub struct TestFileHandle {
     path: AbsPathBuf,
 }
 
-pub struct TestReadDir {}
+pub struct TestReadDir {
+    dir_handle: TestDirectoryHandle,
+    nexxt_child_idx: usize,
+}
 
 pub struct TestWatcher {}
 
@@ -144,7 +147,7 @@ impl Fs for TestFs {
     type Watcher = TestWatcher;
     type DirEntryError = Infallible;
     type NodeAtPathError = Infallible;
-    type ReadDirError = Infallible;
+    type ReadDirError = TestReadDirError;
     type WatchError = Infallible;
 
     async fn node_at_path<P: AsRef<AbsPath>>(
@@ -177,9 +180,16 @@ impl Fs for TestFs {
 
     async fn read_dir<P: AsRef<AbsPath>>(
         &self,
-        _dir_path: P,
+        dir_path: P,
     ) -> Result<Self::ReadDir, Self::ReadDirError> {
-        todo!()
+        let FsNode::Directory(dir_handle) = self
+            .node_at_path(dir_path)
+            .await?
+            .ok_or(TestReadDirError::NoNodeAtPath)?
+        else {
+            return Err(TestReadDirError::NoDirAtPath);
+        };
+        Ok(TestReadDir { dir_handle, nexxt_child_idx: 0 })
     }
 
     async fn watch<P: AsRef<AbsPath>>(
@@ -231,5 +241,19 @@ impl Watcher<TestFs> for TestWatcher {
 
     fn watched_path(&self) -> &AbsPath {
         todo!()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TestReadDirError {
+    #[error("no node at path")]
+    NoNodeAtPath,
+    #[error("no directory at path")]
+    NoDirAtPath,
+}
+
+impl From<Infallible> for TestReadDirError {
+    fn from(_: Infallible) -> Self {
+        unreachable!()
     }
 }
