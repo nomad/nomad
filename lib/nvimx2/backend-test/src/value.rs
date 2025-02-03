@@ -120,8 +120,36 @@ impl From<serde_json::Value> for TestValue {
 impl TryFrom<TestValue> for serde_json::Value {
     type Error = serde_json::Error;
 
-    fn try_from(_value: TestValue) -> Result<Self, Self::Error> {
-        todo!();
+    fn try_from(value: TestValue) -> Result<Self, Self::Error> {
+        use serde::de::Error;
+        match value {
+            TestValue::Null => Ok(serde_json::Value::Null),
+            TestValue::Bool(bool) => Ok(serde_json::Value::Bool(bool)),
+            TestValue::Number(number) => Ok(serde_json::Value::Number(number)),
+            TestValue::String(string) => Ok(serde_json::Value::String(string)),
+            TestValue::List(list) => Ok(serde_json::Value::Array(
+                list.into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            )),
+            TestValue::Map(map) => Ok(serde_json::Value::Object(
+                map.into_iter()
+                    .map(|(k, v)| v.try_into().map(|v| (k, v)))
+                    .collect::<Result<_, _>>()?,
+            )),
+            TestValue::Function(_) => Err(serde_json::Error::custom(
+                "cannot convert function to JSON value",
+            )),
+        }
+    }
+}
+
+impl IntoIterator for TestMap {
+    type Item = (String, TestValue);
+    type IntoIter = indexmap::map::IntoIter<String, TestValue>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
     }
 }
 
