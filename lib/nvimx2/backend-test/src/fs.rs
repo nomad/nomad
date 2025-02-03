@@ -44,9 +44,11 @@ pub struct TestFileHandle {
     path: AbsPathBuf,
 }
 
-pub struct TestReadDir {
-    dir_handle: TestDirectoryHandle,
-    next_child_idx: usize,
+pin_project_lite::pin_project! {
+    pub struct TestReadDir {
+        dir_handle: TestDirectoryHandle,
+        next_child_idx: usize,
+    }
 }
 
 pub struct TestWatcher {}
@@ -123,6 +125,14 @@ impl TestFileHandle {
 }
 
 impl TestFsInner {
+    fn dir_at_path(&self, path: &AbsPath) -> Option<&TestDirectory> {
+        if path.is_root() {
+            Some(self.root())
+        } else {
+            self.root().dir_at_path(path)
+        }
+    }
+
     fn node_at_path(&self, path: &AbsPath) -> Option<&TestFsNode> {
         if path.is_root() {
             Some(&self.root)
@@ -187,7 +197,7 @@ impl Fs for TestFs {
     type File<Path> = TestFileHandle;
     type ReadDir = TestReadDir;
     type Watcher = TestWatcher;
-    type DirEntryError = Infallible;
+    type DirEntryError = TestReadDirNextError;
     type NodeAtPathError = Infallible;
     type ReadDirError = TestReadDirError;
     type WatchError = Infallible;
@@ -266,13 +276,42 @@ impl DirEntry for TestDirEntry {
 }
 
 impl Stream for TestReadDir {
-    type Item = Result<TestDirEntry, Infallible>;
+    type Item = Result<TestDirEntry, TestReadDirNextError>;
 
     fn poll_next(
         self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
+        _: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        todo!()
+        let this = self.project();
+        let (name, kind) = match this.dir_handle.fs.with_inner(|inner| {
+            Ok(inner
+                .dir_at_path(&this.dir_handle.path)
+                .ok_or(TestReadDirNextError::DirWasDeleted)?
+                .children
+                .get_index(*this.next_child_idx)
+                .map(|(name, node)| (name.to_owned(), node.kind())))
+        }) {
+            Ok(Some(tuple)) => tuple,
+            Ok(None) => return Poll::Ready(None),
+            Err(err) => return Poll::Ready(Some(Err(err))),
+        };
+        *this.next_child_idx += 1;
+        let mut child_path = this.dir_handle.path.clone();
+        child_path.push(name);
+        let entry = match kind {
+            FsNodeKind::File => TestDirEntry::File(TestFileHandle {
+                fs: this.dir_handle.fs.clone(),
+                path: child_path,
+            }),
+            FsNodeKind::Directory => {
+                TestDirEntry::Directory(TestDirectoryHandle {
+                    fs: this.dir_handle.fs.clone(),
+                    path: child_path,
+                })
+            },
+            FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
+        };
+        Poll::Ready(Some(Ok(entry)))
     }
 }
 
@@ -292,6 +331,10 @@ impl Watcher<TestFs> for TestWatcher {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[error("dir entry does not exist")]
+pub struct TestDirEntryDoesNotExistError;
+
+#[derive(Debug, thiserror::Error)]
 pub enum TestReadDirError {
     #[error("no node at path")]
     NoNodeAtPath,
@@ -300,8 +343,10 @@ pub enum TestReadDirError {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("dir entry does not exist")]
-pub struct TestDirEntryDoesNotExistError;
+pub enum TestReadDirNextError {
+    #[error("directory has been deleted")]
+    DirWasDeleted,
+}
 
 impl From<Infallible> for TestReadDirError {
     fn from(_: Infallible) -> Self {
