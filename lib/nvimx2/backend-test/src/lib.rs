@@ -13,3 +13,4 @@ pub mod serde;
 pub mod value;
 
 pub use backend::TestBackend;
+pub use backend_test_macros::fs;
