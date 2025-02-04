@@ -232,8 +232,8 @@ version = "0.1.0-dev"
 dependencies = [
  "async-broadcast",
  "async-task",
- "concurrent-queue",
  "crop",
+ "flume",
  "futures-lite",
  "fxhash",
  "indexmap",

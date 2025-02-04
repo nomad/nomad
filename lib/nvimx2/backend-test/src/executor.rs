@@ -1,14 +1,15 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use std::sync::Arc;
 
 use async_task::Runnable;
-use concurrent_queue::{ConcurrentQueue, PushError};
+use flume::{Receiver, Sender};
+use futures_lite::FutureExt;
 use nvimx_core::backend::{BackgroundExecutor, LocalExecutor, Task};
 
 #[derive(Clone)]
 pub struct TestExecutor {
-    state: Arc<ConcurrentQueue<Runnable>>,
+    runnable_tx: Sender<Runnable>,
+    runnable_rx: Receiver<Runnable>,
 }
 
 pin_project_lite::pin_project! {
@@ -19,8 +20,28 @@ pin_project_lite::pin_project! {
 }
 
 impl TestExecutor {
-    pub fn block_on<T>(&self, _future: impl Future<Output = T>) -> T {
-        todo!()
+    pub fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
+        futures_lite::future::block_on(self.run(future))
+    }
+
+    pub async fn run<T>(&self, future: impl Future<Output = T>) -> T {
+        let keep_polling_runnables = async move {
+            loop {
+                self.runnable_rx
+                    .recv_async()
+                    .await
+                    .expect("Self has a sender")
+                    .run();
+            }
+        };
+        future.or(keep_polling_runnables).await
+    }
+
+    fn schedule(&self) -> impl Fn(Runnable) + Send + Sync + 'static {
+        let runnable_tx = self.runnable_tx.clone();
+        move |runnable| {
+            let _ = runnable_tx.send(runnable);
+        }
     }
 }
 
@@ -32,13 +53,7 @@ impl LocalExecutor for TestExecutor {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let this = self.clone();
-        let schedule = move |runnable| match this.state.push(runnable) {
-            Ok(()) => {},
-            Err(PushError::Full(_)) => unreachable!("queue is unbounded"),
-            Err(PushError::Closed(_)) => unreachable!("queue is never closed"),
-        };
-        let (runnable, task) = async_task::spawn_local(fut, schedule);
+        let (runnable, task) = async_task::spawn_local(fut, self.schedule());
         runnable.schedule();
         TestTask { inner: task }
     }
@@ -52,13 +67,16 @@ impl BackgroundExecutor for TestExecutor {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        LocalExecutor::spawn(self, fut)
+        let (runnable, task) = async_task::spawn(fut, self.schedule());
+        runnable.schedule();
+        TestTask { inner: task }
     }
 }
 
 impl Default for TestExecutor {
     fn default() -> Self {
-        Self { state: Arc::new(ConcurrentQueue::unbounded()) }
+        let (runnable_tx, runnable_rx) = flume::unbounded();
+        Self { runnable_tx, runnable_rx }
     }
 }
 
