@@ -212,6 +212,10 @@ impl TestDirectory {
         self
     }
 
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     fn child_at_path(&self, path: &AbsPath) -> Option<&TestFsNode> {
         let mut components = path.components();
         let node = self.children.get(components.next()?)?;

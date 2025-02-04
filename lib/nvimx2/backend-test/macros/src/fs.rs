@@ -1,7 +1,7 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use syn::{Expr, parse_macro_input, token};
+use syn::{Expr, Ident, parse_macro_input, token};
 
 pub(crate) fn fs(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let root = parse_macro_input!(input as Directory);
@@ -44,8 +44,27 @@ impl Parse for File {
 }
 
 impl ToTokens for Directory {
-    fn to_tokens(&self, _tokens: &mut TokenStream) {
-        todo!()
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let variable_name = Ident::new("__dir", Span::call_site());
+
+        let mut definition = quote! {
+            let mut #variable_name = ::nvimx2::tests::fs::TestDirectory::new();
+        };
+
+        for (child_name, child) in self.children.iter() {
+            definition.extend(quote! {
+                #variable_name.insert_child(
+                    <&::nvimx2::fs::FsNodeName>::try_from(#child_name).unwrap(),
+                    #child,
+                );
+            });
+        }
+
+        definition.extend(quote! {
+            #variable_name
+        });
+
+        quote! {{ #definition }}.to_tokens(tokens);
     }
 }
 
