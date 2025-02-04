@@ -1,7 +1,10 @@
 [package]
 name = "backend-test-macros"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [lib]
 proc-macro = true

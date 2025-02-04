@@ -10,7 +10,7 @@ publish.workspace = true
 neovim-mlua = ["backend-neovim/mlua"]
 neovim-0-10 = ["__neovim", "backend-neovim/neovim-0-10"]
 neovim-nightly = ["__neovim", "backend-neovim/neovim-nightly"]
-test = ["dep:backend-test"]
+tests = ["dep:backend-test"]
 __neovim = ["dep:backend-neovim", "nvimx2-macros/plugin"]
 
 [dependencies]

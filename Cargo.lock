@@ -247,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "backend-test-macros"
-version = "0.1.0"
+version = "0.1.0-dev"
 dependencies = [
  "proc-macro2",
  "quote",
