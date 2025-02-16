@@ -41,7 +41,8 @@ where
     if P::COMMAND_NAME != plugin::NO_COMMAND_NAME
         && !command_builder.is_empty()
     {
-        plugin_api.add_command::<P, _, _, _>(
+        plugin_api.add_command::<_, _, _>(
+            P::COMMAND_NAME,
             command_builder.build(state.handle()),
             command_completions_builder.build(),
         );
@@ -168,7 +169,7 @@ impl<B: Backend> ApiCtx<'_, B> {
     {
         self.namespace.push(Mod::NAME);
         let submodule_api = self.add_submodule::<Mod>(module);
-        self.module_api.add_submodule::<Mod>(submodule_api);
+        self.module_api.add_submodule(Mod::NAME, submodule_api);
         self.namespace.pop();
         self
     }

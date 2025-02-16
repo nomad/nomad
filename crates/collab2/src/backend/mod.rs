@@ -91,12 +91,12 @@ pub trait CollabBackend:
 
 /// A [`Buffer`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
-pub trait CollabBuffer<B: CollabBackend>: Buffer<B> {
+pub trait CollabBuffer<B: CollabBackend>: Buffer {
     /// Returns the path to the root of the workspace containing the buffer
     /// with the given ID, or `None` if there's no language server attached to
     /// it.
     fn lsp_root(
-        buffer_id: BufferId<B>,
+        buffer_id: Self::Id,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Option<AbsPathBuf>, B::BufferLspRootError>;
 }

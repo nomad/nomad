@@ -1,13 +1,12 @@
 use core::convert::Infallible;
 use core::fmt;
 
-use crate::backend::Backend;
 use crate::notify;
 
 /// TODO: docs.
-pub trait Value<B: Backend>: 'static {
+pub trait Value: 'static {
     /// TODO: docs.
-    type MapAccess<'a>: MapAccess<B, Value = Self>;
+    type MapAccess<'a>: MapAccess<Value = Self>;
 
     /// TODO: docs.
     type MapAccessError<'a>: notify::Error
@@ -21,9 +20,9 @@ pub trait Value<B: Backend>: 'static {
 }
 
 /// TODO: docs.
-pub trait MapAccess<B: Backend> {
+pub trait MapAccess {
     /// TODO: docs.
-    type Key<'a>: Key<B>
+    type Key<'a>: Key
     where
         Self: 'a;
 
@@ -38,7 +37,7 @@ pub trait MapAccess<B: Backend> {
 }
 
 /// TODO: docs.
-pub trait Key<B: Backend>: fmt::Debug {
+pub trait Key: fmt::Debug {
     /// TODO: docs.
     type AsStrError<'a>: notify::Error
     where
@@ -48,7 +47,7 @@ pub trait Key<B: Backend>: fmt::Debug {
     fn as_str(&self) -> Result<&str, Self::AsStrError<'_>>;
 }
 
-impl<MA: MapAccess<B>, B: Backend> MapAccess<B> for &mut MA {
+impl<MA: MapAccess> MapAccess for &mut MA {
     type Key<'a>
         = MA::Key<'a>
     where
@@ -67,7 +66,7 @@ impl<MA: MapAccess<B>, B: Backend> MapAccess<B> for &mut MA {
     }
 }
 
-impl<B: Backend> Key<B> for &str {
+impl Key for &str {
     type AsStrError<'a>
         = Infallible
     where

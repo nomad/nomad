@@ -3,8 +3,6 @@ use nvimx_core::backend::{MapAccess, Value};
 use nvimx_core::notify;
 use serde_json::Number;
 
-use crate::TestBackend;
-
 /// TODO: docs.
 pub enum TestValue {
     Null,
@@ -19,6 +17,11 @@ pub enum TestValue {
 #[derive(Default)]
 pub struct TestMap {
     inner: IndexMap<String, TestValue>,
+}
+
+pub struct TestMapAccess<'a> {
+    map: &'a mut TestMap,
+    idx: Option<usize>,
 }
 
 pub struct TestMapAccessError {
@@ -53,15 +56,15 @@ impl TestMap {
     }
 }
 
-impl Value<TestBackend> for TestValue {
-    type MapAccess<'a> = (&'a mut TestMap, Option<usize>);
+impl Value for TestValue {
+    type MapAccess<'a> = TestMapAccess<'a>;
     type MapAccessError<'a> = TestMapAccessError;
 
     fn map_access(
         &mut self,
     ) -> Result<Self::MapAccess<'_>, Self::MapAccessError<'_>> {
         match self {
-            Self::Map(map) => Ok((map, None)),
+            Self::Map(map) => Ok(TestMapAccess { map, idx: None }),
             _ => Err(TestMapAccessError { kind: self.kind() }),
         }
     }
@@ -73,7 +76,7 @@ impl Default for TestValue {
     }
 }
 
-impl MapAccess<TestBackend> for (&mut TestMap, Option<usize>) {
+impl MapAccess for TestMapAccess<'_> {
     type Key<'a>
         = &'a str
     where
@@ -81,21 +84,20 @@ impl MapAccess<TestBackend> for (&mut TestMap, Option<usize>) {
     type Value = TestValue;
 
     fn next_key(&mut self) -> Option<Self::Key<'_>> {
-        let (map, maybe_idx) = self;
         let mut is_first_access = false;
-        let idx = maybe_idx.get_or_insert_with(|| {
+        let idx = self.idx.get_or_insert_with(|| {
             is_first_access = true;
             0
         });
-        let maybe_key = map.inner.get_index(*idx).map(|(key, _)| &**key);
+        let maybe_key = self.map.inner.get_index(*idx).map(|(key, _)| &**key);
         *idx += !is_first_access as usize;
         maybe_key
     }
 
     fn take_next_value(&mut self) -> Self::Value {
-        let (map, maybe_idx) = self;
-        let idx = maybe_idx.expect("already called next_key");
-        let (_, value) = map.inner.swap_remove_index(idx).expect("not oob");
+        let idx = self.idx.expect("already called next_key");
+        let (_, value) =
+            self.map.inner.swap_remove_index(idx).expect("not oob");
         value
     }
 }

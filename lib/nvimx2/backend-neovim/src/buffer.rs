@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 
 use nvimx_core::ByteOffset;
-use nvimx_core::backend::{Buffer, BufferId};
+use nvimx_core::backend::Buffer;
 
-use crate::{Neovim, oxi};
+use crate::oxi;
 
 /// TODO: docs.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -102,14 +102,16 @@ impl Point {
     }
 }
 
-impl Buffer<Neovim> for NeovimBuffer {
+impl Buffer for NeovimBuffer {
+    type Id = Self;
+
     #[inline]
     fn byte_len(&self) -> ByteOffset {
         self.byte_offset_of_point(self.point_of_eof())
     }
 
     #[inline]
-    fn id(&self) -> BufferId<Neovim> {
+    fn id(&self) -> Self::Id {
         *self
     }
 

@@ -5,7 +5,6 @@ use nvimx_core::backend::Api;
 use nvimx_core::command::{CommandArgs, CommandCompletion};
 use nvimx_core::module::Module;
 use nvimx_core::notify::Name;
-use nvimx_core::plugin::Plugin;
 
 use crate::Neovim;
 use crate::oxi::{Dictionary, Function, Object, api};
@@ -42,22 +41,20 @@ impl NeovimApi {
     }
 }
 
-impl Api<Neovim> for NeovimApi {
+impl Api for NeovimApi {
     type Value = NeovimValue;
 
     #[inline]
-    fn add_command<P, Cmd, CompFun, Comps>(
+    fn add_command<Cmd, CompFun, Comps>(
         &mut self,
+        command_name: Name,
         mut command: Cmd,
         mut completion_fun: CompFun,
     ) where
         Cmd: FnMut(CommandArgs) + 'static,
         CompFun: FnMut(CommandArgs, ByteOffset) -> Comps + 'static,
         Comps: IntoIterator<Item = CommandCompletion>,
-        P: Plugin<Neovim>,
     {
-        let command_name = P::COMMAND_NAME;
-
         let command =
             Function::from_fn_mut(move |args: api::types::CommandArgs| {
                 command(CommandArgs::new(
@@ -125,12 +122,9 @@ impl Api<Neovim> for NeovimApi {
 
     #[track_caller]
     #[inline]
-    fn add_submodule<S>(&mut self, module_api: Self)
-    where
-        S: Module<Neovim>,
-    {
+    fn add_submodule(&mut self, module_name: Name, module_api: Self) {
         if !module_api.dictionary.is_empty() {
-            self.insert(S::NAME, module_api);
+            self.insert(module_name, module_api);
         }
     }
 }

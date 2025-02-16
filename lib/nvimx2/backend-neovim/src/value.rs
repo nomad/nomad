@@ -5,7 +5,6 @@ use core::fmt;
 use nvimx_core::backend::{Key, MapAccess, Value};
 use nvimx_core::notify;
 
-use crate::Neovim;
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
 
 /// TODO: docs.
@@ -50,7 +49,7 @@ impl NeovimValue {
     }
 }
 
-impl Value<Neovim> for NeovimValue {
+impl Value for NeovimValue {
     type MapAccess<'a> = NeovimMapAccess<'a>;
     type MapAccessError<'a> = NeovimMapAccessError;
 
@@ -100,7 +99,7 @@ impl lua::Pushable for NeovimValue {
     }
 }
 
-impl MapAccess<Neovim> for NeovimMapAccess<'_> {
+impl MapAccess for NeovimMapAccess<'_> {
     type Key<'a>
         = NeovimMapKey<'a>
     where
@@ -125,7 +124,7 @@ impl MapAccess<Neovim> for NeovimMapAccess<'_> {
     }
 }
 
-impl MapAccess<Neovim> for NeovimDictAccess<'_> {
+impl MapAccess for NeovimDictAccess<'_> {
     type Key<'a>
         = NeovimMapKey<'a>
     where
@@ -150,7 +149,7 @@ impl MapAccess<Neovim> for NeovimDictAccess<'_> {
     }
 }
 
-impl Key<Neovim> for NeovimMapKey<'_> {
+impl Key for NeovimMapKey<'_> {
     type AsStrError<'a>
         = NeovimMapKeyAsStrError<'a>
     where

@@ -1,5 +1,3 @@
-//! TODO: docs.
-
 use serde::Serialize;
 use serde::de::Deserialize;
 
@@ -22,10 +20,10 @@ use crate::plugin::Plugin;
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
     /// TODO: docs.
-    type Api: Api<Self>;
+    type Api: Api;
 
     /// TODO: docs.
-    type Buffer<'a>: Buffer<Self>;
+    type Buffer<'a>: Buffer<Id = Self::BufferId>;
 
     /// TODO: docs.
     type BufferId: Clone;
@@ -119,7 +117,7 @@ pub trait Backend: 'static + Sized {
         &mut self,
         config_namespace: &notify::Namespace,
         namespace: &notify::Namespace,
-        err: <ApiValue<Self> as Value<Self>>::MapAccessError<'_>,
+        err: <ApiValue<Self> as Value>::MapAccessError<'_>,
     ) where
         P: Plugin<Self>,
     {
@@ -132,9 +130,7 @@ pub trait Backend: 'static + Sized {
         &mut self,
         config_namespace: &notify::Namespace,
         namespace: &notify::Namespace,
-        err: <<<ApiValue<Self> as Value<Self>>::MapAccess<'_> as MapAccess<
-            Self,
-        >>::Key<'_> as Key<Self>>::AsStrError<'_>,
+        err: <<<ApiValue<Self> as Value>::MapAccess<'_> as MapAccess>::Key<'_> as Key>::AsStrError<'_>,
     ) where
         P: Plugin<Self>,
     {

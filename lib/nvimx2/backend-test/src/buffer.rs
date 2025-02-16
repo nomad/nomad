@@ -4,8 +4,6 @@ use crop::Rope;
 use nvimx_core::ByteOffset;
 use nvimx_core::backend::Buffer;
 
-use crate::TestBackend;
-
 /// TODO: docs.
 pub struct TestBuffer {
     contents: Rope,
@@ -17,12 +15,14 @@ pub struct TestBuffer {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TestBufferId(u64);
 
-impl Buffer<TestBackend> for TestBuffer {
+impl Buffer for TestBuffer {
+    type Id = TestBufferId;
+
     fn byte_len(&self) -> ByteOffset {
         self.contents.byte_len().into()
     }
 
-    fn id(&self) -> TestBufferId {
+    fn id(&self) -> Self::Id {
         self.id
     }
 

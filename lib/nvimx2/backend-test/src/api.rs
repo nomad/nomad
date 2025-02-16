@@ -1,11 +1,8 @@
 use nvimx_core::ByteOffset;
 use nvimx_core::backend::Api;
 use nvimx_core::command::{CommandArgs, CommandCompletion};
-use nvimx_core::module::Module;
 use nvimx_core::notify::Name;
-use nvimx_core::plugin::Plugin;
 
-use crate::TestBackend;
 use crate::value::{TestMap, TestValue};
 
 /// TODO: docs.
@@ -14,7 +11,7 @@ pub struct TestApi {
     map: TestMap,
 }
 
-impl Api<TestBackend> for TestApi {
+impl Api for TestApi {
     type Value = TestValue;
 
     #[track_caller]
@@ -36,24 +33,21 @@ impl Api<TestBackend> for TestApi {
     }
 
     #[track_caller]
-    fn add_submodule<M>(&mut self, module_api: Self)
-    where
-        M: Module<TestBackend>,
-    {
-        assert!(!self.map.contains_key(M::NAME));
+    fn add_submodule(&mut self, module_name: Name, module_api: Self) {
+        assert!(!self.map.contains_key(module_name));
         let value = TestValue::Map(module_api.map);
-        self.map.insert(M::NAME, value);
+        self.map.insert(module_name, value);
     }
 
-    fn add_command<P, Command, CompletionFn, Completions>(
+    fn add_command<Command, CompletionFn, Completions>(
         &mut self,
+        _: Name,
         _: Command,
         _: CompletionFn,
     ) where
         Command: FnMut(CommandArgs) + 'static,
         CompletionFn: FnMut(CommandArgs, ByteOffset) -> Completions + 'static,
         Completions: IntoIterator<Item = CommandCompletion>,
-        P: Plugin<TestBackend>,
     {
     }
 }
