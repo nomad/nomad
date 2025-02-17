@@ -7,7 +7,6 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-default = ["test"]
 neovim = [
   "dep:async-net",
   "dep:clipboard",
@@ -17,7 +16,7 @@ neovim = [
   "nvimx2/neovim-0-10",
   "nvimx2/neovim-mlua",
 ]
-test = ["nvimx2/tests"]
+test = ["auth/test", "nvimx2/tests"]
 
 [dependencies]
 auth = { workspace = true }
@@ -34,6 +33,7 @@ smallvec = { workspace = true }
 smol_str = { workspace = true }
 walkdir = { workspace = true }
 
+# Neovim-only dependencies.
 async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }

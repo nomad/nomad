@@ -29,6 +29,17 @@ impl Auth {
     pub fn logout(&self) -> Logout {
         self.into()
     }
+
+    /// TODO: docs.
+    #[cfg(any(test, feature = "test"))]
+    #[track_caller]
+    pub fn dummy<Gh>(github_handle: Gh) -> Self
+    where
+        Gh: TryInto<collab_server::message::GitHubHandle>,
+        Gh::Error: core::fmt::Debug,
+    {
+        Self { infos: Shared::new(Some(AuthInfos::dummy(github_handle))) }
+    }
 }
 
 impl<B: Backend> Module<B> for Auth {

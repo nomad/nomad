@@ -6,6 +6,9 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+test = ["nvimx2/tests"]
+
 [dependencies]
 collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
 nvimx2 = { workspace = true }
