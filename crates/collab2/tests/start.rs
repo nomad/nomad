@@ -12,6 +12,6 @@ fn cannot_start_session_if_not_logged_in() {
     CollabTestBackend::<TestBackend>::default().block_on(async move |ctx| {
         let collab = Collab::from(&Auth::default());
         let err = collab.start().call((), ctx).await.unwrap_err();
-        assert!(matches!(err, StartError::UserNotLoggedIn(_)));
+        assert_eq!(err, StartError::user_not_logged_in());
     });
 }

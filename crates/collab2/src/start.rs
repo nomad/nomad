@@ -173,6 +173,29 @@ impl<B: CollabBackend> StartError<B> {
     }
 }
 
+impl<B> PartialEq for StartError<B>
+where
+    B: CollabBackend,
+    B::ReadReplicaError: PartialEq,
+    B::SearchProjectRootError: PartialEq,
+    B::StartSessionError: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use StartError::*;
+
+        match (self, other) {
+            (NoBufferFocused(_), NoBufferFocused(_)) => true,
+            (OverlappingSession(l), OverlappingSession(r)) => l == r,
+            (ReadReplica(l), ReadReplica(r)) => l == r,
+            (SearchProjectRoot(l), SearchProjectRoot(r)) => l == r,
+            (SessionRxDropped(_), SessionRxDropped(_)) => true,
+            (StartSession(l), StartSession(r)) => l == r,
+            (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
+            _ => false,
+        }
+    }
+}
+
 impl<B: CollabBackend> notify::Error for StartError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
