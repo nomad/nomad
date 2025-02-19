@@ -63,7 +63,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
     pub fn spawn_local<Out>(
         &self,
         fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
-    ) -> TaskLocal<Out, B>
+    ) -> TaskLocal<Option<Out>, B>
     where
         Out: 'static,
     {

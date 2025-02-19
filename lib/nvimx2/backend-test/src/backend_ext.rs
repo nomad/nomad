@@ -19,7 +19,9 @@ pub trait BackendExt: Backend {
             .take_runner()
             .expect("runner has not been taken");
 
-        runner.block_on(self.with_ctx(move |ctx| ctx.spawn_local(fun)))
+        let task = self.with_ctx(move |ctx| ctx.spawn_local_unprotected(fun));
+
+        runner.block_on(task)
     }
 }
 

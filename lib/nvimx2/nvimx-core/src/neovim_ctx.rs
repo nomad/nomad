@@ -102,6 +102,32 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     pub fn spawn_local<Out>(
         &mut self,
         fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
+    ) -> TaskLocal<Option<Out>, B>
+    where
+        Out: 'static,
+    {
+        let fun = async move |ctx: &mut AsyncCtx<B>| {
+            match panic::AssertUnwindSafe(fun(ctx)).catch_unwind().await {
+                Ok(ret) => Some(ret),
+                Err(_payload) => {
+                    ctx.state().with_mut(|_state| {
+                        // state.handle_panic(ctx.namespace(), payload);
+                        todo!();
+                    });
+                    None
+                },
+            }
+        };
+
+        self.spawn_local_unprotected(fun)
+    }
+
+    /// TODO: docs.
+    #[must_use = "task handles do nothing unless awaited or detached"]
+    #[inline]
+    pub fn spawn_local_unprotected<Out>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
     ) -> TaskLocal<Out, B>
     where
         Out: 'static,
@@ -125,15 +151,7 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
             // will have already finished running.
             futures_lite::future::yield_now().await;
 
-            match panic::AssertUnwindSafe(fun(&mut ctx)).catch_unwind().await {
-                Ok(ret) => ret,
-                Err(_payload) => {
-                    ctx.state().with_mut(|_state| {
-                        // state.handle_panic(ctx.namespace(), payload);
-                        todo!();
-                    })
-                },
-            }
+            fun(&mut ctx).await
         });
 
         TaskLocal::<_, B>::new(task)
