@@ -1,5 +1,6 @@
 use core::any::{self, Any};
 use core::cell::Cell;
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use std::backtrace::Backtrace;
 use std::collections::hash_map::Entry;
@@ -18,7 +19,7 @@ pub(crate) struct State<B: Backend> {
     backend: B,
     modules: FxHashMap<ModuleId, &'static dyn Any>,
     panic_handlers: FxHashMap<PluginId, &'static dyn PanicHandler<B>>,
-    panic_hook: PanicHook,
+    panic_hook: PanicHook<B>,
 }
 
 /// TODO: docs.
@@ -35,7 +36,9 @@ pub(crate) struct StateMut<'a, B: Backend> {
 /// A `PanicHandler` that handles panics by resuming to unwind the stack.
 pub(crate) struct ResumeUnwinding;
 
-struct PanicHook {}
+struct PanicHook<B: Backend> {
+    backend: PhantomData<B>,
+}
 
 trait PanicHandler<B: Backend> {
     fn handle_panic(&self, info: PanicInfo, ctx: &mut NeovimCtx<B>);
@@ -170,7 +173,7 @@ impl<B: Backend> StateMut<'_, B> {
     }
 }
 
-impl PanicHook {
+impl<B: Backend> PanicHook<B> {
     thread_local! {
         static BACKTRACE: Cell<Option<Backtrace>> = const { Cell::new(None) };
         static LOCATION: Cell<Option<PanicLocation>> = const { Cell::new(None) };
@@ -185,15 +188,19 @@ impl PanicHook {
 
     #[inline]
     fn set() -> Self {
+        let prev_hook = B::REINSTATE_PANIC_HOOK.then(panic::take_hook);
         panic::set_hook({
             Box::new(move |info| {
+                if let Some(prev) = &prev_hook {
+                    prev(info);
+                }
                 let trace = Backtrace::capture();
                 let location = info.location().map(Into::into);
                 Self::BACKTRACE.with(move |b| b.set(Some(trace)));
                 Self::LOCATION.with(move |l| l.set(location));
             })
         });
-        Self {}
+        Self { backend: PhantomData }
     }
 }
 

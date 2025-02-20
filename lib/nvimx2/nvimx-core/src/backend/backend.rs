@@ -22,6 +22,9 @@ use crate::{NeovimCtx, fs};
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
     /// TODO: docs.
+    const REINSTATE_PANIC_HOOK: bool = false;
+
+    /// TODO: docs.
     type Api: Api;
 
     /// TODO: docs.

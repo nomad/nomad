@@ -12,6 +12,9 @@ pub trait BackendAdapter: 'static + DerefMut<Target = Self::Base> {
 }
 
 impl<T: BackendAdapter> Backend for T {
+    const REINSTATE_PANIC_HOOK: bool =
+        <T::Target as Backend>::REINSTATE_PANIC_HOOK;
+
     type Api = <T::Target as Backend>::Api;
     type Buffer<'a> = <T::Target as Backend>::Buffer<'a>;
     type BufferId = <T::Target as Backend>::BufferId;

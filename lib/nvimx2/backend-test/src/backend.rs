@@ -31,6 +31,8 @@ impl TestBackend {
 }
 
 impl Backend for TestBackend {
+    const REINSTATE_PANIC_HOOK: bool = true;
+
     type Api = crate::api::TestApi;
     type Buffer<'a> = &'a mut TestBuffer;
     type BufferId = TestBufferId;
