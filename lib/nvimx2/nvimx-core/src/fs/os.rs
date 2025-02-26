@@ -41,6 +41,7 @@ pub struct OsDirectory {
 
 /// TODO: docs.
 pub struct OsFile {
+    _file: RefCell<Option<async_fs::File>>,
     metadata: LazyOsMetadata,
 }
 
@@ -115,8 +116,36 @@ impl Fs for OsFs {
     type Timestamp = SystemTime;
     type Watcher = OsWatcher;
 
+    type CreateDirectoryError = io::Error;
+    type CreateFileError = io::Error;
     type NodeAtPathError = io::Error;
     type WatchError = notify::Error;
+
+    async fn create_directory<P: AsRef<AbsPath>>(
+        &self,
+        path: P,
+    ) -> Result<Self::Directory, Self::CreateDirectoryError> {
+        let path = path.as_ref();
+        async_fs::create_dir(path).await?;
+        Ok(Self::Directory { metadata: LazyOsMetadata::lazy(path.to_owned()) })
+    }
+
+    async fn create_file<P: AsRef<AbsPath>>(
+        &self,
+        path: P,
+    ) -> Result<Self::File, Self::CreateFileError> {
+        let path = path.as_ref();
+        let file = async_fs::OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(path)
+            .await?;
+        Ok(Self::File {
+            _file: RefCell::new(Some(file)),
+            metadata: LazyOsMetadata::lazy(path.to_owned()),
+        })
+    }
 
     #[inline]
     async fn node_at_path<P: AsRef<AbsPath>>(
@@ -134,6 +163,7 @@ impl Fs for OsFs {
         };
         Ok(Some(match file_type {
             FsNodeKind::File => FsNode::File(OsFile {
+                _file: RefCell::new(None),
                 metadata: LazyOsMetadata::new(metadata, path.to_owned()),
             }),
             FsNodeKind::Directory => FsNode::Directory(OsDirectory {

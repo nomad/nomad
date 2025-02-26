@@ -14,6 +14,7 @@ use nvimx_core::fs::{
     File,
     Fs,
     FsEvent,
+    FsEventKind,
     FsNode,
     FsNodeKind,
     FsNodeName,
@@ -162,6 +163,68 @@ impl TestFileHandle {
 }
 
 impl TestFsInner {
+    fn create_node(
+        &mut self,
+        path: &AbsPath,
+        node: TestFsNode,
+    ) -> Result<(), CreateNodeError> {
+        let (parent_path, node_name) =
+            match (path.parent(), path.fs_node_name()) {
+                (Some(parent), Some(name)) => (parent, name),
+                _ => {
+                    return Err(CreateNodeError::AlreadyExists(
+                        NodeAlreadyExistsError {
+                            kind: FsNodeKind::File,
+                            path: path.to_owned(),
+                        },
+                    ));
+                },
+            };
+
+        let parent = self.node_at_path(parent_path).ok_or_else(|| {
+            CreateNodeError::ParentDoesNotExist(parent_path.to_owned())
+        })?;
+
+        let node_kind = match parent {
+            TestFsNode::Directory(parent) => {
+                if let Some(child) = parent.children.get(node_name) {
+                    return Err(CreateNodeError::AlreadyExists(
+                        NodeAlreadyExistsError {
+                            kind: child.kind(),
+                            path: path.to_owned(),
+                        },
+                    ));
+                }
+                let kind = node.kind();
+                parent.children.insert(node_name.to_owned(), node);
+                kind
+            },
+            TestFsNode::File(_) => {
+                return Err(CreateNodeError::ParentIsFile(
+                    parent_path.to_owned(),
+                ));
+            },
+        };
+
+        let event = FsEvent {
+            kind: match node_kind {
+                FsNodeKind::File => FsEventKind::CreatedFile,
+                FsNodeKind::Directory => FsEventKind::CreatedDir,
+                FsNodeKind::Symlink => unreachable!(),
+            },
+            path: path.to_owned(),
+            timestamp: self.timestamp,
+        };
+
+        for (watch_root, watcher) in &self.watchers {
+            if event.path.starts_with(watch_root) {
+                watcher.emit(event.clone());
+            }
+        }
+
+        Ok(())
+    }
+
     fn dir_at_path(&mut self, path: &AbsPath) -> Option<&mut TestDirectory> {
         if path.is_root() {
             Some(self.root())
@@ -272,6 +335,14 @@ impl TestFile {
 impl TestWatchChannel {
     const CAPACITY: usize = 16;
 
+    fn emit(&self, event: FsEvent<TestTimestamp>) {
+        if self.tx.receiver_count() > 0 {
+            self.tx
+                .broadcast_blocking(event)
+                .expect("there's at least one active receiver");
+        }
+    }
+
     fn new() -> Self {
         let (tx, rx) = async_broadcast::broadcast(Self::CAPACITY);
         Self { tx, inactive_rx: rx.deactivate() }
@@ -289,8 +360,32 @@ impl Fs for TestFs {
     type Timestamp = TestTimestamp;
     type Watcher = TestWatcher;
 
+    type CreateDirectoryError = CreateNodeError;
+    type CreateFileError = CreateNodeError;
     type NodeAtPathError = Infallible;
     type WatchError = Infallible;
+
+    async fn create_directory<P: AsRef<AbsPath>>(
+        &self,
+        path: P,
+    ) -> Result<Self::Directory, Self::CreateDirectoryError> {
+        let path = path.as_ref();
+        self.with_inner(|fs| {
+            fs.create_node(path, TestFsNode::Directory(TestDirectory::new()))
+        })?;
+        Ok(TestDirectoryHandle { fs: self.clone(), path: path.to_owned() })
+    }
+
+    async fn create_file<P: AsRef<AbsPath>>(
+        &self,
+        path: P,
+    ) -> Result<Self::File, Self::CreateFileError> {
+        let path = path.as_ref();
+        self.with_inner(|fs| {
+            fs.create_node(path, TestFsNode::File(TestFile::new("")))
+        })?;
+        Ok(TestFileHandle { fs: self.clone(), path: path.to_owned() })
+    }
 
     async fn node_at_path<P: AsRef<AbsPath>>(
         &self,
@@ -532,6 +627,25 @@ pub enum TestReadDirError {
 pub enum TestReadDirNextError {
     #[error("directory has been deleted")]
     DirWasDeleted,
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum CreateNodeError {
+    #[error(transparent)]
+    AlreadyExists(NodeAlreadyExistsError),
+
+    #[error("parent directory does not exist: {:?}", .0)]
+    ParentDoesNotExist(AbsPathBuf),
+
+    #[error("node at {:?} is a file, not a directory", .0)]
+    ParentIsFile(AbsPathBuf),
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[error("a {:?} already exists at {:?}", .kind, .path)]
+pub struct NodeAlreadyExistsError {
+    kind: FsNodeKind,
+    path: AbsPathBuf,
 }
 
 impl From<Infallible> for TestReadDirError {

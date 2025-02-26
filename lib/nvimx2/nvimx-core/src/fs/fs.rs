@@ -25,10 +25,28 @@ pub trait Fs: Sized + Send + 'static {
     >;
 
     /// TODO: docs.
+    type CreateDirectoryError: Error;
+
+    /// TODO: docs.
+    type CreateFileError: Error;
+
+    /// TODO: docs.
     type NodeAtPathError: Error;
 
     /// TODO: docs.
     type WatchError: Error;
+
+    /// TODO: docs.
+    fn create_directory<P: AsRef<AbsPath>>(
+        &self,
+        path: P,
+    ) -> impl Future<Output = Result<Self::Directory, Self::CreateDirectoryError>>;
+
+    /// TODO: docs.
+    fn create_file<P: AsRef<AbsPath>>(
+        &self,
+        path: P,
+    ) -> impl Future<Output = Result<Self::File, Self::CreateFileError>>;
 
     /// TODO: docs.
     fn node_at_path<P: AsRef<AbsPath>>(
