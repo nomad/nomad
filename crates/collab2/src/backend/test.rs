@@ -22,31 +22,20 @@ use crate::backend::{
 };
 
 #[allow(clippy::type_complexity)]
-pub struct CollabTestBackend<B> {
+pub struct CollabTestBackend<B: Backend> {
     inner: B,
     confirm_start_with: Option<Box<dyn FnMut(&fs::AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
-}
-
-pub struct CollabTestBuffer<'a, B: Backend> {
-    inner: <B as Backend>::Buffer<'a>,
     lsp_root_with: Option<
         Box<
-            dyn for<'b> FnMut(
-                <B as Backend>::Buffer<'b>,
-            ) -> Option<fs::AbsPathBuf>,
+            dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<fs::AbsPathBuf>,
         >,
     >,
+    home_dir_with:
+        Option<Box<dyn FnMut(<B as Backend>::Fs) -> fs::AbsPathBuf + Send>>,
 }
 
-pub struct CollabTestFs<B: Backend> {
-    inner: <B as Backend>::Fs,
-    home_dir_with: Option<
-        Box<dyn FnMut(&mut <B as Backend>::Fs) -> fs::AbsPathBuf + Send>,
-    >,
-}
-
-impl<B> CollabTestBackend<B> {
+impl<B: Backend> CollabTestBackend<B> {
     pub fn confirm_start_with(
         mut self,
         fun: impl FnMut(&fs::AbsPath) -> bool + 'static,
@@ -56,7 +45,13 @@ impl<B> CollabTestBackend<B> {
     }
 
     pub fn new(inner: B) -> Self {
-        Self { inner, clipboard: None, confirm_start_with: None }
+        Self {
+            clipboard: None,
+            confirm_start_with: None,
+            home_dir_with: None,
+            inner,
+            lsp_root_with: None,
+        }
     }
 }
 
@@ -65,7 +60,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type ServerTx = futures_util::sink::Drain<Message>;
 
     type CopySessionIdError = Infallible;
-    type HomeDirError = Infallible;
+    type HomeDirError = ();
     type LspRootError = Infallible;
     type ReadReplicaError = Infallible;
     type SearchProjectRootError = Infallible;
@@ -92,16 +87,19 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn home_dir(
-        _: &mut AsyncCtx<'_, Self>,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<fs::AbsPathBuf, Self::HomeDirError> {
-        todo!()
+        ctx.with_backend(|this| match &mut this.home_dir_with {
+            Some(fun) => Ok(fun(this.inner.fs())),
+            None => Err(()),
+        })
     }
 
     fn lsp_root(
-        _: <Self::Buffer<'_> as Buffer>::Id,
-        _: &mut AsyncCtx<'_, Self>,
+        buffer_id: <Self::Buffer<'_> as Buffer>::Id,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<fs::AbsPathBuf>, Self::LspRootError> {
-        todo!()
+        Ok(ctx.with_backend(|this| this.lsp_root_with.as_mut()?(buffer_id)))
     }
 
     async fn read_replica(
@@ -202,7 +200,7 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
     }
 }
 
-impl<B: Default> Default for CollabTestBackend<B> {
+impl<B: Backend + Default> Default for CollabTestBackend<B> {
     fn default() -> Self {
         Self::new(B::default())
     }
