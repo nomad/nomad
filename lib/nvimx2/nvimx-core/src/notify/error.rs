@@ -20,3 +20,10 @@ impl<T: Error> Error for &T {
         (**self).to_message()
     }
 }
+
+impl Error for Box<dyn core::error::Error> {
+    #[inline]
+    fn to_message(&self) -> (Level, Message) {
+        (Level::Error, Message::from_display(self))
+    }
+}

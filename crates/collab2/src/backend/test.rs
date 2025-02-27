@@ -3,12 +3,16 @@
 #![allow(missing_docs)]
 
 use core::convert::Infallible;
+use core::error::Error;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 use collab_server::SessionId;
 use collab_server::message::Message;
 use eerie::PeerId;
+use futures_util::{Sink, Stream};
 use nvimx2::backend::{ApiValue, Backend, Buffer, BufferId};
-use nvimx2::notify::MaybeResult;
+use nvimx2::notify::{self, MaybeResult};
 use nvimx2::{AsyncCtx, fs};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +24,14 @@ use crate::backend::{
     default_read_replica,
     default_search_project_root,
 };
+
+pub fn message_channel() -> (TestTx, TestRx) {
+    let (inner_tx, inner_rx) = flume::unbounded();
+    (
+        TestTx { inner: inner_tx.into_sink() },
+        TestRx { inner: inner_rx.into_stream() },
+    )
+}
 
 #[allow(clippy::type_complexity)]
 pub struct CollabTestBackend<B: Backend> {
@@ -41,6 +53,25 @@ pub struct CollabTestBackend<B: Backend> {
             ) -> Option<&(fs::AbsPathBuf, SessionId)>,
         >,
     >,
+}
+
+pin_project_lite::pin_project! {
+    pub struct TestRx {
+        #[pin]
+        inner: flume::r#async::RecvStream<'static, Message>,
+    }
+}
+
+pin_project_lite::pin_project! {
+    pub struct TestTx {
+        #[pin]
+        inner: flume::r#async::SendSink<'static, Message>,
+    }
+}
+
+#[derive(Debug)]
+pub struct TestTxError {
+    inner: flume::SendError<Message>,
 }
 
 impl<B: Backend> CollabTestBackend<B> {
@@ -94,8 +125,8 @@ impl<B: Backend> CollabTestBackend<B> {
 }
 
 impl<B: Backend> CollabBackend for CollabTestBackend<B> {
-    type ServerRx = futures_util::stream::Pending<Result<Message, Infallible>>;
-    type ServerTx = futures_util::sink::Drain<Message>;
+    type ServerRx = TestRx;
+    type ServerTx = TestTx;
 
     type CopySessionIdError = Infallible;
     type HomeDirError = &'static str;
@@ -103,8 +134,8 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type ReadReplicaError = default_read_replica::Error<Self>;
     type SearchProjectRootError = default_search_project_root::Error<Self>;
     type ServerRxError = Infallible;
-    type ServerTxError = Infallible;
-    type StartSessionError = Infallible;
+    type ServerTxError = TestTxError;
+    type StartSessionError = Box<dyn Error>;
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
@@ -241,5 +272,61 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
 impl<B: Backend + Default> Default for CollabTestBackend<B> {
     fn default() -> Self {
         Self::new(B::default())
+    }
+}
+
+impl Sink<Message> for TestTx {
+    type Error = TestTxError;
+
+    fn poll_ready(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Sink::<Message>::poll_ready(self.project().inner, ctx)
+            .map_err(|err| TestTxError { inner: err })
+    }
+
+    fn start_send(
+        self: Pin<&mut Self>,
+        item: Message,
+    ) -> Result<(), Self::Error> {
+        Sink::<Message>::start_send(self.project().inner, item)
+            .map_err(|err| TestTxError { inner: err })
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Sink::<Message>::poll_flush(self.project().inner, ctx)
+            .map_err(|err| TestTxError { inner: err })
+    }
+
+    fn poll_close(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        Sink::<Message>::poll_close(self.project().inner, ctx)
+            .map_err(|err| TestTxError { inner: err })
+    }
+}
+
+impl Stream for TestRx {
+    type Item = Result<Message, Infallible>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        self.project()
+            .inner
+            .poll_next(ctx)
+            .map(|maybe_next| maybe_next.map(Ok))
+    }
+}
+
+impl notify::Error for TestTxError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        (notify::Level::Error, notify::Message::from_display(&self.inner))
     }
 }
