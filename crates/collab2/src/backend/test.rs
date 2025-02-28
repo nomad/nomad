@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use crate::backend::{
     ActionForSelectedSession,
     CollabBackend,
+    JoinArgs,
+    JoinInfos,
     StartArgs,
     StartInfos,
     default_read_replica,
@@ -159,6 +161,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
     type CopySessionIdError = Infallible;
     type HomeDirError = &'static str;
+    type JoinSessionError = AnyError;
     type LspRootError = Infallible;
     type ReadReplicaError = default_read_replica::Error<Self>;
     type SearchProjectRootError = default_search_project_root::Error<Self>;
@@ -191,6 +194,13 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
             Some(fun) => Ok(fun(this.inner.fs())),
             None => Err("no home directory configured"),
         })
+    }
+
+    async fn join_session(
+        _: JoinArgs<'_>,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<JoinInfos<Self>, Self::JoinSessionError> {
+        todo!()
     }
 
     fn lsp_root(

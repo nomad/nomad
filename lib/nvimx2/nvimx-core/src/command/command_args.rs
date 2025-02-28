@@ -67,7 +67,6 @@ pub enum CommandCursor<'a> {
     PartialOrd,
     Ord,
     Hash,
-    serde::Serialize,
     serde::Deserialize,
 )]
 #[serde(transparent)]

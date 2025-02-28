@@ -9,12 +9,13 @@ use nvimx2::command::{Parse, ToCompletionFn};
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, Shared, notify};
 
+use crate::backend::{CollabBackend, JoinArgs};
+use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
 use crate::session::Session;
 use crate::sessions::{OverlappingSessionError, Sessions};
 use crate::start::{SessionRxDroppedError, UserNotLoggedInError};
-use crate::{Collab, CollabBackend};
 
 /// The `Action` used to join an existing collaborative editing session.
 pub struct Join<B: CollabBackend> {
@@ -33,14 +34,22 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
     async fn call(
         &mut self,
         args: Self::Args,
-        _ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), JoinError<B>> {
-        let _auth_infos = self
+        let auth_infos = self
             .auth_infos
             .with(|infos| infos.as_ref().cloned())
             .ok_or_else(JoinError::user_not_logged_in)?;
 
-        let _session_id = args.into_inner();
+        let join_args = JoinArgs {
+            auth_infos: &auth_infos,
+            session_id: args.into_inner(),
+            server_address: &self.config.with(|c| c.server_address.clone()),
+        };
+
+        let _join_infos = B::join_session(join_args, ctx)
+            .await
+            .map_err(JoinError::JoinSession)?;
 
         todo!();
     }
@@ -50,6 +59,9 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 #[derive(derive_more::Debug)]
 #[debug(bound(B: CollabBackend))]
 pub enum JoinError<B: CollabBackend> {
+    /// TODO: docs.
+    JoinSession(B::JoinSessionError),
+
     /// TODO: docs.
     OverlappingSession(OverlappingSessionError),
 
@@ -103,11 +115,13 @@ impl<B: CollabBackend> JoinError<B> {
 impl<B> PartialEq for JoinError<B>
 where
     B: CollabBackend,
+    B::JoinSessionError: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         use JoinError::*;
 
         match (self, other) {
+            (JoinSession(l), JoinSession(r)) => l == r,
             (OverlappingSession(l), OverlappingSession(r)) => l == r,
             (SessionRxDropped(_), SessionRxDropped(_)) => true,
             (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
@@ -119,6 +133,7 @@ where
 impl<B: CollabBackend> notify::Error for JoinError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
+            Self::JoinSession(err) => err.to_message(),
             Self::OverlappingSession(err) => err.to_message(),
             Self::SessionRxDropped(err) => err.to_message(),
             Self::UserNotLoggedIn(err) => err.to_message(),

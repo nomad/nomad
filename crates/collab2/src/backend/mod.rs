@@ -33,6 +33,10 @@ pub trait CollabBackend: Backend {
     /// The type of error returned by [`home_dir`](CollabBackend::home_dir).
     type HomeDirError;
 
+    /// The type of error returned by
+    /// [`join_session`](CollabBackend::join_session).
+    type JoinSessionError: Debug + notify::Error;
+
     /// The type of error returned by [`lsp_root`](CollabBackend::lsp_root).
     type LspRootError: Debug;
 
@@ -71,6 +75,12 @@ pub trait CollabBackend: Backend {
     fn home_dir(
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
+
+    /// TODO: docs.
+    fn join_session(
+        args: JoinArgs<'_>,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Result<JoinInfos<Self>, Self::JoinSessionError>>;
 
     /// Returns the path to the root of the workspace containing the buffer
     /// with the given ID, or `None` if there's no language server attached to
@@ -145,6 +155,35 @@ pub struct StartInfos<B: CollabBackend> {
 
     /// TODO: docs.
     pub(crate) session_id: SessionId,
+}
+
+/// TODO: docs.
+#[allow(dead_code)]
+pub struct JoinArgs<'a> {
+    /// TODO: docs.
+    pub(crate) auth_infos: &'a auth::AuthInfos,
+
+    /// TODO: docs.
+    pub(crate) session_id: SessionId,
+
+    /// TODO: docs.
+    pub(crate) server_address: &'a config::ServerAddress,
+}
+
+/// TODO: docs.
+#[allow(dead_code)]
+pub struct JoinInfos<B: CollabBackend> {
+    /// TODO: docs.
+    pub(crate) local_peer: Peer,
+
+    /// TODO: docs.
+    pub(crate) remote_peers: Peers,
+
+    /// TODO: docs.
+    pub(crate) server_tx: B::ServerTx,
+
+    /// TODO: docs.
+    pub(crate) server_rx: B::ServerRx,
 }
 
 #[cfg(any(feature = "neovim", feature = "test"))]

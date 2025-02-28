@@ -58,7 +58,7 @@ pub struct NeovimSearchProjectRootError {
 }
 
 #[derive(Debug)]
-pub enum NeovimStartSessionError {
+pub enum NeovimNewSessionError {
     Knock(client::KnockError<nomad::NomadAuthenticator>),
     TcpConnect(io::Error),
 }
@@ -82,12 +82,13 @@ impl CollabBackend for Neovim {
 
     type CopySessionIdError = NeovimCopySessionIdError;
     type HomeDirError = NeovimHomeDirError;
+    type JoinSessionError = NeovimNewSessionError;
     type LspRootError = String;
     type ReadReplicaError = NeovimReadReplicaError;
     type SearchProjectRootError = NeovimSearchProjectRootError;
     type ServerRxError = NeovimServerRxError;
     type ServerTxError = NeovimServerTxError;
-    type StartSessionError = NeovimStartSessionError;
+    type StartSessionError = NeovimNewSessionError;
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
@@ -136,6 +137,13 @@ impl CollabBackend for Neovim {
             },
             _ => Err(NeovimHomeDirError::CouldntFindHome),
         }
+    }
+
+    async fn join_session(
+        _: JoinArgs<'_>,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<JoinInfos<Self>, Self::JoinSessionError> {
+        todo!()
     }
 
     fn lsp_root(
@@ -246,7 +254,7 @@ impl CollabBackend for Neovim {
     ) -> Result<StartInfos<Self>, Self::StartSessionError> {
         let (reader, writer) = TcpStream::connect(&**args.server_address)
             .await
-            .map_err(NeovimStartSessionError::TcpConnect)?
+            .map_err(NeovimNewSessionError::TcpConnect)?
             .split();
 
         let knock = collab_server::Knock::<nomad::NomadAuthenticateInfos> {
@@ -260,7 +268,7 @@ impl CollabBackend for Neovim {
             client::Knocker::<_, _, nomad::NomadConfig>::new(reader, writer)
                 .knock(knock)
                 .await
-                .map_err(NeovimStartSessionError::Knock)?;
+                .map_err(NeovimNewSessionError::Knock)?;
 
         Ok(StartInfos {
             local_peer: Peer::new(welcome.peer_id, github_handle),
@@ -406,7 +414,7 @@ impl notify::Error for NeovimSearchProjectRootError {
     }
 }
 
-impl notify::Error for NeovimStartSessionError {
+impl notify::Error for NeovimNewSessionError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         let mut msg = notify::Message::new();
         match self {
