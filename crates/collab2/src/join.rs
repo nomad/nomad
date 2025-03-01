@@ -9,11 +9,12 @@ use nvimx2::command::{Parse, ToCompletionFn};
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, Shared, notify};
 
-use crate::backend::{CollabBackend, JoinArgs};
+use crate::Project;
+use crate::backend::{CollabBackend, JoinArgs, JoinInfos};
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
-use crate::session::Session;
+use crate::session::{NewSessionArgs, Session};
 use crate::sessions::{OverlappingSessionError, Sessions};
 use crate::start::{SessionRxDroppedError, UserNotLoggedInError};
 
@@ -24,6 +25,15 @@ pub struct Join<B: CollabBackend> {
     sessions: Sessions,
     session_tx: flume::Sender<Session<B>>,
     stop_channels: StopChannels,
+}
+
+impl<B: CollabBackend> Join<B> {
+    async fn request_project(
+        &self,
+        _join_infos: &mut JoinInfos<B>,
+    ) -> Result<Project<B>, RequestProjectError<B>> {
+        todo!();
+    }
 }
 
 impl<B: CollabBackend> AsyncAction<B> for Join<B> {
@@ -47,11 +57,36 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
-        let _join_infos = B::join_session(join_args, ctx)
+        let mut join_infos = B::join_session(join_args, ctx)
             .await
             .map_err(JoinError::JoinSession)?;
 
-        todo!();
+        let project = self
+            .request_project(&mut join_infos)
+            .await
+            .map_err(JoinError::RequestProject)?;
+
+        let project_root = B::root_for_remote_project(&project, ctx)
+            .await
+            .map_err(JoinError::RootForRemoteProject)?;
+
+        project.flush(project_root, ctx.fs()).await;
+
+        let session = Session::new(NewSessionArgs {
+            _is_host: false,
+            _local_peer: join_infos.local_peer,
+            _remote_peers: join_infos.remote_peers,
+            _replica: project.replica,
+            server_rx: join_infos.server_rx,
+            server_tx: join_infos.server_tx,
+            stop_rx: self.stop_channels.insert(join_infos.session_id),
+            session_guard: todo!(),
+        });
+
+        self.session_tx
+            .send_async(session)
+            .await
+            .map_err(|_| JoinError::session_rx_dropped())
     }
 }
 
@@ -66,10 +101,23 @@ pub enum JoinError<B: CollabBackend> {
     OverlappingSession(OverlappingSessionError),
 
     /// TODO: docs.
+    RequestProject(RequestProjectError<B>),
+
+    /// TODO: docs.
+    RootForRemoteProject(B::RootForRemoteProjectError),
+
+    /// TODO: docs.
     SessionRxDropped(SessionRxDroppedError<B>),
 
     /// TODO: docs.
     UserNotLoggedIn(UserNotLoggedInError<B>),
+}
+
+/// The type of error that can occur when requesting a project from another
+/// peer in a session fails.
+pub enum RequestProjectError<B: CollabBackend> {
+    /// TODO: docs.
+    Todo(core::marker::PhantomData<B>),
 }
 
 impl<B: CollabBackend> Clone for Join<B> {
@@ -116,6 +164,7 @@ impl<B> PartialEq for JoinError<B>
 where
     B: CollabBackend,
     B::JoinSessionError: PartialEq,
+    B::RootForRemoteProjectError: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         use JoinError::*;
@@ -123,6 +172,8 @@ where
         match (self, other) {
             (JoinSession(l), JoinSession(r)) => l == r,
             (OverlappingSession(l), OverlappingSession(r)) => l == r,
+            (RequestProject(_), RequestProject(_)) => todo!(),
+            (RootForRemoteProject(l), RootForRemoteProject(r)) => l == r,
             (SessionRxDropped(_), SessionRxDropped(_)) => true,
             (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
             _ => false,
@@ -135,6 +186,8 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
         match self {
             Self::JoinSession(err) => err.to_message(),
             Self::OverlappingSession(err) => err.to_message(),
+            Self::RequestProject(_) => todo!(),
+            Self::RootForRemoteProject(err) => err.to_message(),
             Self::SessionRxDropped(err) => err.to_message(),
             Self::UserNotLoggedIn(err) => err.to_message(),
         }

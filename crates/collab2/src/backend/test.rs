@@ -17,6 +17,7 @@ use nvimx2::notify::{self, MaybeResult};
 use nvimx2::{AsyncCtx, fs};
 use serde::{Deserialize, Serialize};
 
+use crate::Project;
 use crate::backend::{
     ActionForSelectedSession,
     CollabBackend,
@@ -164,6 +165,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type JoinSessionError = AnyError;
     type LspRootError = Infallible;
     type ReadReplicaError = default_read_replica::Error<Self>;
+    type RootForRemoteProjectError = Infallible;
     type SearchProjectRootError = default_search_project_root::Error<Self>;
     type ServerRxError = Infallible;
     type ServerTxError = TestTxError;
@@ -221,6 +223,14 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
             ctx,
         )
         .await
+    }
+
+    async fn root_for_remote_project(
+        _: &Project<Self>,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<<Self::Fs as Fs>::Directory, Self::RootForRemoteProjectError>
+    {
+        todo!()
     }
 
     async fn search_project_root(

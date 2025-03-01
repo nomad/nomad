@@ -12,10 +12,10 @@ use collab_server::message::{Message, Peer, Peers};
 use eerie::{PeerId, Replica};
 use futures_util::{Sink, Stream};
 use nvimx2::backend::{Backend, Buffer, BufferId};
-use nvimx2::fs::{self, AbsPathBuf};
+use nvimx2::fs::{self, AbsPathBuf, Fs};
 use nvimx2::{AsyncCtx, notify};
 
-use crate::config;
+use crate::{Project, config};
 
 /// A [`Backend`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -43,6 +43,10 @@ pub trait CollabBackend: Backend {
     /// The type of error returned by
     /// [`read_replica`](CollabBackend::read_replica).
     type ReadReplicaError: Debug + notify::Error;
+
+    /// The type of error returned by
+    /// [`root_for_remote_project`](CollabBackend::root_for_remote_project).
+    type RootForRemoteProjectError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`search_project_root`](CollabBackend::search_project_root).
@@ -96,6 +100,17 @@ pub trait CollabBackend: Backend {
         project_root: &fs::AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<Replica, Self::ReadReplicaError>>;
+
+    /// TODO: docs.
+    fn root_for_remote_project(
+        project: &Project<Self>,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<
+        Output = Result<
+            <Self::Fs as Fs>::Directory,
+            Self::RootForRemoteProjectError,
+        >,
+    >;
 
     /// Searches for the root of the project containing the buffer with the
     /// given ID.
@@ -184,6 +199,9 @@ pub struct JoinInfos<B: CollabBackend> {
 
     /// TODO: docs.
     pub(crate) server_rx: B::ServerRx,
+
+    /// TODO: docs.
+    pub(crate) session_id: SessionId,
 }
 
 #[cfg(any(feature = "neovim", feature = "test"))]

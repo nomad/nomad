@@ -1,3 +1,4 @@
+use core::convert::Infallible;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -85,6 +86,7 @@ impl CollabBackend for Neovim {
     type JoinSessionError = NeovimNewSessionError;
     type LspRootError = String;
     type ReadReplicaError = NeovimReadReplicaError;
+    type RootForRemoteProjectError = Infallible;
     type SearchProjectRootError = NeovimSearchProjectRootError;
     type ServerRxError = NeovimServerRxError;
     type ServerTxError = NeovimServerTxError;
@@ -186,6 +188,14 @@ impl CollabBackend for Neovim {
         )
         .await
         .map_err(|inner| NeovimReadReplicaError { inner })
+    }
+
+    async fn root_for_remote_project(
+        _: &Project<Self>,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<<Self::Fs as Fs>::Directory, Self::RootForRemoteProjectError>
+    {
+        todo!()
     }
 
     async fn search_project_root(
