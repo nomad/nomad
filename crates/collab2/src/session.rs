@@ -1,6 +1,5 @@
 use core::marker::PhantomData;
 
-use collab_server::message::{Peer, Peers};
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
 use nvimx2::{AsyncCtx, Shared, notify};
@@ -14,27 +13,17 @@ pub(crate) struct Session<B: CollabBackend> {
 }
 
 pub(crate) struct NewSessionArgs<B: CollabBackend> {
-    /// Whether the [`local_peer`](Self::local_peer) is the host of the
-    /// session.
-    pub(crate) _is_host: bool,
-
-    /// The local [`Peer`].
-    pub(crate) _local_peer: Peer,
-
     /// TODO: docs.
     pub(crate) _project: Shared<Project<B>>,
 
-    /// The remote [`Peers`].
-    pub(crate) _remote_peers: Peers,
-
-    /// TODO: docs.
-    pub(crate) stop_rx: Receiver<StopSession>,
+    /// TODO: docs..
+    pub(crate) server_rx: B::ServerRx,
 
     /// TODO: docs..
     pub(crate) server_tx: B::ServerTx,
 
-    /// TODO: docs..
-    pub(crate) server_rx: B::ServerRx,
+    /// TODO: docs.
+    pub(crate) stop_rx: Receiver<StopSession>,
 }
 
 pub(crate) enum RunSessionError<B: CollabBackend> {

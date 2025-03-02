@@ -9,11 +9,10 @@ use eerie::Replica;
 use futures_util::{SinkExt, StreamExt};
 use nvimx2::action::AsyncAction;
 use nvimx2::command::{Parse, ToCompletionFn};
-use nvimx2::fs::Directory;
+use nvimx2::fs::{self, AbsPath};
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, Shared, notify};
 
-use crate::Project;
 use crate::backend::{CollabBackend, JoinArgs, JoinInfos};
 use crate::collab::Collab;
 use crate::config::Config;
@@ -66,29 +65,34 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         }
         .join(&join_infos.project_name);
 
+        let project_guard = self
+            .projects
+            .join_guard(project_root, join_infos.session_id)
+            .map_err(JoinError::OverlappingProject)?;
+
         let ProjectResponse { buffered, file_contents, replica } =
             request_project(&mut join_infos)
                 .await
                 .map_err(JoinError::RequestProject)?;
 
-        // flush_project(&replica, &file_contents, &project_root, ctx.fs())
-        //     .await
-        //     .map_err(JoinError::FlushProject)?;
+        flush_project(
+            &replica,
+            &file_contents,
+            project_guard.root(),
+            ctx.fs(),
+        )
+        .await
+        .map_err(JoinError::FlushProject)?;
 
-        let project = self
-            .projects
-            .insert(NewProjectArgs {
-                replica,
-                root: project_root,
-                session_id: join_infos.session_id,
-            })
-            .map_err(JoinError::OverlappingProject)?;
+        let project = project_guard.activate(NewProjectArgs {
+            host: join_infos.host,
+            local_peer: join_infos.local_peer,
+            replica,
+            remote_peers: join_infos.remote_peers,
+        });
 
         let session = Session::new(NewSessionArgs {
-            _is_host: false,
-            _local_peer: join_infos.local_peer,
             _project: project,
-            _remote_peers: join_infos.remote_peers,
             server_rx: join_infos.server_rx,
             server_tx: join_infos.server_tx,
             stop_rx: self.stop_channels.insert(join_infos.session_id),
@@ -153,12 +157,23 @@ async fn request_project<B: CollabBackend>(
     })
 }
 
+async fn flush_project<Fs: fs::Fs>(
+    replica: &Replica,
+    file_contents: &FileContents,
+    project_root: &AbsPath,
+    fs: Fs,
+) -> Result<(), FlushProjectError<B>> {
+}
+
 /// The type of error that can occur when [`Join`]ing a session fails.
 #[derive(derive_more::Debug)]
 #[debug(bound(B: CollabBackend))]
 pub enum JoinError<B: CollabBackend> {
     /// TODO: docs.
     DefaultDirForRemoteProjects(B::DefaultDirForRemoteProjectsError),
+
+    /// TODO: docs.
+    FlushProject(FlushProjectError<B::Fs>),
 
     /// TODO: docs.
     JoinSession(B::JoinSessionError),
@@ -184,6 +199,12 @@ pub enum RequestProjectError<B: CollabBackend> {
 
     /// TODO: docs.
     SessionEnded,
+}
+
+/// TODO: docs.
+pub enum FlushProjectError<Fs: fs::Fs> {
+    /// TODO: docs.
+    Todo(core::marker::PhantomData<Fs>),
 }
 
 impl<B: CollabBackend> Clone for Join<B> {
@@ -222,20 +243,22 @@ impl<B: CollabBackend> JoinError<B> {
 impl<B> PartialEq for JoinError<B>
 where
     B: CollabBackend,
-    B::JoinSessionError: PartialEq,
+    FlushProjectError<B::Fs>: PartialEq,
     B::DefaultDirForRemoteProjectsError: PartialEq,
+    B::JoinSessionError: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         use JoinError::*;
 
         match (self, other) {
-            (JoinSession(l), JoinSession(r)) => l == r,
-            (OverlappingProject(l), OverlappingProject(r)) => l == r,
-            (RequestProject(_), RequestProject(_)) => todo!(),
             (
                 DefaultDirForRemoteProjects(l),
                 DefaultDirForRemoteProjects(r),
             ) => l == r,
+            (FlushProject(l), FlushProject(r)) => l == r,
+            (JoinSession(l), JoinSession(r)) => l == r,
+            (OverlappingProject(l), OverlappingProject(r)) => l == r,
+            (RequestProject(_), RequestProject(_)) => todo!(),
             (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
             _ => false,
         }
@@ -245,10 +268,11 @@ where
 impl<B: CollabBackend> notify::Error for JoinError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
+            Self::DefaultDirForRemoteProjects(err) => err.to_message(),
+            Self::FlushProject(_) => todo!(),
             Self::JoinSession(err) => err.to_message(),
             Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(_) => todo!(),
-            Self::DefaultDirForRemoteProjects(err) => err.to_message(),
             Self::UserNotLoggedIn(err) => err.to_message(),
         }
     }

@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use collab_server::SessionId;
+use collab_server::message::{Peer, Peers};
 use eerie::Replica;
 use fxhash::FxHashMap;
 use nvimx2::fs::{AbsPathBuf, Fs};
@@ -27,13 +28,26 @@ pub struct OverlappingProjectError {
 pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 pub(crate) struct Projects<B: CollabBackend> {
-    map: Shared<FxHashMap<SessionId, Shared<Project<B>>>>,
+    map: Shared<FxHashMap<SessionId, ProjectState<B>>>,
+}
+
+pub(crate) struct ProjectGuard<B: CollabBackend> {
+    root: AbsPathBuf,
+    projects: Projects<B>,
+    session_id: SessionId,
 }
 
 pub(crate) struct NewProjectArgs {
+    pub(crate) host: Peer,
+    pub(crate) local_peer: Peer,
+    pub(crate) remote_peers: Peers,
     pub(crate) replica: Replica,
-    pub(crate) root: AbsPathBuf,
-    pub(crate) session_id: SessionId,
+}
+
+enum ProjectState<B: CollabBackend> {
+    Active(Shared<Project<B>>),
+    Joining(ProjectGuard<B>),
+    Starting(ProjectGuard<B>),
 }
 
 impl<B: CollabBackend> Project<B> {
