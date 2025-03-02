@@ -77,7 +77,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
         .map_err(StartError::ReadReplica)?;
 
         let project = project_guard.activate(NewProjectArgs {
-            host: todo!(),
+            host: sesh_infos.host,
             local_peer: sesh_infos.local_peer,
             replica,
             remote_peers: sesh_infos.remote_peers,

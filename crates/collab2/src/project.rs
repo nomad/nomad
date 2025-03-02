@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-use std::collections::hash_map::Entry;
 
 use collab_server::SessionId;
 use collab_server::message::{Peer, Peers};
@@ -149,6 +148,8 @@ impl<B> NoActiveSessionError<B> {
 
 impl<B: CollabBackend> Drop for Project<B> {
     fn drop(&mut self) {
+        // FIXME: this doesn't work, the instance in the `Projects` will never
+        // be dropped.
         self.projects.active.with_mut(|map| {
             map.remove(&self.session_id);
         });

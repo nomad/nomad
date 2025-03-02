@@ -1,8 +1,10 @@
 use auth::AuthInfos;
+use collab_server::SessionId;
 use nvimx2::module::{ApiCtx, Module};
 use nvimx2::notify::Name;
 use nvimx2::{NeovimCtx, Shared};
 
+use crate::Project;
 use crate::backend::CollabBackend;
 use crate::config::Config;
 use crate::join::Join;
@@ -28,6 +30,14 @@ impl<B: CollabBackend> Collab<B> {
     /// Returns a new instance of the [`Leave`] action.
     pub fn leave(&self) -> Leave<B> {
         self.into()
+    }
+
+    /// Returns a handle to the project for the given [`SessionId`], if any.
+    pub fn project(
+        &self,
+        session_id: SessionId,
+    ) -> Option<Shared<Project<B>>> {
+        self.projects.get(session_id)
     }
 
     /// Returns a new instance of the [`Start`] action.
