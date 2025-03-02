@@ -75,7 +75,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         let project = self
             .projects
             .insert(NewProjectArgs {
-                replica: project.replica,
+                replica: todo!(),
                 root: project_root.path().to_owned(),
                 session_id: join_infos.session_id,
             })
@@ -122,8 +122,8 @@ pub enum JoinError<B: CollabBackend> {
     UserNotLoggedIn(UserNotLoggedInError<B>),
 }
 
-/// The type of error that can occur when requesting a project from another
-/// peer in a session fails.
+/// The type of error that can occur when requesting the state of the project
+/// from another peer in a session fails.
 pub enum RequestProjectError<B: CollabBackend> {
     /// TODO: docs.
     Todo(core::marker::PhantomData<B>),

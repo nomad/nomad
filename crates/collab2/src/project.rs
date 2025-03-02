@@ -11,9 +11,10 @@ use crate::CollabBackend;
 
 /// TODO: docs.
 pub struct Project<B: CollabBackend> {
-    _projects: Projects<B>,
-    pub(crate) replica: Replica,
-    _session_id: SessionId,
+    projects: Projects<B>,
+    _replica: Replica,
+    _root: AbsPathBuf,
+    session_id: SessionId,
 }
 
 /// TODO: docs.
@@ -55,9 +56,20 @@ impl<B: CollabBackend> Projects<B> {
 
     pub(crate) fn insert(
         &self,
-        _args: NewProjectArgs,
+        args: NewProjectArgs,
     ) -> Result<Shared<Project<B>>, OverlappingProjectError> {
-        todo!();
+        let project = Shared::new(Project {
+            projects: self.clone(),
+            _replica: args.replica,
+            _root: args.root,
+            session_id: args.session_id,
+        });
+
+        self.map.with_mut(|map| {
+            map.insert(args.session_id, project.clone());
+        });
+
+        Ok(project)
     }
 
     pub(crate) async fn select(
@@ -96,6 +108,14 @@ impl<B: CollabBackend> Projects<B> {
 impl<B> NoActiveSessionError<B> {
     pub(crate) fn new() -> Self {
         Self(PhantomData)
+    }
+}
+
+impl<B: CollabBackend> Drop for Project<B> {
+    fn drop(&mut self) {
+        self.projects.map.with_mut(|map| {
+            map.remove(&self.session_id);
+        });
     }
 }
 
