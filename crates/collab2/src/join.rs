@@ -13,7 +13,7 @@ use nvimx2::fs::{self, AbsPath};
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, Shared, notify};
 
-use crate::backend::{CollabBackend, JoinArgs, JoinInfos};
+use crate::backend::{CollabBackend, JoinArgs, SessionInfos};
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
@@ -50,7 +50,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
-        let mut join_infos = B::join_session(join_args, ctx)
+        let mut sesh_infos = B::join_session(join_args, ctx)
             .await
             .map_err(JoinError::JoinSession)?;
 
@@ -63,7 +63,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
                 .await
                 .map_err(JoinError::DefaultDirForRemoteProjects)?,
         }
-        .join(&join_infos.project_name);
+        .join(&sesh_infos.project_name);
 
         let project_guard = self
             .projects
@@ -71,7 +71,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             .map_err(JoinError::OverlappingProject)?;
 
         let ProjectResponse { buffered, file_contents, replica } =
-            request_project(&mut join_infos)
+            request_project(&mut sesh_infos)
                 .await
                 .map_err(JoinError::RequestProject)?;
 
@@ -85,18 +85,18 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         .map_err(JoinError::FlushProject)?;
 
         let project = project_guard.activate(NewProjectArgs {
-            host: join_infos.host,
-            local_peer: join_infos.local_peer,
+            host: sesh_infos.host,
+            local_peer: sesh_infos.local_peer,
             replica,
-            remote_peers: join_infos.remote_peers,
-            session_id: join_infos.session_id,
+            remote_peers: sesh_infos.remote_peers,
+            session_id: sesh_infos.session_id,
         });
 
         let session = Session::new(NewSessionArgs {
             _project: project,
-            server_rx: join_infos.server_rx,
-            server_tx: join_infos.server_tx,
-            stop_rx: self.stop_channels.insert(join_infos.session_id),
+            server_rx: sesh_infos.server_rx,
+            server_tx: sesh_infos.server_tx,
+            stop_rx: self.stop_channels.insert(sesh_infos.session_id),
         });
 
         ctx.spawn_local(async move |ctx| {
@@ -117,7 +117,7 @@ struct ProjectResponse {
 }
 
 async fn request_project<B: CollabBackend>(
-    join_infos: &mut JoinInfos<B>,
+    join_infos: &mut SessionInfos<B>,
 ) -> Result<ProjectResponse, RequestProjectError<B>> {
     let request_from = join_infos
         .remote_peers

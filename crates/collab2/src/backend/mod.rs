@@ -91,7 +91,7 @@ pub trait CollabBackend: Backend {
     fn join_session(
         args: JoinArgs<'_>,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<Output = Result<JoinInfos<Self>, Self::JoinSessionError>>;
+    ) -> impl Future<Output = Result<SessionInfos<Self>, Self::JoinSessionError>>;
 
     /// Returns the path to the root of the workspace containing the buffer
     /// with the given ID, or `None` if there's no language server attached to
@@ -127,7 +127,7 @@ pub trait CollabBackend: Backend {
     fn start_session(
         args: StartArgs<'_>,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<Output = Result<StartInfos<Self>, Self::StartSessionError>>;
+    ) -> impl Future<Output = Result<SessionInfos<Self>, Self::StartSessionError>>;
 }
 
 /// TODO: docs
@@ -150,26 +150,6 @@ pub struct StartArgs<'a> {
 }
 
 /// TODO: docs.
-#[allow(dead_code)]
-pub struct StartInfos<B: CollabBackend> {
-    /// TODO: docs.
-    pub(crate) local_peer: Peer,
-
-    /// TODO: docs.
-    pub(crate) remote_peers: Peers,
-
-    /// TODO: docs.
-    pub(crate) server_tx: B::ServerTx,
-
-    /// TODO: docs.
-    pub(crate) server_rx: B::ServerRx,
-
-    /// TODO: docs.
-    pub(crate) session_id: SessionId,
-}
-
-/// TODO: docs.
-#[allow(dead_code)]
 pub struct JoinArgs<'a> {
     /// TODO: docs.
     pub(crate) auth_infos: &'a auth::AuthInfos,
@@ -182,8 +162,7 @@ pub struct JoinArgs<'a> {
 }
 
 /// TODO: docs.
-#[allow(dead_code)]
-pub struct JoinInfos<B: CollabBackend> {
+pub struct SessionInfos<B: CollabBackend> {
     /// TODO: docs.
     pub(crate) host: Peer,
 

@@ -22,9 +22,8 @@ use crate::backend::{
     ActionForSelectedSession,
     CollabBackend,
     JoinArgs,
-    JoinInfos,
+    SessionInfos,
     StartArgs,
-    StartInfos,
     default_read_replica,
     default_search_project_root,
 };
@@ -56,7 +55,7 @@ pub struct CollabTestBackend<B: Backend> {
         >,
     >,
     start_session_with: Option<
-        Box<dyn FnMut(StartArgs<'_>) -> Result<StartInfos<Self>, AnyError>>,
+        Box<dyn FnMut(StartArgs<'_>) -> Result<SessionInfos<Self>, AnyError>>,
     >,
 }
 
@@ -136,7 +135,8 @@ impl<B: Backend> CollabTestBackend<B> {
 
     pub fn start_session_with<E: Error + 'static>(
         mut self,
-        mut fun: impl FnMut(StartArgs<'_>) -> Result<StartInfos<Self>, E> + 'static,
+        mut fun: impl FnMut(StartArgs<'_>) -> Result<SessionInfos<Self>, E>
+        + 'static,
     ) -> Self {
         self.start_session_with =
             Some(Box::new(move |args| fun(args).map_err(AnyError::new)));
@@ -205,7 +205,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     async fn join_session(
         _: JoinArgs<'_>,
         _: &mut AsyncCtx<'_, Self>,
-    ) -> Result<JoinInfos<Self>, Self::JoinSessionError> {
+    ) -> Result<SessionInfos<Self>, Self::JoinSessionError> {
         todo!()
     }
 
@@ -249,7 +249,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     async fn start_session(
         args: StartArgs<'_>,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<StartInfos<Self>, Self::StartSessionError> {
+    ) -> Result<SessionInfos<Self>, Self::StartSessionError> {
         #[derive(Debug)]
         struct NoStarterSet;
 

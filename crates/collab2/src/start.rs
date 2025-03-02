@@ -64,12 +64,12 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
-        let start_infos = B::start_session(start_args, ctx)
+        let sesh_infos = B::start_session(start_args, ctx)
             .await
             .map_err(StartError::StartSession)?;
 
         let replica = B::read_replica(
-            start_infos.local_peer.id(),
+            sesh_infos.local_peer.id(),
             project_guard.root(),
             ctx,
         )
@@ -78,17 +78,17 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
 
         let project = project_guard.activate(NewProjectArgs {
             host: todo!(),
-            local_peer: start_infos.local_peer,
+            local_peer: sesh_infos.local_peer,
             replica,
-            remote_peers: start_infos.remote_peers,
-            session_id: start_infos.session_id,
+            remote_peers: sesh_infos.remote_peers,
+            session_id: sesh_infos.session_id,
         });
 
         let session = Session::new(NewSessionArgs {
             _project: project,
-            server_rx: start_infos.server_rx,
-            server_tx: start_infos.server_tx,
-            stop_rx: self.stop_channels.insert(start_infos.session_id),
+            server_rx: sesh_infos.server_rx,
+            server_tx: sesh_infos.server_tx,
+            stop_rx: self.stop_channels.insert(sesh_infos.session_id),
         });
 
         ctx.spawn_local(async move |ctx| {

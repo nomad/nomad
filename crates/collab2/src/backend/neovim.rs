@@ -150,7 +150,7 @@ impl CollabBackend for Neovim {
     async fn join_session(
         _: JoinArgs<'_>,
         _: &mut AsyncCtx<'_, Self>,
-    ) -> Result<JoinInfos<Self>, Self::JoinSessionError> {
+    ) -> Result<SessionInfos<Self>, Self::JoinSessionError> {
         todo!()
     }
 
@@ -259,7 +259,7 @@ impl CollabBackend for Neovim {
     async fn start_session(
         args: StartArgs<'_>,
         _: &mut AsyncCtx<'_, Self>,
-    ) -> Result<StartInfos<Self>, Self::StartSessionError> {
+    ) -> Result<SessionInfos<Self>, Self::StartSessionError> {
         let (reader, writer) = TcpStream::connect(&**args.server_address)
             .await
             .map_err(NeovimNewSessionError::TcpConnect)?
@@ -278,11 +278,13 @@ impl CollabBackend for Neovim {
                 .await
                 .map_err(NeovimNewSessionError::Knock)?;
 
-        Ok(StartInfos {
+        Ok(SessionInfos {
+            host: todo!(),
             local_peer: Peer::new(welcome.peer_id, github_handle),
+            project_name: todo!(),
             remote_peers: welcome.other_peers,
-            server_tx: NeovimServerTx { inner: welcome.tx },
             server_rx: NeovimServerRx { inner: welcome.rx },
+            server_tx: NeovimServerTx { inner: welcome.tx },
             session_id: welcome.session_id,
         })
     }
