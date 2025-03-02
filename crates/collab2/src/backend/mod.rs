@@ -12,23 +12,27 @@ use collab_server::message::{Message, Peer, Peers};
 use eerie::{PeerId, Replica};
 use futures_util::{Sink, Stream};
 use nvimx2::backend::{Backend, Buffer, BufferId};
-use nvimx2::fs::{self, AbsPathBuf, Fs};
+use nvimx2::fs::{self, AbsPath, AbsPathBuf, FsNodeNameBuf};
 use nvimx2::{AsyncCtx, notify};
 
-use crate::{Project, config};
+use crate::config;
 
 /// A [`Backend`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
 pub trait CollabBackend: Backend {
     /// TODO: docs.
-    type ServerRx: Stream<Item = Result<Message, Self::ServerRxError>>;
+    type ServerRx: Stream<Item = Result<Message, Self::ServerRxError>> + Unpin;
 
     /// TODO: docs.
-    type ServerTx: Sink<Message, Error = Self::ServerTxError>;
+    type ServerTx: Sink<Message, Error = Self::ServerTxError> + Unpin;
 
     /// The type of error returned by
     /// [`copy_session_id`](CollabBackend::copy_session_id).
     type CopySessionIdError: Debug + notify::Error;
+
+    /// The type of error returned by
+    /// [`default_dir_for_remote_projects`](CollabBackend::default_dir_for_remote_projects).
+    type DefaultDirForRemoteProjectsError: Debug + notify::Error;
 
     /// The type of error returned by [`home_dir`](CollabBackend::home_dir).
     type HomeDirError;
@@ -43,10 +47,6 @@ pub trait CollabBackend: Backend {
     /// The type of error returned by
     /// [`read_replica`](CollabBackend::read_replica).
     type ReadReplicaError: Debug + notify::Error;
-
-    /// The type of error returned by
-    /// [`root_for_remote_project`](CollabBackend::root_for_remote_project).
-    type RootForRemoteProjectError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`search_project_root`](CollabBackend::search_project_root).
@@ -65,7 +65,7 @@ pub trait CollabBackend: Backend {
     /// Asks the user to confirm starting a new collaborative editing session
     /// rooted at the given path.
     fn confirm_start(
-        project_root: &fs::AbsPath,
+        project_root: &AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = bool>;
 
@@ -74,6 +74,13 @@ pub trait CollabBackend: Backend {
         session_id: SessionId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
+
+    /// TODO: docs.
+    fn default_dir_for_remote_projects(
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<
+        Output = Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError>,
+    >;
 
     /// Returns the absolute path to the user's home directory.
     fn home_dir(
@@ -97,20 +104,9 @@ pub trait CollabBackend: Backend {
     /// TODO: docs.
     fn read_replica(
         peer_id: PeerId,
-        project_root: &fs::AbsPath,
+        project_root: &AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<Replica, Self::ReadReplicaError>>;
-
-    /// TODO: docs.
-    fn root_for_remote_project(
-        project: &Project<Self>,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<
-        Output = Result<
-            <Self::Fs as Fs>::Directory,
-            Self::RootForRemoteProjectError,
-        >,
-    >;
 
     /// Searches for the root of the project containing the buffer with the
     /// given ID.
@@ -122,10 +118,10 @@ pub trait CollabBackend: Backend {
     /// Prompts the user to select one of the given `(project_root,
     /// session_id)` pairs.
     fn select_session<'pairs>(
-        sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, SessionId)],
         action: ActionForSelectedSession,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<Output = Option<&'pairs (fs::AbsPathBuf, SessionId)>>;
+    ) -> impl Future<Output = Option<&'pairs (AbsPathBuf, SessionId)>>;
 
     /// TODO: docs.
     fn start_session(
@@ -189,7 +185,13 @@ pub struct JoinArgs<'a> {
 #[allow(dead_code)]
 pub struct JoinInfos<B: CollabBackend> {
     /// TODO: docs.
+    pub(crate) host: Peer,
+
+    /// TODO: docs.
     pub(crate) local_peer: Peer,
+
+    /// TODO: docs.
+    pub(crate) project_name: FsNodeNameBuf,
 
     /// TODO: docs.
     pub(crate) remote_peers: Peers,

@@ -82,11 +82,11 @@ impl CollabBackend for Neovim {
     type ServerTx = NeovimServerTx;
 
     type CopySessionIdError = NeovimCopySessionIdError;
+    type DefaultDirForRemoteProjectsError = Infallible;
     type HomeDirError = NeovimHomeDirError;
     type JoinSessionError = NeovimNewSessionError;
     type LspRootError = String;
     type ReadReplicaError = NeovimReadReplicaError;
-    type RootForRemoteProjectError = Infallible;
     type SearchProjectRootError = NeovimSearchProjectRootError;
     type ServerRxError = NeovimServerRxError;
     type ServerTxError = NeovimServerTxError;
@@ -126,6 +126,12 @@ impl CollabBackend for Neovim {
     ) -> Result<(), Self::CopySessionIdError> {
         clipboard::set(session_id)
             .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
+    }
+
+    async fn default_dir_for_remote_projects(
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError> {
+        todo!()
     }
 
     async fn home_dir(
@@ -188,14 +194,6 @@ impl CollabBackend for Neovim {
         )
         .await
         .map_err(|inner| NeovimReadReplicaError { inner })
-    }
-
-    async fn root_for_remote_project(
-        _: &Project<Self>,
-        _: &mut AsyncCtx<'_, Self>,
-    ) -> Result<<Self::Fs as Fs>::Directory, Self::RootForRemoteProjectError>
-    {
-        todo!()
     }
 
     async fn search_project_root(

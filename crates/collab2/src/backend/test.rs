@@ -12,12 +12,12 @@ use collab_server::SessionId;
 use collab_server::message::Message;
 use eerie::PeerId;
 use futures_util::{Sink, Stream};
+use nvimx2::AsyncCtx;
 use nvimx2::backend::{ApiValue, Backend, Buffer, BufferId};
+use nvimx2::fs::{AbsPath, AbsPathBuf};
 use nvimx2::notify::{self, MaybeResult};
-use nvimx2::{AsyncCtx, fs};
 use serde::{Deserialize, Serialize};
 
-use crate::Project;
 use crate::backend::{
     ActionForSelectedSession,
     CollabBackend,
@@ -40,21 +40,19 @@ pub fn message_channel() -> (TestTx, TestRx) {
 #[allow(clippy::type_complexity)]
 pub struct CollabTestBackend<B: Backend> {
     inner: B,
-    confirm_start_with: Option<Box<dyn FnMut(&fs::AbsPath) -> bool>>,
+    confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
     home_dir_with:
-        Option<Box<dyn FnMut(<B as Backend>::Fs) -> fs::AbsPathBuf + Send>>,
+        Option<Box<dyn FnMut(<B as Backend>::Fs) -> AbsPathBuf + Send>>,
     lsp_root_with: Option<
-        Box<
-            dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<fs::AbsPathBuf>,
-        >,
+        Box<dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>>,
     >,
     select_session_with: Option<
         Box<
             dyn FnMut(
-                &[(fs::AbsPathBuf, SessionId)],
+                &[(AbsPathBuf, SessionId)],
                 ActionForSelectedSession,
-            ) -> Option<&(fs::AbsPathBuf, SessionId)>,
+            ) -> Option<&(AbsPathBuf, SessionId)>,
         >,
     >,
     start_session_with: Option<
@@ -89,7 +87,7 @@ pub struct AnyError {
 impl<B: Backend> CollabTestBackend<B> {
     pub fn confirm_start_with(
         mut self,
-        fun: impl FnMut(&fs::AbsPath) -> bool + 'static,
+        fun: impl FnMut(&AbsPath) -> bool + 'static,
     ) -> Self {
         self.confirm_start_with = Some(Box::new(fun) as _);
         self
@@ -97,7 +95,7 @@ impl<B: Backend> CollabTestBackend<B> {
 
     pub fn home_dir_with(
         mut self,
-        fun: impl FnMut(<B as Backend>::Fs) -> fs::AbsPathBuf + Send + 'static,
+        fun: impl FnMut(<B as Backend>::Fs) -> AbsPathBuf + Send + 'static,
     ) -> Self {
         self.home_dir_with = Some(Box::new(fun) as _);
         self
@@ -105,7 +103,7 @@ impl<B: Backend> CollabTestBackend<B> {
 
     pub fn lsp_root_with(
         mut self,
-        fun: impl FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<fs::AbsPathBuf>
+        fun: impl FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>
         + 'static,
     ) -> Self {
         self.lsp_root_with = Some(Box::new(fun) as _);
@@ -127,9 +125,9 @@ impl<B: Backend> CollabTestBackend<B> {
     pub fn select_session_with(
         mut self,
         fun: impl FnMut(
-            &[(fs::AbsPathBuf, SessionId)],
+            &[(AbsPathBuf, SessionId)],
             ActionForSelectedSession,
-        ) -> Option<&(fs::AbsPathBuf, SessionId)>
+        ) -> Option<&(AbsPathBuf, SessionId)>
         + 'static,
     ) -> Self {
         self.select_session_with = Some(Box::new(fun) as _);
@@ -161,18 +159,18 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type ServerTx = TestTx;
 
     type CopySessionIdError = Infallible;
+    type DefaultDirForRemoteProjectsError = Infallible;
     type HomeDirError = &'static str;
     type JoinSessionError = AnyError;
     type LspRootError = Infallible;
     type ReadReplicaError = default_read_replica::Error<Self>;
-    type RootForRemoteProjectError = Infallible;
     type SearchProjectRootError = default_search_project_root::Error<Self>;
     type ServerRxError = Infallible;
     type ServerTxError = TestTxError;
     type StartSessionError = AnyError;
 
     async fn confirm_start(
-        project_root: &fs::AbsPath,
+        project_root: &AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> bool {
         ctx.with_backend(|this| match &mut this.confirm_start_with {
@@ -189,9 +187,15 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
         Ok(())
     }
 
+    async fn default_dir_for_remote_projects(
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError> {
+        todo!()
+    }
+
     async fn home_dir(
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<fs::AbsPathBuf, Self::HomeDirError> {
+    ) -> Result<AbsPathBuf, Self::HomeDirError> {
         ctx.with_backend(|this| match &mut this.home_dir_with {
             Some(fun) => Ok(fun(this.inner.fs())),
             None => Err("no home directory configured"),
@@ -208,13 +212,13 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     fn lsp_root(
         buffer_id: <Self::Buffer<'_> as Buffer>::Id,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<Option<fs::AbsPathBuf>, Self::LspRootError> {
+    ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
         Ok(ctx.with_backend(|this| this.lsp_root_with.as_mut()?(buffer_id)))
     }
 
     async fn read_replica(
         peer_id: PeerId,
-        project_root: &fs::AbsPath,
+        project_root: &AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<eerie::Replica, Self::ReadReplicaError> {
         default_read_replica::read_replica(
@@ -225,26 +229,18 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
         .await
     }
 
-    async fn root_for_remote_project(
-        _: &Project<Self>,
-        _: &mut AsyncCtx<'_, Self>,
-    ) -> Result<<Self::Fs as Fs>::Directory, Self::RootForRemoteProjectError>
-    {
-        todo!()
-    }
-
     async fn search_project_root(
         buffer_id: BufferId<Self>,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<eerie::fs::AbsPathBuf, Self::SearchProjectRootError> {
+    ) -> Result<AbsPathBuf, Self::SearchProjectRootError> {
         default_search_project_root::search(buffer_id, ctx).await
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, SessionId)],
         action: ActionForSelectedSession,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
+    ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
         ctx.with_backend(|this| {
             this.select_session_with.as_mut()?(sessions, action)
         })
