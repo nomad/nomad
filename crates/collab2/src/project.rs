@@ -14,16 +14,17 @@ use crate::CollabBackend;
 pub struct Project<B: CollabBackend> {
     host: Peer,
     local_peer: Peer,
-    projects: Projects<B>,
     remote_peers: Peers,
     replica: Replica,
     root: AbsPathBuf,
     session_id: SessionId,
+    _phantom: PhantomData<B>,
 }
 
 /// TODO: docs.
 pub struct ProjectHandle<B: CollabBackend> {
     inner: Shared<Project<B>>,
+    projects: Projects<B>,
 }
 
 /// TODO: docs.
@@ -64,10 +65,6 @@ impl<B: CollabBackend> ProjectHandle<B> {
     /// TODO: docs.
     pub fn with<R>(&self, fun: impl FnOnce(&Project<B>) -> R) -> R {
         self.inner.with(fun)
-    }
-
-    fn new(inner: Project<B>) -> Self {
-        Self { inner: Shared::new(inner) }
     }
 }
 
@@ -134,15 +131,18 @@ impl<B: CollabBackend> ProjectGuard<B> {
             assert!(set.remove(&self.root));
         });
 
-        let handle = ProjectHandle::new(Project {
-            host: args.host,
-            local_peer: args.local_peer,
+        let handle = ProjectHandle {
+            inner: Shared::new(Project {
+                host: args.host,
+                local_peer: args.local_peer,
+                remote_peers: args.remote_peers,
+                replica: args.replica,
+                root: self.root.clone(),
+                session_id: args.session_id,
+                _phantom: PhantomData,
+            }),
             projects: self.projects.clone(),
-            remote_peers: args.remote_peers,
-            replica: args.replica,
-            root: self.root.clone(),
-            session_id: args.session_id,
-        });
+        };
 
         self.projects.active.with_mut(|map| {
             map.insert(args.session_id, handle.clone());
@@ -164,18 +164,21 @@ impl<B> NoActiveSessionError<B> {
 
 impl<B: CollabBackend> Clone for ProjectHandle<B> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone() }
+        Self { inner: self.inner.clone(), projects: self.projects.clone() }
     }
 }
 
 impl<B: CollabBackend> Drop for ProjectHandle<B> {
     fn drop(&mut self) {
-        // FIXME: this doesn't work, the instance in the `Projects` will never
-        // be dropped.
-        //
-        // self.projects.active.with_mut(|map| {
-        //     map.remove(&self.session_id);
-        // });
+        let session_id = if self.inner.strong_count() == 2 {
+            self.with(|project| project.session_id)
+        } else {
+            return;
+        };
+
+        self.projects.active.with_mut(|map| {
+            map.remove(&session_id);
+        });
     }
 }
 

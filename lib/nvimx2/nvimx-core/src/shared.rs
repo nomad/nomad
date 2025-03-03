@@ -50,6 +50,11 @@ impl<T> Shared<T> {
     }
 
     /// TODO: docs
+    pub fn strong_count(&self) -> usize {
+        Rc::strong_count(&self.inner)
+    }
+
+    /// TODO: docs
     #[track_caller]
     pub fn take(&self) -> T
     where
