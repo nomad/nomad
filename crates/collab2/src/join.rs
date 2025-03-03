@@ -192,6 +192,8 @@ pub enum JoinError<B: CollabBackend> {
 
 /// The type of error that can occur when requesting the state of the project
 /// from another peer in a session fails.
+#[derive(derive_more::Debug)]
+#[debug(bound(B: CollabBackend))]
 pub enum RequestProjectError<B: CollabBackend> {
     /// TODO: docs.
     RecvResponse(B::ServerRxError),
@@ -204,6 +206,8 @@ pub enum RequestProjectError<B: CollabBackend> {
 }
 
 /// TODO: docs.
+#[derive(derive_more::Debug)]
+#[debug(bound(Fs: fs::Fs))]
 pub enum FlushProjectError<Fs: fs::Fs> {
     /// TODO: docs.
     Todo(core::marker::PhantomData<Fs>),
@@ -245,9 +249,10 @@ impl<B: CollabBackend> JoinError<B> {
 impl<B> PartialEq for JoinError<B>
 where
     B: CollabBackend,
-    FlushProjectError<B::Fs>: PartialEq,
     B::DefaultDirForRemoteProjectsError: PartialEq,
     B::JoinSessionError: PartialEq,
+    FlushProjectError<B::Fs>: PartialEq,
+    RequestProjectError<B>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         use JoinError::*;
@@ -260,7 +265,7 @@ where
             (FlushProject(l), FlushProject(r)) => l == r,
             (JoinSession(l), JoinSession(r)) => l == r,
             (OverlappingProject(l), OverlappingProject(r)) => l == r,
-            (RequestProject(_), RequestProject(_)) => todo!(),
+            (RequestProject(l), RequestProject(r)) => l == r,
             (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
             _ => false,
         }
@@ -276,6 +281,38 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
             Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(_) => todo!(),
             Self::UserNotLoggedIn(err) => err.to_message(),
+        }
+    }
+}
+
+impl<B: CollabBackend> PartialEq for RequestProjectError<B>
+where
+    B::ServerRxError: PartialEq,
+    B::ServerTxError: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use RequestProjectError::*;
+
+        match (self, other) {
+            (RecvResponse(l), RecvResponse(r)) => l == r,
+            (SendRequest(l), SendRequest(r)) => l == r,
+            (SessionEnded, SessionEnded) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<B: CollabBackend> notify::Error for RequestProjectError<B> {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        match self {
+            Self::RecvResponse(err) => err.to_message(),
+            Self::SendRequest(err) => err.to_message(),
+            Self::SessionEnded => (
+                notify::Level::Error,
+                notify::Message::from_str(
+                    "session ended before we could join it",
+                ),
+            ),
         }
     }
 }
