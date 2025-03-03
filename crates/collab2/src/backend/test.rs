@@ -44,6 +44,9 @@ pub struct CollabTestBackend<B: Backend> {
     default_dir_for_remote_projects: Option<AbsPathBuf>,
     home_dir_with:
         Option<Box<dyn FnMut(<B as Backend>::Fs) -> AbsPathBuf + Send>>,
+    join_session_with: Option<
+        Box<dyn FnMut(JoinArgs<'_>) -> Result<SessionInfos<Self>, AnyError>>,
+    >,
     lsp_root_with: Option<
         Box<dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>>,
     >,
@@ -112,6 +115,16 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
+    pub fn join_session_with<E: Error + 'static>(
+        mut self,
+        mut fun: impl FnMut(JoinArgs<'_>) -> Result<SessionInfos<Self>, E>
+        + 'static,
+    ) -> Self {
+        self.join_session_with =
+            Some(Box::new(move |args| fun(args).map_err(AnyError::new)));
+        self
+    }
+
     pub fn lsp_root_with(
         mut self,
         fun: impl FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>
@@ -128,6 +141,7 @@ impl<B: Backend> CollabTestBackend<B> {
             default_dir_for_remote_projects: None,
             home_dir_with: None,
             inner,
+            join_session_with: None,
             lsp_root_with: None,
             select_session_with: None,
             start_session_with: None,
@@ -220,10 +234,28 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn join_session(
-        _: JoinArgs<'_>,
-        _: &mut AsyncCtx<'_, Self>,
+        args: JoinArgs<'_>,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<SessionInfos<Self>, Self::JoinSessionError> {
-        todo!()
+        #[derive(Debug)]
+        struct NoJoinerSet;
+
+        impl fmt::Display for NoJoinerSet {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(
+                    f,
+                    "no joiner set, call \
+                     CollabTestBackend::join_session_with() to set one"
+                )
+            }
+        }
+
+        impl Error for NoJoinerSet {}
+
+        ctx.with_backend(|this| match this.join_session_with.as_mut() {
+            Some(fun) => fun(args),
+            None => Err(AnyError::new(NoJoinerSet)),
+        })
     }
 
     fn lsp_root(
