@@ -41,6 +41,7 @@ pub struct CollabTestBackend<B: Backend> {
     inner: B,
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
+    default_dir_for_remote_projects: Option<AbsPathBuf>,
     home_dir_with:
         Option<Box<dyn FnMut(<B as Backend>::Fs) -> AbsPathBuf + Send>>,
     lsp_root_with: Option<
@@ -74,13 +75,16 @@ pin_project_lite::pin_project! {
 }
 
 #[derive(Debug)]
-pub struct TestTxError {
-    inner: flume::SendError<Message>,
+pub struct AnyError {
+    inner: Box<dyn Error>,
 }
 
 #[derive(Debug)]
-pub struct AnyError {
-    inner: Box<dyn Error>,
+pub struct NoDefaultDirForRemoteProjectsError;
+
+#[derive(Debug)]
+pub struct TestTxError {
+    inner: flume::SendError<Message>,
 }
 
 impl<B: Backend> CollabTestBackend<B> {
@@ -89,6 +93,14 @@ impl<B: Backend> CollabTestBackend<B> {
         fun: impl FnMut(&AbsPath) -> bool + 'static,
     ) -> Self {
         self.confirm_start_with = Some(Box::new(fun) as _);
+        self
+    }
+
+    pub fn default_dir_for_remote_projects_with(
+        mut self,
+        dir_path: AbsPathBuf,
+    ) -> Self {
+        self.default_dir_for_remote_projects = Some(dir_path);
         self
     }
 
@@ -113,6 +125,7 @@ impl<B: Backend> CollabTestBackend<B> {
         Self {
             clipboard: None,
             confirm_start_with: None,
+            default_dir_for_remote_projects: None,
             home_dir_with: None,
             inner,
             lsp_root_with: None,
@@ -159,7 +172,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type ServerTx = TestTx;
 
     type CopySessionIdError = Infallible;
-    type DefaultDirForRemoteProjectsError = Infallible;
+    type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
     type HomeDirError = &'static str;
     type JoinSessionError = AnyError;
     type LspRootError = Infallible;
@@ -188,9 +201,13 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn default_dir_for_remote_projects(
-        _: &mut AsyncCtx<'_, Self>,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError> {
-        todo!()
+        ctx.with_backend(|this| {
+            this.default_dir_for_remote_projects
+                .clone()
+                .ok_or(NoDefaultDirForRemoteProjectsError)
+        })
     }
 
     async fn home_dir(
@@ -397,6 +414,17 @@ impl PartialEq for AnyError {
 impl notify::Error for AnyError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         self.inner.to_message()
+    }
+}
+
+impl notify::Error for NoDefaultDirForRemoteProjectsError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        (
+            notify::Level::Error,
+            notify::Message::from_str(
+                "no default directory for remote projects configured",
+            ),
+        )
     }
 }
 
