@@ -146,7 +146,7 @@ pub struct StartArgs<'a> {
     pub(crate) auth_infos: &'a auth::AuthInfos,
 
     /// TODO: docs.
-    pub(crate) project_root: &'a fs::AbsPath,
+    pub(crate) project_name: &'a fs::FsNodeName,
 
     /// TODO: docs.
     pub(crate) server_address: &'a config::ServerAddress,

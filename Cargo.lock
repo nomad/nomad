@@ -778,7 +778,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "eerie"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/eerie.git#38ed31caf38ef64bcd3843e8de64238caa026b35"
+source = "git+ssh://git@github.com/nomad/eerie.git#150dbc5ae8204224fc4cd7270a754188f7b4f483"
 dependencies = [
  "cola",
  "compact_str 0.9.0",

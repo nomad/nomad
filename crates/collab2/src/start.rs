@@ -58,9 +58,14 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             return Ok(());
         }
 
+        let project_name = project_guard
+            .root()
+            .node_name()
+            .ok_or(StartError::ProjectRootIsFsRoot)?;
+
         let start_args = StartArgs {
             auth_infos: &auth_infos,
-            project_root: project_guard.root(),
+            project_name,
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
@@ -111,6 +116,9 @@ pub enum StartError<B: CollabBackend> {
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
+
+    /// TODO: docs.
+    ProjectRootIsFsRoot,
 
     /// TODO: docs.
     ReadReplica(B::ReadReplicaError),
@@ -182,6 +190,7 @@ where
         match (self, other) {
             (NoBufferFocused(_), NoBufferFocused(_)) => true,
             (OverlappingProject(l), OverlappingProject(r)) => l == r,
+            (ProjectRootIsFsRoot, ProjectRootIsFsRoot) => true,
             (ReadReplica(l), ReadReplica(r)) => l == r,
             (SearchProjectRoot(l), SearchProjectRoot(r)) => l == r,
             (StartSession(l), StartSession(r)) => l == r,
@@ -196,6 +205,13 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
         match self {
             Self::NoBufferFocused(err) => err.to_message(),
             Self::OverlappingProject(err) => err.to_message(),
+            Self::ProjectRootIsFsRoot => (
+                notify::Level::Error,
+                notify::Message::from_str(
+                    "cannot start a new collaborative editing session at the \
+                     root of the filesystem",
+                ),
+            ),
             Self::ReadReplica(err) => err.to_message(),
             Self::SearchProjectRoot(err) => err.to_message(),
             Self::StartSession(err) => err.to_message(),

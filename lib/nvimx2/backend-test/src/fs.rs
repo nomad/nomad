@@ -168,18 +168,18 @@ impl TestFsInner {
         path: &AbsPath,
         node: TestFsNode,
     ) -> Result<(), CreateNodeError> {
-        let (parent_path, node_name) =
-            match (path.parent(), path.fs_node_name()) {
-                (Some(parent), Some(name)) => (parent, name),
-                _ => {
-                    return Err(CreateNodeError::AlreadyExists(
-                        NodeAlreadyExistsError {
-                            kind: FsNodeKind::File,
-                            path: path.to_owned(),
-                        },
-                    ));
-                },
-            };
+        let (parent_path, node_name) = match (path.parent(), path.node_name())
+        {
+            (Some(parent), Some(name)) => (parent, name),
+            _ => {
+                return Err(CreateNodeError::AlreadyExists(
+                    NodeAlreadyExistsError {
+                        kind: FsNodeKind::File,
+                        path: path.to_owned(),
+                    },
+                ));
+            },
+        };
 
         let parent = self.node_at_path(parent_path).ok_or_else(|| {
             CreateNodeError::ParentDoesNotExist(parent_path.to_owned())
@@ -483,7 +483,7 @@ impl Metadata for TestDirEntry {
 
     async fn name(&self) -> Result<FsNodeNameBuf, Self::NameError> {
         self.exists()
-            .then(|| self.path().fs_node_name().expect("path is not root"))
+            .then(|| self.path().node_name().expect("path is not root"))
             .map(ToOwned::to_owned)
             .ok_or(TestDirEntryDoesNotExistError)
     }
