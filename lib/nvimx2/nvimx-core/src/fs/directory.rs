@@ -40,9 +40,7 @@ pub trait Directory: Sized {
     ) -> impl Future<Output = Result<<Self::Fs as Fs>::File, Self::CreateFileError>>;
 
     /// TODO: docs.
-    fn clear(
-        &self,
-    ) -> impl Future<Output = Result<(), Self::ClearError>>;
+    fn clear(&self) -> impl Future<Output = Result<(), Self::ClearError>>;
 
     /// TODO: docs.
     fn read(
