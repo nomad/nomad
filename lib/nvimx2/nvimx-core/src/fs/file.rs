@@ -12,6 +12,9 @@ pub trait File {
     type Error: Error;
 
     /// TODO: docs.
+    type WriteError: Error;
+
+    /// TODO: docs.
     fn len(&self) -> impl Future<Output = Result<ByteOffset, Self::Error>>;
 
     /// TODO: docs.
@@ -19,4 +22,10 @@ pub trait File {
 
     /// TODO: docs.
     fn path(&self) -> &AbsPath;
+
+    /// TODO: docs.
+    fn write<C: AsRef<[u8]>>(
+        &self,
+        new_contents: C,
+    ) -> impl Future<Output = Result<(), Self::WriteError>>;
 }

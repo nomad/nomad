@@ -24,6 +24,7 @@ use crate::fs::{
     FsEvent,
     FsNode,
     FsNodeKind,
+    FsNodeName,
     FsNodeNameBuf,
     InvalidFsNodeNameError,
     Metadata,
@@ -221,8 +222,30 @@ impl Fs for OsFs {
 impl Directory for OsDirectory {
     type Fs = OsFs;
     type Metadata = OsMetadata;
+
+    type CreateDirectoryError = io::Error;
+    type CreateFileError = io::Error;
+    type DeleteAllError = io::Error;
     type ReadEntryError = io::Error;
     type ReadError = io::Error;
+
+    async fn create_directory(
+        &self,
+        _directory_name: &FsNodeName,
+    ) -> Result<Self, Self::CreateDirectoryError> {
+        todo!();
+    }
+
+    async fn create_file(
+        &self,
+        _file_name: &FsNodeName,
+    ) -> Result<OsFile, Self::CreateFileError> {
+        todo!();
+    }
+
+    async fn delete_all(&self) -> Result<(), Self::DeleteAllError> {
+        todo!();
+    }
 
     async fn read(
         &self,
@@ -297,6 +320,7 @@ impl Directory for OsDirectory {
 impl File for OsFile {
     type Fs = OsFs;
     type Error = io::Error;
+    type WriteError = io::Error;
 
     async fn len(&self) -> Result<ByteOffset, Self::Error> {
         self.metadata.with(|meta| meta.len().into()).await
@@ -312,6 +336,13 @@ impl File for OsFile {
 
     fn path(&self) -> &AbsPath {
         &self.metadata.path
+    }
+
+    async fn write<C: AsRef<[u8]>>(
+        &self,
+        _new_contents: C,
+    ) -> Result<(), Self::WriteError> {
+        todo!();
     }
 }
 

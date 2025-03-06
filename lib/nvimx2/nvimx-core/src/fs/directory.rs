@@ -2,10 +2,10 @@ use core::error::Error;
 
 use futures_lite::Stream;
 
-use crate::fs::{AbsPath, Fs, Metadata};
+use crate::fs::{AbsPath, Fs, FsNodeName, Metadata};
 
 /// TODO: docs.
-pub trait Directory {
+pub trait Directory: Sized {
     /// TODO: docs.
     type Fs: Fs;
 
@@ -13,10 +13,36 @@ pub trait Directory {
     type Metadata: Metadata<Timestamp = <Self::Fs as Fs>::Timestamp>;
 
     /// TODO: docs.
+    type CreateDirectoryError: Error;
+
+    /// TODO: docs.
+    type CreateFileError: Error;
+
+    /// TODO: docs.
+    type DeleteAllError: Error;
+
+    /// TODO: docs.
     type ReadEntryError: Error;
 
     /// TODO: docs.
     type ReadError: Error;
+
+    /// TODO: docs.
+    fn create_directory(
+        &self,
+        directory_name: &FsNodeName,
+    ) -> impl Future<Output = Result<Self, Self::CreateDirectoryError>>;
+
+    /// TODO: docs.
+    fn create_file(
+        &self,
+        file_name: &FsNodeName,
+    ) -> impl Future<Output = Result<<Self::Fs as Fs>::File, Self::CreateFileError>>;
+
+    /// TODO: docs.
+    fn delete_all(
+        &self,
+    ) -> impl Future<Output = Result<(), Self::DeleteAllError>>;
 
     /// TODO: docs.
     fn read(

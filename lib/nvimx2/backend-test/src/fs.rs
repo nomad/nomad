@@ -559,8 +559,30 @@ impl Stream for TestWatcher {
 impl Directory for TestDirectoryHandle {
     type Fs = TestFs;
     type Metadata = TestDirEntry;
+
+    type CreateDirectoryError = Infallible;
+    type CreateFileError = Infallible;
+    type DeleteAllError = Infallible;
     type ReadEntryError = TestReadDirNextError;
     type ReadError = TestReadDirError;
+
+    async fn create_directory(
+        &self,
+        _directory_name: &FsNodeName,
+    ) -> Result<Self, Self::CreateDirectoryError> {
+        todo!();
+    }
+
+    async fn create_file(
+        &self,
+        _file_name: &FsNodeName,
+    ) -> Result<TestFileHandle, Self::CreateFileError> {
+        todo!();
+    }
+
+    async fn delete_all(&self) -> Result<(), Self::DeleteAllError> {
+        todo!();
+    }
 
     async fn read(&self) -> Result<TestReadDir, Self::ReadError> {
         let FsNode::Directory(dir_handle) = self
@@ -588,6 +610,7 @@ impl Directory for TestDirectoryHandle {
 impl File for TestFileHandle {
     type Fs = TestFs;
     type Error = TestDirEntryDoesNotExistError;
+    type WriteError = Infallible;
 
     async fn len(&self) -> Result<ByteOffset, Self::Error> {
         self.with_file(|file| file.len())
@@ -602,6 +625,13 @@ impl File for TestFileHandle {
 
     fn path(&self) -> &AbsPath {
         &self.path
+    }
+
+    async fn write<C: AsRef<[u8]>>(
+        &self,
+        _new_contents: C,
+    ) -> Result<(), Self::WriteError> {
+        todo!();
     }
 }
 
