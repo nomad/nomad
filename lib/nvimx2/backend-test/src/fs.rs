@@ -62,7 +62,10 @@ pub struct TestFileHandle {
     path: AbsPathBuf,
 }
 
-pub enum TestSymlinkHandle {}
+pub struct TestSymlinkHandle {
+    fs: TestFs,
+    path: AbsPathBuf,
+}
 
 pin_project_lite::pin_project! {
     pub struct TestReadDir {
@@ -100,6 +103,10 @@ struct TestWatchChannel {
 impl TestFs {
     pub fn new(root: TestDirectory) -> Self {
         Self { inner: Arc::new(Mutex::new(TestFsInner::new(root))) }
+    }
+
+    fn delete_node(&self, path: &AbsPath) -> Result<(), TestDeleteNodeError> {
+        self.with_inner(|inner| inner.delete_node(path))
     }
 
     #[allow(clippy::unwrap_used)]
@@ -142,6 +149,16 @@ impl TestDirectoryHandle {
                 inner.node_at_path(&self.path),
                 Some(TestFsNode::Directory(_))
             )
+        })
+    }
+
+    fn with_inner<T>(
+        &self,
+        f: impl FnOnce(&mut TestDirectory) -> T,
+    ) -> Result<T, TestDirEntryDoesNotExistError> {
+        self.fs.with_inner(|inner| match inner.dir_at_path(&self.path) {
+            Some(dir) => Ok(f(dir)),
+            None => Err(TestDirEntryDoesNotExistError),
         })
     }
 }
@@ -220,6 +237,28 @@ impl TestFsInner {
             if event.path.starts_with(watch_root) {
                 watcher.emit(event.clone());
             }
+        }
+
+        Ok(())
+    }
+
+    fn delete_node(
+        &mut self,
+        path: &AbsPath,
+    ) -> Result<(), TestDeleteNodeError> {
+        let parent_path =
+            path.parent().ok_or(TestDeleteNodeError::NodeIsRoot)?;
+
+        let node_name = path.node_name().expect("path is not root");
+
+        let parent = self.dir_at_path(parent_path).ok_or_else(|| {
+            TestDeleteNodeError::NodeDoesNotExist(path.to_owned())
+        })?;
+
+        if !parent.delete_child(node_name) {
+            return Err(TestDeleteNodeError::NodeDoesNotExist(
+                path.to_owned(),
+            ));
         }
 
         Ok(())
@@ -305,6 +344,14 @@ impl TestDirectory {
         dir.child_at_path(components.as_path())
     }
 
+    fn clear(&mut self) {
+        self.children.clear();
+    }
+
+    fn delete_child(&mut self, name: &FsNodeName) -> bool {
+        self.children.swap_remove(name).is_some()
+    }
+
     fn dir_at_path(&mut self, path: &AbsPath) -> Option<&mut Self> {
         match self.child_at_path(path)? {
             TestFsNode::Directory(dir) => Some(dir),
@@ -331,6 +378,10 @@ impl TestFile {
 
     pub fn new<C: AsRef<[u8]>>(contents: C) -> Self {
         Self { contents: contents.as_ref().to_owned() }
+    }
+
+    pub fn write<C: AsRef<[u8]>>(&mut self, contents: C) {
+        self.contents = contents.as_ref().to_owned();
     }
 }
 
@@ -553,33 +604,33 @@ impl Directory for TestDirectoryHandle {
     type Fs = TestFs;
     type Metadata = TestDirEntry;
 
-    type CreateDirectoryError = Infallible;
-    type CreateFileError = Infallible;
-    type ClearError = Infallible;
-    type DeleteError = Infallible;
+    type CreateDirectoryError = CreateNodeError;
+    type CreateFileError = CreateNodeError;
+    type ClearError = TestDirEntryDoesNotExistError;
+    type DeleteError = TestDeleteNodeError;
     type ReadEntryError = TestReadDirNextError;
     type ReadError = TestReadDirError;
 
     async fn create_directory(
         &self,
-        _directory_name: &FsNodeName,
+        directory_name: &FsNodeName,
     ) -> Result<Self, Self::CreateDirectoryError> {
-        todo!();
+        self.fs.create_directory(self.path.clone().join(directory_name)).await
     }
 
     async fn create_file(
         &self,
-        _file_name: &FsNodeName,
+        file_name: &FsNodeName,
     ) -> Result<TestFileHandle, Self::CreateFileError> {
-        todo!();
+        self.fs.create_file(self.path.clone().join(file_name)).await
     }
 
     async fn clear(&self) -> Result<(), Self::ClearError> {
-        todo!();
+        self.with_inner(|dir| dir.clear())
     }
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        todo!();
+        self.fs.delete_node(&self.path)
     }
 
     async fn read(&self) -> Result<TestReadDir, Self::ReadError> {
@@ -608,16 +659,16 @@ impl Directory for TestDirectoryHandle {
 impl File for TestFileHandle {
     type Fs = TestFs;
 
-    type DeleteError = Infallible;
+    type DeleteError = TestDeleteNodeError;
     type Error = TestDirEntryDoesNotExistError;
-    type WriteError = Infallible;
+    type WriteError = TestDirEntryDoesNotExistError;
 
     async fn len(&self) -> Result<ByteOffset, Self::Error> {
         self.with_file(|file| file.len())
     }
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        todo!()
+        self.fs.delete_node(&self.path)
     }
 
     async fn parent(&self) -> <Self::Fs as Fs>::Directory {
@@ -633,16 +684,16 @@ impl File for TestFileHandle {
 
     async fn write<C: AsRef<[u8]>>(
         &self,
-        _new_contents: C,
+        new_contents: C,
     ) -> Result<(), Self::WriteError> {
-        todo!();
+        self.with_file(|file| file.write(new_contents.as_ref()))
     }
 }
 
 impl Symlink for TestSymlinkHandle {
     type Fs = TestFs;
 
-    type DeleteError = Infallible;
+    type DeleteError = TestDeleteNodeError;
     type FollowError = Infallible;
 
     async fn follow(
@@ -658,7 +709,7 @@ impl Symlink for TestSymlinkHandle {
     }
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        todo!()
+        self.fs.delete_node(&self.path)
     }
 }
 
@@ -671,6 +722,15 @@ impl Default for TestFsInner {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 #[error("dir entry does not exist")]
 pub struct TestDirEntryDoesNotExistError;
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum TestDeleteNodeError {
+    #[error("cannot delete root")]
+    NodeIsRoot,
+
+    #[error("no node at {:?}", .0)]
+    NodeDoesNotExist(AbsPathBuf),
+}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum TestReadDirError {
