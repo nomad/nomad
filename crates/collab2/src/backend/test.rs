@@ -322,6 +322,8 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 }
 
 impl<B: Backend> Backend for CollabTestBackend<B> {
+    const REINSTATE_PANIC_HOOK: bool = B::REINSTATE_PANIC_HOOK;
+
     type Api = <B as Backend>::Api;
     type Buffer<'a> = <B as Backend>::Buffer<'a>;
     type BufferId = <B as Backend>::BufferId;

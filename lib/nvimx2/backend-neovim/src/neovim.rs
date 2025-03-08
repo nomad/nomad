@@ -36,6 +36,8 @@ impl Neovim {
 }
 
 impl Backend for Neovim {
+    const REINSTATE_PANIC_HOOK: bool = false;
+
     type Api = api::NeovimApi;
     type Buffer<'a> = NeovimBuffer;
     type BufferId = NeovimBuffer;
