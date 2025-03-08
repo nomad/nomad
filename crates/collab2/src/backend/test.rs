@@ -42,8 +42,7 @@ pub struct CollabTestBackend<B: Backend> {
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
     default_dir_for_remote_projects: Option<AbsPathBuf>,
-    home_dir_with:
-        Option<Box<dyn FnMut(<B as Backend>::Fs) -> AbsPathBuf + Send>>,
+    home_dir: Option<AbsPathBuf>,
     join_session_with: Option<
         Box<dyn FnMut(JoinArgs<'_>) -> Result<SessionInfos<Self>, AnyError>>,
     >,
@@ -99,7 +98,7 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
-    pub fn default_dir_for_remote_projects_with(
+    pub fn default_dir_for_remote_projects(
         mut self,
         dir_path: AbsPathBuf,
     ) -> Self {
@@ -107,11 +106,8 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
-    pub fn home_dir_with(
-        mut self,
-        fun: impl FnMut(<B as Backend>::Fs) -> AbsPathBuf + Send + 'static,
-    ) -> Self {
-        self.home_dir_with = Some(Box::new(fun) as _);
+    pub fn home_dir(mut self, dir_path: AbsPathBuf) -> Self {
+        self.home_dir = Some(dir_path);
         self
     }
 
@@ -139,7 +135,7 @@ impl<B: Backend> CollabTestBackend<B> {
             clipboard: None,
             confirm_start_with: None,
             default_dir_for_remote_projects: None,
-            home_dir_with: None,
+            home_dir: None,
             inner,
             join_session_with: None,
             lsp_root_with: None,
@@ -227,8 +223,8 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     async fn home_dir(
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<AbsPathBuf, Self::HomeDirError> {
-        ctx.with_backend(|this| match &mut this.home_dir_with {
-            Some(fun) => Ok(fun(this.inner.fs())),
+        ctx.with_backend(|this| match &this.home_dir {
+            Some(path) => Ok(path.clone()),
             None => Err("no home directory configured"),
         })
     }

@@ -3,14 +3,12 @@ use std::borrow::Cow;
 use crop::Rope;
 use nvimx_core::ByteOffset;
 use nvimx_core::backend::Buffer;
-use nvimx_core::fs::AbsPathBuf;
 
 /// TODO: docs.
 pub struct TestBuffer {
     pub(crate) contents: Rope,
     pub(crate) id: TestBufferId,
     pub(crate) name: String,
-    pub(crate) path: AbsPathBuf,
 }
 
 /// TODO: docs.

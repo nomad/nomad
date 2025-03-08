@@ -33,7 +33,10 @@ fn cannot_start_session_if_project_root_is_fs_root() {
         "foo.txt": "",
     };
 
-    CollabTestBackend::new(TestBackend::new(fs)).block_on(async |ctx| {
+    let backend = CollabTestBackend::new(TestBackend::new(fs))
+        .home_dir(AbsPathBuf::root());
+
+    backend.block_on(async |ctx| {
         let collab = Collab::from(&Auth::dummy("foo"));
 
         ctx.focus_buffer_at(&path("/foo.txt")).unwrap();
@@ -54,7 +57,11 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         },
     };
 
-    CollabTestBackend::new(TestBackend::new(fs)).block_on(async |ctx| {
+    let backend = CollabTestBackend::new(TestBackend::new(fs))
+        .home_dir(AbsPathBuf::root())
+        .start_session_with::<core::convert::Infallible>(|_args| todo!());
+
+    backend.block_on(async |ctx| {
         let collab = Collab::from(&Auth::dummy("foo"));
 
         ctx.focus_buffer_at(&path("/a/foo.txt")).unwrap();

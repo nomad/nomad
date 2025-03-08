@@ -143,49 +143,49 @@ pub enum ActionForSelectedSession {
 #[allow(dead_code)]
 pub struct StartArgs<'a> {
     /// TODO: docs.
-    pub(crate) auth_infos: &'a auth::AuthInfos,
+    pub auth_infos: &'a auth::AuthInfos,
 
     /// TODO: docs.
-    pub(crate) project_name: &'a fs::FsNodeName,
+    pub project_name: &'a fs::FsNodeName,
 
     /// TODO: docs.
-    pub(crate) server_address: &'a config::ServerAddress,
+    pub server_address: &'a config::ServerAddress,
 }
 
 /// TODO: docs.
 pub struct JoinArgs<'a> {
     /// TODO: docs.
-    pub(crate) auth_infos: &'a auth::AuthInfos,
+    pub auth_infos: &'a auth::AuthInfos,
 
     /// TODO: docs.
-    pub(crate) session_id: SessionId,
+    pub session_id: SessionId,
 
     /// TODO: docs.
-    pub(crate) server_address: &'a config::ServerAddress,
+    pub server_address: &'a config::ServerAddress,
 }
 
 /// TODO: docs.
 pub struct SessionInfos<B: CollabBackend> {
     /// TODO: docs.
-    pub(crate) host_id: PeerId,
+    pub host_id: PeerId,
 
     /// TODO: docs.
-    pub(crate) local_peer: Peer,
+    pub local_peer: Peer,
 
     /// TODO: docs.
-    pub(crate) project_name: FsNodeNameBuf,
+    pub project_name: FsNodeNameBuf,
 
     /// TODO: docs.
-    pub(crate) remote_peers: Peers,
+    pub remote_peers: Peers,
 
     /// TODO: docs.
-    pub(crate) server_tx: B::ServerTx,
+    pub server_tx: B::ServerTx,
 
     /// TODO: docs.
-    pub(crate) server_rx: B::ServerRx,
+    pub server_rx: B::ServerRx,
 
     /// TODO: docs.
-    pub(crate) session_id: SessionId,
+    pub session_id: SessionId,
 }
 
 #[cfg(any(feature = "neovim", feature = "test"))]

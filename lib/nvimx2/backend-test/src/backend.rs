@@ -33,7 +33,7 @@ impl TestBackend {
     }
 
     fn buffer_at(&self, path: &AbsPath) -> Option<&TestBuffer> {
-        self.buffers.values().find(|buf| buf.path == path)
+        self.buffers.values().find(|buf| path.as_str() == buf.name)
     }
 
     #[track_caller]
@@ -59,8 +59,7 @@ impl TestBackend {
         let buffer = TestBuffer {
             contents,
             id: self.next_buffer_id.post_inc(),
-            name: file.name().to_string(),
-            path: path.to_owned(),
+            name: path.to_string(),
         };
 
         let buffer_id = buffer.id;
