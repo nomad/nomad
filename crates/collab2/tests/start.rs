@@ -21,7 +21,7 @@ fn cannot_start_session_if_not_logged_in() {
 #[test]
 fn cannot_start_session_if_no_buffer_is_focused() {
     CollabTestBackend::<TestBackend>::default().block_on(async |ctx| {
-        let collab = Collab::from(&Auth::dummy("foo"));
+        let collab = Collab::from(&Auth::dummy("peer-1"));
         let err = collab.start().call((), ctx).await.unwrap_err();
         assert_eq!(err, StartError::NoBufferFocused);
     });
@@ -34,11 +34,10 @@ fn cannot_start_session_if_project_root_is_fs_root() {
     };
 
     let backend = CollabTestBackend::new(TestBackend::new(fs))
-        .home_dir(AbsPathBuf::root());
+        .with_home_dir(AbsPathBuf::root());
 
     backend.block_on(async |ctx| {
-        let collab = Collab::from(&Auth::dummy("foo"));
-
+        let collab = Collab::from(&Auth::dummy("peer-1"));
         ctx.focus_buffer_at(&path("/foo.txt")).unwrap();
         let err = collab.start().call((), ctx).await.unwrap_err();
         assert_eq!(err, StartError::ProjectRootIsFsRoot);
@@ -52,29 +51,32 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
             ".git": {},
             "foo.txt": "",
             "b": {
+                ".git": {},
                 "bar.txt": "",
             },
         },
     };
 
     let backend = CollabTestBackend::new(TestBackend::new(fs))
-        .home_dir(AbsPathBuf::root())
+        .with_home_dir(AbsPathBuf::root())
         .start_session_with::<core::convert::Infallible>(|_args| todo!());
 
     backend.block_on(async |ctx| {
-        let collab = Collab::from(&Auth::dummy("foo"));
+        let collab = Collab::from(&Auth::dummy("peer-1"));
 
-        ctx.focus_buffer_at(&path("/a/foo.txt")).unwrap();
+        // Start session at "/a/b".
+        ctx.focus_buffer_at(&path("/a/b/bar.txt")).unwrap();
         collab.start().call((), ctx).await.unwrap();
         let project = collab.project(session_id(1)).unwrap();
-        assert_eq!(project.root(), "/a");
+        assert_eq!(project.root(), "/a/b");
 
-        ctx.focus_buffer_at(&path("/a/b/bar.txt")).unwrap();
+        // Can't start new session at "/a", it overlaps "/a/b".
+        ctx.focus_buffer_at(&path("/a/foo.txt")).unwrap();
         let err = match collab.start().call((), ctx).await.unwrap_err() {
             StartError::OverlappingProject(err) => err,
             other => panic!("unexpected error: {:?}", other),
         };
-        assert_eq!(err.existing_root, "/a");
+        assert_eq!(err.existing_root, "/a/b");
         assert_eq!(err.new_root, "/a");
     });
 }

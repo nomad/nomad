@@ -98,19 +98,6 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
-    pub fn default_dir_for_remote_projects(
-        mut self,
-        dir_path: AbsPathBuf,
-    ) -> Self {
-        self.default_dir_for_remote_projects = Some(dir_path);
-        self
-    }
-
-    pub fn home_dir(mut self, dir_path: AbsPathBuf) -> Self {
-        self.home_dir = Some(dir_path);
-        self
-    }
-
     pub fn join_session_with<E: Error + 'static>(
         mut self,
         mut fun: impl FnMut(JoinArgs<'_>) -> Result<SessionInfos<Self>, E>
@@ -163,6 +150,19 @@ impl<B: Backend> CollabTestBackend<B> {
     ) -> Self {
         self.start_session_with =
             Some(Box::new(move |args| fun(args).map_err(AnyError::new)));
+        self
+    }
+
+    pub fn with_default_dir_for_remote_projects(
+        mut self,
+        dir_path: AbsPathBuf,
+    ) -> Self {
+        self.default_dir_for_remote_projects = Some(dir_path);
+        self
+    }
+
+    pub fn with_home_dir(mut self, dir_path: AbsPathBuf) -> Self {
+        self.home_dir = Some(dir_path);
         self
     }
 }
