@@ -11,15 +11,16 @@ neovim = [
   "dep:async-net",
   "dep:clipboard",
   "dep:home",
+  "collab-server/nomad",
   "futures-util/async-await-macro",
   "nvimx2/neovim-0-10",
   "nvimx2/neovim-mlua",
 ]
-test = ["auth/test", "nvimx2/tests"]
+test = ["dep:duplex-stream", "auth/test", "nvimx2/tests"]
 
 [dependencies]
 auth = { workspace = true }
-collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client"] }
 concurrent-queue = "2.5"
 derive_more = { workspace = true }
 eerie = { workspace = true }
@@ -38,7 +39,12 @@ async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }
 
+# Test-only dependencies.
+duplex-stream = { git = "ssh://git@github.com/nomad/collab.git", optional = true }
+
 [dev-dependencies]
+collab-server = { git = "ssh://git@github.com/nomad/collab.git" }
+futures-lite = { workspace = true }
 nvimx2 = { workspace = true, features = ["tests"] }
 
 [lints]
