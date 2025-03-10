@@ -5,9 +5,11 @@ mod neovim;
 #[cfg(feature = "test")]
 pub mod test;
 
+use core::error::Error as StdError;
 use core::fmt::Debug;
+use core::hash::Hash;
+use core::str::FromStr;
 
-use collab_server::SessionId;
 use collab_server::message::{Message, Peer, Peers};
 use eerie::{PeerId, Replica};
 use futures_util::{Sink, Stream};
@@ -25,6 +27,14 @@ pub trait CollabBackend: Backend {
 
     /// TODO: docs.
     type ServerTx: Sink<Message, Error = Self::ServerTxError> + Unpin;
+
+    /// TODO: docs.
+    type SessionId: Debug
+        + Copy
+        + FromStr<Err: StdError>
+        + Eq
+        + Hash
+        + serde::de::DeserializeOwned;
 
     /// The type of error returned by
     /// [`copy_session_id`](CollabBackend::copy_session_id).
@@ -69,9 +79,9 @@ pub trait CollabBackend: Backend {
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = bool>;
 
-    /// Copies the given [`SessionId`] to the user's clipboard.
+    /// Copies the given [`SessionId`](Self::SessionId) to the user's clipboard.
     fn copy_session_id(
-        session_id: SessionId,
+        session_id: Self::SessionId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
 
@@ -89,7 +99,7 @@ pub trait CollabBackend: Backend {
 
     /// TODO: docs.
     fn join_session(
-        args: JoinArgs<'_>,
+        args: JoinArgs<'_, Self>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<SessionInfos<Self>, Self::JoinSessionError>>;
 
@@ -118,10 +128,10 @@ pub trait CollabBackend: Backend {
     /// Prompts the user to select one of the given `(project_root,
     /// session_id)` pairs.
     fn select_session<'pairs>(
-        sessions: &'pairs [(AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, Self::SessionId)],
         action: ActionForSelectedSession,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<Output = Option<&'pairs (AbsPathBuf, SessionId)>>;
+    ) -> impl Future<Output = Option<&'pairs (AbsPathBuf, Self::SessionId)>>;
 
     /// TODO: docs.
     fn start_session(
@@ -153,12 +163,12 @@ pub struct StartArgs<'a> {
 }
 
 /// TODO: docs.
-pub struct JoinArgs<'a> {
+pub struct JoinArgs<'a, B: CollabBackend> {
     /// TODO: docs.
     pub auth_infos: &'a auth::AuthInfos,
 
     /// TODO: docs.
-    pub session_id: SessionId,
+    pub session_id: B::SessionId,
 
     /// TODO: docs.
     pub server_address: &'a config::ServerAddress,
@@ -185,7 +195,7 @@ pub struct SessionInfos<B: CollabBackend> {
     pub server_rx: B::ServerRx,
 
     /// TODO: docs.
-    pub session_id: SessionId,
+    pub session_id: B::SessionId,
 }
 
 #[cfg(any(feature = "neovim", feature = "test"))]

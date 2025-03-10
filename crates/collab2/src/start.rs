@@ -20,7 +20,7 @@ pub struct Start<B: CollabBackend> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
     projects: Projects<B>,
-    stop_channels: StopChannels,
+    stop_channels: StopChannels<B>,
 }
 
 impl<B: CollabBackend> AsyncAction<B> for Start<B> {

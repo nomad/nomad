@@ -1,5 +1,4 @@
 use auth::AuthInfos;
-use collab_server::SessionId;
 use nvimx2::module::{ApiCtx, Module};
 use nvimx2::notify::Name;
 use nvimx2::{NeovimCtx, Shared};
@@ -17,7 +16,7 @@ pub struct Collab<B: CollabBackend> {
     pub(crate) auth_infos: Shared<Option<AuthInfos>>,
     pub(crate) config: Shared<Config>,
     pub(crate) projects: Projects<B>,
-    pub(crate) stop_channels: StopChannels,
+    pub(crate) stop_channels: StopChannels<B>,
 }
 
 impl<B: CollabBackend> Collab<B> {
@@ -32,7 +31,10 @@ impl<B: CollabBackend> Collab<B> {
     }
 
     /// Returns a handle to the project for the given [`SessionId`], if any.
-    pub fn project(&self, session_id: SessionId) -> Option<ProjectHandle<B>> {
+    pub fn project(
+        &self,
+        session_id: B::SessionId,
+    ) -> Option<ProjectHandle<B>> {
         self.projects.get(session_id)
     }
 

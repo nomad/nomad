@@ -3,7 +3,6 @@
 use core::fmt;
 
 use auth::AuthInfos;
-use collab_server::SessionId;
 use collab_server::message::{FileContents, Message, ProjectRequest};
 use eerie::{DirectoryId, FileId, Replica};
 use futures_util::{SinkExt, StreamExt, future, stream};
@@ -26,13 +25,13 @@ pub struct Join<B: CollabBackend> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
     projects: Projects<B>,
-    stop_channels: StopChannels,
+    stop_channels: StopChannels<B>,
 }
 
 impl<B: CollabBackend> AsyncAction<B> for Join<B> {
     const NAME: Name = "join";
 
-    type Args = Parse<SessionId>;
+    type Args = Parse<B::SessionId>;
 
     async fn call(
         &mut self,

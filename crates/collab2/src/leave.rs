@@ -1,6 +1,5 @@
 use std::collections::hash_map::Entry;
 
-use collab_server::SessionId;
 use flume::{Receiver, Sender};
 use fxhash::FxHashMap;
 use nvimx2::action::AsyncAction;
@@ -14,13 +13,12 @@ use crate::project::{NoActiveSessionError, Projects};
 
 /// TODO: docs.
 pub struct Leave<B: CollabBackend> {
-    channels: StopChannels,
+    channels: StopChannels<B>,
     projects: Projects<B>,
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct StopChannels {
-    inner: Shared<FxHashMap<SessionId, Sender<StopSession>>>,
+pub(crate) struct StopChannels<B: CollabBackend> {
+    inner: Shared<FxHashMap<B::SessionId, Sender<StopSession>>>,
 }
 
 pub(crate) struct StopSession;
@@ -47,11 +45,11 @@ impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
     }
 }
 
-impl StopChannels {
+impl<B: CollabBackend> StopChannels<B> {
     #[track_caller]
     pub(crate) fn insert(
         &self,
-        session_id: SessionId,
+        session_id: B::SessionId,
     ) -> Receiver<StopSession> {
         let (tx, rx) = flume::bounded(1);
         self.inner.with_mut(move |inner| match inner.entry(session_id) {
@@ -65,7 +63,7 @@ impl StopChannels {
         rx
     }
 
-    fn take(&self, session_id: SessionId) -> Option<Sender<StopSession>> {
+    fn take(&self, session_id: B::SessionId) -> Option<Sender<StopSession>> {
         self.inner.with_mut(|inner| inner.remove(&session_id))
     }
 }
@@ -90,4 +88,16 @@ impl<B: CollabBackend> From<&Collab<B>> for Leave<B> {
 
 impl<B: CollabBackend> ToCompletionFn<B> for Leave<B> {
     fn to_completion_fn(&self) {}
+}
+
+impl<B: CollabBackend> Default for StopChannels<B> {
+    fn default() -> Self {
+        Self { inner: Default::default() }
+    }
+}
+
+impl<B: CollabBackend> Clone for StopChannels<B> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
 }

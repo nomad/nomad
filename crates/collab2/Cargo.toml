@@ -20,6 +20,7 @@ test = [
   "dep:duplex-stream",
   "auth/test",
   "collab-server/server",
+  "collab-server/test",
   "nvimx2/tests",
 ]
 

@@ -6,19 +6,16 @@ use core::convert::Infallible;
 use core::error::Error;
 use core::fmt;
 use core::pin::Pin;
+use core::str::FromStr;
 use core::task::{Context, Poll};
+use std::io;
 
 use collab_server::message::{Message, Peer};
-use collab_server::tests::TestAuthInfos;
-use collab_server::{
-    CollabConnection,
-    Knock,
-    SessionId,
-    SessionIntent,
-    client,
-};
-use duplex_stream::duplex;
+use collab_server::test::{TestConfig, TestSessionId};
+use collab_server::{CollabConnection, Knock, SessionIntent, client};
+use duplex_stream::{DuplexStream, duplex};
 use eerie::PeerId;
+use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
 use nvimx2::AsyncCtx;
 use nvimx2::backend::{ApiValue, Backend, Buffer, BufferId};
@@ -35,8 +32,6 @@ use crate::backend::{
     default_read_replica,
     default_search_project_root,
 };
-
-type TestConfig = collab_server::tests::TestConfig<32>;
 
 #[allow(clippy::type_complexity)]
 pub struct CollabTestBackend<B: Backend> {
@@ -65,17 +60,21 @@ pub struct CollabTestServer {
     conn_tx: flume::Sender<CollabConnection<TestConfig>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(transparent)]
+pub struct SessionId(pub u64);
+
 pin_project_lite::pin_project! {
     pub struct TestRx {
         #[pin]
-        inner: flume::r#async::RecvStream<'static, Message>,
+        inner: client::ClientRx<ReadHalf<DuplexStream>>,
     }
 }
 
 pin_project_lite::pin_project! {
     pub struct TestTx {
         #[pin]
-        inner: flume::r#async::SendSink<'static, Message>,
+        inner: client::ClientTx<WriteHalf<DuplexStream>>,
     }
 }
 
@@ -89,7 +88,12 @@ pub struct NoDefaultDirForRemoteProjectsError;
 
 #[derive(Debug)]
 pub struct TestTxError {
-    inner: flume::SendError<Message>,
+    inner: io::Error,
+}
+
+#[derive(Debug)]
+pub struct TestRxError {
+    inner: client::ClientRxError,
 }
 
 impl<B: Backend> CollabTestBackend<B> {
@@ -156,16 +160,14 @@ impl<B: Backend> CollabTestBackend<B> {
 
 impl CollabTestServer {
     pub async fn run(self) {
-        use collab_server::Server;
-
         let (done_tx, done_rx) = flume::bounded::<()>(1);
 
         std::thread::spawn(move || {
             self.inner.run(self.conn_rx.into_stream());
-            done_tx.send(()).unwrap();
+            done_tx.send(()).expect("rx is still alive");
         });
 
-        done_rx.recv_async().await.unwrap();
+        done_rx.recv_async().await.expect("tx is still alive");
     }
 }
 
@@ -202,6 +204,7 @@ impl AnyError {
 impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type ServerRx = TestRx;
     type ServerTx = TestTx;
+    type SessionId = SessionId;
 
     type CopySessionIdError = Infallible;
     type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
@@ -210,7 +213,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type LspRootError = Infallible;
     type ReadReplicaError = default_read_replica::Error<Self>;
     type SearchProjectRootError = default_search_project_root::Error<Self>;
-    type ServerRxError = Infallible;
+    type ServerRxError = TestRxError;
     type ServerTxError = TestTxError;
     type StartSessionError = AnyError;
 
@@ -225,7 +228,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn copy_session_id(
-        session_id: SessionId,
+        session_id: Self::SessionId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<(), Self::CopySessionIdError> {
         ctx.with_backend(|this| this.clipboard = Some(session_id));
@@ -252,7 +255,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn join_session(
-        args: JoinArgs<'_>,
+        args: JoinArgs<'_, Self>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<SessionInfos<Self>, Self::JoinSessionError> {
         let server_tx = ctx
@@ -261,29 +264,30 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         let (client_io, server_io) = duplex(usize::MAX);
 
-        server_tx.send(CollabConnection::new(server_io)).await?;
+        server_tx.send(CollabConnection::new(server_io))?;
 
         let (reader, writer) = client_io.split();
 
-        let knock = Knock::<TestAuthInfos> {
-            auth_infos: args.auth_infos.handle().clone(),
-            session_intent: SessionIntent::JoinExisting(args.session_id),
+        let github_handle = args.auth_infos.handle().clone();
+
+        let knock = Knock::<TestConfig> {
+            auth_infos: github_handle.clone(),
+            session_intent: SessionIntent::JoinExisting(
+                args.session_id.into(),
+            ),
         };
 
-        let github_handle = knock.auth_infos.github_handle.clone();
-
-        let welcome = client::Knocker::<_, _, TestConfig>::new(reader, writer)
-            .knock(knock)
-            .await?;
+        let welcome =
+            client::Knocker::new(reader, writer).knock(knock).await?;
 
         Ok(SessionInfos {
             host_id: welcome.host_id,
             local_peer: Peer::new(welcome.peer_id, github_handle),
             project_name: welcome.project_name,
             remote_peers: welcome.other_peers,
-            server_rx: welcome.rx,
-            server_tx: welcome.tx,
-            session_id: welcome.session_id,
+            server_rx: TestRx { inner: welcome.rx },
+            server_tx: TestTx { inner: welcome.tx },
+            session_id: welcome.session_id.into(),
         })
     }
 
@@ -315,10 +319,10 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, Self::SessionId)],
         action: ActionForSelectedSession,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
+    ) -> Option<&'pairs (AbsPathBuf, Self::SessionId)> {
         ctx.with_backend(|this| {
             this.select_session_with.as_mut()?(sessions, action)
         })
@@ -334,18 +338,18 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         let (client_io, server_io) = duplex(usize::MAX);
 
-        server_tx.send(CollabConnection::new(server_io)).await?;
+        server_tx.send(CollabConnection::new(server_io))?;
 
         let (reader, writer) = client_io.split();
 
-        let knock = Knock::<TestAuthInfos> {
-            auth_infos: args.auth_infos.handle().clone(),
+        let github_handle = args.auth_infos.handle().clone();
+
+        let knock = Knock::<TestConfig> {
+            auth_infos: github_handle.clone(),
             session_intent: SessionIntent::StartNew(
                 args.project_name.to_owned(),
             ),
         };
-
-        let github_handle = knock.auth_infos.github_handle.clone();
 
         let welcome = client::Knocker::<_, _, TestConfig>::new(reader, writer)
             .knock(knock)
@@ -356,9 +360,9 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
             local_peer: Peer::new(welcome.peer_id, github_handle),
             project_name: welcome.project_name,
             remote_peers: welcome.other_peers,
-            server_rx: welcome.rx,
-            server_tx: welcome.tx,
-            session_id: welcome.session_id,
+            server_rx: TestRx { inner: welcome.rx },
+            server_tx: TestTx { inner: welcome.tx },
+            session_id: welcome.session_id.into(),
         })
     }
 }
@@ -446,6 +450,26 @@ impl<B: Backend + Default> Default for CollabTestBackend<B> {
     }
 }
 
+impl FromStr for SessionId {
+    type Err = core::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(SessionId)
+    }
+}
+
+impl From<SessionId> for TestSessionId {
+    fn from(SessionId(session_id): SessionId) -> Self {
+        Self(session_id)
+    }
+}
+
+impl From<TestSessionId> for SessionId {
+    fn from(TestSessionId(session_id): TestSessionId) -> Self {
+        Self(session_id)
+    }
+}
+
 impl Sink<Message> for TestTx {
     type Error = TestTxError;
 
@@ -483,7 +507,7 @@ impl Sink<Message> for TestTx {
 }
 
 impl Stream for TestRx {
-    type Item = Result<Message, Infallible>;
+    type Item = Result<Message, TestRxError>;
 
     fn poll_next(
         self: Pin<&mut Self>,
@@ -492,7 +516,7 @@ impl Stream for TestRx {
         self.project()
             .inner
             .poll_next(ctx)
-            .map(|maybe_next| maybe_next.map(Ok))
+            .map_err(|err| TestRxError { inner: err })
     }
 }
 
@@ -522,6 +546,12 @@ impl notify::Error for NoDefaultDirForRemoteProjectsError {
                 "no default directory for remote projects configured",
             ),
         )
+    }
+}
+
+impl notify::Error for TestRxError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        (notify::Level::Error, notify::Message::from_display(&self.inner))
     }
 }
 

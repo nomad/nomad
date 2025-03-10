@@ -6,8 +6,9 @@ use std::path::PathBuf;
 use std::{env, io};
 
 use async_net::TcpStream;
-use collab_server::configs::nomad;
-use collab_server::{SessionIntent, client, message};
+use collab_server::message::Message;
+use collab_server::nomad::{NomadConfig, NomadSessionId};
+use collab_server::{SessionIntent, client};
 use eerie::Replica;
 use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
@@ -21,7 +22,7 @@ use crate::backend::*;
 #[derive(Debug)]
 pub struct NeovimCopySessionIdError {
     inner: clipboard::ClipboardError,
-    session_id: SessionId,
+    session_id: NomadSessionId,
 }
 
 #[derive(Debug)]
@@ -74,7 +75,7 @@ pub struct NeovimSearchProjectRootError {
 
 #[derive(Debug)]
 pub enum NeovimNewSessionError {
-    Knock(client::KnockError<nomad::NomadAuthenticator>),
+    Knock(client::KnockError<NomadConfig>),
     TcpConnect(io::Error),
 }
 
@@ -88,6 +89,7 @@ struct TildePath<'a> {
 impl CollabBackend for Neovim {
     type ServerRx = NeovimServerRx;
     type ServerTx = NeovimServerTx;
+    type SessionId = NomadSessionId;
 
     type CopySessionIdError = NeovimCopySessionIdError;
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
@@ -129,7 +131,7 @@ impl CollabBackend for Neovim {
     }
 
     async fn copy_session_id(
-        session_id: SessionId,
+        session_id: Self::SessionId,
         _: &mut AsyncCtx<'_, Self>,
     ) -> Result<(), Self::CopySessionIdError> {
         clipboard::set(session_id)
@@ -181,7 +183,7 @@ impl CollabBackend for Neovim {
     }
 
     async fn join_session(
-        args: JoinArgs<'_>,
+        args: JoinArgs<'_, Self>,
         _: &mut AsyncCtx<'_, Self>,
     ) -> Result<SessionInfos<Self>, Self::JoinSessionError> {
         let (reader, writer) = TcpStream::connect(&**args.server_address)
@@ -189,18 +191,17 @@ impl CollabBackend for Neovim {
             .map_err(NeovimNewSessionError::TcpConnect)?
             .split();
 
-        let knock = collab_server::Knock::<nomad::NomadAuthenticateInfos> {
+        let knock = collab_server::Knock::<NomadConfig> {
             auth_infos: args.auth_infos.clone().into(),
             session_intent: SessionIntent::JoinExisting(args.session_id),
         };
 
         let github_handle = knock.auth_infos.github_handle.clone();
 
-        let welcome =
-            client::Knocker::<_, _, nomad::NomadConfig>::new(reader, writer)
-                .knock(knock)
-                .await
-                .map_err(NeovimNewSessionError::Knock)?;
+        let welcome = client::Knocker::new(reader, writer)
+            .knock(knock)
+            .await
+            .map_err(NeovimNewSessionError::Knock)?;
 
         Ok(SessionInfos {
             host_id: welcome.host_id,
@@ -265,10 +266,10 @@ impl CollabBackend for Neovim {
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        sessions: &'pairs [(fs::AbsPathBuf, Self::SessionId)],
         action: ActionForSelectedSession,
         ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
+    ) -> Option<&'pairs (fs::AbsPathBuf, Self::SessionId)> {
         let select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
 
         let home_dir = Self::home_dir(ctx).await.ok();
@@ -327,7 +328,7 @@ impl CollabBackend for Neovim {
             .map_err(NeovimNewSessionError::TcpConnect)?
             .split();
 
-        let knock = collab_server::Knock::<nomad::NomadAuthenticateInfos> {
+        let knock = collab_server::Knock::<NomadConfig> {
             auth_infos: args.auth_infos.clone().into(),
             session_intent: SessionIntent::StartNew(
                 args.project_name.to_owned(),
@@ -336,11 +337,10 @@ impl CollabBackend for Neovim {
 
         let github_handle = knock.auth_infos.github_handle.clone();
 
-        let welcome =
-            client::Knocker::<_, _, nomad::NomadConfig>::new(reader, writer)
-                .knock(knock)
-                .await
-                .map_err(NeovimNewSessionError::Knock)?;
+        let welcome = client::Knocker::new(reader, writer)
+            .knock(knock)
+            .await
+            .map_err(NeovimNewSessionError::Knock)?;
 
         Ok(SessionInfos {
             host_id: welcome.host_id,
@@ -354,22 +354,22 @@ impl CollabBackend for Neovim {
     }
 }
 
-impl Sink<message::Message> for NeovimServerTx {
+impl Sink<Message> for NeovimServerTx {
     type Error = NeovimServerTxError;
 
     fn poll_ready(
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
     ) -> Poll<Result<(), Self::Error>> {
-        Sink::<message::Message>::poll_ready(self.project().inner, ctx)
+        Sink::<Message>::poll_ready(self.project().inner, ctx)
             .map_err(|err| NeovimServerTxError { inner: err })
     }
 
     fn start_send(
         self: Pin<&mut Self>,
-        item: message::Message,
+        item: Message,
     ) -> Result<(), Self::Error> {
-        Sink::<message::Message>::start_send(self.project().inner, item)
+        Sink::<Message>::start_send(self.project().inner, item)
             .map_err(|err| NeovimServerTxError { inner: err })
     }
 
@@ -377,7 +377,7 @@ impl Sink<message::Message> for NeovimServerTx {
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
     ) -> Poll<Result<(), Self::Error>> {
-        Sink::<message::Message>::poll_flush(self.project().inner, ctx)
+        Sink::<Message>::poll_flush(self.project().inner, ctx)
             .map_err(|err| NeovimServerTxError { inner: err })
     }
 
@@ -385,13 +385,13 @@ impl Sink<message::Message> for NeovimServerTx {
         self: Pin<&mut Self>,
         ctx: &mut Context<'_>,
     ) -> Poll<Result<(), Self::Error>> {
-        Sink::<message::Message>::poll_close(self.project().inner, ctx)
+        Sink::<Message>::poll_close(self.project().inner, ctx)
             .map_err(|err| NeovimServerTxError { inner: err })
     }
 }
 
 impl Stream for NeovimServerRx {
-    type Item = Result<message::Message, NeovimServerRxError>;
+    type Item = Result<Message, NeovimServerRxError>;
 
     fn poll_next(
         self: Pin<&mut Self>,

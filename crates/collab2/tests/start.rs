@@ -1,9 +1,8 @@
 #![allow(missing_docs)]
 
 use auth::Auth;
-use collab_server::SessionId;
 use collab2::Collab;
-use collab2::backend::test::{CollabTestBackend, CollabTestServer};
+use collab2::backend::test::{CollabTestBackend, CollabTestServer, SessionId};
 use collab2::start::StartError;
 use futures_lite::future;
 use nvimx2::action::AsyncAction;
@@ -70,7 +69,7 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         // Start session at "/a/b".
         ctx.focus_buffer_at(&path("/a/b/bar.txt")).unwrap();
         collab.start().call((), ctx).await.unwrap();
-        let project = collab.project(session_id(1)).unwrap();
+        let project = collab.project(SessionId(1)).unwrap();
         assert_eq!(project.root(), "/a/b");
 
         // Can't start new session at "/a", it overlaps "/a/b".
@@ -88,8 +87,4 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
 
 fn path(path: &str) -> AbsPathBuf {
     path.parse().unwrap()
-}
-
-fn session_id(id: u64) -> SessionId {
-    SessionId::from_parts(id, 0)
 }

@@ -1,6 +1,5 @@
 use core::marker::PhantomData;
 
-use collab_server::SessionId;
 use collab_server::message::{Peer, Peers};
 use eerie::{PeerId, Replica};
 use fxhash::{FxHashMap, FxHashSet};
@@ -19,8 +18,7 @@ pub struct Project<B: CollabBackend> {
     _remote_peers: Peers,
     _replica: Replica,
     root: AbsPathBuf,
-    session_id: SessionId,
-    _phantom: PhantomData<B>,
+    session_id: B::SessionId,
 }
 
 /// TODO: docs.
@@ -42,7 +40,7 @@ pub struct OverlappingProjectError {
 pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 pub(crate) struct Projects<B: CollabBackend> {
-    active: Shared<FxHashMap<SessionId, ProjectHandle<B>>>,
+    active: Shared<FxHashMap<B::SessionId, ProjectHandle<B>>>,
     starting: Shared<FxHashSet<AbsPathBuf>>,
 }
 
@@ -51,12 +49,12 @@ pub(crate) struct ProjectGuard<B: CollabBackend> {
     projects: Projects<B>,
 }
 
-pub(crate) struct NewProjectArgs {
+pub(crate) struct NewProjectArgs<B: CollabBackend> {
     pub(crate) host_id: PeerId,
     pub(crate) local_peer: Peer,
     pub(crate) remote_peers: Peers,
     pub(crate) replica: Replica,
-    pub(crate) session_id: SessionId,
+    pub(crate) session_id: B::SessionId,
 }
 
 impl<B: CollabBackend> Project<B> {
@@ -81,7 +79,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
 impl<B: CollabBackend> Projects<B> {
     pub(crate) fn get(
         &self,
-        session_id: SessionId,
+        session_id: B::SessionId,
     ) -> Option<ProjectHandle<B>> {
         self.active.with(|map| map.get(&session_id).cloned())
     }
@@ -106,7 +104,8 @@ impl<B: CollabBackend> Projects<B> {
         &self,
         action: ActionForSelectedSession,
         ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<Option<(AbsPathBuf, SessionId)>, NoActiveSessionError<B>> {
+    ) -> Result<Option<(AbsPathBuf, B::SessionId)>, NoActiveSessionError<B>>
+    {
         let active_sessions = self.active.with(|map| {
             map.iter()
                 .map(|(session_id, handle)| {
@@ -143,7 +142,7 @@ impl<B: CollabBackend> Projects<B> {
 }
 
 impl<B: CollabBackend> ProjectGuard<B> {
-    pub(crate) fn activate(self, args: NewProjectArgs) -> ProjectHandle<B> {
+    pub(crate) fn activate(self, args: NewProjectArgs<B>) -> ProjectHandle<B> {
         self.projects.starting.with_mut(|set| {
             assert!(set.remove(&self.root));
         });
@@ -155,7 +154,6 @@ impl<B: CollabBackend> ProjectGuard<B> {
             _replica: args.replica,
             root: self.root.clone(),
             session_id: args.session_id,
-            _phantom: PhantomData,
         })
     }
 

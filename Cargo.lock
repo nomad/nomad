@@ -619,7 +619,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#ac3a64f67b19f8317bc573d5520285b0fc1bdcf5"
+source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
 dependencies = [
  "bincode",
  "bytes",
@@ -673,7 +673,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#ac3a64f67b19f8317bc573d5520285b0fc1bdcf5"
+source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
 dependencies = [
  "codecs",
  "eerie",
@@ -686,12 +686,13 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#ac3a64f67b19f8317bc573d5520285b0fc1bdcf5"
+source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
 dependencies = [
  "async-compat",
  "codecs",
  "collab-message",
  "derive_more",
+ "duplex-stream",
  "eerie",
  "futures-util",
  "generic-server",
@@ -913,7 +914,7 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#ac3a64f67b19f8317bc573d5520285b0fc1bdcf5"
+source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1147,7 +1148,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#ac3a64f67b19f8317bc573d5520285b0fc1bdcf5"
+source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
 dependencies = [
  "codecs",
  "collab-message",

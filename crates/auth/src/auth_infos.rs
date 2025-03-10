@@ -1,5 +1,5 @@
-use collab_server::configs::nomad::NomadAuthenticateInfos;
 use collab_server::message::GitHubHandle;
+use collab_server::nomad::NomadAuthenticateInfos;
 
 /// TODO: docs.
 #[derive(Debug, Clone)]
