@@ -88,6 +88,36 @@ impl<B: CollabBackend> Projects<B> {
         &self,
         project_root: AbsPathBuf,
     ) -> Result<ProjectGuard<B>, OverlappingProjectError> {
+        fn overlaps(l: &AbsPath, r: &AbsPath) -> bool {
+            l.starts_with(r) || r.starts_with(l)
+        }
+
+        let conflicting_root = self
+            .active
+            .with(|map| {
+                map.values().find_map(|handle| {
+                    handle.with(|proj| {
+                        overlaps(&proj.root, &project_root)
+                            .then(|| proj.root.clone())
+                    })
+                })
+            })
+            .or_else(|| {
+                self.starting.with(|roots| {
+                    roots
+                        .iter()
+                        .find(|root| overlaps(root, &project_root))
+                        .cloned()
+                })
+            });
+
+        if let Some(conflicting_root) = conflicting_root {
+            return Err(OverlappingProjectError {
+                existing_root: conflicting_root,
+                new_root: project_root,
+            });
+        }
+
         let guard = ProjectGuard {
             root: project_root.clone(),
             projects: self.clone(),
