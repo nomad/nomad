@@ -51,7 +51,7 @@ home = { version = "0.5", optional = true }
 duplex-stream = { git = "ssh://git@github.com/nomad/collab.git", optional = true }
 
 [dev-dependencies]
-futures-lite = { workspace = true }
+futures-lite = { workspace = true, features = ["default"] }
 nvimx2 = { workspace = true, features = ["tests"] }
 
 [lints]

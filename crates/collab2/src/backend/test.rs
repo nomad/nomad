@@ -12,7 +12,7 @@ use std::io;
 
 use collab_server::message::{Message, Peer};
 use collab_server::test::{TestConfig, TestSessionId};
-use collab_server::{CollabConnection, Knock, SessionIntent, client};
+use collab_server::{Knock, SessionIntent, client};
 use duplex_stream::{DuplexStream, duplex};
 use eerie::PeerId;
 use futures_util::io::{ReadHalf, WriteHalf};
@@ -51,13 +51,13 @@ pub struct CollabTestBackend<B: Backend> {
             ) -> Option<&(AbsPathBuf, SessionId)>,
         >,
     >,
-    server_tx: Option<flume::Sender<CollabConnection<TestConfig>>>,
+    server_tx: Option<flume::Sender<DuplexStream>>,
 }
 
 pub struct CollabTestServer {
     inner: collab_server::CollabServer<TestConfig>,
-    conn_rx: flume::Receiver<CollabConnection<TestConfig>>,
-    conn_tx: flume::Sender<CollabConnection<TestConfig>>,
+    conn_rx: flume::Receiver<DuplexStream>,
+    conn_tx: flume::Sender<DuplexStream>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
@@ -264,7 +264,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         let (client_io, server_io) = duplex(usize::MAX);
 
-        server_tx.send(CollabConnection::new(server_io))?;
+        server_tx.send(server_io)?;
 
         let (reader, writer) = client_io.split();
 
@@ -338,7 +338,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         let (client_io, server_io) = duplex(usize::MAX);
 
-        server_tx.send(CollabConnection::new(server_io))?;
+        server_tx.send(server_io)?;
 
         let (reader, writer) = client_io.split();
 
