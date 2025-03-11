@@ -14,7 +14,6 @@ use collab_server::message::{Message, Peer};
 use collab_server::test::{TestConfig, TestSessionId};
 use collab_server::{Knock, SessionIntent, client};
 use duplex_stream::{DuplexStream, duplex};
-use eerie::PeerId;
 use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
 use nvimx2::AsyncCtx;
@@ -29,7 +28,6 @@ use crate::backend::{
     JoinArgs,
     SessionInfos,
     StartArgs,
-    default_read_replica,
     default_search_project_root,
 };
 
@@ -212,7 +210,6 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type HomeDirError = &'static str;
     type JoinSessionError = AnyError;
     type LspRootError = Infallible;
-    type ReadReplicaError = default_read_replica::Error<Self>;
     type SearchProjectRootError = default_search_project_root::Error<Self>;
     type ServerRxError = TestRxError;
     type ServerTxError = TestTxError;
@@ -297,19 +294,6 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
         Ok(ctx.with_backend(|this| this.lsp_root_with.as_mut()?(buffer_id)))
-    }
-
-    async fn read_replica(
-        peer_id: PeerId,
-        project_root: &AbsPath,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<eerie::Replica, Self::ReadReplicaError> {
-        default_read_replica::read_replica(
-            peer_id,
-            project_root.to_owned(),
-            ctx,
-        )
-        .await
     }
 
     async fn search_project_root(

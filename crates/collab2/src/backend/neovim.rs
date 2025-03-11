@@ -9,7 +9,6 @@ use async_net::TcpStream;
 use collab_server::message::Message;
 use collab_server::nomad::{NomadConfig, NomadSessionId};
 use collab_server::{SessionIntent, client};
-use eerie::Replica;
 use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
 use mlua::{Function, Table};
@@ -23,11 +22,6 @@ use crate::backend::*;
 pub struct NeovimCopySessionIdError {
     inner: clipboard::ClipboardError,
     session_id: NomadSessionId,
-}
-
-#[derive(Debug)]
-pub struct NeovimReadReplicaError {
-    inner: default_read_replica::Error<Neovim>,
 }
 
 pin_project_lite::pin_project! {
@@ -96,7 +90,6 @@ impl CollabBackend for Neovim {
     type HomeDirError = NeovimHomeDirError;
     type JoinSessionError = NeovimNewSessionError;
     type LspRootError = String;
-    type ReadReplicaError = NeovimReadReplicaError;
     type SearchProjectRootError = NeovimSearchProjectRootError;
     type ServerRxError = NeovimServerRxError;
     type ServerTxError = NeovimServerTxError;
@@ -240,20 +233,6 @@ impl CollabBackend for Neovim {
         inner(buffer)
             .map(|root_dir| root_dir.parse().map_err(|_| root_dir))
             .transpose()
-    }
-
-    async fn read_replica(
-        peer_id: PeerId,
-        project_root: &fs::AbsPath,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<Replica, Self::ReadReplicaError> {
-        default_read_replica::read_replica(
-            peer_id,
-            project_root.to_owned(),
-            ctx,
-        )
-        .await
-        .map_err(|inner| NeovimReadReplicaError { inner })
     }
 
     async fn search_project_root(
@@ -427,25 +406,6 @@ impl notify::Error for NeovimCopySessionIdError {
             .push_info(self.session_id.to_smolstr())
             .push_str(" to clipboard: ")
             .push_str(self.inner.to_smolstr());
-        (notify::Level::Error, msg)
-    }
-}
-
-impl notify::Error for NeovimReadReplicaError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        use default_read_replica::Error::*;
-
-        let mut msg = notify::Message::from_str("error at ");
-
-        let err: &dyn fmt::Display = match &self.inner {
-            Walk(err) => {
-                msg.push_info(&err.dir_path);
-                &err.kind
-            },
-        };
-
-        msg.push_str(": ").push_str(err.to_smolstr());
-
         (notify::Level::Error, msg)
     }
 }

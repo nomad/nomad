@@ -11,7 +11,7 @@ use core::hash::Hash;
 use core::str::FromStr;
 
 use collab_server::message::{Message, Peer, Peers};
-use eerie::{PeerId, Replica};
+use eerie::PeerId;
 use futures_util::{Sink, Stream};
 use nvimx2::backend::{Backend, Buffer, BufferId};
 use nvimx2::fs::{self, AbsPath, AbsPathBuf, FsNodeNameBuf};
@@ -53,10 +53,6 @@ pub trait CollabBackend: Backend {
 
     /// The type of error returned by [`lsp_root`](CollabBackend::lsp_root).
     type LspRootError: Debug;
-
-    /// The type of error returned by
-    /// [`read_replica`](CollabBackend::read_replica).
-    type ReadReplicaError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`search_project_root`](CollabBackend::search_project_root).
@@ -110,13 +106,6 @@ pub trait CollabBackend: Backend {
         id: <Self::Buffer<'_> as Buffer>::Id,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
-
-    /// TODO: docs.
-    fn read_replica(
-        peer_id: PeerId,
-        project_root: &AbsPath,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> impl Future<Output = Result<Replica, Self::ReadReplicaError>>;
 
     /// Searches for the root of the project containing the buffer with the
     /// given ID.
@@ -196,127 +185,6 @@ pub struct SessionInfos<B: CollabBackend> {
 
     /// TODO: docs.
     pub session_id: B::SessionId,
-}
-
-#[cfg(any(feature = "neovim", feature = "test"))]
-mod default_read_replica {
-    use core::convert::Infallible;
-    use core::fmt;
-    use std::sync::Arc;
-
-    use concurrent_queue::{ConcurrentQueue, PushError};
-    use eerie::ReplicaBuilder;
-    use fs::{FsNodeKind, Metadata};
-    use nvimx2::ByteOffset;
-    use walkdir::{Either, WalkDir, WalkError, WalkErrorKind};
-
-    use super::*;
-
-    pub(super) async fn read_replica<B>(
-        peer_id: PeerId,
-        project_root: fs::AbsPathBuf,
-        ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<Replica, Error<B>>
-    where
-        B: CollabBackend,
-    {
-        let fs = ctx.fs();
-        let res = async move {
-            let op_queue = Arc::new(ConcurrentQueue::unbounded());
-            let op_queue2 = Arc::clone(&op_queue);
-            let handler = async move |entry: walkdir::DirEntry<'_, _>| {
-                let op = match entry.node_kind() {
-                    FsNodeKind::File => {
-                        PushNode::File(entry.path(), entry.byte_len())
-                    },
-                    FsNodeKind::Directory => PushNode::Directory(entry.path()),
-                    FsNodeKind::Symlink => return Ok(()),
-                };
-                match op_queue2.push(op) {
-                    Ok(()) => Ok(()),
-                    Err(PushError::Full(_)) => unreachable!("unbounded"),
-                    Err(PushError::Closed(_)) => unreachable!("never closed"),
-                }
-            };
-            fs.for_each::<_, Infallible>(&project_root, handler).await?;
-            let mut builder = ReplicaBuilder::new(peer_id);
-            while let Ok(op) = op_queue.pop() {
-                let _ = match op {
-                    PushNode::File(path, len) => {
-                        builder.push_file(path, len.into_u64())
-                    },
-                    PushNode::Directory(path) => builder.push_directory(path),
-                };
-            }
-            Ok::<_, walkdir::ForEachError<_, _>>(builder)
-        };
-
-        let mut builder = match res.await {
-            Ok(builder) => builder,
-            Err(err) => match err.kind {
-                Either::Left(left) => {
-                    return Err(Error::Walk(WalkError {
-                        dir_path: err.dir_path,
-                        kind: left,
-                    }));
-                },
-                Either::Right(_infallible) => unreachable!(),
-            },
-        };
-
-        // Update the lengths of the open buffers.
-        //
-        // FIXME: what if a buffer was edited and already closed?
-        ctx.for_each_buffer(|buffer| {
-            if let Some(mut file) = <&fs::AbsPath>::try_from(&*buffer.name())
-                .ok()
-                .and_then(|buffer_path| builder.file_mut(buffer_path))
-            {
-                file.set_len(buffer.byte_len().into());
-            }
-        });
-
-        Ok(builder.build())
-    }
-
-    #[derive(derive_more::Debug)]
-    #[debug(bound(B: CollabBackend))]
-    pub enum Error<B: CollabBackend> {
-        Walk(WalkError<WalkErrorKind<B::Fs>>),
-    }
-
-    enum PushNode {
-        File(AbsPathBuf, ByteOffset),
-        Directory(AbsPathBuf),
-    }
-
-    impl<B: CollabBackend> PartialEq for Error<B>
-        where
-            WalkErrorKind<B::Fs>: PartialEq,
-            <<<B::Fs as fs::Fs>::Directory as fs::Directory>::Metadata as fs::Metadata>::Error: PartialEq
-    {
-        fn eq(&self, other: &Self) -> bool {
-            use Error::*;
-
-            match (self, other) {
-                (Walk(l), Walk(r)) => l == r,
-            }
-        }
-    }
-
-    impl<B: CollabBackend> fmt::Display for Error<B> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                Error::Walk(err) => fmt::Display::fmt(err, f),
-            }
-        }
-    }
-
-    impl<B: CollabBackend> notify::Error for Error<B> {
-        fn to_message(&self) -> (notify::Level, notify::Message) {
-            (notify::Level::Error, notify::Message::from_display(self))
-        }
-    }
 }
 
 #[cfg(any(feature = "neovim", feature = "test"))]

@@ -1,12 +1,19 @@
 //! TODO: docs.
 
+use core::convert::Infallible;
+use core::fmt;
 use core::marker::PhantomData;
+use std::sync::Arc;
 
 use auth::AuthInfos;
+use concurrent_queue::{ConcurrentQueue, PushError};
+use eerie::{PeerId, Replica, ReplicaBuilder};
 use nvimx2::action::AsyncAction;
 use nvimx2::command::ToCompletionFn;
+use nvimx2::fs::{self, AbsPath, AbsPathBuf, Directory, FsNodeKind, Metadata};
 use nvimx2::notify::{self, Name};
-use nvimx2::{AsyncCtx, Shared};
+use nvimx2::{AsyncCtx, ByteOffset, Shared};
+use walkdir::{Either, WalkDir, WalkError, WalkErrorKind};
 
 use crate::backend::{CollabBackend, StartArgs};
 use crate::collab::Collab;
@@ -72,9 +79,9 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::StartSession)?;
 
-        let replica = B::read_replica(
+        let replica = read_replica(
             sesh_infos.local_peer.id(),
-            project_guard.root(),
+            project_guard.root().to_owned(),
             ctx,
         )
         .await
@@ -106,6 +113,78 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     }
 }
 
+async fn read_replica<B>(
+    peer_id: PeerId,
+    project_root: AbsPathBuf,
+    ctx: &mut AsyncCtx<'_, B>,
+) -> Result<Replica, ReadReplicaError<B>>
+where
+    B: CollabBackend,
+{
+    enum PushNode {
+        File(AbsPathBuf, ByteOffset),
+        Directory(AbsPathBuf),
+    }
+
+    let fs = ctx.fs();
+    let res = async move {
+        let op_queue = Arc::new(ConcurrentQueue::unbounded());
+        let op_queue2 = Arc::clone(&op_queue);
+        let handler = async move |entry: walkdir::DirEntry<'_, _>| {
+            let op = match entry.node_kind() {
+                FsNodeKind::File => {
+                    PushNode::File(entry.path(), entry.byte_len())
+                },
+                FsNodeKind::Directory => PushNode::Directory(entry.path()),
+                FsNodeKind::Symlink => return Ok(()),
+            };
+            match op_queue2.push(op) {
+                Ok(()) => Ok(()),
+                Err(PushError::Full(_)) => unreachable!("unbounded"),
+                Err(PushError::Closed(_)) => unreachable!("never closed"),
+            }
+        };
+        fs.for_each::<_, Infallible>(&project_root, handler).await?;
+        let mut builder = ReplicaBuilder::new(peer_id);
+        while let Ok(op) = op_queue.pop() {
+            let _ = match op {
+                PushNode::File(path, len) => {
+                    builder.push_file(path, len.into_u64())
+                },
+                PushNode::Directory(path) => builder.push_directory(path),
+            };
+        }
+        Ok::<_, walkdir::ForEachError<_, _>>(builder)
+    };
+
+    let mut builder = match res.await {
+        Ok(builder) => builder,
+        Err(err) => match err.kind {
+            Either::Left(left) => {
+                return Err(ReadReplicaError::Walk(WalkError {
+                    dir_path: err.dir_path,
+                    kind: left,
+                }));
+            },
+            Either::Right(_infallible) => unreachable!(),
+        },
+    };
+
+    // Update the lengths of the open buffers.
+    //
+    // FIXME: what if a buffer was edited and already closed?
+    ctx.for_each_buffer(|buffer| {
+        if let Some(mut file) = <&AbsPath>::try_from(&*buffer.name())
+            .ok()
+            .and_then(|buffer_path| builder.file_mut(buffer_path))
+        {
+            file.set_len(buffer.byte_len().into());
+        }
+    });
+
+    Ok(builder.build())
+}
+
 /// The type of error that can occur when [`Start`]ing a session fails.
 #[derive(derive_more::Debug)]
 #[debug(bound(B: CollabBackend))]
@@ -120,7 +199,7 @@ pub enum StartError<B: CollabBackend> {
     ProjectRootIsFsRoot,
 
     /// TODO: docs.
-    ReadReplica(B::ReadReplicaError),
+    ReadReplica(ReadReplicaError<B>),
 
     /// TODO: docs.
     SearchProjectRoot(B::SearchProjectRootError),
@@ -133,10 +212,18 @@ pub enum StartError<B: CollabBackend> {
 }
 
 /// TODO: docs.
-struct NoBufferFocusedError<B>(PhantomData<B>);
+#[derive(derive_more::Debug)]
+#[debug(bound(B: CollabBackend))]
+pub enum ReadReplicaError<B: CollabBackend> {
+    /// TODO: docs.
+    Walk(WalkError<WalkErrorKind<B::Fs>>),
+}
 
 /// TODO: docs.
 pub(crate) struct UserNotLoggedInError<B>(PhantomData<B>);
+
+/// TODO: docs.
+struct NoBufferFocusedError<B>(PhantomData<B>);
 
 impl<B: CollabBackend> Clone for Start<B> {
     fn clone(&self) -> Self {
@@ -179,7 +266,7 @@ impl<B> UserNotLoggedInError<B> {
 impl<B> PartialEq for StartError<B>
 where
     B: CollabBackend,
-    B::ReadReplicaError: PartialEq,
+    ReadReplicaError<B>: PartialEq,
     B::SearchProjectRootError: PartialEq,
     B::StartSessionError: PartialEq,
 {
@@ -229,6 +316,35 @@ impl<B> notify::Error for NoBufferFocusedError<B> {
     }
 }
 
+impl<B: CollabBackend> PartialEq for ReadReplicaError<B>
+where
+    WalkErrorKind<B::Fs>: PartialEq,
+    <<<B::Fs as fs::Fs>::Directory as Directory>::Metadata as Metadata>::Error:
+        PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use ReadReplicaError::*;
+
+        match (self, other) {
+            (Walk(l), Walk(r)) => l == r,
+        }
+    }
+}
+
+impl<B: CollabBackend> fmt::Display for ReadReplicaError<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadReplicaError::Walk(err) => fmt::Display::fmt(err, f),
+        }
+    }
+}
+
+impl<B: CollabBackend> notify::Error for ReadReplicaError<B> {
+    default fn to_message(&self) -> (notify::Level, notify::Message) {
+        (notify::Level::Error, notify::Message::from_display(self))
+    }
+}
+
 impl<B> notify::Error for UserNotLoggedInError<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         (notify::Level::Off, notify::Message::new())
@@ -238,6 +354,7 @@ impl<B> notify::Error for UserNotLoggedInError<B> {
 #[cfg(feature = "neovim")]
 mod neovim_error_impls {
     use nvimx2::neovim::Neovim;
+    use smol_str::ToSmolStr;
 
     use super::*;
 
@@ -246,6 +363,25 @@ mod neovim_error_impls {
             let msg = "couldn't determine path to project root. Either move \
                        the cursor to a text buffer, or pass one explicitly";
             (notify::Level::Error, notify::Message::from_str(msg))
+        }
+    }
+
+    impl notify::Error for ReadReplicaError<Neovim> {
+        fn to_message(&self) -> (notify::Level, notify::Message) {
+            use ReadReplicaError::*;
+
+            let mut msg = notify::Message::from_str("error at ");
+
+            let err: &dyn fmt::Display = match &self {
+                Walk(err) => {
+                    msg.push_info(&err.dir_path);
+                    &err.kind
+                },
+            };
+
+            msg.push_str(": ").push_str(err.to_smolstr());
+
+            (notify::Level::Error, msg)
         }
     }
 
