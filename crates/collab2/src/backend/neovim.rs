@@ -18,12 +18,6 @@ use smol_str::ToSmolStr;
 
 use crate::backend::*;
 
-#[derive(Debug)]
-pub struct NeovimCopySessionIdError {
-    inner: clipboard::ClipboardError,
-    session_id: NomadSessionId,
-}
-
 pin_project_lite::pin_project! {
     pub struct NeovimServerTx {
         #[pin]
@@ -36,6 +30,12 @@ pin_project_lite::pin_project! {
         #[pin]
         inner: client::ClientRx<ReadHalf<TcpStream>>,
     }
+}
+
+#[derive(Debug)]
+pub struct NeovimCopySessionIdError {
+    inner: clipboard::ClipboardError,
+    session_id: NomadSessionId,
 }
 
 #[derive(Debug)]
@@ -53,8 +53,14 @@ pub enum NeovimHomeDirError {
 }
 
 #[derive(Debug)]
-pub struct NeovimServerTxError {
-    inner: io::Error,
+pub struct NeovimLspRootError {
+    root_dir: String,
+}
+
+#[derive(Debug)]
+pub enum NeovimNewSessionError {
+    Knock(client::KnockError<NomadConfig>),
+    TcpConnect(io::Error),
 }
 
 #[derive(Debug)]
@@ -63,14 +69,8 @@ pub struct NeovimServerRxError {
 }
 
 #[derive(Debug)]
-pub struct NeovimSearchProjectRootError {
-    inner: default_search_project_root::Error<Neovim>,
-}
-
-#[derive(Debug)]
-pub enum NeovimNewSessionError {
-    Knock(client::KnockError<NomadConfig>),
-    TcpConnect(io::Error),
+pub struct NeovimServerTxError {
+    inner: io::Error,
 }
 
 /// An [`AbsPath`] wrapper whose `Display` impl replaces the path's home
@@ -89,8 +89,7 @@ impl CollabBackend for Neovim {
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
     type HomeDirError = NeovimHomeDirError;
     type JoinSessionError = NeovimNewSessionError;
-    type LspRootError = String;
-    type SearchProjectRootError = NeovimSearchProjectRootError;
+    type LspRootError = NeovimLspRootError;
     type ServerRxError = NeovimServerRxError;
     type ServerTxError = NeovimServerTxError;
     type StartSessionError = NeovimNewSessionError;
@@ -230,18 +229,12 @@ impl CollabBackend for Neovim {
                 .ok()
         }
 
-        inner(buffer)
-            .map(|root_dir| root_dir.parse().map_err(|_| root_dir))
-            .transpose()
-    }
+        let Some(root_dir) = inner(buffer) else { return Ok(None) };
 
-    async fn search_project_root(
-        buffer: NeovimBuffer,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<AbsPathBuf, Self::SearchProjectRootError> {
-        default_search_project_root::search(buffer, ctx)
-            .await
-            .map_err(|inner| NeovimSearchProjectRootError { inner })
+        root_dir
+            .parse::<AbsPathBuf>()
+            .map(Some)
+            .map_err(|_| NeovimLspRootError { root_dir })
     }
 
     async fn select_session<'pairs>(
@@ -410,40 +403,10 @@ impl notify::Error for NeovimCopySessionIdError {
     }
 }
 
-impl notify::Error for NeovimSearchProjectRootError {
+impl notify::Error for NeovimLspRootError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        use default_search_project_root::Error::*;
-
-        let mut msg = notify::Message::new();
-
-        match &self.inner {
-            BufNameNotAbsolutePath(buf_name) => {
-                if buf_name.is_empty() {
-                    msg.push_str("the current buffer's name is empty");
-                } else {
-                    msg.push_str("buffer name ")
-                        .push_invalid(buf_name)
-                        .push_str(" is not an absolute path");
-                }
-            },
-            Lsp(lsp_root) => {
-                msg.push_str("LSP root at ")
-                    .push_invalid(lsp_root)
-                    .push_str(" is not an absolute path");
-            },
-            FindRoot(err) => return err.to_message(),
-            HomeDir(err) => return err.to_message(),
-            InvalidBufId(buf) => {
-                msg.push_str("there's no buffer whose handle is ")
-                    .push_invalid(buf.handle().to_smolstr());
-            },
-            CouldntFindRoot(buffer_path) => {
-                msg.push_str("couldn't find project root for buffer at ")
-                    .push_info(buffer_path.to_smolstr())
-                    .push_str(", please pass one explicitly");
-            },
-        }
-
+        let mut msg = notify::Message::from_str("LSP root at ");
+        msg.push_invalid(&self.root_dir).push_str(" is not an absolute path");
         (notify::Level::Error, msg)
     }
 }

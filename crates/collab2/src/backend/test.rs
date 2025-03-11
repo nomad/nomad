@@ -28,7 +28,6 @@ use crate::backend::{
     JoinArgs,
     SessionInfos,
     StartArgs,
-    default_search_project_root,
 };
 
 #[allow(clippy::type_complexity)]
@@ -207,10 +206,9 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
     type CopySessionIdError = Infallible;
     type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
-    type HomeDirError = &'static str;
+    type HomeDirError = AnyError;
     type JoinSessionError = AnyError;
     type LspRootError = Infallible;
-    type SearchProjectRootError = default_search_project_root::Error<Self>;
     type ServerRxError = TestRxError;
     type ServerTxError = TestTxError;
     type StartSessionError = AnyError;
@@ -248,7 +246,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     ) -> Result<AbsPathBuf, Self::HomeDirError> {
         ctx.with_backend(|this| match &this.home_dir {
             Some(path) => Ok(path.clone()),
-            None => Err("no home directory configured"),
+            None => Err(AnyError::from_str("no home directory configured")),
         })
     }
 
@@ -294,13 +292,6 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
         Ok(ctx.with_backend(|this| this.lsp_root_with.as_mut()?(buffer_id)))
-    }
-
-    async fn search_project_root(
-        buffer_id: BufferId<Self>,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Result<AbsPathBuf, Self::SearchProjectRootError> {
-        default_search_project_root::search(buffer_id, ctx).await
     }
 
     async fn select_session<'pairs>(

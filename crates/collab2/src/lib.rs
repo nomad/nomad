@@ -9,6 +9,7 @@ mod config;
 pub mod join;
 mod leave;
 mod project;
+mod root_markers;
 mod session;
 pub mod start;
 mod yank;

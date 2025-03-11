@@ -1,7 +1,6 @@
 //! TODO: docs.
 
 use core::convert::Infallible;
-use core::fmt;
 use core::marker::PhantomData;
 use std::sync::Arc;
 
@@ -13,6 +12,7 @@ use nvimx2::command::ToCompletionFn;
 use nvimx2::fs::{self, AbsPath, AbsPathBuf, Directory, FsNodeKind, Metadata};
 use nvimx2::notify::{self, Name};
 use nvimx2::{AsyncCtx, ByteOffset, Shared};
+use smol_str::ToSmolStr;
 use walkdir::{Either, WalkDir, WalkError, WalkErrorKind};
 
 use crate::backend::{CollabBackend, StartArgs};
@@ -20,7 +20,10 @@ use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
 use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
+use crate::root_markers;
 use crate::session::{NewSessionArgs, Session};
+
+type Markers = root_markers::GitDirectory;
 
 /// The `Action` used to start a new collaborative editing session.
 pub struct Start<B: CollabBackend> {
@@ -51,7 +54,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
                 .ok_or(StartError::NoBufferFocused)
         })?;
 
-        let project_root = B::search_project_root(buffer_id, ctx)
+        let project_root = search_project_root(buffer_id, ctx)
             .await
             .map_err(StartError::SearchProjectRoot)?;
 
@@ -185,6 +188,47 @@ where
     Ok(builder.build())
 }
 
+/// Searches for the root of the project containing the buffer with the given
+/// ID.
+async fn search_project_root<B: CollabBackend>(
+    buffer_id: B::BufferId,
+    ctx: &mut AsyncCtx<'_, B>,
+) -> Result<AbsPathBuf, SearchProjectRootError<B>> {
+    if let Some(lsp_res) = B::lsp_root(buffer_id.clone(), ctx).transpose() {
+        return lsp_res.map_err(SearchProjectRootError::Lsp);
+    }
+
+    let buffer_name = ctx.with_ctx(|ctx| {
+        ctx.buffer(buffer_id.clone())
+            .ok_or(SearchProjectRootError::InvalidBufId(buffer_id))
+            .map(|buf| buf.name().into_owned())
+    })?;
+
+    let buffer_path = buffer_name.parse::<AbsPathBuf>().map_err(|_| {
+        SearchProjectRootError::BufNameNotAbsolutePath(buffer_name)
+    })?;
+
+    let home_dir =
+        B::home_dir(ctx).await.map_err(SearchProjectRootError::HomeDir)?;
+
+    let args = root_markers::FindRootArgs {
+        marker: root_markers::GitDirectory,
+        start_from: &buffer_path,
+        stop_at: Some(&home_dir),
+    };
+
+    let mut fs = ctx.fs();
+
+    if let Some(res) = args.find(&mut fs).await.transpose() {
+        return res.map_err(SearchProjectRootError::FindRoot);
+    }
+
+    buffer_path
+        .parent()
+        .map(ToOwned::to_owned)
+        .ok_or(SearchProjectRootError::CouldntFindRoot(buffer_path))
+}
+
 /// The type of error that can occur when [`Start`]ing a session fails.
 #[derive(derive_more::Debug)]
 #[debug(bound(B: CollabBackend))]
@@ -202,7 +246,7 @@ pub enum StartError<B: CollabBackend> {
     ReadReplica(ReadReplicaError<B>),
 
     /// TODO: docs.
-    SearchProjectRoot(B::SearchProjectRootError),
+    SearchProjectRoot(SearchProjectRootError<B>),
 
     /// TODO: docs.
     StartSession(B::StartSessionError),
@@ -217,6 +261,29 @@ pub enum StartError<B: CollabBackend> {
 pub enum ReadReplicaError<B: CollabBackend> {
     /// TODO: docs.
     Walk(WalkError<WalkErrorKind<B::Fs>>),
+}
+
+/// TODO: docs.
+#[derive(derive_more::Debug)]
+#[debug(bound(B: CollabBackend))]
+pub enum SearchProjectRootError<B: CollabBackend> {
+    /// TODO: docs.
+    BufNameNotAbsolutePath(String),
+
+    /// TODO: docs.
+    CouldntFindRoot(fs::AbsPathBuf),
+
+    /// TODO: docs.
+    FindRoot(root_markers::FindRootError<B::Fs, Markers>),
+
+    /// TODO: docs.
+    HomeDir(B::HomeDirError),
+
+    /// TODO: docs.
+    InvalidBufId(B::BufferId),
+
+    /// TODO: docs.
+    Lsp(B::LspRootError),
 }
 
 /// TODO: docs.
@@ -267,7 +334,7 @@ impl<B> PartialEq for StartError<B>
 where
     B: CollabBackend,
     ReadReplicaError<B>: PartialEq,
-    B::SearchProjectRootError: PartialEq,
+    SearchProjectRootError<B>: PartialEq,
     B::StartSessionError: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -331,17 +398,65 @@ where
     }
 }
 
-impl<B: CollabBackend> fmt::Display for ReadReplicaError<B> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ReadReplicaError::Walk(err) => fmt::Display::fmt(err, f),
+impl<B: CollabBackend> notify::Error for ReadReplicaError<B> {
+    default fn to_message(&self) -> (notify::Level, notify::Message) {
+        let msg = match self {
+            ReadReplicaError::Walk(err) => notify::Message::from_display(err),
+        };
+        (notify::Level::Error, msg)
+    }
+}
+
+impl<B: CollabBackend> PartialEq for SearchProjectRootError<B>
+where
+    B::BufferId: PartialEq,
+    B::HomeDirError: PartialEq,
+    B::LspRootError: PartialEq,
+    root_markers::FindRootError<B::Fs, Markers>: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use SearchProjectRootError::*;
+
+        match (self, other) {
+            (BufNameNotAbsolutePath(l), BufNameNotAbsolutePath(r)) => l == r,
+            (CouldntFindRoot(l), CouldntFindRoot(r)) => l == r,
+            (FindRoot(l), FindRoot(r)) => l == r,
+            (HomeDir(l), HomeDir(r)) => l == r,
+            (InvalidBufId(l), InvalidBufId(r)) => l == r,
+            (Lsp(l), Lsp(r)) => l == r,
+            _ => false,
         }
     }
 }
 
-impl<B: CollabBackend> notify::Error for ReadReplicaError<B> {
+impl<B: CollabBackend> notify::Error for SearchProjectRootError<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
-        (notify::Level::Error, notify::Message::from_display(self))
+        use SearchProjectRootError::*;
+
+        let mut msg = notify::Message::new();
+
+        match self {
+            BufNameNotAbsolutePath(str) => {
+                msg.push_str("buffer name ")
+                    .push_invalid(str)
+                    .push_str(" is not an absolute path");
+            },
+            CouldntFindRoot(abs_path_buf) => {
+                msg.push_str("couldn't find project root for buffer at ")
+                    .push_info(abs_path_buf);
+            },
+            FindRoot(err) => {
+                msg.push_str(err.to_smolstr());
+            },
+            HomeDir(err) => return err.to_message(),
+            InvalidBufId(buf_id) => {
+                msg.push_str("there's no buffer whose handle is ")
+                    .push_invalid(format!("{buf_id:?}"));
+            },
+            Lsp(err) => return err.to_message(),
+        }
+
+        (notify::Level::Error, msg)
     }
 }
 
@@ -353,8 +468,9 @@ impl<B> notify::Error for UserNotLoggedInError<B> {
 
 #[cfg(feature = "neovim")]
 mod neovim_error_impls {
+    use core::fmt;
+
     use nvimx2::neovim::Neovim;
-    use smol_str::ToSmolStr;
 
     use super::*;
 
@@ -380,6 +496,40 @@ mod neovim_error_impls {
             };
 
             msg.push_str(": ").push_str(err.to_smolstr());
+
+            (notify::Level::Error, msg)
+        }
+    }
+
+    impl notify::Error for SearchProjectRootError<Neovim> {
+        fn to_message(&self) -> (notify::Level, notify::Message) {
+            use SearchProjectRootError::*;
+
+            let mut msg = notify::Message::new();
+
+            match &self {
+                BufNameNotAbsolutePath(buf_name) => {
+                    if buf_name.is_empty() {
+                        msg.push_str("the current buffer's name is empty");
+                    } else {
+                        msg.push_str("buffer name ")
+                            .push_invalid(buf_name)
+                            .push_str(" is not an absolute path");
+                    }
+                },
+                Lsp(err) => return err.to_message(),
+                FindRoot(err) => return err.to_message(),
+                HomeDir(err) => return err.to_message(),
+                InvalidBufId(buf) => {
+                    msg.push_str("there's no buffer whose handle is ")
+                        .push_invalid(buf.handle().to_smolstr());
+                },
+                CouldntFindRoot(buffer_path) => {
+                    msg.push_str("couldn't find project root for buffer at ")
+                        .push_info(buffer_path.to_smolstr())
+                        .push_str(", please pass one explicitly");
+                },
+            }
 
             (notify::Level::Error, msg)
         }
