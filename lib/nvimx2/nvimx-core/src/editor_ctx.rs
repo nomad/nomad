@@ -18,13 +18,13 @@ use crate::state::StateMut;
 use crate::{AsyncCtx, BufferCtx};
 
 /// TODO: docs.
-pub struct NeovimCtx<'a, B: Backend> {
+pub struct EditorCtx<'a, B: Backend> {
     namespace: &'a Namespace,
     plugin_id: PluginId,
     state: StateMut<'a, B>,
 }
 
-impl<'a, B: Backend> NeovimCtx<'a, B> {
+impl<'a, B: Backend> EditorCtx<'a, B> {
     /// TODO: docs.
     #[inline]
     pub fn backend_mut(&mut self) -> &mut B {
@@ -164,7 +164,7 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
             //   point is reached
             //
             // In that case, `with_ctx()` would panic because `State` is
-            // already mutably borrowed in this `NeovimCtx`.
+            // already mutably borrowed in this `EditorCtx`.
             //
             // Yielding guarantees that by the time `with_ctx()` is called,
             // the synchronous code in which the `AsyncCtx` was created

@@ -7,7 +7,7 @@ use crate::module::{self, Module};
 use crate::notify::Name;
 use crate::plugin::PanicInfo;
 use crate::state::StateHandle;
-use crate::{NeovimCtx, notify};
+use crate::{EditorCtx, notify};
 
 pub(crate) const NO_COMMAND_NAME: &str = "�";
 
@@ -20,7 +20,7 @@ pub trait Plugin<B: Backend>: Module<B> {
     const CONFIG_FN_NAME: Name = "setup";
 
     /// TODO: docs.
-    fn handle_panic(&self, panic_info: PanicInfo, ctx: &mut NeovimCtx<B>) {
+    fn handle_panic(&self, panic_info: PanicInfo, ctx: &mut EditorCtx<B>) {
         let mut message = notify::Message::from_str("panicked");
 
         if let Some(location) = &panic_info.location {

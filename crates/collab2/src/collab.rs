@@ -1,7 +1,7 @@
 use auth::AuthInfos;
 use nvimx2::module::{ApiCtx, Module};
 use nvimx2::notify::Name;
-use nvimx2::{NeovimCtx, Shared};
+use nvimx2::{EditorCtx, Shared};
 
 use crate::backend::{CollabBackend, SessionId};
 use crate::config::Config;
@@ -65,7 +65,7 @@ impl<B: CollabBackend> Module<B> for Collab<B> {
             .with_function(self.yank());
     }
 
-    fn on_new_config(&self, new_config: Self::Config, _: &mut NeovimCtx<B>) {
+    fn on_new_config(&self, new_config: Self::Config, _: &mut EditorCtx<B>) {
         self.config.set(new_config);
     }
 }

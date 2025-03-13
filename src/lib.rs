@@ -1,4 +1,4 @@
-use nvimx2::NeovimCtx;
+use nvimx2::EditorCtx;
 use nvimx2::backend::Backend;
 use nvimx2::module::{ApiCtx, Empty, Module};
 use nvimx2::neovim::{self, Neovim};
@@ -38,5 +38,5 @@ where
             .with_module(collab);
     }
 
-    fn on_new_config(&self, _: Self::Config, _: &mut NeovimCtx<B>) {}
+    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<B>) {}
 }

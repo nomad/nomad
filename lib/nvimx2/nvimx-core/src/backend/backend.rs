@@ -17,7 +17,7 @@ use crate::backend::{
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
 use crate::state::StateHandle;
-use crate::{NeovimCtx, fs};
+use crate::{EditorCtx, fs};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
@@ -169,7 +169,7 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     #[inline]
-    fn with_ctx<R>(self, fun: impl FnOnce(&mut NeovimCtx<Self>) -> R) -> R {
+    fn with_ctx<R>(self, fun: impl FnOnce(&mut EditorCtx<Self>) -> R) -> R {
         StateHandle::new(self).with_mut(|mut s| {
             s.with_ctx(
                 &notify::Namespace::default(),

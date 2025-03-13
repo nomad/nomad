@@ -1,7 +1,7 @@
 use crate::action::Action;
 use crate::backend::Backend;
 use crate::notify::{MaybeResult, Name};
-use crate::{AsyncCtx, NeovimCtx};
+use crate::{AsyncCtx, EditorCtx};
 
 /// TODO: docs.
 pub trait AsyncAction<B: Backend>: 'static {
@@ -33,7 +33,7 @@ where
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         args: Self::Args<'_>,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut EditorCtx<B>,
     ) {
         let mut this = self.clone();
         ctx.spawn_local(async move |ctx| {

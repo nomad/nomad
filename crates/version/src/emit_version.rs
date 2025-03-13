@@ -1,4 +1,4 @@
-use nvimx2::NeovimCtx;
+use nvimx2::EditorCtx;
 use nvimx2::action::Action;
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
@@ -26,7 +26,7 @@ impl<B: Backend> Action<B> for EmitVersion {
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         _: Self::Args<'_>,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut EditorCtx<B>,
     ) {
         ctx.emit_info(Message::from_display(VERSION));
     }

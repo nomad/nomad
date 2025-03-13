@@ -2,7 +2,7 @@ use core::any;
 
 use serde::de::DeserializeOwned;
 
-use crate::NeovimCtx;
+use crate::EditorCtx;
 use crate::backend::Backend;
 use crate::module::ApiCtx;
 use crate::notify::Name;
@@ -20,11 +20,11 @@ pub trait Module<B: Backend>: 'static + Sized {
     fn api(&self, ctx: &mut ApiCtx<B>);
 
     /// TODO: docs.
-    fn on_new_config(&self, new_config: Self::Config, ctx: &mut NeovimCtx<B>);
+    fn on_new_config(&self, new_config: Self::Config, ctx: &mut EditorCtx<B>);
 
     /// TODO: docs.
     #[allow(unused_variables)]
-    fn on_init(&self, ctx: &mut NeovimCtx<B>) {}
+    fn on_init(&self, ctx: &mut EditorCtx<B>) {}
 
     #[inline]
     #[doc(hidden)]

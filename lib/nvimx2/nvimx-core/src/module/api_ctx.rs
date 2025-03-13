@@ -1,4 +1,4 @@
-use crate::NeovimCtx;
+use crate::EditorCtx;
 use crate::backend::{Api, ApiValue, Backend, Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder, CommandCompletionsBuilder};
 use crate::module::{Constant, Function, Module};
@@ -62,7 +62,7 @@ pub struct ApiCtx<'a, B: Backend> {
 type ConfigHandler<B> = Box<
     dyn FnMut(
         ApiValue<B>,
-        &mut NeovimCtx<B>,
+        &mut EditorCtx<B>,
     ) -> Result<(), <B as Backend>::DeserializeError>,
 >;
 
@@ -267,7 +267,7 @@ impl<B: Backend> ConfigBuilder<B> {
         if let Some(Err(err)) = state.with_ctx(
             config_path,
             <P as Plugin<_>>::id(),
-            |ctx: &mut NeovimCtx<B>| (self.handler)(config, ctx),
+            |ctx: &mut EditorCtx<B>| (self.handler)(config, ctx),
         ) {
             state.emit_deserialize_error_in_config::<P>(
                 config_path,

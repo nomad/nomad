@@ -1,7 +1,7 @@
 use nvimx2::backend::Backend;
 use nvimx2::module::{ApiCtx, Module};
 use nvimx2::notify::Name;
-use nvimx2::{NeovimCtx, Shared};
+use nvimx2::{EditorCtx, Shared};
 
 use crate::auth_infos::AuthInfos;
 use crate::login::Login;
@@ -51,7 +51,7 @@ impl<B: Backend> Module<B> for Auth {
         ctx.with_function(self.login()).with_function(self.logout());
     }
 
-    fn on_init(&self, _: &mut NeovimCtx<B>) {}
+    fn on_init(&self, _: &mut EditorCtx<B>) {}
 
-    fn on_new_config(&self, _: Self::Config, _: &mut NeovimCtx<B>) {}
+    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<B>) {}
 }

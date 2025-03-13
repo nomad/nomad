@@ -12,7 +12,7 @@ use crate::backend::Backend;
 use crate::module::{Module, ModuleId};
 use crate::notify::{Name, Namespace};
 use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
-use crate::{NeovimCtx, Shared};
+use crate::{EditorCtx, Shared};
 
 /// TODO: docs.
 pub(crate) struct State<B: Backend> {
@@ -41,7 +41,7 @@ struct PanicHook<B: Backend> {
 }
 
 trait PanicHandler<B: Backend> {
-    fn handle_panic(&self, info: PanicInfo, ctx: &mut NeovimCtx<B>);
+    fn handle_panic(&self, info: PanicInfo, ctx: &mut EditorCtx<B>);
 }
 
 impl<B: Backend> State<B> {
@@ -149,7 +149,7 @@ impl<B: Backend> StateMut<'_, B> {
             .expect("no handler matching the given ID");
         let info = self.panic_hook.to_info(payload);
         #[allow(deprecated)]
-        let mut ctx = NeovimCtx::new(namespace, plugin_id, self.as_mut());
+        let mut ctx = EditorCtx::new(namespace, plugin_id, self.as_mut());
         handler.handle_panic(info, &mut ctx);
     }
 
@@ -159,10 +159,10 @@ impl<B: Backend> StateMut<'_, B> {
         &mut self,
         namespace: &Namespace,
         plugin_id: PluginId,
-        fun: impl FnOnce(&mut NeovimCtx<B>) -> R,
+        fun: impl FnOnce(&mut EditorCtx<B>) -> R,
     ) -> Option<R> {
         #[allow(deprecated)]
-        let mut ctx = NeovimCtx::new(namespace, plugin_id, self.as_mut());
+        let mut ctx = EditorCtx::new(namespace, plugin_id, self.as_mut());
         match panic::catch_unwind(panic::AssertUnwindSafe(|| fun(&mut ctx))) {
             Ok(ret) => Some(ret),
             Err(payload) => {
@@ -257,7 +257,7 @@ where
     B: Backend,
 {
     #[inline]
-    fn handle_panic(&self, info: PanicInfo, ctx: &mut NeovimCtx<B>) {
+    fn handle_panic(&self, info: PanicInfo, ctx: &mut EditorCtx<B>) {
         Plugin::handle_panic(self, info, ctx);
     }
 }
@@ -269,14 +269,14 @@ impl<B: Backend> Module<B> for ResumeUnwinding {
     fn api(&self, _: &mut crate::module::ApiCtx<B>) {
         unreachable!()
     }
-    fn on_new_config(&self, _: Self::Config, _: &mut NeovimCtx<B>) {
+    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<B>) {
         unreachable!()
     }
 }
 
 impl<B: Backend> Plugin<B> for ResumeUnwinding {
     #[inline]
-    fn handle_panic(&self, info: PanicInfo, _: &mut NeovimCtx<B>) {
+    fn handle_panic(&self, info: PanicInfo, _: &mut EditorCtx<B>) {
         panic::resume_unwind(info.payload);
     }
 }

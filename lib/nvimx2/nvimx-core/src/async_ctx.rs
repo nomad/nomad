@@ -5,7 +5,7 @@ use crate::fs::AbsPath;
 use crate::notify::{Namespace, NotificationId};
 use crate::plugin::PluginId;
 use crate::state::StateHandle;
-use crate::{BufferCtx, NeovimCtx, notify};
+use crate::{BufferCtx, EditorCtx, notify};
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, B: Backend> {
@@ -94,14 +94,14 @@ impl<B: Backend> AsyncCtx<'_, B> {
     #[inline]
     pub fn with_ctx<Out>(
         &self,
-        fun: impl FnOnce(&mut NeovimCtx<B>) -> Out,
+        fun: impl FnOnce(&mut EditorCtx<B>) -> Out,
     ) -> Out {
         self.state.with_mut(|state| {
-            // We're running inside a call to `NeovimCtx::spawn_local()` which
+            // We're running inside a call to `EditorCtx::spawn_local()` which
             // is already catching unwinding panics, so we can directly create
-            // a `NeovimCtx` here.
+            // a `EditorCtx` here.
             #[allow(deprecated)]
-            fun(&mut NeovimCtx::new(&self.namespace, self.plugin_id, state))
+            fun(&mut EditorCtx::new(&self.namespace, self.plugin_id, state))
         })
     }
 
