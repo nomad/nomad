@@ -14,7 +14,7 @@ neovim-nightly = ["__neovim", "backend-neovim/neovim-nightly"]
 __neovim = ["dep:backend-neovim"]
 
 [dependencies]
-nvimx-core = { path = "./nvimx-core" }
+nvimx-core = { path = "./core" }
 backend-mock = { path = "./backend-mock", optional = true }
 backend-neovim = { path = "./backend-neovim", optional = true }
 

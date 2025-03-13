@@ -19,7 +19,7 @@ concurrent-queue = "2.5"
 futures-executor = { version = "0.3", features = ["thread-pool"] }
 neovim-macros = { path = "./macros" }
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
-nvimx-core = { path = "../nvimx-core", features = ["os-fs"] }
+nvimx-core = { path = "../core", features = ["os-fs"] }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }
 serde_path_to_error = "0.1"
