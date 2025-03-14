@@ -277,35 +277,27 @@ impl<B: Backend> Backend for CollabMock<B> {
     fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer<'_>> {
         self.inner.buffer(id)
     }
-
     fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId<Self>> + use<B> {
         self.inner.buffer_ids()
     }
-
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
     }
-
     fn fs(&mut self) -> Self::Fs {
         self.inner.fs()
     }
-
     fn emitter(&mut self) -> Self::Emitter<'_> {
         self.inner.emitter()
     }
-
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
         self.inner.local_executor()
     }
-
     fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
         self.inner.focus_buffer_at(path)
     }
-
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
         self.inner.background_executor()
     }
-
     fn serialize<V>(
         &mut self,
         value: &V,
@@ -315,7 +307,6 @@ impl<B: Backend> Backend for CollabMock<B> {
     {
         self.inner.serialize(value)
     }
-
     fn deserialize<'de, V>(
         &mut self,
         value: ApiValue<Self>,
