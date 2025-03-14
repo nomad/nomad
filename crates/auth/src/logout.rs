@@ -35,13 +35,13 @@ impl<B: Backend> AsyncAction<B> for Logout {
             }
         })?;
 
-        let entry = self
-            .credential_store
+        self.credential_store
             .get_entry()
             .await
-            .map_err(LogoutError::GetCredential)?;
-
-        entry.delete().await.map_err(LogoutError::DeleteCredential)
+            .map_err(LogoutError::GetCredential)?
+            .delete()
+            .await
+            .map_err(LogoutError::DeleteCredential)
     }
 }
 

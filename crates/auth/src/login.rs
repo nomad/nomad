@@ -32,17 +32,17 @@ impl<B: AuthBackend> AsyncAction<B> for Login {
             return Err(LoginError::AlreadyLoggedIn(handle));
         }
 
-        let entry = self
-            .credential_store
-            .get_entry()
-            .await
-            .map_err(LoginError::GetCredential)?;
-
         let auth_infos = B::login(ctx).await.map_err(LoginError::Login)?;
 
         self.infos.set(Some(auth_infos.clone()));
 
-        entry.persist(auth_infos).await.map_err(LoginError::PersistAuthInfos)
+        self.credential_store
+            .get_entry()
+            .await
+            .map_err(LoginError::GetCredential)?
+            .persist(auth_infos)
+            .await
+            .map_err(LoginError::PersistAuthInfos)
     }
 }
 
