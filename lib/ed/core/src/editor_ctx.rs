@@ -102,10 +102,11 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
         fut: Fut,
     ) -> TaskBackground<Fut::Output, B>
     where
-        Fut: Future<Output = ()> + Send + 'static,
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
     {
         let task = self.backend_mut().background_executor().spawn(fut);
-        TaskBackground::<(), B>::new(task)
+        TaskBackground::<_, B>::new(task)
     }
 
     /// TODO: docs.

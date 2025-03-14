@@ -1,8 +1,8 @@
-use ed::backend::Backend;
 use ed::module::{ApiCtx, Module};
 use ed::notify::Name;
 use ed::{EditorCtx, Shared};
 
+use crate::AuthBackend;
 use crate::auth_infos::AuthInfos;
 use crate::login::Login;
 use crate::logout::Logout;
@@ -42,7 +42,7 @@ impl Auth {
     }
 }
 
-impl<B: Backend> Module<B> for Auth {
+impl<B: AuthBackend> Module<B> for Auth {
     const NAME: Name = "auth";
 
     type Config = ();
@@ -51,7 +51,14 @@ impl<B: Backend> Module<B> for Auth {
         ctx.with_function(self.login()).with_function(self.logout());
     }
 
-    fn on_init(&self, _: &mut EditorCtx<B>) {}
+    fn on_init(&self, ctx: &mut EditorCtx<B>) {
+        let fut = B::credential_store(ctx);
+
+        ctx.spawn_background(async move {
+            let _store = fut.await;
+        })
+        .detach();
+    }
 
     fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<B>) {}
 }

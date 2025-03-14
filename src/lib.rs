@@ -19,7 +19,7 @@ impl Plugin<Neovim> for Mad {
 
 impl<B> Module<B> for Mad
 where
-    B: Backend + collab::CollabBackend,
+    B: Backend + auth::AuthBackend + collab::CollabBackend,
 {
     const NAME: Name = "mad";
 
