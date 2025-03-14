@@ -26,7 +26,7 @@ where
     type Config = Empty;
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
-        let auth = auth::Auth::dummy("noib3");
+        let auth = auth::Auth::default();
         let collab = collab::Collab::from(&auth);
 
         ctx.with_command(auth.login())

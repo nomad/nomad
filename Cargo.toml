@@ -86,7 +86,7 @@ crate-type = ["cdylib"]
 neovim-nightly = ["ed/neovim-nightly"]
 
 [dependencies]
-auth = { workspace = true }
+auth = { workspace = true, features = ["neovim"] }
 collab = { workspace = true, features = ["neovim"] }
 ed = { workspace = true, features = ["neovim"] }
 version = { workspace = true }
