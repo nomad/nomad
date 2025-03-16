@@ -713,7 +713,7 @@ impl fs::File for FileHandle {
     }
 
     async fn write<C: AsRef<[u8]>>(
-        &self,
+        &mut self,
         new_contents: C,
     ) -> Result<(), Self::WriteError> {
         self.with_file(|file| file.write(new_contents.as_ref()))

@@ -39,7 +39,7 @@ pub trait File {
 
     /// TODO: docs.
     fn write<C: AsRef<[u8]>>(
-        &self,
+        &mut self,
         new_contents: C,
     ) -> impl Future<Output = Result<(), Self::WriteError>>;
 }

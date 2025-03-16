@@ -222,11 +222,11 @@ impl<'a> ProjectTree<'a> {
             let child_id = child.id();
             let child_name = child.name();
             async move {
-                let child = dir
+                let mut child = dir
                     .create_file(child_name)
                     .await
                     .map_err(FlushProjectError::CreateFile)?;
-                self.flush_file::<Fs>(child_id, &child).await
+                self.flush_file::<Fs>(child_id, &mut child).await
             }
         });
 
@@ -245,7 +245,7 @@ impl<'a> ProjectTree<'a> {
     async fn flush_file<Fs: fs::Fs>(
         &self,
         file_id: FileId,
-        file: &Fs::File,
+        file: &mut Fs::File,
     ) -> Result<(), FlushProjectError<Fs>> {
         let contents = self.file_contents.get(file_id).expect("ID is valid");
         file.write(contents).await.map_err(FlushProjectError::WriteToFile)
