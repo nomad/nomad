@@ -89,16 +89,16 @@ impl<B: AuthBackend> notify::Error for LoginError<B> {
         let mut msg = notify::Message::new();
         match self {
             Self::AlreadyLoggedIn(handle) => {
-                msg.push_str("already logged in as ")
+                msg.push_str("Already logged in as ")
                     .push_info(handle.as_str());
             },
             Self::GetCredential(err) => {
-                msg.push_str("couldn't get credential from keyring: ")
+                msg.push_str("Couldn't get credential from keyring: ")
                     .push_str(err.to_string());
             },
             Self::Login(err) => return err.to_message(),
             Self::PersistAuthInfos(err) => {
-                msg.push_str("couldn't persist credentials: ")
+                msg.push_str("Couldn't persist credentials: ")
                     .push_str(err.to_string());
             },
         }

@@ -10,6 +10,7 @@ mod local_executor;
 mod neovim;
 pub mod notify;
 pub mod serde;
+pub mod utils;
 pub mod value;
 
 pub use api::NeovimApi;
@@ -24,7 +25,6 @@ pub use neovim::Neovim;
 pub use neovim_macros::plugin;
 #[doc(hidden)]
 pub use nvim_oxi as oxi;
-#[cfg(feature = "mlua")]
 pub use nvim_oxi::mlua;
 
 /// TODO: docs.

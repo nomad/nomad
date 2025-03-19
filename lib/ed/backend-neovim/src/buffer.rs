@@ -121,7 +121,6 @@ impl Buffer for NeovimBuffer {
     }
 }
 
-#[cfg(feature = "mlua")]
 impl oxi::mlua::IntoLua for NeovimBuffer {
     #[inline]
     fn into_lua(

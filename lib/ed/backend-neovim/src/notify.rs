@@ -3,7 +3,7 @@
 use ed_core::notify::{Emitter, Level, Notification, NotificationId};
 
 use crate::convert::Convert;
-use crate::oxi;
+use crate::{oxi, utils};
 
 /// TODO: docs.
 pub trait VimNotifyProvider: 'static {
@@ -54,7 +54,7 @@ impl NeovimEmitter {
 impl NvimNotify {
     #[inline]
     fn is_installed() -> bool {
-        true
+        utils::is_module_available("notify")
     }
 }
 

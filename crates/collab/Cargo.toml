@@ -20,7 +20,6 @@ neovim = [
   "dep:home",
   "collab-server/nomad",
   "ed/neovim",
-  "ed/neovim-mlua",
 ]
 
 [dependencies]

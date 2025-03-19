@@ -9,7 +9,6 @@ publish.workspace = true
 [features]
 mock = ["dep:backend-mock"]
 neovim = ["dep:backend-neovim"]
-neovim-mlua = ["backend-neovim?/mlua"]
 neovim-nightly = ["backend-neovim?/nightly"]
 
 [dependencies]

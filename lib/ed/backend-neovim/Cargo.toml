@@ -7,7 +7,6 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-mlua = ["nvim-oxi/mlua", "nvim-oxi/__vendored_luajit"]
 nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
@@ -18,8 +17,10 @@ ed-core = { path = "../core", features = ["os-fs"] }
 futures-executor = { version = "0.3", features = ["thread-pool"] }
 neovim-macros = { path = "./macros" }
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [
-	"libuv",
-	"neovim-0-10",
+  "libuv",
+  "mlua",
+  "neovim-0-10",
+  "__vendored_luajit",
 ] }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }
