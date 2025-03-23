@@ -1,6 +1,7 @@
 use core::time::Duration;
 use core::{iter, str};
 use std::io;
+use std::path::MAIN_SEPARATOR;
 use std::process::{Command, ExitStatus};
 use std::sync::Mutex;
 use std::time::Instant;
@@ -57,7 +58,9 @@ impl GitIgnore {
 
     /// TODO: docs.
     pub fn new(dir_path: AbsPathBuf) -> Self {
-        Self { inner: Mutex::new(GitIgnoreInner::new_outdated(dir_path)) }
+        let inner = GitIgnoreInner::new_outdated(dir_path);
+        debug_assert!(inner.is_outdated());
+        Self { inner: Mutex::new(inner) }
     }
 
     fn command() -> Command {
@@ -90,15 +93,11 @@ trait Path: Sized {
 }
 
 impl GitIgnoreInner {
-    fn dir_path(&self) -> AbsPathBuf {
-        self.dir_path[..self.dir_path.len() - 1].parse().expect("it's valid")
-    }
-
     fn is_ignored(&self, path: impl Path) -> Result<bool, GitIgnoreError> {
         path.strip_prefix(&self.dir_path)
             .map(|stripped| self.ignored_paths.contains(stripped.components()))
             .ok_or_else(|| GitIgnoreError::NotInDir {
-                dir_path: self.dir_path(),
+                dir_path: self.dir_path.clone(),
                 path: path.components().collect(),
             })
     }
@@ -160,22 +159,78 @@ impl GitIgnoreInner {
 }
 
 impl IgnoredPaths {
-    fn binary_search<'a>(
-        &self,
-        _components: impl Iterator<Item = &'a NodeName>,
-    ) -> Result<usize, usize> {
-        todo!()
-    }
-
     fn clear(&mut self) {
         self.inner.clear();
     }
 
     fn contains<'a>(&self, path: impl Iterator<Item = &'a NodeName>) -> bool {
-        self.binary_search(path).is_ok()
+        let mut cursor = Cursor::new(self);
+        for component in path {
+            if let Some(SeekResult::FoundAt(_)) = cursor.seek(component) {
+                return true;
+            }
+        }
+        false
     }
 
-    fn insert(&mut self, _path: &str) -> Result<(), GitIgnoreError> {
+    fn insert(&mut self, path: &str) -> Result<(), GitIgnoreError> {
+        let mut cursor = Cursor::new(self);
+        let mut components = path.split(MAIN_SEPARATOR);
+
+        let idx = loop {
+            let Some(component) = components.next() else {
+                break cursor.insert_at();
+            };
+
+            let component =
+                <&NodeName>::try_from(component).map_err(|err| {
+                    GitIgnoreError::NotNodeName {
+                        node_name: component.to_owned(),
+                        err,
+                    }
+                })?;
+
+            if let Some(status) = cursor.seek(component) {
+                match status {
+                    SeekResult::FoundAt(_) => return Ok(()),
+                    SeekResult::InsertAt(idx) => break idx,
+                }
+            }
+        };
+
+        self.inner.insert(idx, path.into());
+
+        Ok(())
+    }
+}
+
+struct Cursor<'a> {
+    _paths: &'a [CompactString],
+    insert_at: Option<usize>,
+}
+
+enum SeekResult {
+    /// TODO: docs.
+    FoundAt(usize),
+
+    /// TODO: docs.
+    InsertAt(usize),
+}
+
+impl<'a> Cursor<'a> {
+    #[track_caller]
+    fn insert_at(&self) -> usize {
+        match self.insert_at {
+            Some(idx) => idx,
+            None => panic!("Cursor::seek was never called"),
+        }
+    }
+
+    fn new(paths: &'a IgnoredPaths) -> Self {
+        Self { _paths: paths.inner.as_slice(), insert_at: None }
+    }
+
+    fn seek(&mut self, _node_name: &NodeName) -> Option<SeekResult> {
         todo!()
     }
 }
