@@ -10,7 +10,7 @@ use concurrent_queue::{ConcurrentQueue, PushError};
 use ed::action::AsyncAction;
 use ed::backend::Backend;
 use ed::command::ToCompletionFn;
-use ed::fs::{self, AbsPath, AbsPathBuf, FsNodeKind, Metadata};
+use ed::fs::{self, AbsPath, AbsPathBuf, Fs, FsNodeKind, Metadata};
 use ed::notify::{self, Name};
 use ed::{AsyncCtx, ByteOffset, Shared};
 use eerie::{Replica, ReplicaBuilder};
@@ -137,8 +137,23 @@ async fn read_replica2<B: CollabBackend>(
     let event_stream_builder = EventStream::<B>::builder(project_root);
 
     walkdir
-        .for_each(project_root, async |dir_path, entry| {
-            event_stream_builder.push_node(dir_path, entry, ctx).await
+        .for_each(project_root, async |dir_path, meta| {
+            let node_name =
+                meta.name().await.map_err(VisitNodeError::NodeName)?;
+
+            let Some(node) = ctx
+                .fs()
+                .node_at_path(dir_path.join(&node_name))
+                .await
+                .map_err(VisitNodeError::Node)?
+            else {
+                return Ok(());
+            };
+
+            event_stream_builder
+                .push_node(&node, ctx)
+                .await
+                .map_err(VisitNodeError::PushToEventStream)
         })
         .await
         .map_err(ReadReplicaError2::Walk)?;

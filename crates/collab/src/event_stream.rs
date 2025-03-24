@@ -1,6 +1,6 @@
 use abs_path::{AbsPath, AbsPathBuf};
+use ed::fs::FsNode;
 use ed::{AsyncCtx, fs};
-use walkdir::DirEntry;
 
 use crate::CollabBackend;
 use crate::event::Event;
@@ -42,8 +42,35 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
 
     pub(crate) async fn push_node(
         &self,
-        _dir_path: &AbsPath,
-        _node: DirEntry<B::Fs>,
+        node: &FsNode<B::Fs>,
+        ctx: &AsyncCtx<'_, B>,
+    ) -> Result<(), PushError<B::Fs>> {
+        match node {
+            FsNode::Directory(dir) => self.push_directory(dir, ctx).await,
+            FsNode::File(file) => self.push_file(file, ctx).await,
+            FsNode::Symlink(symlink) => self.push_symlink(symlink, ctx).await,
+        }
+    }
+
+    async fn push_directory(
+        &self,
+        _dir: &<B::Fs as fs::Fs>::Directory,
+        _ctx: &AsyncCtx<'_, B>,
+    ) -> Result<(), PushError<B::Fs>> {
+        todo!()
+    }
+
+    async fn push_file(
+        &self,
+        _file: &<B::Fs as fs::Fs>::File,
+        _ctx: &AsyncCtx<'_, B>,
+    ) -> Result<(), PushError<B::Fs>> {
+        todo!()
+    }
+
+    async fn push_symlink(
+        &self,
+        _symlink: &<B::Fs as fs::Fs>::Symlink,
         _ctx: &AsyncCtx<'_, B>,
     ) -> Result<(), PushError<B::Fs>> {
         todo!()
