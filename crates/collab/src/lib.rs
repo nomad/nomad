@@ -6,6 +6,8 @@
 mod backend;
 mod collab;
 pub mod config;
+mod event;
+mod event_stream;
 pub mod join;
 pub mod leave;
 pub mod project;

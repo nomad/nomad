@@ -18,7 +18,7 @@ pub struct AsyncCtx<'a, B: Backend> {
 impl<B: Backend> AsyncCtx<'_, B> {
     /// TODO: docs.
     #[inline]
-    pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
+    pub fn emit_err<Err>(&self, err: Err) -> NotificationId
     where
         Err: notify::Error,
     {
@@ -27,14 +27,14 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
+    pub fn emit_info(&self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Info, message)
     }
 
     /// TODO: docs.
     #[inline]
     pub fn focus_buffer_at(
-        &mut self,
+        &self,
         path: &AbsPath,
     ) -> Result<(), core::convert::Infallible> {
         self.with_ctx(move |ctx| ctx.focus_buffer_at(path).map(|_| ()))
@@ -42,13 +42,13 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn for_each_buffer(&mut self, fun: impl FnMut(BufferCtx<'_, B>)) {
+    pub fn for_each_buffer(&self, fun: impl FnMut(BufferCtx<'_, B>)) {
         self.with_ctx(move |ctx| ctx.for_each_buffer(fun))
     }
 
     /// TODO: docs.
     #[inline]
-    pub fn fs(&mut self) -> B::Fs {
+    pub fn fs(&self) -> B::Fs {
         self.with_ctx(|ctx| ctx.fs())
     }
 
@@ -107,7 +107,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     #[inline]
     pub(crate) fn emit_message(
-        &mut self,
+        &self,
         level: notify::Level,
         message: notify::Message,
     ) -> NotificationId {

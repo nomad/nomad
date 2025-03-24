@@ -21,6 +21,7 @@ use walkdir::{DirEntry, Either, WalkDir};
 use crate::backend::CollabBackend;
 use crate::collab::Collab;
 use crate::config::Config;
+use crate::event_stream::{self, EventStream};
 use crate::leave::StopChannels;
 use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
 use crate::root_markers;
@@ -126,6 +127,35 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
         Ok(())
     }
 }
+
+async fn read_replica2<B: CollabBackend>(
+    project_root: &AbsPath,
+    ctx: &mut AsyncCtx<'_, B>,
+) -> Result<ReplicaBuilder, ReadReplicaError2<B>> {
+    let stream_builder = EventStream::<B::Fs>::builder(project_root);
+
+    ctx.fs()
+        .for_each(project_root, async |dir_path, entry| {
+            stream_builder.push_node(dir_path, entry).await
+        })
+        .await
+        .map_err(ReadReplicaError2::Walk)?;
+
+    let _event_stream = stream_builder.build();
+
+    todo!();
+}
+
+enum ReadReplicaError2<B: CollabBackend> {
+    Walk(WalkError2<B>),
+}
+
+/// TODO: docs.
+pub type WalkError2<B> = walkdir::WalkError<
+    <B as Backend>::Fs,
+    <B as Backend>::Fs,
+    event_stream::PushError<<B as Backend>::Fs>,
+>;
 
 async fn read_replica<B>(
     peer_id: PeerId,
