@@ -14,6 +14,7 @@ use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{AsyncWriteExt, select};
 use notify::{RecursiveMode, Watcher};
 
+use super::DirectoryEvent;
 use crate::ByteOffset;
 use crate::fs::{
     AbsPath,
@@ -231,6 +232,7 @@ impl Fs for OsFs {
 }
 
 impl Directory for OsDirectory {
+    type EventStream = futures_util::stream::Pending<DirectoryEvent<Self>>;
     type Fs = OsFs;
     type Metadata = OsMetadata;
 
@@ -341,6 +343,11 @@ impl Directory for OsDirectory {
                 Some((metadata_res, (read_dir, get_metadata, dir_path)))
             },
         ))
+    }
+
+    #[inline]
+    async fn watch(&self) -> Self::EventStream {
+        todo!()
     }
 }
 

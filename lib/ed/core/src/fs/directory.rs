@@ -1,11 +1,16 @@
 use core::error::Error;
 
+use abs_path::AbsPathBuf;
 use futures_lite::Stream;
 
-use crate::fs::{AbsPath, Fs, Metadata, NodeName};
+use super::FsNode;
+use crate::fs::{self, AbsPath, Fs, Metadata, NodeName};
 
 /// TODO: docs.
 pub trait Directory: Sized {
+    /// TODO: docs.
+    type EventStream: Stream<Item = DirectoryEvent<Self>> + Unpin;
+
     /// TODO: docs.
     type Fs: Fs;
 
@@ -72,4 +77,43 @@ pub trait Directory: Sized {
             Self::ReadError,
         >,
     >;
+
+    /// TODO: docs.
+    fn watch(&self) -> impl Future<Output = Self::EventStream>;
+}
+
+/// TODO: docs.
+pub enum DirectoryEvent<Dir: Directory> {
+    /// TODO: docs.
+    Creation(ChildCreation<Dir::Fs>),
+
+    /// TODO: docs.
+    Deletion(DirectoryDeletion),
+
+    /// TODO: docs.
+    Move(DirectoryMove<Dir>),
+}
+
+/// TODO: docs.
+pub struct ChildCreation<Fs: fs::Fs> {
+    /// TODO: docs.
+    pub child: FsNode<Fs>,
+
+    /// TODO: docs.
+    pub parent: Fs::Directory,
+}
+
+/// TODO: docs.
+pub struct DirectoryDeletion {
+    /// TODO: docs.
+    pub dir_path: AbsPathBuf,
+}
+
+/// TODO: docs.
+pub struct DirectoryMove<Dir: Directory> {
+    /// TODO: docs.
+    pub dir: Dir,
+
+    /// TODO: docs.
+    pub old_path: AbsPathBuf,
 }

@@ -13,7 +13,13 @@ mod symlink;
 
 #[doc(inline)]
 pub use abs_path::*;
-pub use directory::Directory;
+pub use directory::{
+    ChildCreation,
+    Directory,
+    DirectoryDeletion,
+    DirectoryEvent,
+    DirectoryMove,
+};
 pub use file::File;
 pub use fs::Fs;
 pub use fs_event::{FsEvent, FsEventKind};

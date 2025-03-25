@@ -9,6 +9,7 @@ use ed_core::fs::{
     self,
     AbsPath,
     AbsPathBuf,
+    DirectoryEvent,
     Fs,
     FsEvent,
     FsEventKind,
@@ -614,6 +615,7 @@ impl PartialEq for DirectoryHandle {
 }
 
 impl fs::Directory for DirectoryHandle {
+    type EventStream = futures_lite::stream::Pending<DirectoryEvent<Self>>;
     type Fs = MockFs;
     type Metadata = DirEntry;
 
@@ -666,6 +668,10 @@ impl fs::Directory for DirectoryHandle {
 
     fn path(&self) -> &AbsPath {
         &self.path
+    }
+
+    async fn watch(&self) -> Self::EventStream {
+        todo!()
     }
 }
 
