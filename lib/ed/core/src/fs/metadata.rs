@@ -1,12 +1,12 @@
 use core::error::Error;
 
 use crate::ByteOffset;
-use crate::fs::{FsNodeKind, NodeNameBuf};
+use crate::fs::{Fs, FsNodeKind, NodeNameBuf};
 
 /// TODO: docs.
 pub trait Metadata {
     /// TODO: docs.
-    type Timestamp;
+    type Fs: Fs;
 
     /// TODO: docs.
     type NameError: Error;
@@ -18,10 +18,10 @@ pub trait Metadata {
     fn byte_len(&self) -> ByteOffset;
 
     /// TODO: docs.
-    fn created_at(&self) -> Option<Self::Timestamp>;
+    fn created_at(&self) -> Option<<Self::Fs as Fs>::Timestamp>;
 
     /// TODO: docs.
-    fn last_modified_at(&self) -> Option<Self::Timestamp>;
+    fn last_modified_at(&self) -> Option<<Self::Fs as Fs>::Timestamp>;
 
     /// TODO: docs.
     fn name(

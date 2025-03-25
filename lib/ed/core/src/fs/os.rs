@@ -453,7 +453,7 @@ impl Stream for OsWatcher {
 }
 
 impl Metadata for OsMetadata {
-    type Timestamp = SystemTime;
+    type Fs = OsFs;
     type NameError = OsNameError;
     type NodeKindError = Infallible;
 

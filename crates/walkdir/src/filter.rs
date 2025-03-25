@@ -2,7 +2,7 @@ use core::convert::Infallible;
 use core::error::Error;
 use core::fmt;
 
-use ed::fs::{self, AbsPath};
+use ed::fs::{self, AbsPath, Metadata};
 use futures_util::stream::{self, FusedStream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 
@@ -17,7 +17,7 @@ pub trait Filter<Fs: fs::Fs> {
     fn should_filter(
         &self,
         dir_path: &AbsPath,
-        dir_entry: &DirEntry<Fs>,
+        node_meta: &impl Metadata<Fs = Fs>,
     ) -> impl Future<Output = Result<bool, Self::Error>>;
 
     /// TODO: docs.
@@ -140,7 +140,7 @@ impl<Fs: fs::Fs> Filter<Fs> for () {
     async fn should_filter(
         &self,
         _: &AbsPath,
-        _: &DirEntry<Fs>,
+        _: &impl Metadata<Fs = Fs>,
     ) -> Result<bool, Self::Error> {
         Ok(false)
     }
@@ -156,9 +156,9 @@ where
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
-        dir_entry: &DirEntry<Fs>,
+        node_meta: &impl Metadata<Fs = Fs>,
     ) -> Result<bool, Self::Error> {
-        (*self).should_filter(dir_path, dir_entry).await
+        (*self).should_filter(dir_path, node_meta).await
     }
 }
 
@@ -172,10 +172,10 @@ where
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
-        dir_entry: &DirEntry<Fs>,
+        node_meta: &impl Metadata<Fs = Fs>,
     ) -> Result<bool, Self::Error> {
         match self {
-            Some(filter) => filter.should_filter(dir_path, dir_entry).await,
+            Some(filter) => filter.should_filter(dir_path, node_meta).await,
             None => Ok(false),
         }
     }
@@ -192,10 +192,10 @@ where
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
-        dir_entry: &DirEntry<Fs>,
+        node_meta: &impl Metadata<Fs = Fs>,
     ) -> Result<bool, Self::Error> {
-        let filter_1 = self.filter_1.should_filter(dir_path, dir_entry).fuse();
-        let filter_2 = self.filter_2.should_filter(dir_path, dir_entry).fuse();
+        let filter_1 = self.filter_1.should_filter(dir_path, node_meta).fuse();
+        let filter_2 = self.filter_2.should_filter(dir_path, node_meta).fuse();
         pin_mut!(filter_1);
         pin_mut!(filter_2);
 

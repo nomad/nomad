@@ -15,7 +15,7 @@ pub trait Directory: Sized {
     type Fs: Fs;
 
     /// TODO: docs.
-    type Metadata: Metadata<Timestamp = <Self::Fs as Fs>::Timestamp>;
+    type Metadata: Metadata<Fs = Self::Fs>;
 
     /// TODO: docs.
     type CreateDirectoryError: Error;

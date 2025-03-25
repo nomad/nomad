@@ -315,7 +315,7 @@ impl Filter<os::OsFs> for GitIgnore {
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
-        entry: &DirEntry<os::OsFs>,
+        node_meta: &impl Metadata<Fs = os::OsFs>,
     ) -> Result<bool, Self::Error> {
         struct Concat<'a>(&'a AbsPath, &'a NodeName);
 
@@ -330,8 +330,8 @@ impl Filter<os::OsFs> for GitIgnore {
             }
         }
 
-        let entry_name = entry.name().await.map_err(Either::Left)?;
-        let path = Concat(dir_path, &entry_name);
+        let node_name = node_meta.name().await.map_err(Either::Left)?;
+        let path = Concat(dir_path, &node_name);
         self.with_inner(|inner| inner.is_ignored(path))
             .map_err(Either::Right)?
             .map_err(Either::Right)

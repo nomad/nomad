@@ -5,6 +5,7 @@ use ed::AsyncCtx;
 use ed::fs::{self, Directory, FsNode, Symlink};
 use futures_util::select;
 use futures_util::stream::{SelectAll, StreamExt};
+use walkdir::Filter;
 
 use crate::CollabBackend;
 use crate::event::Event;
@@ -27,8 +28,9 @@ pub(crate) struct EventStreamBuilder<B: CollabBackend> {
 }
 
 /// TODO: docs.
-pub(crate) enum PushError<Fs: fs::Fs> {
-    FollowSymlink(<Fs::Symlink as Symlink>::FollowError),
+pub(crate) enum EventStreamError<B: CollabBackend> {
+    FollowSymlink(<<B::Fs as fs::Fs>::Symlink as Symlink>::FollowError),
+    FsFilter(<B::FsFilter as Filter<B::Fs>>::Error),
 }
 
 impl<B: CollabBackend> EventStream<B> {
@@ -44,7 +46,7 @@ impl<B: CollabBackend> EventStream<B> {
     pub(crate) async fn next(
         &mut self,
         ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<Event<B>, PushError<B::Fs>> {
+    ) -> Result<Event<B>, EventStreamError<B>> {
         select! {
             dir_event = self.directory_streams.select_next_some() => {
                 self.on_directory_event(&dir_event, ctx).await?;
@@ -57,7 +59,7 @@ impl<B: CollabBackend> EventStream<B> {
         &mut self,
         event: &fs::DirectoryEvent<<B::Fs as fs::Fs>::Directory>,
         ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<(), PushError<B::Fs>> {
+    ) -> Result<(), EventStreamError<B>> {
         match event {
             fs::DirectoryEvent::Creation(node_creation) => {
                 self.on_node_creation(node_creation, ctx).await
@@ -92,10 +94,26 @@ impl<B: CollabBackend> EventStream<B> {
 
     async fn on_node_creation(
         &mut self,
-        _creation: &fs::NodeCreation<B::Fs>,
+        creation: &fs::NodeCreation<B::Fs>,
         _ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<(), PushError<B::Fs>> {
-        todo!()
+    ) -> Result<(), EventStreamError<B>> {
+        if self
+            .fs_filter
+            .should_filter(creation.parent.path(), &creation.child)
+            .await
+            .map_err(EventStreamError::FsFilter)?
+        {
+            return Ok(());
+        }
+
+        match &creation.child {
+            FsNode::File(file) => todo!(),
+            FsNode::Directory(dir) => {
+                self.directory_streams.push(dir.watch().await);
+                Ok(())
+            },
+            FsNode::Symlink(symlink) => todo!(),
+        }
     }
 }
 
@@ -110,7 +128,7 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
         &self,
         node: &FsNode<B::Fs>,
         ctx: &AsyncCtx<'_, B>,
-    ) -> Result<(), PushError<B::Fs>> {
+    ) -> Result<(), EventStreamError<B>> {
         match node {
             FsNode::Directory(dir) => {
                 self.push_directory(dir).await;
@@ -130,7 +148,7 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
         &self,
         _file: &<B::Fs as fs::Fs>::File,
         _ctx: &AsyncCtx<'_, B>,
-    ) -> Result<(), PushError<B::Fs>> {
+    ) -> Result<(), EventStreamError<B>> {
         todo!()
     }
 
@@ -138,14 +156,14 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
         &self,
         symlink: &<B::Fs as fs::Fs>::Symlink,
         ctx: &AsyncCtx<'_, B>,
-    ) -> Result<(), PushError<B::Fs>> {
+    ) -> Result<(), EventStreamError<B>> {
         // FIXME: we should add a watcher on the symlink itself to react to its
         // deletion.
 
         let Some(node) = symlink
             .follow_recursively()
             .await
-            .map_err(PushError::FollowSymlink)?
+            .map_err(EventStreamError::FollowSymlink)?
         else {
             return Ok(());
         };
