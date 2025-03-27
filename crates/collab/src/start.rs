@@ -142,7 +142,8 @@ async fn read_replica2<B: CollabBackend>(
 ) -> Result<ReplicaBuilder, ReadReplicaError2<B>> {
     let walkdir = ctx.fs().filter(B::fs_filter(project_root, ctx));
 
-    let event_stream_builder = EventStream::<B>::builder(project_root);
+    let event_stream_builder =
+        EventStream::<B>::builder(project_root.to_owned());
 
     walkdir
         .for_each(project_root, async |dir_path, meta| {
