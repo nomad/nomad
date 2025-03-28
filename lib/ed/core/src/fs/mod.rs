@@ -15,12 +15,12 @@ mod symlink;
 pub use abs_path::*;
 pub use directory::{
     Directory,
-    DirectoryDeletion,
+    NodeDeletion,
     DirectoryEvent,
-    DirectoryMove,
+    NodeMove,
     NodeCreation,
 };
-pub use file::File;
+pub use file::{File, FileEvent};
 pub use fs::Fs;
 pub use fs_event::{FsEvent, FsEventKind};
 pub use fs_node::{FsNode, NodeDeleteError, NodeMetadataError};

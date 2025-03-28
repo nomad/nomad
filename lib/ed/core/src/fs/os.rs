@@ -21,6 +21,7 @@ use crate::fs::{
     Directory,
     DirectoryEvent,
     File,
+    FileEvent,
     Fs,
     FsEvent,
     FsNode,
@@ -357,6 +358,7 @@ impl Directory for OsDirectory {
 }
 
 impl File for OsFile {
+    type EventStream = futures_util::stream::Pending<FileEvent<OsFs>>;
     type Fs = OsFs;
 
     type Error = io::Error;
@@ -397,6 +399,11 @@ impl File for OsFile {
     #[inline]
     fn path(&self) -> &AbsPath {
         &self.metadata.path
+    }
+
+    #[inline]
+    async fn watch(&self) -> Self::EventStream {
+        todo!()
     }
 
     #[inline]

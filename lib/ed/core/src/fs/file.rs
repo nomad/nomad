@@ -1,10 +1,22 @@
 use core::error::Error;
 
+use futures_util::Stream;
+
 use crate::ByteOffset;
-use crate::fs::{AbsPath, Fs, NodeName};
+use crate::fs::{
+    self,
+    AbsPath,
+    NodeDeletion,
+    NodeMove,
+    Fs,
+    NodeName,
+};
 
 /// TODO: docs.
 pub trait File {
+    /// TODO: docs.
+    type EventStream: Stream<Item = FileEvent<Self::Fs>> + Unpin;
+
     /// TODO: docs.
     type Fs: Fs;
 
@@ -46,8 +58,32 @@ pub trait File {
     fn path(&self) -> &AbsPath;
 
     /// TODO: docs.
+    fn watch(&self) -> impl Future<Output = Self::EventStream>;
+
+    /// TODO: docs.
     fn write<C: AsRef<[u8]>>(
         &mut self,
         new_contents: C,
     ) -> impl Future<Output = Result<(), Self::WriteError>>;
+}
+
+/// TODO: docs.
+pub enum FileEvent<Fs: fs::Fs> {
+    /// TODO: docs.
+    Deletion(NodeDeletion<Fs>),
+
+    /// TODO: docs.
+    Move(NodeMove<Fs>),
+
+    /// TODO: docs.
+    Modification(FileModification<Fs>),
+}
+
+/// TODO: docs.
+pub struct FileModification<Fs: fs::Fs> {
+    /// The node ID of the file.
+    pub file_id: Fs::NodeId,
+
+    /// TODO: docs.
+    pub modified_at: Fs::Timestamp,
 }

@@ -96,37 +96,10 @@ pub enum DirectoryEvent<Fs: fs::Fs> {
     Creation(NodeCreation<Fs>),
 
     /// TODO: docs.
-    Deletion(DirectoryDeletion<Fs>),
+    Deletion(NodeDeletion<Fs>),
 
     /// TODO: docs.
-    Move(DirectoryMove<Fs>),
-}
-
-/// TODO: docs.
-pub struct DirectoryDeletion<Fs: fs::Fs> {
-    /// The node ID of the directory.
-    pub dir_id: Fs::NodeId,
-
-    /// The path to the directory at the time of its deletion.
-    pub dir_path: AbsPathBuf,
-
-    /// TODO: docs.
-    pub deletion_root_id: Fs::NodeId,
-}
-
-/// TODO: docs.
-pub struct DirectoryMove<Fs: fs::Fs> {
-    /// The node ID of the directory.
-    pub dir_id: Fs::NodeId,
-
-    /// The path to the directory before it was moved.
-    pub old_path: AbsPathBuf,
-
-    /// The path to the directory after it was moved.
-    pub new_path: AbsPathBuf,
-
-    /// TODO: docs.
-    pub move_root_id: Fs::NodeId,
+    Move(NodeMove<Fs>),
 }
 
 /// TODO: docs.
@@ -139,4 +112,31 @@ pub struct NodeCreation<Fs: fs::Fs> {
 
     /// TODO: docs.
     pub parent_id: Fs::NodeId,
+}
+
+/// TODO: docs.
+pub struct NodeDeletion<Fs: fs::Fs> {
+    /// The ID of the node that was deleted.
+    pub node_id: Fs::NodeId,
+
+    /// The path to the node at the time of its deletion.
+    pub node_path: AbsPathBuf,
+
+    /// TODO: docs.
+    pub deletion_root_id: Fs::NodeId,
+}
+
+/// TODO: docs.
+pub struct NodeMove<Fs: fs::Fs> {
+    /// The ID of the node that was moved.
+    pub node_id: Fs::NodeId,
+
+    /// The path to the node before it was moved.
+    pub old_path: AbsPathBuf,
+
+    /// The path to the node after it was moved.
+    pub new_path: AbsPathBuf,
+
+    /// TODO: docs.
+    pub move_root_id: Fs::NodeId,
 }

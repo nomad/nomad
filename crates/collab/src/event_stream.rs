@@ -78,21 +78,21 @@ impl<B: CollabBackend> EventStream<B> {
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<bool, EventStreamError<B>> {
         Ok(match event {
-            fs::DirectoryEvent::Deletion(node_deletion) => {
-                node_deletion.dir_id == node_deletion.deletion_root_id
-                    || node_deletion.dir_id == self.root_id
+            fs::DirectoryEvent::Deletion(deletion) => {
+                deletion.node_id == deletion.deletion_root_id
+                    || deletion.node_id == self.root_id
             },
-            fs::DirectoryEvent::Move(node_move) => {
-                if !node_move.new_path.starts_with(&self.root_path) {
+            fs::DirectoryEvent::Move(r#move) => {
+                if !r#move.new_path.starts_with(&self.root_path) {
                     // The directory was moved outside the project, so we can
                     // drop its event stream.
                     todo!("drop dir's stream");
                 }
-                node_move.dir_id == node_move.move_root_id
-                    || node_move.dir_id == self.root_id
+                r#move.node_id == r#move.move_root_id
+                    || r#move.node_id == self.root_id
             },
-            fs::DirectoryEvent::Creation(node_creation) => {
-                self.on_node_creation(node_creation, ctx).await?;
+            fs::DirectoryEvent::Creation(creation) => {
+                self.on_node_creation(creation, ctx).await?;
                 true
             },
         })

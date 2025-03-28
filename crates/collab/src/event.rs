@@ -2,20 +2,14 @@ use core::ops::Range;
 
 use ed::ByteOffset;
 use ed::backend::Backend;
-use ed::fs::{DirectoryEvent, Fs};
+use ed::fs::{DirectoryEvent, FileEvent, Fs};
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
 /// TODO: docs.
 pub(crate) enum Event<B: Backend> {
     /// TODO: docs.
-    BufferDropped(B::BufferId),
-
-    /// TODO: docs.
-    BufferEdited(BufferEdit<B>),
-
-    /// TODO: docs.
-    BufferSaved(BufferSave<B>),
+    Buffer(BufferEvent<B>),
 
     /// TODO: docs.
     Cursor(CursorEvent<B>),
@@ -24,7 +18,15 @@ pub(crate) enum Event<B: Backend> {
     Directory(DirectoryEvent<B::Fs>),
 
     /// TODO: docs.
+    File(FileEvent<B::Fs>),
+
+    /// TODO: docs.
     Selection(SelectionEvent<B>),
+}
+
+pub(crate) enum BufferEvent<B: Backend> {
+    Edited(BufferEdit<B>),
+    Saved(BufferSave<B>),
 }
 
 pub(crate) struct BufferEdit<B: Backend> {
