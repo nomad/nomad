@@ -47,10 +47,13 @@ impl Backend for Neovim {
     type Api = api::NeovimApi;
     type Buffer<'a> = NeovimBuffer;
     type BufferId = NeovimBuffer;
+    type CursorId = NeovimBuffer;
     type Fs = NeovimFs;
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
+    type SelectionId = NeovimBuffer;
+
     type SerializeError = serde::NeovimSerializeError;
     type DeserializeError = serde::NeovimDeserializeError;
 

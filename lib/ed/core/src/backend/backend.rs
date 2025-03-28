@@ -1,4 +1,5 @@
 use core::fmt::Debug;
+use core::hash::Hash;
 
 use serde::Serialize;
 use serde::de::Deserialize;
@@ -31,7 +32,10 @@ pub trait Backend: 'static + Sized {
     type Buffer<'a>: Buffer<Id = Self::BufferId>;
 
     /// TODO: docs.
-    type BufferId: Clone + Debug;
+    type BufferId: Clone + Debug + Eq + Hash;
+
+    /// TODO: docs.
+    type CursorId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
     type LocalExecutor: LocalExecutor;
@@ -44,6 +48,9 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     type Emitter<'this>: notify::Emitter;
+
+    /// TODO: docs.
+    type SelectionId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
     type SerializeError: notify::Error;

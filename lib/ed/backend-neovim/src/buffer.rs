@@ -7,7 +7,7 @@ use ed_core::backend::Buffer;
 use crate::oxi;
 
 /// TODO: docs.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct NeovimBuffer(oxi::BufHandle);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
