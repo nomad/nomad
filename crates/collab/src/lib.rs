@@ -10,6 +10,7 @@ mod event;
 mod event_stream;
 pub mod join;
 pub mod leave;
+mod seq_ext;
 pub mod project;
 mod root_markers;
 mod session;

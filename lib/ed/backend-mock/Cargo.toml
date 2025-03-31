@@ -16,7 +16,7 @@ ed-core = { path = "../core" }
 flume = { workspace = true, features = ["async"] }
 futures-lite = { workspace = true, features = ["std"] }
 fxhash = { workspace = true }
-indexmap = "2.7"
+indexmap = { workspace = true }
 mock-macros = { path = "./macros" }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }

@@ -33,9 +33,11 @@ concurrent-queue = "2.5"
 derive_more = { workspace = true }
 ed = { workspace = true }
 eerie = { git = "ssh://git@github.com/nomad/eerie.git" }
+fastrand = "2"
 flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
+indexmap = { workspace = true }
 pin-project-lite = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
