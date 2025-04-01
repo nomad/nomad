@@ -3,7 +3,7 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use collab_server::message::{Peer, Peers};
+use collab_server::message::{Message, Peer, Peers};
 use ed::fs::{AbsPath, AbsPathBuf};
 use ed::{AsyncCtx, Shared, notify};
 use eerie::{PeerId, Replica};
@@ -13,6 +13,7 @@ use smol_str::ToSmolStr;
 
 use crate::CollabBackend;
 use crate::backend::{ActionForSelectedSession, SessionId};
+use crate::event::Event;
 
 /// TODO: docs.
 pub struct Project<B: CollabBackend> {
@@ -67,6 +68,20 @@ impl<B: CollabBackend> Project<B> {
     pub fn is_host(&self) -> bool {
         self.local_peer.id() == self.host_id
     }
+
+    /// TODO: docs.
+    pub(crate) fn integrate_message(
+        &mut self,
+        _msg: Message,
+        _ctx: &AsyncCtx<'_, B>,
+    ) {
+        todo!();
+    }
+
+    /// TODO: docs.
+    pub(crate) fn synchronize_event(&mut self, _event: Event<B>) -> Message {
+        todo!();
+    }
 }
 
 impl<B: CollabBackend> ProjectHandle<B> {
@@ -83,6 +98,11 @@ impl<B: CollabBackend> ProjectHandle<B> {
     /// TODO: docs.
     pub fn with<R>(&self, fun: impl FnOnce(&Project<B>) -> R) -> R {
         self.inner.with(fun)
+    }
+
+    /// TODO: docs.
+    pub fn with_mut<R>(&self, fun: impl FnOnce(&mut Project<B>) -> R) -> R {
+        self.inner.with_mut(fun)
     }
 }
 

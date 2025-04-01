@@ -33,7 +33,7 @@ use crate::event_stream::{self, EventStream};
 use crate::leave::StopChannels;
 use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
 use crate::root_markers;
-use crate::session::{NewSessionArgs, Session};
+use crate::session::Session;
 
 type Markers = root_markers::GitDirectory;
 
@@ -118,12 +118,16 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             session_id: welcome.session_id,
         });
 
-        let session = Session::new(NewSessionArgs {
+        let session = Session {
+            event_rx: todo!(),
             message_rx: welcome.rx,
             message_tx: welcome.tx,
             project_handle,
-            stop_rx: self.stop_channels.insert(welcome.session_id),
-        });
+            stop_rx: self
+                .stop_channels
+                .insert(welcome.session_id)
+                .into_stream(),
+        };
 
         ctx.spawn_local(async move |ctx| {
             if let Err(err) = session.run(ctx).await {

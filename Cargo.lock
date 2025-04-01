@@ -655,6 +655,7 @@ dependencies = [
  "serde",
  "smallvec",
  "smol_str",
+ "thiserror 2.0.12",
  "walkdir 0.1.0-dev",
 ]
 

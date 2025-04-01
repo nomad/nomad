@@ -357,7 +357,7 @@ impl Directory for OsDirectory {
     }
 
     #[inline]
-    async fn watch(&self) -> Self::EventStream {
+    fn watch(&self) -> Self::EventStream {
         todo!()
     }
 }
@@ -412,7 +412,7 @@ impl File for OsFile {
     }
 
     #[inline]
-    async fn watch(&self) -> Self::EventStream {
+    fn watch(&self) -> Self::EventStream {
         todo!()
     }
 

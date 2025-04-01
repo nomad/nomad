@@ -54,7 +54,7 @@ pub trait File {
     fn path(&self) -> &AbsPath;
 
     /// TODO: docs.
-    fn watch(&self) -> impl Future<Output = Self::EventStream>;
+    fn watch(&self) -> Self::EventStream;
 
     /// TODO: docs.
     fn write<C: AsRef<[u8]>>(

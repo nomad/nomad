@@ -36,10 +36,9 @@ use crate::seq_ext::StreamableSeq;
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 pub(crate) struct Session<B: CollabBackend> {
-    args: NewSessionArgs<B>,
-}
+    /// TODO: docs..
+    pub(crate) event_rx: EventRx<B>,
 
-pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// TODO: docs..
     pub(crate) message_rx: MessageRx<B>,
 
@@ -50,7 +49,7 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     pub(crate) project_handle: ProjectHandle<B>,
 
     /// TODO: docs.
-    pub(crate) stop_rx: flume::Receiver<StopSession>,
+    pub(crate) stop_rx: flume::r#async::RecvStream<'static, StopSession>,
 }
 
 pub(crate) struct EventRx<B: CollabBackend> {
@@ -80,64 +79,71 @@ pub(crate) struct EventRx<B: CollabBackend> {
     saved_buffers: Shared<FxHashSet<B::BufferId>>,
 }
 
-pub(crate) enum RunSessionError {
-    Rx(ClientRxError),
-    RxExhausted,
-    Tx(io::Error),
+#[derive(derive_more::Debug, thiserror::Error)]
+#[debug(bounds(B: CollabBackend))]
+pub(crate) enum SessionError<B: CollabBackend> {
+    #[error(transparent)]
+    EventRx(#[from] EventRxError<B>),
+
+    #[error(transparent)]
+    MessageRx(#[from] ClientRxError),
+
+    #[error("the server kicked this peer out of the session")]
+    MessageRxExhausted,
+
+    #[error(transparent)]
+    MessageTx(#[from] io::Error),
 }
 
+#[derive(derive_more::Debug, thiserror::Error)]
+#[debug(bounds(B: CollabBackend))]
 pub(crate) enum EventRxError<B: CollabBackend> {
+    #[error(transparent)]
     FsFilter(<B::FsFilter as walkdir::Filter<B::Fs>>::Error),
+
+    #[error(transparent)]
     Metadata(fs::NodeMetadataError<B::Fs>),
+
+    #[error(transparent)]
     NodeAtPath(<B::Fs as Fs>::NodeAtPathError),
 }
 
 impl<B: CollabBackend> Session<B> {
-    pub(crate) fn new(args: NewSessionArgs<B>) -> Self {
-        Self { args }
-    }
-
     pub(crate) async fn run(
         self,
-        _ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<(), RunSessionError> {
-        let NewSessionArgs { stop_rx, message_rx, message_tx, .. } = self.args;
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<(), SessionError<B>> {
+        let Self {
+            mut event_rx,
+            message_rx,
+            message_tx,
+            project_handle,
+            mut stop_rx,
+        } = self;
 
         pin_mut!(message_rx);
         pin_mut!(message_tx);
 
         loop {
-            select! {
-                maybe_msg_res = message_rx.next().fuse() => {
-                    let msg = maybe_msg_res
-                        .ok_or(RunSessionError::RxExhausted)?
-                        .map_err(RunSessionError::Rx)?;
-
-                    // Echo it back. Just a placeholder for now.
-                    message_tx
-                        .send(msg)
-                        .await
-                        .map_err(RunSessionError::Tx)?;
+            select_biased! {
+                event_res = event_rx.next(ctx).fuse() => {
+                    let event = event_res?;
+                    let message = project_handle.with_mut(|proj| {
+                        proj.synchronize_event(event)
+                    });
+                    message_tx.send(message).await?;
                 },
+                maybe_message_res = message_rx.next() => {
+                    let message = maybe_message_res
+                        .ok_or(SessionError::MessageRxExhausted)??;
 
-                _ = stop_rx.recv_async() => {
-                    return Ok(());
+                    project_handle.with_mut(|proj| {
+                        proj.integrate_message(message, ctx);
+                    });
                 },
+                StopSession = stop_rx.select_next_some() => return Ok(()),
             }
         }
-
-        // loop {
-        //     select! {
-        //         message = self.message_rx.next() => {
-        //             self.project.handle_message(message, ctx).await?;
-        //         },
-        //         event = self.event_stream.next() => {
-        //             let message = self.project.message_of_event(event);
-        //             self.message_tx.send(message).await?;
-        //         },
-        //         _ = self.stop_rx.recv() => return Ok(()),
-        //     }
-        // }
     }
 }
 
@@ -198,10 +204,10 @@ impl<B: CollabBackend> EventRx<B> {
     ) {
         match node {
             FsNode::Directory(dir) => {
-                // self.directory_streams.insert(dir.id(), dir.watch());
+                self.directory_streams.insert(dir.id(), dir.watch());
             },
             FsNode::File(file) => {
-                // self.file_streams.insert(file.id(), file.watch());
+                self.file_streams.insert(file.id(), file.watch());
                 ctx.with_ctx(|ctx| {
                     if let Some(mut buffer) = ctx.buffer_at_path(file.path()) {
                         self.watch_buffer(file, &mut buffer);
@@ -435,15 +441,8 @@ impl<B: CollabBackend> EventRx<B> {
     }
 }
 
-impl notify::Error for RunSessionError {
+impl<B: CollabBackend> notify::Error for SessionError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        match self {
-            RunSessionError::Rx(_) => todo!(),
-            RunSessionError::RxExhausted => {
-                let msg = "the server kicked this peer out of the session";
-                (notify::Level::Warn, notify::Message::from_str(msg))
-            },
-            RunSessionError::Tx(_) => todo!(),
-        }
+        todo!();
     }
 }

@@ -19,7 +19,7 @@ use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
 use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
-use crate::session::{NewSessionArgs, Session};
+use crate::session::Session;
 use crate::start::UserNotLoggedInError;
 
 /// The `Action` used to join an existing collaborative editing session.
@@ -99,12 +99,16 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             session_id: welcome.session_id,
         });
 
-        let session = Session::new(NewSessionArgs {
+        let session = Session {
+            event_rx: todo!(),
             message_rx: welcome.rx,
             message_tx: welcome.tx,
             project_handle,
-            stop_rx: self.stop_channels.insert(welcome.session_id),
-        });
+            stop_rx: self
+                .stop_channels
+                .insert(welcome.session_id)
+                .into_stream(),
+        };
 
         ctx.spawn_local(async move |ctx| {
             if let Err(err) = session.run(ctx).await {

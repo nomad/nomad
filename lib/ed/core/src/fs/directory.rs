@@ -90,7 +90,7 @@ pub trait Directory: Sized {
     >;
 
     /// TODO: docs.
-    fn watch(&self) -> impl Future<Output = Self::EventStream>;
+    fn watch(&self) -> Self::EventStream;
 }
 
 /// TODO: docs.
