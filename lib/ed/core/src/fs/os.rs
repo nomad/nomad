@@ -459,6 +459,11 @@ impl Symlink for OsSymlink {
     }
 
     #[inline]
+    fn id(&self) -> Inode {
+        todo!()
+    }
+
+    #[inline]
     async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
         Ok(OsMetadata {
             metadata: self.metadata.clone(),

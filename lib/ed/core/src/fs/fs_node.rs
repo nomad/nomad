@@ -64,6 +64,16 @@ impl<Fs: fs::Fs> FsNode<Fs> {
 
     /// TODO: docs.
     #[inline]
+    pub fn id(&self) -> Fs::NodeId {
+        match self {
+            Self::File(file) => file.id(),
+            Self::Directory(dir) => dir.id(),
+            Self::Symlink(symlink) => symlink.id(),
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn is_dir(&self) -> bool {
         self.kind().is_dir()
     }

@@ -149,9 +149,11 @@ impl<B: CollabBackend> Session<B> {
 
 impl<B: CollabBackend> EventRx<B> {
     pub(crate) fn new(
-        root: &<B::Fs as Fs>::Directory,
+        root: &FsNode<B::Fs>,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Self {
+        debug_assert!(!root.kind().is_symlink());
+
         let (new_buffer_tx, new_buffer_rx) = flume::unbounded();
 
         let _handle = ctx.with_ctx(|ctx| {
@@ -214,7 +216,7 @@ impl<B: CollabBackend> EventRx<B> {
                     }
                 });
             },
-            FsNode::Symlink(_) => {},
+            FsNode::Symlink(_) => unreachable!(),
         }
     }
 

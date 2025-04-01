@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use core::cell::RefCell;
 use core::marker::PhantomData;
 use std::sync::Arc;
 
@@ -14,7 +15,9 @@ use ed::fs::{
     self,
     AbsPath,
     AbsPathBuf,
+    Directory,
     Fs,
+    FsNode,
     Metadata,
     MetadataNameError,
     NodeKind,
@@ -29,11 +32,10 @@ use walkdir::WalkDir;
 use crate::backend::CollabBackend;
 use crate::collab::Collab;
 use crate::config::Config;
-use crate::event_stream::{self, EventStream};
 use crate::leave::StopChannels;
 use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
 use crate::root_markers;
-use crate::session::Session;
+use crate::session::{EventRx, Session};
 
 type Markers = root_markers::GitDirectory;
 
@@ -144,33 +146,48 @@ async fn read_replica2<B: CollabBackend>(
     project_root: &AbsPath,
     ctx: &mut AsyncCtx<'_, B>,
 ) -> Result<ReplicaBuilder, ReadReplicaError2<B>> {
-    let walkdir = ctx.fs().filter(B::fs_filter(project_root, ctx));
+    let root = match ctx.fs().node_at_path(project_root).await {
+        Ok(Some(node)) => node,
+        _ => todo!(),
+    };
 
-    let event_stream_builder =
-        EventStream::<B>::builder(project_root.to_owned());
+    let mut event_rx = EventRx::<B>::new(&root, ctx);
 
-    walkdir
-        .for_each(project_root, async |dir_path, meta| {
-            let node_name = meta.name().map_err(VisitNodeError::NodeName)?;
+    event_rx.watch(&root, ctx);
 
-            let Some(node) = ctx
-                .fs()
-                .node_at_path(dir_path.join(&node_name))
+    match &root {
+        FsNode::Directory(dir) => {
+            let event_rx = RefCell::new(&mut event_rx);
+
+            ctx.fs()
+                .filter(B::fs_filter(dir.path(), ctx))
+                .for_each(dir.path(), async |parent_path, meta| {
+                    let node_name =
+                        meta.name().map_err(VisitNodeError::NodeName)?;
+
+                    let Some(node) = ctx
+                        .fs()
+                        .node_at_path(parent_path.join(&node_name))
+                        .await
+                        .map_err(VisitNodeError::Node)?
+                    else {
+                        return Ok(());
+                    };
+
+                    if node.kind().is_symlink() {
+                        return Ok(());
+                    }
+
+                    event_rx.borrow_mut().watch(&node, ctx);
+
+                    Ok(())
+                })
                 .await
-                .map_err(VisitNodeError::Node)?
-            else {
-                return Ok(());
-            };
-
-            event_stream_builder
-                .push_node(&node, ctx)
-                .await
-                .map_err(VisitNodeError::PushToEventStream)
-        })
-        .await
-        .map_err(ReadReplicaError2::Walk)?;
-
-    let _event_stream = event_stream_builder.build(walkdir.into_filter());
+                .map_err(ReadReplicaError2::Walk)?;
+        },
+        FsNode::File(_) => {},
+        FsNode::Symlink(_) => {},
+    }
 
     todo!();
 }
@@ -193,9 +210,6 @@ pub enum VisitNodeError<B: CollabBackend> {
 
     /// TODO: docs.
     NodeName(MetadataNameError),
-
-    /// TODO: docs.
-    PushToEventStream(event_stream::EventStreamError<B>),
 }
 
 async fn read_replica<B>(
