@@ -1,7 +1,5 @@
 //! TODO: docs.
 
-#![feature(precise_capturing_in_traits)]
-
 mod async_once_lock;
 mod auth;
 mod auth_infos;

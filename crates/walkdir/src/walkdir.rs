@@ -1,5 +1,4 @@
 use core::error::Error;
-use core::fmt;
 use core::pin::Pin;
 
 use ed::fs::{

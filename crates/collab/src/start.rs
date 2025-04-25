@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use auth::AuthInfos;
+use collab_project::{Project, ProjectBuilder};
 use collab_server::message::{Peer, PeerId};
 use collab_server::{SessionIntent, client};
 use concurrent_queue::{ConcurrentQueue, PushError};
@@ -25,7 +26,6 @@ use ed::fs::{
 };
 use ed::notify::{self, Name};
 use ed::{AsyncCtx, ByteOffset, Shared};
-use eerie::{Replica, ReplicaBuilder};
 use futures_util::AsyncReadExt;
 use smol_str::ToSmolStr;
 use walkdir::WalkDir;
@@ -106,16 +106,16 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::Knock)?;
 
-        let (replica, event_rx) =
+        let (project, event_rx) =
             read_replica2(project_guard.root(), welcome.peer_id, ctx)
                 .await
-                .map_err(StartError::ReadReplica)?;
+                .map_err(StartError::ReadProject)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
             host_id: welcome.host_id,
             peer_handle,
             remote_peers: welcome.other_peers,
-            replica,
+            project,
             session_id: welcome.session_id,
         });
 
@@ -145,7 +145,7 @@ async fn read_replica2<B: CollabBackend>(
     project_root: &AbsPath,
     peer_id: PeerId,
     ctx: &mut AsyncCtx<'_, B>,
-) -> Result<(Replica, EventRx<B>), ReadReplicaError2<B>> {
+) -> Result<(Project, EventRx<B>), ReadProjectError2<B>> {
     let root = match ctx.fs().node_at_path(project_root).await {
         Ok(Some(node)) => node,
         _ => todo!(),
@@ -213,7 +213,7 @@ async fn read_replica2<B: CollabBackend>(
                     Ok(())
                 })
                 .await
-                .map_err(ReadReplicaError2::Walk)?;
+                .map_err(ReadProjectError2::Walk)?;
 
             todo!();
         },
@@ -224,7 +224,7 @@ async fn read_replica2<B: CollabBackend>(
     Ok((replica, event_rx))
 }
 
-enum ReadReplicaError2<B: CollabBackend> {
+enum ReadProjectError2<B: CollabBackend> {
     Walk(WalkError2<B>),
 }
 
@@ -244,71 +244,71 @@ pub enum VisitNodeError<B: CollabBackend> {
     NodeName(MetadataNameError),
 }
 
-async fn read_replica<B>(
-    peer_id: PeerId,
-    project_root: AbsPathBuf,
-    ctx: &mut AsyncCtx<'_, B>,
-) -> Result<Replica, ReadReplicaError<B>>
-where
-    B: CollabBackend,
-{
-    enum PushNode {
-        File(AbsPathBuf, ByteOffset),
-        Directory(AbsPathBuf),
-    }
-
-    let fs = ctx.fs();
-    let res = async move {
-        let op_queue = Arc::new(ConcurrentQueue::unbounded());
-        let op_queue2 = Arc::clone(&op_queue);
-        let handler =
-            async move |dir_path: &AbsPath,
-                        entry: <B::Fs as fs::Fs>::Metadata| {
-                let entry_path = dir_path.join(entry.name()?);
-                let op = match entry.node_kind() {
-                    NodeKind::File => {
-                        PushNode::File(entry_path, entry.byte_len())
-                    },
-                    NodeKind::Directory => PushNode::Directory(entry_path),
-                    NodeKind::Symlink => return Ok(()),
-                };
-                match op_queue2.push(op) {
-                    Ok(()) => Ok(()),
-                    Err(PushError::Full(_)) => unreachable!("unbounded"),
-                    Err(PushError::Closed(_)) => unreachable!("never closed"),
-                }
-            };
-
-        fs.for_each(&project_root, handler).await?;
-
-        let mut builder = ReplicaBuilder::new(peer_id);
-        while let Ok(op) = op_queue.pop() {
-            let _ = match op {
-                PushNode::File(path, len) => {
-                    builder.push_file(path, len.into_u64())
-                },
-                PushNode::Directory(path) => builder.push_directory(path),
-            };
-        }
-        Ok::<_, WalkError<B>>(builder)
-    };
-
-    let mut builder = res.await.map_err(ReadReplicaError::Walk)?;
-
-    // Update the lengths of the open buffers.
-    //
-    // FIXME: what if a buffer was edited and already closed?
-    ctx.for_each_buffer(|buffer| {
-        if let Some(mut file) = <&AbsPath>::try_from(&*buffer.name())
-            .ok()
-            .and_then(|buffer_path| builder.file_mut(buffer_path))
-        {
-            file.set_len(buffer.byte_len().into());
-        }
-    });
-
-    Ok(builder.build())
-}
+// async fn read_replica<B>(
+//     peer_id: PeerId,
+//     project_root: AbsPathBuf,
+//     ctx: &mut AsyncCtx<'_, B>,
+// ) -> Result<Replica, ReadReplicaError<B>>
+// where
+//     B: CollabBackend,
+// {
+//     enum PushNode {
+//         File(AbsPathBuf, ByteOffset),
+//         Directory(AbsPathBuf),
+//     }
+//
+//     let fs = ctx.fs();
+//     let res = async move {
+//         let op_queue = Arc::new(ConcurrentQueue::unbounded());
+//         let op_queue2 = Arc::clone(&op_queue);
+//         let handler =
+//             async move |dir_path: &AbsPath,
+//                         entry: <B::Fs as fs::Fs>::Metadata| {
+//                 let entry_path = dir_path.join(entry.name()?);
+//                 let op = match entry.node_kind() {
+//                     NodeKind::File => {
+//                         PushNode::File(entry_path, entry.byte_len())
+//                     },
+//                     NodeKind::Directory => PushNode::Directory(entry_path),
+//                     NodeKind::Symlink => return Ok(()),
+//                 };
+//                 match op_queue2.push(op) {
+//                     Ok(()) => Ok(()),
+//                     Err(PushError::Full(_)) => unreachable!("unbounded"),
+//                     Err(PushError::Closed(_)) => unreachable!("never closed"),
+//                 }
+//             };
+//
+//         fs.for_each(&project_root, handler).await?;
+//
+//         let mut builder = ReplicaBuilder::new(peer_id);
+//         while let Ok(op) = op_queue.pop() {
+//             let _ = match op {
+//                 PushNode::File(path, len) => {
+//                     builder.push_file(path, len.into_u64())
+//                 },
+//                 PushNode::Directory(path) => builder.push_directory(path),
+//             };
+//         }
+//         Ok::<_, WalkError<B>>(builder)
+//     };
+//
+//     let mut builder = res.await.map_err(ReadReplicaError::Walk)?;
+//
+//     // Update the lengths of the open buffers.
+//     //
+//     // FIXME: what if a buffer was edited and already closed?
+//     ctx.for_each_buffer(|buffer| {
+//         if let Some(mut file) = <&AbsPath>::try_from(&*buffer.name())
+//             .ok()
+//             .and_then(|buffer_path| builder.file_mut(buffer_path))
+//         {
+//             file.set_len(buffer.byte_len().into());
+//         }
+//     });
+//
+//     Ok(builder.build())
+// }
 
 /// Searches for the root of the project containing the buffer with the given
 /// ID.
@@ -370,7 +370,7 @@ pub enum StartError<B: CollabBackend> {
     ProjectRootIsFsRoot,
 
     /// TODO: docs.
-    ReadReplica(ReadReplicaError2<B>),
+    ReadProject(ReadProjectError2<B>),
 
     /// TODO: docs.
     SearchProjectRoot(SearchProjectRootError<B>),
@@ -388,7 +388,7 @@ pub type WalkError<B> = walkdir::WalkError<
 
 /// TODO: docs.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum ReadReplicaError<B: CollabBackend> {
+pub enum ReadProjectError<B: CollabBackend> {
     /// TODO: docs.
     Walk(WalkError<B>),
 }
@@ -464,7 +464,7 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
                      root of the filesystem",
                 ),
             ),
-            Self::ReadReplica(err) => err.to_message(),
+            Self::ReadProject(err) => err.to_message(),
             Self::SearchProjectRoot(err) => err.to_message(),
             Self::UserNotLoggedIn => {
                 UserNotLoggedInError::<B>::new().to_message()
@@ -479,16 +479,16 @@ impl<B> notify::Error for NoBufferFocusedError<B> {
     }
 }
 
-impl<B: CollabBackend> notify::Error for ReadReplicaError<B> {
+impl<B: CollabBackend> notify::Error for ReadProjectError<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         let msg = match self {
-            ReadReplicaError::Walk(err) => notify::Message::from_display(err),
+            ReadProjectError::Walk(err) => notify::Message::from_display(err),
         };
         (notify::Level::Error, msg)
     }
 }
 
-impl<B: CollabBackend> notify::Error for ReadReplicaError2<B> {
+impl<B: CollabBackend> notify::Error for ReadProjectError2<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         todo!();
     }
@@ -545,7 +545,7 @@ mod neovim_error_impls {
         }
     }
 
-    impl notify::Error for ReadReplicaError<Neovim> {
+    impl notify::Error for ReadProjectError<Neovim> {
         fn to_message(&self) -> (notify::Level, notify::Message) {
             let msg = match &self {
                 Self::Walk(err) => notify::Message::from_display(err),

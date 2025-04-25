@@ -1,6 +1,5 @@
 use core::convert::Infallible;
 use core::error::Error;
-use core::fmt;
 
 use ed::fs::{self, AbsPath, Metadata};
 use futures_util::stream::{self, FusedStream, StreamExt};

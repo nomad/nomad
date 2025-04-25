@@ -1,7 +1,6 @@
 //! TODO: docs.
 
 #![feature(min_specialization)]
-#![feature(precise_capturing_in_traits)]
 
 mod backend;
 mod collab;

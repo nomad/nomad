@@ -3,11 +3,11 @@
 use core::fmt;
 use core::marker::PhantomData;
 
+use collab_project::PeerId;
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::AgentId;
 use ed::fs::{AbsPath, AbsPathBuf};
 use ed::{AsyncCtx, Shared, notify};
-use eerie::{PeerId, Replica};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -21,8 +21,8 @@ pub struct Project<B: CollabBackend> {
     agent_id: AgentId,
     host_id: PeerId,
     peer_handle: GitHubHandle,
+    project: collab_project::Project,
     _remote_peers: Peers,
-    replica: Replica,
     root_path: AbsPathBuf,
     session_id: SessionId<B>,
 }
@@ -63,14 +63,14 @@ pub(crate) struct NewProjectArgs<B: CollabBackend> {
     pub(crate) host_id: PeerId,
     pub(crate) peer_handle: GitHubHandle,
     pub(crate) remote_peers: Peers,
-    pub(crate) replica: Replica,
+    pub(crate) project: collab_project::Project,
     pub(crate) session_id: SessionId<B>,
 }
 
 impl<B: CollabBackend> Project<B> {
     /// TODO: docs.
     pub fn is_host(&self) -> bool {
-        self.replica.id() == self.host_id
+        self.project.peer_id() == self.host_id
     }
 
     /// TODO: docs.
@@ -217,7 +217,7 @@ impl<B: CollabBackend> ProjectGuard<B> {
             host_id: args.host_id,
             peer_handle: args.peer_handle,
             _remote_peers: args.remote_peers,
-            replica: args.replica,
+            project: args.project,
             root_path: self.root.clone(),
             session_id: args.session_id,
         })

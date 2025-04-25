@@ -4,14 +4,15 @@ use core::fmt;
 use std::io;
 
 use auth::AuthInfos;
-use collab_server::message::{FileContents, Message, Peer, ProjectRequest};
+use collab_project::Project;
+use collab_project::fs::{DirectoryId, File as ProjectFile, FileId, Node};
+use collab_server::message::{Message, Peer, ProjectRequest};
 use collab_server::{SessionIntent, client};
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::fs::{self, AbsPath, Directory, File};
 use ed::notify::Name;
 use ed::{AsyncCtx, Shared, notify};
-use eerie::{DirectoryId, FileId, Replica};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
 
 use crate::backend::{CollabBackend, SessionId, Welcome};
@@ -80,22 +81,22 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             .new_guard(project_root)
             .map_err(JoinError::OverlappingProject)?;
 
-        let local_peer = Peer::new(welcome.peer_id, github_handle);
+        let local_peer = Peer { id: welcome.peer_id, github_handle };
 
-        let ProjectResponse { buffered, file_contents, replica } =
+        let ProjectResponse { buffered, project: replica } =
             request_project::<B>(local_peer.clone(), &mut welcome)
                 .await
                 .map_err(JoinError::RequestProject)?;
 
-        ProjectTree::new(&replica, &file_contents)
+        ProjectTree::new(&replica)
             .flush(project_guard.root(), ctx.fs())
             .await
             .map_err(JoinError::FlushProject)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
             host_id: welcome.host_id,
-            peer_handle: local_peer.github_handle().clone(),
-            replica,
+            peer_handle: local_peer.github_handle.clone(),
+            project: replica,
             remote_peers: welcome.other_peers,
             session_id: welcome.session_id,
         });
@@ -124,20 +125,18 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 
 struct ProjectResponse {
     buffered: Vec<Message>,
-    file_contents: FileContents,
-    replica: Replica,
+    project: Project,
 }
 
 struct ProjectTree<'a> {
-    file_contents: &'a FileContents,
-    replica: &'a Replica,
+    project: &'a Project,
 }
 
 async fn request_project<B: CollabBackend>(
     local_peer: Peer,
     welcome: &mut Welcome<B>,
 ) -> Result<ProjectResponse, RequestProjectError> {
-    let local_id = local_peer.id();
+    let local_id = local_peer.id;
 
     let request = ProjectRequest {
         requested_by: local_peer,
@@ -146,7 +145,7 @@ async fn request_project<B: CollabBackend>(
             .as_slice()
             .first()
             .expect("can't be empty")
-            .id(),
+            .id,
     };
 
     welcome
@@ -166,15 +165,14 @@ async fn request_project<B: CollabBackend>(
             .map_err(RequestProjectError::RecvResponse)?;
 
         match message {
-            Message::ProjectResponse(response) => break *response,
+            Message::ProjectResponse(response) => break response,
             other => buffered.push(other),
         }
     };
 
     Ok(ProjectResponse {
         buffered,
-        file_contents: response.file_contents,
-        replica: Replica::decode(local_id, response.replica),
+        project: Project::from_state(local_id, *response.project),
     })
 }
 
@@ -199,7 +197,7 @@ impl<'a> ProjectTree<'a> {
 
         root.clear().await.map_err(FlushProjectError::ClearRoot)?;
 
-        let root_id = self.replica.root().id();
+        let root_id = self.project.root().id();
 
         self.flush_directory(root_id, &root).await
     }
@@ -209,31 +207,44 @@ impl<'a> ProjectTree<'a> {
         dir_id: DirectoryId,
         dir: &Fs::Directory,
     ) -> Result<(), FlushProjectError<Fs>> {
-        let parent = self.replica.directory(dir_id).expect("ID is valid");
+        let parent = self.project.directory(dir_id).expect("ID is valid");
 
-        let flush_dirs = parent.child_directories().map(|child| {
-            let child_id = child.id();
-            let child_name = child.name().expect("child can't be root");
-            async move {
-                let child = dir
-                    .create_directory(child_name)
-                    .await
-                    .map_err(FlushProjectError::CreateDirectory)?;
-                self.flush_directory::<Fs>(child_id, &child).await
-            }
-        });
+        let flush_dirs = parent
+            .children()
+            .filter_map(|node| match node {
+                Node::Directory(dir) => Some(dir),
+                Node::File(_) => None,
+            })
+            .map(|child_dir| {
+                let child_id = child_dir.id();
+                let child_name =
+                    child_dir.name().expect("child can't be root");
+                async move {
+                    let child = dir
+                        .create_directory(child_name)
+                        .await
+                        .map_err(FlushProjectError::CreateDirectory)?;
+                    self.flush_directory::<Fs>(child_id, &child).await
+                }
+            });
 
-        let flush_files = parent.child_files().map(|child| {
-            let child_id = child.id();
-            let child_name = child.name();
-            async move {
-                let mut child = dir
-                    .create_file(child_name)
-                    .await
-                    .map_err(FlushProjectError::CreateFile)?;
-                self.flush_file::<Fs>(child_id, &mut child).await
-            }
-        });
+        let flush_files = parent
+            .children()
+            .filter_map(|node| match node {
+                Node::Directory(_) => None,
+                Node::File(file) => Some(file),
+            })
+            .map(|child_file| {
+                let child_id = child_file.id();
+                let child_name = child_file.name();
+                async move {
+                    let mut child = dir
+                        .create_file(child_name)
+                        .await
+                        .map_err(FlushProjectError::CreateFile)?;
+                    self.flush_file::<Fs>(child_id, &mut child).await
+                }
+            });
 
         let mut flush_children = flush_dirs
             .map(future::Either::Left)
@@ -252,12 +263,22 @@ impl<'a> ProjectTree<'a> {
         file_id: FileId,
         file: &mut Fs::File,
     ) -> Result<(), FlushProjectError<Fs>> {
-        let contents = self.file_contents.get(file_id).expect("ID is valid");
-        file.write(contents).await.map_err(FlushProjectError::WriteToFile)
+        match self.project.file(file_id).expect("ID is valid") {
+            ProjectFile::Binary(binary_file) => {
+                file.write(binary_file.contents()).await
+            },
+            ProjectFile::Symlink(symlink_file) => {
+                file.write(symlink_file.target_path()).await
+            },
+            ProjectFile::Text(text_file) => {
+                file.write(text_file.contents().to_string()).await
+            },
+        }
+        .map_err(FlushProjectError::WriteToFile)
     }
 
-    fn new(replica: &'a Replica, file_contents: &'a FileContents) -> Self {
-        Self { file_contents, replica }
+    fn new(project: &'a Project) -> Self {
+        Self { project }
     }
 }
 

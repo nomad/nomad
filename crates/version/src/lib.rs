@@ -1,7 +1,5 @@
 //! TODO: docs.
 
-#![feature(precise_capturing_in_traits)]
-
 mod emit_version;
 mod version;
 

@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-#![feature(precise_capturing_in_traits)]
 #![allow(missing_docs)]
 
 pub mod api;

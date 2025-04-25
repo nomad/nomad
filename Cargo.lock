@@ -615,16 +615,17 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f424bc0c1ee6b2564fd3753a315e7b800091ab37"
+source = "git+ssh://git@github.com/nomad/collab.git#5a6a1495f7dc27c2a92c52d3f22e1ef5e12bd0c2"
 dependencies = [
  "bincode",
  "bytes",
+ "cauchy",
+ "derive_more",
  "futures-util",
  "nohash",
  "pin-project-lite",
  "serde",
  "smallvec",
- "thiserror 2.0.12",
  "varint-simd",
  "zstd",
 ]
@@ -649,12 +650,12 @@ dependencies = [
  "auth",
  "cauchy",
  "clipboard",
+ "collab-project",
  "collab-server",
  "concurrent-queue",
  "derive_more",
  "duplex-stream",
  "ed",
- "eerie",
  "fastrand",
  "flume",
  "futures-lite",
@@ -672,11 +673,11 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f424bc0c1ee6b2564fd3753a315e7b800091ab37"
+source = "git+ssh://git@github.com/nomad/collab.git#5a6a1495f7dc27c2a92c52d3f22e1ef5e12bd0c2"
 dependencies = [
+ "cauchy",
  "codecs",
- "eerie",
- "flume",
+ "collab-project",
  "fxhash",
  "serde",
  "smallvec",
@@ -710,11 +711,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "collab-project"
+version = "0.0.9"
+source = "git+ssh://git@github.com/nomad/collab.git#5a6a1495f7dc27c2a92c52d3f22e1ef5e12bd0c2"
+dependencies = [
+ "cauchy",
+ "cola",
+ "crop",
+ "fxhash",
+ "nohash",
+ "puff",
+ "serde",
+ "smallvec",
+ "smol_str",
+]
+
+[[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f424bc0c1ee6b2564fd3753a315e7b800091ab37"
+source = "git+ssh://git@github.com/nomad/collab.git#5a6a1495f7dc27c2a92c52d3f22e1ef5e12bd0c2"
 dependencies = [
  "abs-path",
+ "cauchy",
  "codecs",
  "collab-message",
  "derive_more",
@@ -727,7 +745,6 @@ dependencies = [
  "rand 0.9.0",
  "rand_chacha 0.9.0",
  "serde",
- "thiserror 2.0.12",
  "ulid",
 ]
 
@@ -816,10 +833,11 @@ dependencies = [
 
 [[package]]
 name = "crop"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0c36a21e864b7accff2cf3bef09af553704556ff2fb704ebee242bfc5c89f10"
+checksum = "2fa28d21af9044d49bcfb1eceddeeb9fadc6a17207c6a1bf0d841ef0bd9ad36e"
 dependencies = [
+ "serde",
  "str_indices",
 ]
 
@@ -953,7 +971,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f424bc0c1ee6b2564fd3753a315e7b800091ab37"
+source = "git+ssh://git@github.com/nomad/collab.git#5a6a1495f7dc27c2a92c52d3f22e1ef5e12bd0c2"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1212,10 +1230,8 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f424bc0c1ee6b2564fd3753a315e7b800091ab37"
+source = "git+ssh://git@github.com/nomad/collab.git#5a6a1495f7dc27c2a92c52d3f22e1ef5e12bd0c2"
 dependencies = [
- "codecs",
- "collab-message",
  "flume",
  "futures-util",
  "fxhash",
@@ -2208,6 +2224,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
+name = "pando"
+version = "0.1.0"
+source = "git+ssh://git@github.com/nomad/pando.git#4df4af442904609e75bc5cebb89e08144d94b57e"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2308,6 +2332,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31971752e70b8b2686d7e46ec17fb38dad4051d94024c88df49b667caea9c84"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "puff"
+version = "0.1.0"
+source = "git+ssh://git@github.com/nomad/puff.git#20c36bd468c89bb14246f03da3065c9d0cbf027b"
+dependencies = [
+ "abs-path",
+ "fxhash",
+ "pando",
+ "serde",
+ "smallvec",
 ]
 
 [[package]]
