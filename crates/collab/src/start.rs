@@ -4,15 +4,16 @@ use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
-use collab_project::Project;
+use collab_project::{Project, ProjectBuilder};
 use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
+use ed::AsyncCtx;
 use ed::action::AsyncAction;
 use ed::backend::Buffer;
 use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
-use ed::{AsyncCtx, Shared};
+use ed::shared::{MultiThreaded, Shared};
 use futures_util::AsyncReadExt;
 use smol_str::ToSmolStr;
 use walkdir::FsExt;
@@ -198,17 +199,18 @@ async fn read_project<B: CollabBackend>(
 
     let (project, _fs_filter) = ctx
         .spawn_background(async move {
+            let walker = fs.walk(&root_dir).filter(fs_filter);
+            let project_root = root_dir.path();
             let mut project_builder = Project::builder(local_id);
             let builder_mut = Shared::new(&mut project_builder);
-            let walker = fs.walk(&root_dir).filter(fs_filter);
 
             walker
                 .for_each(async |parent_path, node_meta| {
                     read_node(
+                        project_root,
                         parent_path,
                         node_meta,
                         &builder_mut,
-                        &root_dir,
                         &fs,
                     )
                     .await
@@ -225,10 +227,10 @@ async fn read_project<B: CollabBackend>(
 
 /// TODO: docs.
 async fn read_node<Fs: fs::Fs>(
+    project_root: &AbsPath,
     parent_path: &AbsPath,
     node_meta: Fs::Metadata,
-    project_builder: &Shared<&mut collab_project::ProjectBuilder, ThreadSafe>,
-    root_dir: &Fs::Directory,
+    project_builder: &Shared<&mut ProjectBuilder, MultiThreaded>,
     fs: &Fs,
 ) -> Result<(), ReadNodeError<Fs>> {
     let node_name = node_meta.name().map_err(ReadNodeError::NodeName)?;
@@ -242,7 +244,7 @@ async fn read_node<Fs: fs::Fs>(
     };
 
     let path_in_project = node_path
-        .strip_prefix(root_dir.path())
+        .strip_prefix(project_root)
         .expect("node is under the root dir");
 
     let _maybe_err = match node {

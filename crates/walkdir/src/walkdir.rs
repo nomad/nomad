@@ -46,49 +46,62 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     /// TODO: docs.
     #[allow(clippy::type_complexity)]
     #[inline]
-    fn for_each<'a, H, E>(
-        &'a self,
-        dir_path: &'a AbsPath,
-        handler: H,
-    ) -> Pin<Box<dyn Future<Output = Result<(), WalkError<Fs, Self, E>>> + 'a>>
-    where
-        H: AsyncFn(&AbsPath, Fs::Metadata) -> Result<(), E> + Clone + 'a,
-        E: 'a,
-    {
-        Box::pin(async move {
-            let entries =
-                self.read_dir(dir_path).await.map_err(WalkError::ReadDir)?;
-            let mut handle_entries = stream::FuturesUnordered::new();
-            let mut read_children = stream::FuturesUnordered::new();
-            pin_mut!(entries);
-            loop {
-                select! {
-                    res = entries.select_next_some() => {
-                        let entry = res.map_err(WalkError::ReadEntry)?;
-                        let node_kind = entry.node_kind();
-                        if node_kind.is_dir() {
-                            let dir_name = entry
-                                .name()
-                                .map_err(WalkError::NodeName)?;
-                            let dir_path = dir_path.join(&dir_name);
+    fn for_each<E>(
+        &self,
+        dir_path: &AbsPath,
+        handler: impl AsyncFn(&AbsPath, Fs::Metadata) -> Result<(), E> + Clone,
+    ) -> impl Future<Output = Result<(), WalkError<Fs, Self, E>>> {
+        #[inline]
+        fn inner<'a, W, H, E, Fs>(
+            walkdir: &'a W,
+            dir_path: &'a AbsPath,
+            handler: H,
+        ) -> Pin<Box<dyn Future<Output = Result<(), WalkError<Fs, W, E>>> + 'a>>
+        where
+            W: WalkDir<Fs>,
+            Fs: fs::Fs,
+            H: AsyncFn(&AbsPath, Fs::Metadata) -> Result<(), E> + Clone + 'a,
+            E: 'a,
+        {
+            Box::pin(async move {
+                let entries = walkdir
+                    .read_dir(dir_path)
+                    .await
+                    .map_err(WalkError::ReadDir)?;
+                let mut handle_entries = stream::FuturesUnordered::new();
+                let mut read_children = stream::FuturesUnordered::new();
+                pin_mut!(entries);
+                loop {
+                    select! {
+                        res = entries.select_next_some() => {
+                            let entry = res.map_err(WalkError::ReadEntry)?;
+                            let node_kind = entry.node_kind();
+                            if node_kind.is_dir() {
+                                let dir_name = entry
+                                    .name()
+                                    .map_err(WalkError::NodeName)?;
+                                let dir_path = dir_path.join(&dir_name);
+                                let handler = handler.clone();
+                                read_children.push(async move {
+                                    walkdir.for_each(&dir_path, handler).await
+                                });
+                            }
                             let handler = handler.clone();
-                            read_children.push(async move {
-                                self.for_each(&dir_path, handler).await
+                            handle_entries.push(async move {
+                                handler(dir_path, entry).await
                             });
-                        }
-                        let handler = handler.clone();
-                        handle_entries.push(async move {
-                            handler(dir_path, entry).await
-                        });
-                    },
-                    res = read_children.select_next_some() => res?,
-                    res = handle_entries.select_next_some() => {
-                        res.map_err(WalkError::Other)?;
-                    },
-                    complete => return Ok(()),
+                        },
+                        res = read_children.select_next_some() => res?,
+                        res = handle_entries.select_next_some() => {
+                            res.map_err(WalkError::Other)?;
+                        },
+                        complete => return Ok(()),
+                    }
                 }
-            }
-        })
+            })
+        }
+
+        async move { inner(self, dir_path, handler).await }
     }
 
     /// TODO: docs.

@@ -12,7 +12,7 @@ pub mod fs;
 pub mod module;
 pub mod notify;
 pub mod plugin;
-mod shared;
+pub mod shared;
 mod state;
 mod util;
 

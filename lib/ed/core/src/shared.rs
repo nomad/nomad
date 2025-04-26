@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::panic::AssertUnwindSafe;
@@ -5,26 +7,33 @@ use core::panic::AssertUnwindSafe;
 use core::panic::Location;
 use std::panic;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// TODO: docs
-#[derive(Default)]
-pub struct Shared<T> {
-    inner: Rc<WithCell<T>>,
+pub struct Shared<T, Access: SharedAccess = SingleThreaded> {
+    container: Access::Container<T>,
 }
 
-impl<T> Clone for Shared<T> {
-    fn clone(&self) -> Self {
-        Self { inner: Rc::clone(&self.inner) }
-    }
+/// TODO: docs
+pub struct SingleThreaded;
+
+/// TODO: docs
+pub struct MultiThreaded;
+
+/// TODO: docs
+pub trait SharedAccess {
+    #[allow(private_bounds)]
+    #[doc(hidden)]
+    type Container<T>: SharedContainer<T>;
 }
 
-impl<T> Shared<T> {
+impl<T, Access: SharedAccess> Shared<T, Access> {
     /// Returns a cloned instance of the value.
     pub fn cloned(&self) -> T
     where
         T: Clone,
     {
-        self.inner.with(T::clone)
+        self.container.with(T::clone)
     }
 
     /// Returns a copied instance of the value.
@@ -32,17 +41,17 @@ impl<T> Shared<T> {
     where
         T: Copy,
     {
-        self.inner.get()
+        self.container.get()
     }
 
     /// TODO: docs
     pub fn into_inner(self) -> Option<T> {
-        Rc::into_inner(self.inner).map(|cell| cell.value.into_inner())
+        self.container.into_inner()
     }
 
     /// Constructs a new `Shared<T>`.
     pub fn new(value: T) -> Self {
-        Self { inner: Rc::new(WithCell::new(value)) }
+        Self { container: Access::Container::new(value) }
     }
 
     /// TODO: docs
@@ -59,7 +68,7 @@ impl<T> Shared<T> {
 
     /// TODO: docs
     pub fn strong_count(&self) -> usize {
-        Rc::strong_count(&self.inner)
+        self.container.strong_count()
     }
 
     /// TODO: docs
@@ -78,7 +87,7 @@ impl<T> Shared<T> {
         &self,
         fun: impl FnOnce(&T) -> R,
     ) -> Result<R, BorrowError> {
-        self.inner.try_with(fun)
+        self.container.try_with(fun)
     }
 
     /// Tries to call a closure with an exclusive reference to the value,
@@ -88,7 +97,7 @@ impl<T> Shared<T> {
         &self,
         fun: impl FnOnce(&mut T) -> R,
     ) -> Result<R, BorrowError> {
-        self.inner.try_with_mut(fun)
+        self.container.try_with_mut(fun)
     }
 
     /// Calls a closure with a shared reference to the value, panicking if the
@@ -97,7 +106,7 @@ impl<T> Shared<T> {
     /// Check out [`try_with`](Self::try_with) for a non-panicking alternative.
     #[track_caller]
     pub fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
-        self.inner.with(fun)
+        self.container.with(fun)
     }
 
     /// Calls a closure with an exclusive reference to the value, panicking if
@@ -107,18 +116,166 @@ impl<T> Shared<T> {
     /// alternative.
     #[track_caller]
     pub fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
-        self.inner.with_mut(fun)
+        self.container.with_mut(fun)
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Shared<T> {
+trait SharedContainer<T>: Clone {
+    fn get(&self) -> T
+    where
+        T: Copy;
+
+    fn into_inner(self) -> Option<T>;
+
+    fn new(value: T) -> Self;
+
+    fn strong_count(&self) -> usize;
+
+    fn try_with<R>(&self, fun: impl FnOnce(&T) -> R)
+    -> Result<R, BorrowError>;
+
+    fn try_with_mut<R>(
+        &self,
+        fun: impl FnOnce(&mut T) -> R,
+    ) -> Result<R, BorrowError>;
+
+    #[track_caller]
+    #[inline]
+    fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
+        match self.try_with(fun) {
+            Ok(result) => result,
+            Err(err) => panic!("{err}"),
+        }
+    }
+
+    #[track_caller]
+    #[inline]
+    fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
+        match self.try_with_mut(fun) {
+            Ok(result) => result,
+            Err(err) => panic!("{err}"),
+        }
+    }
+}
+
+impl SharedAccess for SingleThreaded {
+    type Container<T> = Rc<WithCell<T>>;
+}
+
+impl<T> SharedContainer<T> for Rc<WithCell<T>> {
+    fn get(&self) -> T
+    where
+        T: Copy,
+    {
+        WithCell::get(self)
+    }
+
+    fn into_inner(self) -> Option<T> {
+        Rc::into_inner(self).map(|cell| cell.value.into_inner())
+    }
+
+    fn new(value: T) -> Self {
+        Rc::new(WithCell::new(value))
+    }
+
+    fn strong_count(&self) -> usize {
+        Rc::strong_count(self)
+    }
+
+    #[track_caller]
+    fn try_with<R>(
+        &self,
+        fun: impl FnOnce(&T) -> R,
+    ) -> Result<R, BorrowError> {
+        WithCell::try_with(self, fun)
+    }
+
+    #[track_caller]
+    fn try_with_mut<R>(
+        &self,
+        fun: impl FnOnce(&mut T) -> R,
+    ) -> Result<R, BorrowError> {
+        WithCell::try_with_mut(self, fun)
+    }
+}
+
+impl SharedAccess for MultiThreaded {
+    type Container<T> = Arc<Mutex<T>>;
+}
+
+impl<T> SharedContainer<T> for Arc<Mutex<T>> {
+    fn get(&self) -> T
+    where
+        T: Copy,
+    {
+        self.with(Clone::clone)
+    }
+
+    #[track_caller]
+    fn into_inner(self) -> Option<T> {
+        Arc::try_unwrap(self)
+            .ok()
+            .map(|mutex| mutex.into_inner().expect("Mutex was poisoned"))
+    }
+
+    fn new(value: T) -> Self {
+        Arc::new(Mutex::new(value))
+    }
+
+    fn strong_count(&self) -> usize {
+        Arc::strong_count(self)
+    }
+
+    #[track_caller]
+    fn try_with<R>(
+        &self,
+        fun: impl FnOnce(&T) -> R,
+    ) -> Result<R, BorrowError> {
+        Ok(self.with(fun))
+    }
+
+    #[track_caller]
+    fn try_with_mut<R>(
+        &self,
+        fun: impl FnOnce(&mut T) -> R,
+    ) -> Result<R, BorrowError> {
+        Ok(self.with_mut(fun))
+    }
+
+    #[track_caller]
+    fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
+        let guard = self.lock().expect("poisoned mutex");
+        fun(&*guard)
+    }
+
+    #[track_caller]
+    fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
+        let mut guard = self.lock().expect("poisoned mutex");
+        fun(&mut *guard)
+    }
+}
+
+impl<T: Default, Access: SharedAccess> Default for Shared<T, Access> {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+
+impl<T, Access: SharedAccess> Clone for Shared<T, Access> {
+    fn clone(&self) -> Self {
+        Self { container: self.container.clone() }
+    }
+}
+
+impl<T: fmt::Debug, Access: SharedAccess> fmt::Debug for Shared<T, Access> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.with(|field| f.debug_tuple("Shared").field(&field).finish())
     }
 }
 
 #[derive(Default)]
-struct WithCell<T> {
+#[doc(hidden)]
+pub struct WithCell<T> {
     borrow: Cell<Borrow>,
     value: UnsafeCell<T>,
 }
@@ -178,22 +335,6 @@ impl<T> WithCell<T> {
             },
             Borrow::Shared(shrd) => Err(BorrowError::new_shared(shrd)),
             Borrow::Exclusive(excl) => Err(BorrowError::new_exclusive(excl)),
-        }
-    }
-
-    #[track_caller]
-    fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
-        match self.try_with(fun) {
-            Ok(result) => result,
-            Err(err) => panic!("{err}"),
-        }
-    }
-
-    #[track_caller]
-    fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
-        match self.try_with_mut(fun) {
-            Ok(result) => result,
-            Err(err) => panic!("{err}"),
         }
     }
 }
@@ -301,7 +442,7 @@ mod tests {
     /// `Shared::with()`.
     #[test]
     fn shared_with_nested() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with(|_value| {
             shared.with(|_also_value| {});
@@ -312,7 +453,7 @@ mod tests {
     /// if neither is called inside the body of the other.
     #[test]
     fn shared_with_and_with_mut_alternating() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         for idx in 0..10 {
             if idx % 2 == 0 {
@@ -327,7 +468,7 @@ mod tests {
     /// `Shared::with()` returns an error.
     #[test]
     fn shared_try_with_mut_inside_with() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with(|_value| {
             let res = shared.try_with_mut(|_also_value| {});
@@ -339,7 +480,7 @@ mod tests {
     /// `Shared::with_mut()` returns an error.
     #[test]
     fn shared_try_with_inside_with_mut() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with_mut(|_value| {
             let res = shared.try_with(|_also_value| {});
@@ -351,7 +492,7 @@ mod tests {
     /// `Shared::with_mut()` returns an error.
     #[test]
     fn shared_try_with_mut_inside_with_mut() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with_mut(|_value| {
             let res = shared.try_with_mut(|_also_value| {});
@@ -364,7 +505,7 @@ mod tests {
     #[should_panic]
     #[test]
     fn shared_with_mut_inside_with() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with(|_value| {
             shared.with_mut(|_also_value| {});
@@ -376,7 +517,7 @@ mod tests {
     #[should_panic]
     #[test]
     fn shared_with_inside_with_mut() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with_mut(|_value| {
             shared.with(|_also_value| {});
@@ -388,7 +529,7 @@ mod tests {
     #[should_panic]
     #[test]
     fn shared_with_mut_inside_with_mut() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
 
         shared.with_mut(|_value| {
             shared.with_mut(|_also_value| {});
@@ -397,7 +538,7 @@ mod tests {
 
     #[test]
     fn borrow_is_reset_even_if_closure_panics() {
-        let shared = Shared::new(0);
+        let shared = Shared::<i32>::new(0);
         let _ = panic::catch_unwind(AssertUnwindSafe(|| {
             shared.with_mut(|_| panic!())
         }));
