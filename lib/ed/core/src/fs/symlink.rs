@@ -8,13 +8,16 @@ pub trait Symlink: Send {
     type Fs: Fs;
 
     /// TODO: docs.
-    type DeleteError: Error;
+    type DeleteError: Error + Send;
 
     /// TODO: docs.
-    type FollowError: Error;
+    type FollowError: Error + Send;
 
     /// TODO: docs.
-    type MetadataError: Error;
+    type MetadataError: Error + Send;
+
+    /// TODO: docs.
+    type ReadError: Error + Send;
 
     /// TODO: docs.
     fn delete(self) -> impl Future<Output = Result<(), Self::DeleteError>>;
@@ -44,4 +47,9 @@ pub trait Symlink: Send {
 
     /// TODO: docs.
     fn path(&self) -> &AbsPath;
+
+    /// TODO: docs.
+    fn read_path(
+        &self,
+    ) -> impl Future<Output = Result<String, Self::ReadError>>;
 }

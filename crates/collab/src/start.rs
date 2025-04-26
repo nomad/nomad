@@ -1,31 +1,17 @@
 //! TODO: docs.
 
-use core::cell::RefCell;
 use core::marker::PhantomData;
-use std::sync::{Arc, Mutex};
 
+use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
-use collab_project::{Project, ProjectBuilder};
-use collab_server::message::{Peer, PeerId};
+use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
-use concurrent_queue::{ConcurrentQueue, PushError};
 use ed::action::AsyncAction;
-use ed::backend::{Backend, Buffer};
+use ed::backend::Buffer;
 use ed::command::ToCompletionFn;
-use ed::fs::{
-    self,
-    AbsPath,
-    AbsPathBuf,
-    Directory,
-    File,
-    Fs,
-    FsNode,
-    Metadata,
-    MetadataNameError,
-    NodeKind,
-};
+use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
-use ed::{AsyncCtx, ByteOffset, Shared};
+use ed::{AsyncCtx, Shared};
 use futures_util::AsyncReadExt;
 use smol_str::ToSmolStr;
 use walkdir::WalkDir;
@@ -107,7 +93,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .map_err(StartError::Knock)?;
 
         let (project, event_rx) =
-            read_replica2(project_guard.root(), welcome.peer_id, ctx)
+            read_project(project_guard.root(), welcome.peer_id, ctx)
                 .await
                 .map_err(StartError::ReadProject)?;
 
@@ -140,175 +126,6 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
         Ok(())
     }
 }
-
-async fn read_replica2<B: CollabBackend>(
-    project_root: &AbsPath,
-    peer_id: PeerId,
-    ctx: &mut AsyncCtx<'_, B>,
-) -> Result<(Project, EventRx<B>), ReadProjectError2<B>> {
-    let root = match ctx.fs().node_at_path(project_root).await {
-        Ok(Some(node)) => node,
-        _ => todo!(),
-    };
-
-    let mut event_rx = EventRx::<B>::new(&root, ctx);
-
-    event_rx.watch(&root, ctx);
-
-    let replica = match &root {
-        FsNode::Directory(dir) => {
-            // let worktree = Arc::new(Mutex::new(Worktree::new()));
-            let event_rx = RefCell::new(&mut event_rx);
-
-            ctx.fs()
-                .filter(B::fs_filter(dir.path(), ctx))
-                .for_each(dir.path(), async |parent_path, meta| {
-                    let node_name =
-                        meta.name().map_err(VisitNodeError::NodeName)?;
-
-                    let Some(node) = ctx
-                        .fs()
-                        .node_at_path(parent_path.join(&node_name))
-                        .await
-                        .map_err(VisitNodeError::Node)?
-                    else {
-                        return Ok(());
-                    };
-
-                    if node.kind().is_symlink() {
-                        return Ok(());
-                    }
-
-                    event_rx.borrow_mut().watch(&node, ctx);
-
-                    ctx.spawn_background(async move {
-                        let child = match &node {
-                            FsNode::Directory(_) => {
-                                // eerie::Directory::new(node_name)
-                            },
-                            FsNode::File(_file) => {
-                                // let file_contents = file.read().await?;
-                                // match str::from_utf8(&*file_contents) {
-                                //     Ok(contents) => eerie::File::new_text(
-                                //         node_name, contents,
-                                //     ),
-                                //     Err(_) => eerie::File::new_binary(
-                                //         node_name, contents,
-                                //     ),
-                                // }
-                            },
-                            FsNode::Symlink(_) => {
-                                unreachable!("already checked")
-                            },
-                        };
-
-                        // worktree
-                        //     .lock()
-                        //     .dir_at_path_mut(parent_path)
-                        //     .expect("parent exists")
-                        //     .create_child(child);
-                    })
-                    .await;
-
-                    Ok(())
-                })
-                .await
-                .map_err(ReadProjectError2::Walk)?;
-
-            todo!();
-        },
-        FsNode::File(_) => todo!(),
-        FsNode::Symlink(_) => todo!(),
-    };
-
-    Ok((replica, event_rx))
-}
-
-enum ReadProjectError2<B: CollabBackend> {
-    Walk(WalkError2<B>),
-}
-
-/// TODO: docs.
-pub type WalkError2<B> = walkdir::WalkError<
-    <B as Backend>::Fs,
-    walkdir::Filtered<<B as CollabBackend>::FsFilter, <B as Backend>::Fs>,
-    VisitNodeError<B>,
->;
-
-/// TODO: docs.
-pub enum VisitNodeError<B: CollabBackend> {
-    /// TODO: docs.
-    Node(<<B as Backend>::Fs as fs::Fs>::NodeAtPathError),
-
-    /// TODO: docs.
-    NodeName(MetadataNameError),
-}
-
-// async fn read_replica<B>(
-//     peer_id: PeerId,
-//     project_root: AbsPathBuf,
-//     ctx: &mut AsyncCtx<'_, B>,
-// ) -> Result<Replica, ReadReplicaError<B>>
-// where
-//     B: CollabBackend,
-// {
-//     enum PushNode {
-//         File(AbsPathBuf, ByteOffset),
-//         Directory(AbsPathBuf),
-//     }
-//
-//     let fs = ctx.fs();
-//     let res = async move {
-//         let op_queue = Arc::new(ConcurrentQueue::unbounded());
-//         let op_queue2 = Arc::clone(&op_queue);
-//         let handler =
-//             async move |dir_path: &AbsPath,
-//                         entry: <B::Fs as fs::Fs>::Metadata| {
-//                 let entry_path = dir_path.join(entry.name()?);
-//                 let op = match entry.node_kind() {
-//                     NodeKind::File => {
-//                         PushNode::File(entry_path, entry.byte_len())
-//                     },
-//                     NodeKind::Directory => PushNode::Directory(entry_path),
-//                     NodeKind::Symlink => return Ok(()),
-//                 };
-//                 match op_queue2.push(op) {
-//                     Ok(()) => Ok(()),
-//                     Err(PushError::Full(_)) => unreachable!("unbounded"),
-//                     Err(PushError::Closed(_)) => unreachable!("never closed"),
-//                 }
-//             };
-//
-//         fs.for_each(&project_root, handler).await?;
-//
-//         let mut builder = ReplicaBuilder::new(peer_id);
-//         while let Ok(op) = op_queue.pop() {
-//             let _ = match op {
-//                 PushNode::File(path, len) => {
-//                     builder.push_file(path, len.into_u64())
-//                 },
-//                 PushNode::Directory(path) => builder.push_directory(path),
-//             };
-//         }
-//         Ok::<_, WalkError<B>>(builder)
-//     };
-//
-//     let mut builder = res.await.map_err(ReadReplicaError::Walk)?;
-//
-//     // Update the lengths of the open buffers.
-//     //
-//     // FIXME: what if a buffer was edited and already closed?
-//     ctx.for_each_buffer(|buffer| {
-//         if let Some(mut file) = <&AbsPath>::try_from(&*buffer.name())
-//             .ok()
-//             .and_then(|buffer_path| builder.file_mut(buffer_path))
-//         {
-//             file.set_len(buffer.byte_len().into());
-//         }
-//     });
-//
-//     Ok(builder.build())
-// }
 
 /// Searches for the root of the project containing the buffer with the given
 /// ID.
@@ -351,6 +168,117 @@ async fn search_project_root<B: CollabBackend>(
         .ok_or(SearchProjectRootError::CouldntFindRoot(buffer_path))
 }
 
+/// Constructs a [`collab_project::Project`] by reading the contents of the
+/// directory at the given path.
+async fn read_project<B: CollabBackend>(
+    project_root: &AbsPath,
+    local_id: PeerId,
+    ctx: &mut AsyncCtx<'_, B>,
+) -> Result<(collab_project::Project, EventRx<B>), ReadProjectError<B>> {
+    let fs = ctx.fs();
+
+    let root_node = fs
+        .node_at_path(project_root)
+        .await
+        .map_err(ReadProjectError::GetRoot)?
+        .ok_or_else(|| {
+            ReadProjectError::NoNodeAtRootPath(project_root.to_owned())
+        })?;
+
+    let root_dir = match root_node {
+        FsNode::Directory(dir) => dir,
+        FsNode::File(_) => todo!(),
+        FsNode::Symlink(_) => todo!(),
+    };
+
+    let fs_filter = B::fs_filter(project_root, ctx);
+
+    let event_rx = EventRx::<B>::new(&root_dir, ctx);
+
+    let project = ctx
+        .spawn_background(async move {
+            let mut project_builder =
+                collab_project::Project::builder(local_id);
+
+            let builder_mut = Shared::new(&mut project_builder);
+
+            root_dir
+                .walker()
+                .filter(fs_filter)
+                .for_each(async |parent_path, node_meta| {
+                    read_node(
+                        parent_path,
+                        node_meta,
+                        &builder_mut,
+                        &root_dir,
+                        &fs,
+                    )
+                    .await
+                })
+                .await
+                .map_err(ReadProjectError::WalkRoot)?;
+
+            Ok(project_builder.build())
+        })
+        .await?;
+
+    Ok((project, event_rx))
+}
+
+/// TODO: docs.
+async fn read_node<Fs: fs::Fs>(
+    parent_path: &AbsPath,
+    node_meta: Fs::Metadata,
+    project_builder: &Shared<&mut collab_project::ProjectBuilder, ThreadSafe>,
+    root_dir: &Fs::Directory,
+    fs: &Fs,
+) -> Result<(), ReadNodeError<Fs>> {
+    let node_name = node_meta.name().map_err(ReadNodeError::NodeName)?;
+
+    let node_path = parent_path.join(&node_name);
+
+    let Some(node) =
+        fs.node_at_path(&node_path).await.map_err(ReadNodeError::GetNode)?
+    else {
+        return Ok(());
+    };
+
+    let path_in_project = node_path
+        .strip_prefix(root_dir.path())
+        .expect("node is under the root dir");
+
+    let _maybe_err = match node {
+        FsNode::Directory(_) => project_builder
+            .with_mut(|builder| builder.push_directory(path_in_project).err()),
+
+        FsNode::File(file) => {
+            let contents =
+                file.read().await.map_err(ReadNodeError::ReadFile)?;
+
+            match str::from_utf8(&contents) {
+                Ok(contents) => project_builder.with_mut(|builder| {
+                    builder.push_text_file(path_in_project, contents).err()
+                }),
+                Err(_) => project_builder.with_mut(|builder| {
+                    builder.push_binary_file(path_in_project, contents).err()
+                }),
+            }
+        },
+        FsNode::Symlink(symlink) => {
+            let target_path = symlink
+                .read_path()
+                .await
+                .map_err(ReadNodeError::ReadSymlink)?;
+
+            project_builder.with_mut(|builder| {
+                builder.push_symlink(path_in_project, target_path).err()
+            })
+        },
+    };
+
+    Ok(())
+}
+
 /// The type of error that can occur when [`Start`]ing a session fails.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
 pub enum StartError<B: CollabBackend> {
@@ -370,7 +298,7 @@ pub enum StartError<B: CollabBackend> {
     ProjectRootIsFsRoot,
 
     /// TODO: docs.
-    ReadProject(ReadProjectError2<B>),
+    ReadProject(ReadProjectError<B>),
 
     /// TODO: docs.
     SearchProjectRoot(SearchProjectRootError<B>),
@@ -379,18 +307,37 @@ pub enum StartError<B: CollabBackend> {
     UserNotLoggedIn,
 }
 
-/// TODO: docs.
-pub type WalkError<B> = walkdir::WalkError<
-    <B as Backend>::Fs,
-    <B as Backend>::Fs,
-    MetadataNameError,
->;
+/// The type of error that can occur when [read](`read_node`)ing a node fails.
+#[derive(cauchy::Debug, cauchy::PartialEq)]
+pub enum ReadNodeError<Fs: fs::Fs> {
+    /// TODO: docs.
+    GetNode(Fs::NodeAtPathError),
 
-/// TODO: docs.
+    /// TODO: docs.
+    NodeName(fs::MetadataNameError),
+
+    /// TODO: docs.
+    ReadFile(<Fs::File as File>::ReadError),
+
+    /// TODO: docs.
+    ReadSymlink(<Fs::Symlink as Symlink>::ReadError),
+}
+
+/// The type of error that can occur when [read](`read_project`)ing a project
+/// fails.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
 pub enum ReadProjectError<B: CollabBackend> {
     /// TODO: docs.
-    Walk(WalkError<B>),
+    GetRoot(<B::Fs as Fs>::NodeAtPathError),
+
+    /// TODO: docs.
+    NoNodeAtRootPath(AbsPathBuf),
+
+    /// TODO: docs.
+    ReadNode(ReadNodeError<B::Fs>),
+
+    /// TODO: docs.
+    WalkRoot(walkdir::WalkError<B::Fs, B::Fs, ReadNodeError<B::Fs>>),
 }
 
 /// TODO: docs.
@@ -473,24 +420,15 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
     }
 }
 
+impl<B: CollabBackend> notify::Error for ReadProjectError<B> {
+    default fn to_message(&self) -> (notify::Level, notify::Message) {
+        todo!();
+    }
+}
+
 impl<B> notify::Error for NoBufferFocusedError<B> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         (notify::Level::Off, notify::Message::new())
-    }
-}
-
-impl<B: CollabBackend> notify::Error for ReadProjectError<B> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        let msg = match self {
-            ReadProjectError::Walk(err) => notify::Message::from_display(err),
-        };
-        (notify::Level::Error, msg)
-    }
-}
-
-impl<B: CollabBackend> notify::Error for ReadProjectError2<B> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
     }
 }
 

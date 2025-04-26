@@ -14,16 +14,19 @@ pub trait File: Send {
     type Fs: Fs;
 
     /// TODO: docs.
-    type Error: Error;
+    type Error: Error + Send;
 
     /// TODO: docs.
-    type DeleteError: Error;
+    type DeleteError: Error + Send;
 
     /// TODO: docs.
-    type MetadataError: Error;
+    type MetadataError: Error + Send;
 
     /// TODO: docs.
-    type WriteError: Error;
+    type ReadError: Error + Send;
+
+    /// TODO: docs.
+    type WriteError: Error + Send;
 
     /// TODO: docs.
     fn byte_len(
@@ -52,6 +55,9 @@ pub trait File: Send {
 
     /// TODO: docs.
     fn path(&self) -> &AbsPath;
+
+    /// TODO: docs.
+    fn read(&self) -> impl Future<Output = Result<Vec<u8>, Self::ReadError>>;
 
     /// TODO: docs.
     fn watch(&self) -> Self::EventStream;

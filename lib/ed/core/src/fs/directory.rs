@@ -14,25 +14,25 @@ pub trait Directory: Send + Sized {
     type Fs: Fs;
 
     /// TODO: docs.
-    type CreateDirectoryError: Error;
+    type CreateDirectoryError: Error + Send;
 
     /// TODO: docs.
-    type CreateFileError: Error;
+    type CreateFileError: Error + Send;
 
     /// TODO: docs.
-    type ClearError: Error;
+    type ClearError: Error + Send;
 
     /// TODO: docs.
-    type DeleteError: Error;
+    type DeleteError: Error + Send;
 
     /// TODO: docs.
-    type MetadataError: Error;
+    type MetadataError: Error + Send;
 
     /// TODO: docs.
-    type ReadEntryError: Error;
+    type ReadEntryError: Error + Send;
 
     /// TODO: docs.
-    type ReadError: Error;
+    type ReadError: Error + Send;
 
     /// TODO: docs.
     fn create_directory(

@@ -136,11 +136,9 @@ impl<B: CollabBackend> Session<B> {
 
 impl<B: CollabBackend> EventRx<B> {
     pub(crate) fn new(
-        root: &FsNode<B::Fs>,
+        root_dir: &<B::Fs as Fs>::Directory,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Self {
-        debug_assert!(!root.kind().is_symlink());
-
         let (new_buffer_tx, new_buffer_rx) = flume::unbounded();
 
         let new_buffers_handle = ctx.with_ctx(|ctx| {
@@ -158,12 +156,12 @@ impl<B: CollabBackend> EventRx<B> {
             buffer_tx,
             directory_streams: Default::default(),
             file_streams: Default::default(),
-            fs_filter: B::fs_filter(root.path(), ctx),
+            fs_filter: B::fs_filter(root_dir.path(), ctx),
             new_buffer_rx: new_buffer_rx.into_stream(),
             new_buffers_handle,
             node_to_buf_ids: Default::default(),
-            root_id: root.id(),
-            root_path: root.path().to_owned(),
+            root_id: root_dir.id(),
+            root_path: root_dir.path().to_owned(),
             saved_buffers: Default::default(),
         }
     }

@@ -41,16 +41,16 @@ pub trait Fs: Clone + Send + 'static {
     >;
 
     /// TODO: docs.
-    type CreateDirectoryError: Error;
+    type CreateDirectoryError: Error + Send;
 
     /// TODO: docs.
-    type CreateFileError: Error;
+    type CreateFileError: Error + Send;
 
     /// TODO: docs.
-    type NodeAtPathError: Error;
+    type NodeAtPathError: Error + Send;
 
     /// TODO: docs.
-    type WatchError: Error;
+    type WatchError: Error + Send;
 
     /// TODO: docs.
     fn create_directory<P: AsRef<AbsPath>>(

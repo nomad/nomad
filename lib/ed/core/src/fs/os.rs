@@ -369,6 +369,7 @@ impl File for OsFile {
     type Error = io::Error;
     type DeleteError = io::Error;
     type MetadataError = io::Error;
+    type ReadError = io::Error;
     type WriteError = io::Error;
 
     #[inline]
@@ -412,6 +413,11 @@ impl File for OsFile {
     }
 
     #[inline]
+    async fn read(&self) -> Result<Vec<u8>, Self::ReadError> {
+        async_fs::read(self.path()).await
+    }
+
+    #[inline]
     fn watch(&self) -> Self::EventStream {
         todo!()
     }
@@ -434,6 +440,7 @@ impl Symlink for OsSymlink {
     type DeleteError = io::Error;
     type FollowError = io::Error;
     type MetadataError = Infallible;
+    type ReadError = io::Error;
 
     #[inline]
     async fn delete(self) -> Result<(), Self::DeleteError> {
@@ -475,6 +482,13 @@ impl Symlink for OsSymlink {
     #[inline]
     fn path(&self) -> &AbsPath {
         &self.path
+    }
+
+    #[inline]
+    async fn read_path(&self) -> Result<String, Self::ReadError> {
+        async_fs::read_link(&*self.path)
+            .await
+            .map(|path| path.display().to_string())
     }
 }
 
