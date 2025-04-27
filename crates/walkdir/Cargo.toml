@@ -17,6 +17,7 @@ derive_more = { workspace = true }
 ed = { workspace = true }
 flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true, features = ["default"] }
+send-future = "0.1"
 
 compact_str = { workspace = true, optional = true }
 

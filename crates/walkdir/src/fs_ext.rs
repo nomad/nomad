@@ -3,6 +3,7 @@ use core::marker::PhantomData;
 use abs_path::AbsPath;
 use ed::fs::{self, Directory};
 
+use crate::walkdir::ForEachHandler;
 use crate::{Filter, Filtered, WalkDir, WalkError};
 
 /// TODO: docs.
@@ -44,17 +45,15 @@ where
 
     /// TODO: docs.
     #[inline]
-    pub async fn for_each<Err>(
+    pub fn for_each<Err: Send>(
         &self,
-        handler: impl AsyncFnOnce(&AbsPath, Fs::Metadata) -> Result<(), Err>
-        + Send
-        + Clone,
-    ) -> Result<(), WalkError<Fs, W, Err>>
+        handler: impl ForEachHandler<Fs, Err>,
+    ) -> impl Future<Output = Result<(), WalkError<Fs, W, Err>>> + Send
     where
         W: Sync,
-        Err: Send,
     {
-        self.inner.for_each(self.dir_path, handler).await
+        use send_future::SendFuture;
+        async move { self.inner.for_each(self.dir_path, handler).send().await }
     }
 
     /// TODO: docs.

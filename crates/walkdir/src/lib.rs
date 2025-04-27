@@ -1,5 +1,9 @@
 //! TODO: docs.
 
+// Needed to bound the future returned by an `AsyncFnOnce` to `Send`.
+#![feature(async_fn_traits)]
+#![feature(unboxed_closures)]
+
 mod filter;
 mod fs_ext;
 #[cfg(feature = "gitignore")]
