@@ -83,7 +83,7 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
                                 let dir_name = entry
                                     .name()
                                     .map_err(WalkError::NodeName)?;
-                                let dir_path = dir_path.join(&dir_name);
+                                let dir_path = dir_path.join(dir_name);
                                 let handler = handler.clone();
                                 read_children.push(async move {
                                     inner(walkdir, &dir_path, handler).await

@@ -338,7 +338,7 @@ impl Filter<os::OsFs> for GitIgnore {
         }
 
         let node_name = node_meta.name().map_err(Either::Left)?;
-        let path = Concat(dir_path, &node_name);
+        let path = Concat(dir_path, node_name);
         self.with_inner(|inner| inner.is_ignored(path))
             .map_err(Either::Right)?
             .map_err(Either::Right)

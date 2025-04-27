@@ -75,6 +75,7 @@ pub trait Directory: Send + Sized {
     fn path(&self) -> &AbsPath;
 
     /// TODO: docs.
+    #[allow(clippy::type_complexity)]
     fn read(
         &self,
     ) -> impl Future<
