@@ -8,7 +8,7 @@ use core::fmt::Debug;
 use collab_server::Authenticator;
 use ed::backend::{Backend, Buffer};
 use ed::command::CommandArgs;
-use ed::fs::{AbsPath, AbsPathBuf};
+use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::{AsyncCtx, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
@@ -18,10 +18,10 @@ use crate::config;
 /// actions in this crate.
 pub trait CollabBackend: Backend {
     /// TODO: docs.
-    type FsFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
+    type Io: AsyncRead + AsyncWrite + Unpin;
 
     /// TODO: docs.
-    type Io: AsyncRead + AsyncWrite + Unpin;
+    type ProjectFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
 
     /// TODO: docs.
     type ServerConfig: collab_server::Config<
@@ -73,12 +73,6 @@ pub trait CollabBackend: Backend {
         Output = Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError>,
     >;
 
-    /// TODO: docs.
-    fn fs_filter(
-        project_root: &AbsPath,
-        ctx: &mut AsyncCtx<'_, Self>,
-    ) -> Self::FsFilter;
-
     /// Returns the absolute path to the user's home directory.
     fn home_dir(
         ctx: &mut AsyncCtx<'_, Self>,
@@ -91,6 +85,12 @@ pub trait CollabBackend: Backend {
         id: <Self::Buffer<'_> as Buffer>::Id,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
+
+    /// TODO: docs.
+    fn project_filter(
+        project_root: &<Self::Fs as fs::Fs>::Directory,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Self::ProjectFilter;
 
     /// Prompts the user to select one of the given `(project_root,
     /// session_id)` pairs.

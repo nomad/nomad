@@ -9,8 +9,9 @@ use collab_server::Config;
 use collab_server::message::PeerId;
 use collab_server::nomad::{NomadConfig, NomadSessionId};
 use ed::command::{CommandArgs, Parse};
+use ed::fs::{self, Directory};
 use ed::neovim::{Neovim, NeovimBuffer, mlua, oxi};
-use ed::{AsyncCtx, fs, notify};
+use ed::{AsyncCtx, notify};
 use mlua::{Function, Table};
 use smol_str::ToSmolStr;
 
@@ -70,8 +71,8 @@ struct TildePath<'a> {
 }
 
 impl CollabBackend for Neovim {
-    type FsFilter = walkdir::GitIgnore;
     type Io = async_net::TcpStream;
+    type ProjectFilter = walkdir::GitIgnore;
     type ServerConfig = ServerConfig;
 
     type ConnectToServerError = NeovimConnectToServerError;
@@ -149,13 +150,6 @@ impl CollabBackend for Neovim {
         Ok(data_dir.join(node!("nomad")).join(node!("remote-projects")))
     }
 
-    fn fs_filter(
-        project_root: &AbsPath,
-        _: &mut AsyncCtx<'_, Self>,
-    ) -> Self::FsFilter {
-        walkdir::GitIgnore::new(project_root.to_owned())
-    }
-
     async fn home_dir(
         _: &mut AsyncCtx<'_, Self>,
     ) -> Result<AbsPathBuf, Self::HomeDirError> {
@@ -203,6 +197,13 @@ impl CollabBackend for Neovim {
             .parse::<AbsPathBuf>()
             .map(Some)
             .map_err(|_| NeovimLspRootError { root_dir })
+    }
+
+    fn project_filter(
+        project_root: &<Self::Fs as fs::Fs>::Directory,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Self::ProjectFilter {
+        walkdir::GitIgnore::new(project_root.path().to_owned())
     }
 
     async fn select_session<'pairs>(

@@ -12,7 +12,7 @@ use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
 use duplex_stream::{DuplexStream, duplex};
 use ed::AsyncCtx;
 use ed::backend::{ApiValue, Backend, Buffer, BufferId};
-use ed::fs::{AbsPath, AbsPathBuf};
+use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::notify::{self, MaybeResult};
 use serde::{Deserialize, Serialize};
 
@@ -182,8 +182,8 @@ impl AnyError {
 }
 
 impl<B: Backend> CollabBackend for CollabMock<B> {
-    type FsFilter = ();
     type Io = DuplexStream;
+    type ProjectFilter = ();
     type ServerConfig = ServerConfig;
 
     type ConnectToServerError = AnyError;
@@ -235,8 +235,6 @@ impl<B: Backend> CollabBackend for CollabMock<B> {
         })
     }
 
-    fn fs_filter(_: &AbsPath, _: &mut AsyncCtx<'_, Self>) -> Self::FsFilter {}
-
     async fn home_dir(
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<AbsPathBuf, Self::HomeDirError> {
@@ -251,6 +249,12 @@ impl<B: Backend> CollabBackend for CollabMock<B> {
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
         Ok(ctx.with_backend(|this| this.lsp_root_with.as_mut()?(buffer_id)))
+    }
+
+    fn project_filter(
+        _: &<Self::Fs as fs::Fs>::Directory,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Self::ProjectFilter {
     }
 
     async fn select_session<'pairs>(

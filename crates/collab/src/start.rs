@@ -1,7 +1,6 @@
 //! TODO: docs.
 
 use core::marker::PhantomData;
-use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
@@ -10,7 +9,7 @@ use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
 use ed::AsyncCtx;
 use ed::action::AsyncAction;
-use ed::backend::{BackgroundExecutor, Buffer};
+use ed::backend::Buffer;
 use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
@@ -194,7 +193,7 @@ async fn read_project<B: CollabBackend>(
         FsNode::Symlink(_) => todo!(),
     };
 
-    let fs_filter = B::fs_filter(project_root, ctx);
+    let fs_filter = B::project_filter(&root_dir, ctx);
 
     let event_rx = EventRx::<B>::new(&root_dir, ctx);
 
@@ -341,7 +340,7 @@ pub enum ReadProjectError<B: CollabBackend> {
     WalkRoot(
         walkdir::WalkError<
             B::Fs,
-            walkdir::Filtered<B::FsFilter, B::Fs>,
+            walkdir::Filtered<B::ProjectFilter, B::Fs>,
             ReadNodeError<B::Fs>,
         >,
     ),

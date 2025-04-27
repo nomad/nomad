@@ -63,7 +63,7 @@ pub(crate) struct EventRx<B: CollabBackend> {
     >,
     /// A filter used to check if [`FsNode`]s created under the project root
     /// should be part of the project.
-    fs_filter: B::FsFilter,
+    fs_filter: B::ProjectFilter,
     new_buffer_rx: flume::r#async::RecvStream<'static, B::BufferId>,
     #[allow(dead_code)]
     new_buffers_handle: B::EventHandle,
@@ -90,7 +90,7 @@ pub(crate) enum SessionError<B: CollabBackend> {
 #[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
 #[display("{_0}")]
 pub(crate) enum EventRxError<B: CollabBackend> {
-    FsFilter(<B::FsFilter as walkdir::Filter<B::Fs>>::Error),
+    FsFilter(<B::ProjectFilter as walkdir::Filter<B::Fs>>::Error),
     Metadata(fs::NodeMetadataError<B::Fs>),
     NodeAtPath(<B::Fs as Fs>::NodeAtPathError),
 }
@@ -156,7 +156,7 @@ impl<B: CollabBackend> EventRx<B> {
             buffer_tx,
             directory_streams: Default::default(),
             file_streams: Default::default(),
-            fs_filter: B::fs_filter(root_dir.path(), ctx),
+            fs_filter: todo!(),
             new_buffer_rx: new_buffer_rx.into_stream(),
             new_buffers_handle,
             node_to_buf_ids: Default::default(),
