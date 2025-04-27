@@ -212,3 +212,30 @@ where
         }
     }
 }
+
+impl<Fi1, Fi2, Fs> Filter<Fs> for Either<Fi1, Fi2>
+where
+    Fi1: Filter<Fs> + Sync,
+    Fi2: Filter<Fs> + Sync,
+    Fs: fs::Fs,
+{
+    type Error = Either<Fi1::Error, Fi2::Error>;
+
+    async fn should_filter(
+        &self,
+        dir_path: &AbsPath,
+        node_meta: &impl Metadata<Fs = Fs>,
+    ) -> Result<bool, Self::Error> {
+        match self {
+            Self::Left(filter) => filter
+                .should_filter(dir_path, node_meta)
+                .await
+                .map_err(Either::Left),
+
+            Self::Right(filter) => filter
+                .should_filter(dir_path, node_meta)
+                .await
+                .map_err(Either::Right),
+        }
+    }
+}

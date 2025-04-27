@@ -58,7 +58,7 @@ pub struct OsSymlink {
 
 /// TODO: docs.
 pub struct OsMetadata {
-    metadata: async_fs::Metadata,
+    inner: async_fs::Metadata,
     node_kind: NodeKind,
     node_name: OsString,
 }
@@ -273,7 +273,7 @@ impl Directory for OsDirectory {
     async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
         self.metadata
             .with(|inner| OsMetadata {
-                metadata: inner.clone(),
+                inner: inner.clone(),
                 node_kind: NodeKind::Directory,
                 node_name: self
                     .name()
@@ -342,7 +342,7 @@ impl Directory for OsDirectory {
                                 continue
                             };
                             break Ok(OsMetadata {
-                                metadata,
+                                inner: metadata,
                                 node_kind,
                                 node_name,
                             })
@@ -390,7 +390,7 @@ impl File for OsFile {
     async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
         self.metadata
             .with(|inner| OsMetadata {
-                metadata: inner.clone(),
+                inner: inner.clone(),
                 node_kind: NodeKind::File,
                 node_name: self.name().as_str().into(),
             })
@@ -472,7 +472,7 @@ impl Symlink for OsSymlink {
     #[inline]
     async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
         Ok(OsMetadata {
-            metadata: self.metadata.clone(),
+            inner: self.metadata.clone(),
             node_kind: NodeKind::Symlink,
             node_name: self.name().as_str().into(),
         })
@@ -519,17 +519,26 @@ impl Metadata for OsMetadata {
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
-        self.metadata.len().into()
+        self.inner.len().into()
     }
 
     #[inline]
     fn created_at(&self) -> Option<SystemTime> {
-        self.metadata.created().ok()
+        self.inner.created().ok()
+    }
+
+    #[inline]
+    fn id(&self) -> Inode {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            self.inner.ino()
+        }
     }
 
     #[inline]
     fn last_modified_at(&self) -> Option<SystemTime> {
-        self.metadata.modified().ok()
+        self.inner.modified().ok()
     }
 
     #[inline]

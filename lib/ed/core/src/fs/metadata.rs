@@ -19,6 +19,9 @@ pub trait Metadata: Send + Sync {
     fn created_at(&self) -> Option<<Self::Fs as Fs>::Timestamp>;
 
     /// TODO: docs.
+    fn id(&self) -> <Self::Fs as Fs>::NodeId;
+
+    /// TODO: docs.
     fn last_modified_at(&self) -> Option<<Self::Fs as Fs>::Timestamp>;
 
     /// TODO: docs.

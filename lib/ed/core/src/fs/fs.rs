@@ -30,7 +30,7 @@ pub trait Fs: Clone + Send + Sync + 'static {
     type Metadata: Metadata<Fs = Self>;
 
     /// TODO: docs.
-    type NodeId: Debug + Clone + Eq + Hash;
+    type NodeId: Debug + Clone + Eq + Hash + Send + Sync;
 
     /// TODO: docs.
     type Timestamp: Clone + Ord;

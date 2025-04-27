@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use core::convert::Infallible;
 use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
@@ -170,37 +171,47 @@ async fn search_project_root<B: CollabBackend>(
         .ok_or(SearchProjectRootError::CouldntFindRoot(buffer_path))
 }
 
-/// Constructs a [`Project`] by reading the contents of the directory at the
-/// given path.
+/// Constructs a [`Project`] by reading the contents of the file or directory
+/// at the given path.
 async fn read_project<B: CollabBackend>(
-    project_root: &AbsPath,
+    root_path: &AbsPath,
     local_id: PeerId,
     ctx: &mut AsyncCtx<'_, B>,
 ) -> Result<(Project, EventRx<B>), ReadProjectError<B>> {
     let fs = ctx.fs();
 
     let root_node = fs
-        .node_at_path(project_root)
+        .node_at_path(root_path)
         .await
         .map_err(ReadProjectError::GetRoot)?
         .ok_or_else(|| {
-            ReadProjectError::NoNodeAtRootPath(project_root.to_owned())
+            ReadProjectError::NoNodeAtRootPath(root_path.to_owned())
         })?;
 
-    let root_dir = match root_node {
-        FsNode::Directory(dir) => dir,
-        FsNode::File(_) => todo!(),
-        FsNode::Symlink(_) => todo!(),
+    let (project_root, project_filter) = match root_node {
+        FsNode::Directory(dir) => {
+            let filter = B::project_filter(&dir, ctx);
+            (dir, walkdir::Either::Left(filter))
+        },
+        // The user wants to collaborate on a single file. The root must always
+        // be a directory, so we just use its parent together with a filter
+        // that ignores all its siblings.
+        FsNode::File(file) => {
+            let parent = file.parent().await;
+            let filter = AllButOne::<B::Fs> { id: file.id() };
+            (parent, walkdir::Either::Right(filter))
+        },
+        FsNode::Symlink(_) => {
+            return Err(ReadProjectError::RootIsSymlink(root_path.to_owned()));
+        },
     };
 
-    let fs_filter = B::project_filter(&root_dir, ctx);
-
-    let event_rx = EventRx::<B>::new(&root_dir, ctx);
+    let event_rx = EventRx::<B>::new(&project_root, ctx);
 
     let (project, _fs_filter) = ctx
         .spawn_background(async move {
-            let walker = fs.walk(&root_dir).filter(fs_filter);
-            let project_root = root_dir.path();
+            let walker = fs.walk(&project_root).filter(project_filter);
+            let project_root = project_root.path();
             let mut project_builder = Project::builder(local_id);
             let builder_mut = Shared::new(&mut project_builder);
 
@@ -337,10 +348,16 @@ pub enum ReadProjectError<B: CollabBackend> {
     ReadNode(ReadNodeError<B::Fs>),
 
     /// TODO: docs.
+    RootIsSymlink(AbsPathBuf),
+
+    /// TODO: docs.
     WalkRoot(
         walkdir::WalkError<
             B::Fs,
-            walkdir::Filtered<B::ProjectFilter, B::Fs>,
+            walkdir::Filtered<
+                walkdir::Either<B::ProjectFilter, AllButOne<B::Fs>>,
+                B::Fs,
+            >,
             ReadNodeError<B::Fs>,
         >,
     ),
@@ -366,6 +383,23 @@ pub enum SearchProjectRootError<B: CollabBackend> {
 
     /// TODO: docs.
     Lsp(B::LspRootError),
+}
+
+/// A [`walkdir::Filter`] that filters out every node but one.
+pub struct AllButOne<Fs: fs::Fs> {
+    id: Fs::NodeId,
+}
+
+impl<Fs: fs::Fs> walkdir::Filter<Fs> for AllButOne<Fs> {
+    type Error = Infallible;
+
+    async fn should_filter(
+        &self,
+        _: &AbsPath,
+        node_meta: &impl Metadata<Fs = Fs>,
+    ) -> Result<bool, Self::Error> {
+        Ok(node_meta.id() != self.id)
+    }
 }
 
 /// TODO: docs.
