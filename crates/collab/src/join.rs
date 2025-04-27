@@ -20,7 +20,12 @@ use crate::collab::Collab;
 use crate::config::Config;
 use crate::event_stream::EventStream;
 use crate::leave::StopChannels;
-use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
+use crate::project::{
+    IdMaps,
+    NewProjectArgs,
+    OverlappingProjectError,
+    Projects,
+};
 use crate::session::Session;
 use crate::start::UserNotLoggedInError;
 
@@ -95,6 +100,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             .map_err(JoinError::FlushProject)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
+            id_maps: IdMaps::default(),
             host_id: welcome.host_id,
             peer_handle: local_peer.github_handle.clone(),
             project: replica,

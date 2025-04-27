@@ -4,9 +4,10 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use collab_project::PeerId;
+use collab_project::fs::{DirectoryId, FileId};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
-use ed::backend::AgentId;
-use ed::fs::{AbsPath, AbsPathBuf};
+use ed::backend::{AgentId, Backend};
+use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::{AsyncCtx, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -61,10 +62,19 @@ pub(crate) struct ProjectGuard<B: CollabBackend> {
 
 pub(crate) struct NewProjectArgs<B: CollabBackend> {
     pub(crate) host_id: PeerId,
+    pub(crate) id_maps: IdMaps<B>,
     pub(crate) peer_handle: GitHubHandle,
     pub(crate) remote_peers: Peers,
     pub(crate) project: collab_project::Project,
     pub(crate) session_id: SessionId<B>,
+}
+
+#[derive(cauchy::Default)]
+pub(crate) struct IdMaps<B: Backend> {
+    pub(crate) buffer2file: FxHashMap<B::BufferId, FileId>,
+    pub(crate) file2buffer: FxHashMap<FileId, B::BufferId>,
+    pub(crate) node2dir: FxHashMap<<B::Fs as fs::Fs>::NodeId, DirectoryId>,
+    pub(crate) node2file: FxHashMap<<B::Fs as fs::Fs>::NodeId, FileId>,
 }
 
 impl<B: CollabBackend> Project<B> {

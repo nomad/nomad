@@ -5,7 +5,12 @@ use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
-use collab_project::fs::{File as ProjectFile, Node as ProjectNode};
+use collab_project::fs::{
+    DirectoryId,
+    File as ProjectFile,
+    FileId,
+    Node as ProjectNode,
+};
 use collab_project::{Project, ProjectBuilder};
 use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
@@ -17,6 +22,7 @@ use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use futures_util::AsyncReadExt;
+use fxhash::FxHashMap;
 use smol_str::ToSmolStr;
 use walkdir::FsExt;
 
@@ -25,7 +31,12 @@ use crate::collab::Collab;
 use crate::config::Config;
 use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
-use crate::project::{NewProjectArgs, OverlappingProjectError, Projects};
+use crate::project::{
+    IdMaps,
+    NewProjectArgs,
+    OverlappingProjectError,
+    Projects,
+};
 use crate::root_markers;
 use crate::session::Session;
 
@@ -103,13 +114,14 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::Knock)?;
 
-        let (project, event_stream) =
+        let (project, event_stream, id_maps) =
             read_project(project_guard.root(), welcome.peer_id, ctx)
                 .await
                 .map_err(StartError::ReadProject)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
             host_id: welcome.host_id,
+            id_maps,
             peer_handle,
             remote_peers: welcome.other_peers,
             project,
@@ -133,6 +145,21 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
 
         Ok(())
     }
+}
+
+impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
+    fn from(collab: &Collab<B>) -> Self {
+        Self {
+            auth_infos: collab.auth_infos.clone(),
+            config: collab.config.clone(),
+            projects: collab.projects.clone(),
+            stop_channels: collab.stop_channels.clone(),
+        }
+    }
+}
+
+impl<B: CollabBackend> ToCompletionFn<B> for Start<B> {
+    fn to_completion_fn(&self) {}
 }
 
 /// Searches for the root of the project containing the buffer with the given
@@ -182,7 +209,10 @@ async fn read_project<B: CollabBackend>(
     root_path: &AbsPath,
     local_id: PeerId,
     ctx: &mut AsyncCtx<'_, B>,
-) -> Result<(Project, EventStream<B, ProjectFilter<B>>), ReadProjectError<B>> {
+) -> Result<
+    (Project, EventStream<B, ProjectFilter<B>>, IdMaps<B>),
+    ReadProjectError<B>,
+> {
     let fs = ctx.fs();
 
     let root_node = fs
@@ -211,7 +241,7 @@ async fn read_project<B: CollabBackend>(
         },
     };
 
-    let (project, stream_builder) = ctx
+    let (project, stream_builder, node_id_maps) = ctx
         .spawn_background(async move {
             let walker = fs.walk(&project_root).filter(project_filter);
 
@@ -221,6 +251,9 @@ async fn read_project<B: CollabBackend>(
             let mut stream_builder = EventStreamBuilder::new(&project_root);
             let stream_builder_mut = Shared::new(&mut stream_builder);
 
+            let mut node_id_maps = NodeIdMaps::default();
+            let node_id_maps_mut = Shared::new(&mut node_id_maps);
+
             walker
                 .for_each(async |parent_path, node_meta| {
                     read_node(
@@ -229,6 +262,7 @@ async fn read_project<B: CollabBackend>(
                         &project_root,
                         &project_builder_mut,
                         &stream_builder_mut,
+                        &node_id_maps_mut,
                         &fs,
                     )
                     .await
@@ -239,28 +273,38 @@ async fn read_project<B: CollabBackend>(
             Ok((
                 project_builder.build(),
                 stream_builder.push_filter(walker.into_inner().into_filter()),
+                node_id_maps,
             ))
         })
         .await?;
 
-    let event_stream = stream_builder.build(ctx);
+    let mut event_stream = stream_builder.build(ctx);
 
-    ctx.for_each_buffer(|mut buf| {
-        let Some(_text_file) = <&AbsPath>::try_from(&*buf.name())
+    let mut id_maps = IdMaps::default();
+
+    ctx.for_each_buffer(|mut buffer| {
+        let Some(file_id) = <&AbsPath>::try_from(&*buffer.name())
             .ok()
             .and_then(|path| path.strip_prefix(root_path))
             .and_then(|path| match project.node_at_path(path)? {
-                ProjectNode::File(ProjectFile::Text(file)) => Some(file),
+                ProjectNode::File(ProjectFile::Text(file)) => Some(file.id()),
                 _ => None,
             })
         else {
             return;
         };
 
-        // event_stream.watch_buffer(text_file.id(), &mut buf);
+        if let Some(node_id) = node_id_maps.file2node.get(&file_id) {
+            event_stream.watch_buffer(node_id.clone(), &mut buffer);
+            id_maps.buffer2file.insert(buffer.id(), file_id);
+            id_maps.file2buffer.insert(file_id, buffer.id());
+        }
     });
 
-    Ok((project, event_stream))
+    id_maps.node2dir = node_id_maps.node2dir;
+    id_maps.node2file = node_id_maps.node2file;
+
+    Ok((project, event_stream, id_maps))
 }
 
 /// TODO: docs.
@@ -270,6 +314,7 @@ async fn read_node<Fs: fs::Fs>(
     project_root: &Fs::Directory,
     project_builder: &Shared<&mut ProjectBuilder, MultiThreaded>,
     stream_builder: &Shared<&mut EventStreamBuilder<Fs>, MultiThreaded>,
+    _node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
     fs: &Fs,
 ) -> Result<(), ReadNodeError<Fs>> {
     let node_name = node_meta.name().map_err(ReadNodeError::NodeName)?;
@@ -423,6 +468,13 @@ pub struct AllButOne<Fs: fs::Fs> {
     id: Fs::NodeId,
 }
 
+#[derive(cauchy::Default)]
+struct NodeIdMaps<Fs: fs::Fs> {
+    file2node: FxHashMap<FileId, Fs::NodeId>,
+    node2dir: FxHashMap<Fs::NodeId, DirectoryId>,
+    node2file: FxHashMap<Fs::NodeId, FileId>,
+}
+
 impl<Fs: fs::Fs> walkdir::Filter<Fs> for AllButOne<Fs> {
     type Error = Infallible;
 
@@ -440,21 +492,6 @@ pub(crate) struct UserNotLoggedInError<B>(PhantomData<B>);
 
 /// TODO: docs.
 struct NoBufferFocusedError<B>(PhantomData<B>);
-
-impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
-    fn from(collab: &Collab<B>) -> Self {
-        Self {
-            auth_infos: collab.auth_infos.clone(),
-            config: collab.config.clone(),
-            projects: collab.projects.clone(),
-            stop_channels: collab.stop_channels.clone(),
-        }
-    }
-}
-
-impl<B: CollabBackend> ToCompletionFn<B> for Start<B> {
-    fn to_completion_fn(&self) {}
-}
 
 impl<B> NoBufferFocusedError<B> {
     fn new() -> Self {
