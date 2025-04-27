@@ -40,10 +40,10 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
 
     /// TODO: docs.
     #[inline]
-    fn for_each<'a, Err: Send + 'a>(
-        &'a self,
-        dir_path: &'a AbsPath,
-        handler: impl ForEachHandler<Fs, Err> + 'a,
+    fn for_each<Err: Send>(
+        &self,
+        dir_path: &AbsPath,
+        handler: impl ForEachHandler<Result<(), Err>, Fs>,
     ) -> impl Future<Output = Result<(), WalkError<Fs, Self, Err>>> + Send
     where
         Self: Sync,
@@ -53,7 +53,7 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
         fn inner<'a, W, Err, Fs>(
             walkdir: &'a W,
             dir_path: &'a AbsPath,
-            handler: impl ForEachHandler<Fs, Err> + 'a,
+            handler: impl ForEachHandler<Result<(), Err>, Fs> + 'a,
         ) -> Pin<
             Box<
                 dyn Future<Output = Result<(), WalkError<Fs, W, Err>>>
@@ -107,62 +107,58 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
         async move { inner(self, dir_path, handler).await }
     }
 
-    // /// TODO: docs.
-    // #[inline]
-    // fn paths<'a>(
-    //     &'a self,
-    //     dir_path: &'a AbsPath,
-    // ) -> impl FusedStream<
-    //     Item = Result<AbsPathBuf, WalkError<Fs, Self, fs::MetadataNameError>>,
-    // > + 'a
-    // where
-    //     Self: Sync,
-    // {
-    //     self.to_stream(dir_path, async |dir_path, entry| {
-    //         entry.name().map(|name| dir_path.join(name))
-    //     })
-    // }
-    //
-    // /// TODO: docs.
-    // #[inline]
-    // fn to_stream<'a, T, E>(
-    //     &'a self,
-    //     dir_path: &'a AbsPath,
-    //     handler: impl AsyncFnOnce(&AbsPath, Fs::Metadata) -> Result<T, E>
-    //     + Send
-    //     + Clone
-    //     + 'a,
-    // ) -> impl FusedStream<Item = Result<T, WalkError<Fs, Self, E>>> + 'a
-    // where
-    //     Self: Sync,
-    //     T: Send + 'a,
-    //     E: Send + 'a,
-    // {
-    //     let (tx, rx) = flume::unbounded();
-    //     let for_each = self
-    //         .for_each(dir_path, async move |dir_path, entry| {
-    //             let _ = tx.send(handler(dir_path, entry).await?);
-    //             Ok(())
-    //         })
-    //         .boxed_local()
-    //         .fuse();
-    //     futures_util::stream::unfold(
-    //         (for_each, rx),
-    //         move |(mut for_each, rx)| async move {
-    //             let res = select! {
-    //                 res = for_each => match res {
-    //                     Ok(()) => return None,
-    //                     Err(err) => Err(err),
-    //                 },
-    //                 res = rx.recv_async() => match res {
-    //                     Ok(value) => Ok(value),
-    //                     Err(_err) => return None,
-    //                 },
-    //             };
-    //             Some((res, (for_each, rx)))
-    //         },
-    //     )
-    // }
+    /// TODO: docs.
+    #[inline]
+    fn paths<'a>(
+        &'a self,
+        dir_path: &'a AbsPath,
+    ) -> impl FusedStream<
+        Item = Result<AbsPathBuf, WalkError<Fs, Self, fs::MetadataNameError>>,
+    > + Send
+    + 'a
+    where
+        Self: Sync,
+    {
+        self.to_stream(dir_path, async move |dir_path, entry| {
+            entry.name().map(|name| dir_path.join(name))
+        })
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn to_stream<'a, T: Send + 'a, E: Send + 'a>(
+        &'a self,
+        dir_path: &'a AbsPath,
+        handler: impl ForEachHandler<Result<T, E>, Fs> + 'a,
+    ) -> impl FusedStream<Item = Result<T, WalkError<Fs, Self, E>>> + Send + 'a
+    where
+        Self: Sync,
+    {
+        let (tx, rx) = flume::unbounded();
+        let for_each = self
+            .for_each(dir_path, async move |dir_path, entry| {
+                let _ = tx.send(handler(dir_path, entry).await?);
+                Ok(())
+            })
+            .boxed()
+            .fuse();
+        futures_util::stream::unfold(
+            (for_each, rx),
+            move |(mut for_each, rx)| async move {
+                let res = select! {
+                    res = for_each => match res {
+                        Ok(()) => return None,
+                        Err(err) => Err(err),
+                    },
+                    res = rx.recv_async() => match res {
+                        Ok(value) => Ok(value),
+                        Err(_err) => return None,
+                    },
+                };
+                Some((res, (for_each, rx)))
+            },
+        )
+    }
 }
 
 /// TODO: docs.
@@ -246,24 +242,24 @@ impl<Fs: fs::Fs> WalkDir<Self> for Fs {
     }
 }
 
-pub trait ForEachHandler<Fs: fs::Fs, Err>:
+pub trait ForEachHandler<Out, Fs: fs::Fs>:
     for<'a> AsyncFnOnce<
         (&'a AbsPath, Fs::Metadata),
         CallOnceFuture: Send,
-        Output = Result<(), Err>,
+        Output = Out,
     > + Send
     + Clone
 {
 }
 
-impl<Fs, Err, H> ForEachHandler<Fs, Err> for H
+impl<H, Out, Fs> ForEachHandler<Out, Fs> for H
 where
-    Fs: fs::Fs,
     H: for<'a> AsyncFnOnce<
             (&'a AbsPath, Fs::Metadata),
             CallOnceFuture: Send,
-            Output = Result<(), Err>,
+            Output = Out,
         > + Send
         + Clone,
+    Fs: fs::Fs,
 {
 }

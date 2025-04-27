@@ -47,7 +47,7 @@ where
     #[inline]
     pub fn for_each<Err: Send>(
         &self,
-        handler: impl ForEachHandler<Fs, Err>,
+        handler: impl ForEachHandler<Result<(), Err>, Fs>,
     ) -> impl Future<Output = Result<(), WalkError<Fs, W, Err>>> + Send
     where
         W: Sync,
