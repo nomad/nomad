@@ -102,6 +102,12 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             session_id: welcome.session_id,
         });
 
+        project_handle.with_mut(|proj| {
+            for message in buffered {
+                proj.integrate_message(message, ctx);
+            }
+        });
+
         let event_stream: EventStream<B, B::ProjectFilter> = todo!();
 
         let session = Session {
