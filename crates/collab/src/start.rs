@@ -282,6 +282,7 @@ async fn read_project<B: CollabBackend>(
 
     let mut id_maps = IdMaps::default();
 
+    // Start watching the opened buffers that are part of the project.
     ctx.for_each_buffer(|mut buffer| {
         let Some(file_id) = <&AbsPath>::try_from(&*buffer.name())
             .ok()
@@ -314,7 +315,7 @@ async fn read_node<Fs: fs::Fs>(
     project_root: &Fs::Directory,
     project_builder: &Shared<&mut ProjectBuilder, MultiThreaded>,
     stream_builder: &Shared<&mut EventStreamBuilder<Fs>, MultiThreaded>,
-    _node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
+    node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
     fs: &Fs,
 ) -> Result<(), ReadNodeError<Fs>> {
     let node_name = node_meta.name().map_err(ReadNodeError::NodeName)?;
@@ -331,9 +332,14 @@ async fn read_node<Fs: fs::Fs>(
         .strip_prefix(project_root.path())
         .expect("node is under the root dir");
 
-    let maybe_err = match &node {
-        FsNode::Directory(_) => project_builder
-            .with_mut(|builder| builder.push_directory(path_in_project).err()),
+    let push_res = match &node {
+        FsNode::Directory(dir) => project_builder
+            .with_mut(|builder| builder.push_directory(path_in_project))
+            .map(|dir_id| {
+                node_id_maps.with_mut(|maps| {
+                    maps.node2dir.insert(dir.id(), dir_id);
+                })
+            }),
 
         FsNode::File(file) => {
             let contents =
@@ -341,12 +347,18 @@ async fn read_node<Fs: fs::Fs>(
 
             match str::from_utf8(&contents) {
                 Ok(contents) => project_builder.with_mut(|builder| {
-                    builder.push_text_file(path_in_project, contents).err()
+                    builder.push_text_file(path_in_project, contents)
                 }),
                 Err(_) => project_builder.with_mut(|builder| {
-                    builder.push_binary_file(path_in_project, contents).err()
+                    builder.push_binary_file(path_in_project, contents)
                 }),
             }
+            .map(|file_id| {
+                node_id_maps.with_mut(|maps| {
+                    maps.file2node.insert(file_id, file.id());
+                    maps.node2file.insert(file.id(), file_id);
+                })
+            })
         },
         FsNode::Symlink(symlink) => {
             let target_path = symlink
@@ -354,14 +366,21 @@ async fn read_node<Fs: fs::Fs>(
                 .await
                 .map_err(ReadNodeError::ReadSymlink)?;
 
-            project_builder.with_mut(|builder| {
-                builder.push_symlink(path_in_project, target_path).err()
-            })
+            project_builder
+                .with_mut(|builder| {
+                    builder.push_symlink(path_in_project, target_path)
+                })
+                .map(|file_id| {
+                    node_id_maps.with_mut(|maps| {
+                        maps.file2node.insert(file_id, symlink.id());
+                        maps.node2file.insert(symlink.id(), file_id);
+                    })
+                })
         },
     };
 
-    if maybe_err.is_some() {
-        Err(ReadNodeError::DuplicateNodeAtPath(path_in_project.to_owned()))
+    if push_res.is_err() {
+        Err(ReadNodeError::DuplicateNodeAtPath(node_path))
     } else {
         stream_builder.with_mut(|builder| builder.push_node(&node));
         Ok(())
