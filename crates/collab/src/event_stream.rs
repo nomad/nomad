@@ -13,7 +13,10 @@ use crate::seq_ext::StreamableSeq;
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
-pub(crate) struct EventStream<B: CollabBackend, F: Filter<B::Fs>> {
+pub(crate) struct EventStream<
+    B: CollabBackend,
+    F: Filter<B::Fs> = <B as CollabBackend>::ProjectFilter,
+> {
     /// The `AgentId` of the `Session` that owns this `EventRx`.
     agent_id: AgentId,
     buffer_handles: FxHashMap<B::BufferId, SmallVec<[B::EventHandle; 3]>>,

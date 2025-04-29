@@ -75,7 +75,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             .config
             .with(|c| c.store_remote_projects_under.clone())
         {
-            Some(path) => path,
+            Some(remote_dir) => remote_dir,
             None => B::default_dir_for_remote_projects(ctx)
                 .await
                 .map_err(JoinError::DefaultDirForRemoteProjects)?,
@@ -89,21 +89,21 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 
         let local_peer = Peer { id: welcome.peer_id, github_handle };
 
-        let ProjectResponse { buffered, project: replica } =
+        let ProjectResponse { buffered, project } =
             request_project::<B>(local_peer.clone(), &mut welcome)
                 .await
                 .map_err(JoinError::RequestProject)?;
 
-        ProjectTree::new(&replica)
-            .flush(project_guard.root(), ctx.fs())
-            .await
-            .map_err(JoinError::FlushProject)?;
+        let (event_stream, id_maps) =
+            write_project(&project, project_guard.root(), ctx)
+                .await
+                .map_err(JoinError::WriteProject)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
-            id_maps: IdMaps::default(),
+            id_maps,
             host_id: welcome.host_id,
             peer_handle: local_peer.github_handle.clone(),
-            project: replica,
+            project,
             remote_peers: welcome.other_peers,
             session_id: welcome.session_id,
         });
@@ -113,8 +113,6 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
                 proj.integrate_message(message, ctx);
             }
         });
-
-        let event_stream: EventStream<B, B::ProjectFilter> = todo!();
 
         let session = Session {
             event_stream,
@@ -133,6 +131,15 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 
         Ok(())
     }
+}
+
+/// TODO: docs.
+async fn write_project<B: CollabBackend>(
+    project: &Project,
+    root_path: &AbsPath,
+    ctx: &mut AsyncCtx<'_, B>,
+) -> Result<(EventStream<B>, IdMaps<B>), WriteProjectError<B::Fs>> {
+    todo!();
 }
 
 struct ProjectResponse {
@@ -193,21 +200,21 @@ impl<'a> ProjectTree<'a> {
         &self,
         flush_under: &AbsPath,
         fs: Fs,
-    ) -> Result<(), FlushProjectError<Fs>> {
+    ) -> Result<(), WriteProjectError<Fs>> {
         if let Some(node) = fs
             .node_at_path(flush_under)
             .await
-            .map_err(FlushProjectError::GetNodeAtRoot)?
+            .map_err(WriteProjectError::GetNodeAtRoot)?
         {
-            node.delete().await.map_err(FlushProjectError::DeleteNodeAtRoot)?
+            node.delete().await.map_err(WriteProjectError::DeleteNodeAtRoot)?
         }
 
         let root = fs
             .create_directory(flush_under)
             .await
-            .map_err(FlushProjectError::GetOrCreateRoot)?;
+            .map_err(WriteProjectError::GetOrCreateRoot)?;
 
-        root.clear().await.map_err(FlushProjectError::ClearRoot)?;
+        root.clear().await.map_err(WriteProjectError::ClearRoot)?;
 
         let root_id = self.project.root().id();
 
@@ -218,7 +225,7 @@ impl<'a> ProjectTree<'a> {
         &self,
         dir_id: DirectoryId,
         dir: &Fs::Directory,
-    ) -> Result<(), FlushProjectError<Fs>> {
+    ) -> Result<(), WriteProjectError<Fs>> {
         let parent = self.project.directory(dir_id).expect("ID is valid");
 
         let flush_dirs = parent
@@ -235,7 +242,7 @@ impl<'a> ProjectTree<'a> {
                     let child = dir
                         .create_directory(child_name)
                         .await
-                        .map_err(FlushProjectError::CreateDirectory)?;
+                        .map_err(WriteProjectError::CreateDirectory)?;
                     self.flush_directory::<Fs>(child_id, &child).await
                 }
             });
@@ -253,7 +260,7 @@ impl<'a> ProjectTree<'a> {
                     let mut child = dir
                         .create_file(child_name)
                         .await
-                        .map_err(FlushProjectError::CreateFile)?;
+                        .map_err(WriteProjectError::CreateFile)?;
                     self.flush_file::<Fs>(child_id, &mut child).await
                 }
             });
@@ -274,7 +281,7 @@ impl<'a> ProjectTree<'a> {
         &self,
         file_id: FileId,
         file: &mut Fs::File,
-    ) -> Result<(), FlushProjectError<Fs>> {
+    ) -> Result<(), WriteProjectError<Fs>> {
         match self.project.file(file_id).expect("ID is valid") {
             ProjectFile::Binary(binary_file) => {
                 file.write(binary_file.contents()).await
@@ -286,7 +293,7 @@ impl<'a> ProjectTree<'a> {
                 file.write(text_file.contents().to_string()).await
             },
         }
-        .map_err(FlushProjectError::WriteToFile)
+        .map_err(WriteProjectError::WriteToFile)
     }
 
     fn new(project: &'a Project) -> Self {
@@ -304,9 +311,6 @@ pub enum JoinError<B: CollabBackend> {
     DefaultDirForRemoteProjects(B::DefaultDirForRemoteProjectsError),
 
     /// TODO: docs.
-    FlushProject(FlushProjectError<B::Fs>),
-
-    /// TODO: docs.
     Knock(client::KnockError<B::ServerConfig>),
 
     /// TODO: docs.
@@ -317,6 +321,9 @@ pub enum JoinError<B: CollabBackend> {
 
     /// TODO: docs.
     UserNotLoggedIn,
+
+    /// TODO: docs.
+    WriteProject(WriteProjectError<B::Fs>),
 }
 
 /// The type of error that can occur when requesting the state of the project
@@ -335,7 +342,7 @@ pub enum RequestProjectError {
 
 /// TODO: docs.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum FlushProjectError<Fs: fs::Fs> {
+pub enum WriteProjectError<Fs: fs::Fs> {
     /// TODO: docs.
     CreateDirectory(<Fs::Directory as fs::Directory>::CreateDirectoryError),
 
@@ -378,7 +385,7 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
         match self {
             Self::ConnectToServer(err) => err.to_message(),
             Self::DefaultDirForRemoteProjects(err) => err.to_message(),
-            Self::FlushProject(err) => err.to_message(),
+            Self::WriteProject(err) => err.to_message(),
             Self::Knock(_err) => todo!(),
             Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(err) => err.to_message(),
@@ -389,7 +396,7 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
     }
 }
 
-impl<Fs: fs::Fs> notify::Error for FlushProjectError<Fs> {
+impl<Fs: fs::Fs> notify::Error for WriteProjectError<Fs> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         let err: &dyn fmt::Display = match self {
             Self::CreateDirectory(err) => err,
