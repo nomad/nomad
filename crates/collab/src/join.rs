@@ -100,7 +100,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 
         let local_peer = Peer { id: welcome.peer_id, github_handle };
 
-        let ProjectResponse { buffered, project } =
+        let (project, buffered) =
             request_project::<B>(local_peer.clone(), &mut welcome)
                 .await
                 .map_err(JoinError::RequestProject)?;
@@ -157,6 +157,49 @@ impl<B: CollabBackend> From<&Collab<B>> for Join<B> {
 
 impl<B: CollabBackend> ToCompletionFn<B> for Join<B> {
     fn to_completion_fn(&self) {}
+}
+
+/// TODO: docs.
+async fn request_project<B: CollabBackend>(
+    local_peer: Peer,
+    welcome: &mut Welcome<B>,
+) -> Result<(Project, Vec<Message>), RequestProjectError> {
+    let local_id = local_peer.id;
+
+    let request = ProjectRequest {
+        requested_by: local_peer,
+        request_from: welcome
+            .other_peers
+            .as_slice()
+            .first()
+            .expect("can't be empty")
+            .id,
+    };
+
+    welcome
+        .tx
+        .send(Message::ProjectRequest(request))
+        .await
+        .map_err(RequestProjectError::SendRequest)?;
+
+    let mut buffered = Vec::new();
+
+    loop {
+        let message = welcome
+            .rx
+            .next()
+            .await
+            .ok_or(RequestProjectError::SessionEnded)?
+            .map_err(RequestProjectError::RecvResponse)?;
+
+        match message {
+            Message::ProjectResponse(response) => {
+                let proj = Project::from_state(local_id, *response.project);
+                break Ok((proj, buffered));
+            },
+            other => buffered.push(other),
+        }
+    }
 }
 
 /// TODO: docs.
@@ -313,55 +356,6 @@ async fn write_file<Fs: fs::Fs>(
     });
 
     Ok(())
-}
-
-struct ProjectResponse {
-    buffered: Vec<Message>,
-    project: Project,
-}
-
-async fn request_project<B: CollabBackend>(
-    local_peer: Peer,
-    welcome: &mut Welcome<B>,
-) -> Result<ProjectResponse, RequestProjectError> {
-    let local_id = local_peer.id;
-
-    let request = ProjectRequest {
-        requested_by: local_peer,
-        request_from: welcome
-            .other_peers
-            .as_slice()
-            .first()
-            .expect("can't be empty")
-            .id,
-    };
-
-    welcome
-        .tx
-        .send(Message::ProjectRequest(request))
-        .await
-        .map_err(RequestProjectError::SendRequest)?;
-
-    let mut buffered = Vec::new();
-
-    let response = loop {
-        let message = welcome
-            .rx
-            .next()
-            .await
-            .ok_or(RequestProjectError::SessionEnded)?
-            .map_err(RequestProjectError::RecvResponse)?;
-
-        match message {
-            Message::ProjectResponse(response) => break response,
-            other => buffered.push(other),
-        }
-    };
-
-    Ok(ProjectResponse {
-        buffered,
-        project: Project::from_state(local_id, *response.project),
-    })
 }
 
 /// The type of error that can occur when [`Join`]ing a session fails.
