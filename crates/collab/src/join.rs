@@ -20,7 +20,7 @@ use collab_server::{SessionIntent, client};
 use ed::AsyncCtx;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
-use ed::fs::{self, AbsPath, Directory, File, Fs, Symlink};
+use ed::fs::{self, Directory, File, Fs, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
@@ -309,10 +309,6 @@ struct ProjectResponse {
     project: Project,
 }
 
-struct ProjectTree<'a> {
-    project: &'a Project,
-}
-
 async fn request_project<B: CollabBackend>(
     local_peer: Peer,
     welcome: &mut Welcome<B>,
@@ -355,112 +351,6 @@ async fn request_project<B: CollabBackend>(
         buffered,
         project: Project::from_state(local_id, *response.project),
     })
-}
-
-impl<'a> ProjectTree<'a> {
-    async fn flush<Fs: fs::Fs>(
-        &self,
-        flush_under: &AbsPath,
-        fs: Fs,
-    ) -> Result<(), WriteProjectError<Fs>> {
-        if let Some(node) = fs
-            .node_at_path(flush_under)
-            .await
-            .map_err(WriteProjectError::GetNodeAtRoot)?
-        {
-            node.delete().await.map_err(WriteProjectError::DeleteNodeAtRoot)?
-        }
-
-        let root = fs
-            .create_directory(flush_under)
-            .await
-            .map_err(WriteProjectError::CreateRootDirectory)?;
-
-        root.clear().await.map_err(WriteProjectError::ClearRoot)?;
-
-        let root_id = self.project.root().id();
-
-        self.flush_directory(root_id, &root).await
-    }
-
-    async fn flush_directory<Fs: fs::Fs>(
-        &self,
-        dir_id: DirectoryId,
-        dir: &Fs::Directory,
-    ) -> Result<(), WriteProjectError<Fs>> {
-        let parent = self.project.directory(dir_id).expect("ID is valid");
-
-        let flush_dirs = parent
-            .children()
-            .filter_map(|node| match node {
-                Node::Directory(dir) => Some(dir),
-                Node::File(_) => None,
-            })
-            .map(|child_dir| {
-                let child_id = child_dir.id();
-                let child_name =
-                    child_dir.name().expect("child can't be root");
-                async move {
-                    let child = dir
-                        .create_directory(child_name)
-                        .await
-                        .map_err(WriteProjectError::CreateDirectory)?;
-                    self.flush_directory::<Fs>(child_id, &child).await
-                }
-            });
-
-        let flush_files = parent
-            .children()
-            .filter_map(|node| match node {
-                Node::Directory(_) => None,
-                Node::File(file) => Some(file),
-            })
-            .map(|child_file| {
-                let child_id = child_file.id();
-                let child_name = child_file.name();
-                async move {
-                    let mut child = dir
-                        .create_file(child_name)
-                        .await
-                        .map_err(WriteProjectError::CreateFile)?;
-                    self.flush_file::<Fs>(child_id, &mut child).await
-                }
-            });
-
-        let mut flush_children = flush_dirs
-            .map(future::Either::Left)
-            .chain(flush_files.map(future::Either::Right))
-            .collect::<stream::FuturesOrdered<_>>();
-
-        while let Some(res) = flush_children.next().await {
-            res?;
-        }
-
-        Ok(())
-    }
-
-    async fn flush_file<Fs: fs::Fs>(
-        &self,
-        file_id: FileId,
-        file: &mut Fs::File,
-    ) -> Result<(), WriteProjectError<Fs>> {
-        match self.project.file(file_id).expect("ID is valid") {
-            ProjectFile::Binary(binary_file) => {
-                file.write(binary_file.contents()).await
-            },
-            ProjectFile::Symlink(symlink_file) => {
-                file.write(symlink_file.target_path()).await
-            },
-            ProjectFile::Text(text_file) => {
-                file.write(text_file.contents().to_string()).await
-            },
-        }
-        .map_err(WriteProjectError::WriteFile)
-    }
-
-    fn new(project: &'a Project) -> Self {
-        Self { project }
-    }
 }
 
 /// The type of error that can occur when [`Join`]ing a session fails.

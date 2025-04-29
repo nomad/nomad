@@ -2,7 +2,7 @@ use abs_path::{AbsPath, AbsPathBuf};
 use ed::backend::{AgentId, Buffer};
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::{AsyncCtx, Shared};
-use futures_util::{FutureExt, SinkExt, StreamExt, select_biased};
+use futures_util::{StreamExt, select_biased};
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 use walkdir::Filter;
