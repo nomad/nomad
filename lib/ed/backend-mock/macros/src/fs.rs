@@ -87,7 +87,7 @@ impl ToTokens for Directory {
         let variable_name = Ident::new("__dir", Span::call_site());
 
         let mut definition = quote! {
-            let mut #variable_name = ::ed::mock::fs::MockDirectory::new();
+            let mut #variable_name = ::ed::mock::fs::DirectoryInner::new();
         };
 
         for (child_name, child) in self.children.iter() {
@@ -110,7 +110,7 @@ impl ToTokens for Directory {
 impl ToTokens for File {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let contents = &self.contents;
-        quote! { ::ed::mock::fs::MockFile::new(#contents) }.to_tokens(tokens);
+        quote! { ::ed::mock::fs::FileInner::new(#contents) }.to_tokens(tokens);
     }
 }
 

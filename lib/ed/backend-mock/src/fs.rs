@@ -99,12 +99,14 @@ pub struct DirectoryInner {
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
-struct FileInner {
+#[doc(hidden)]
+pub struct FileInner {
     contents: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct SymlinkInner {
+#[doc(hidden)]
+pub struct SymlinkInner {
     target_path: String,
 }
 
@@ -277,9 +279,25 @@ impl FsInner {
         Ok(())
     }
 
-    fn new(root: DirectoryInner) -> Self {
+    fn new(mut root: DirectoryInner) -> Self {
+        fn update_node_ids(
+            next_node_id: &mut MockNodeId,
+            parent: &mut DirectoryInner,
+        ) {
+            for (metadata, _) in parent.children.values_mut() {
+                metadata.node_id = next_node_id.post_inc();
+            }
+            for (_, node) in parent.children.values_mut() {
+                if let Node::Directory(dir) = node {
+                    update_node_ids(next_node_id, dir);
+                }
+            }
+        }
+
+        let mut next_node_id = MockNodeId(0);
+        update_node_ids(&mut next_node_id, &mut root);
         Self {
-            next_node_id: MockNodeId(0),
+            next_node_id,
             root: Node::Directory(root),
             timestamp: MockTimestamp(0),
             watchers: FxHashMap::default(),
@@ -331,12 +349,28 @@ impl DirectoryInner {
                 panic!("duplicate child name: {name:?}");
             },
             indexmap::map::Entry::Vacant(entry) => {
-                entry.insert(child.into());
+                let child = child.into();
+                let metadata = MockMetadata {
+                    byte_len: match &child {
+                        Node::File(file) => file.len(),
+                        Node::Directory(_) => 0usize.into(),
+                        Node::Symlink(symlink) => {
+                            symlink.target_path.len().into()
+                        },
+                    },
+                    created_at: MockTimestamp(0),
+                    last_modified_at: MockTimestamp(0),
+                    name: name.to_owned(),
+                    node_id: MockNodeId(0),
+                    node_kind: child.kind(),
+                };
+                entry.insert((metadata, child));
             },
         }
         self
     }
 
+    #[doc(hidden)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -393,20 +427,28 @@ impl DirectoryInner {
 }
 
 impl FileInner {
-    pub fn contents(&self) -> &[u8] {
+    fn contents(&self) -> &[u8] {
         &self.contents
     }
 
-    pub fn len(&self) -> ByteOffset {
+    fn len(&self) -> ByteOffset {
         self.contents().len().into()
     }
 
+    #[doc(hidden)]
     pub fn new<C: AsRef<[u8]>>(contents: C) -> Self {
         Self { contents: contents.as_ref().to_owned() }
     }
 
-    pub fn write<C: AsRef<[u8]>>(&mut self, contents: C) {
+    fn write<C: AsRef<[u8]>>(&mut self, contents: C) {
         self.contents = contents.as_ref().to_owned();
+    }
+}
+
+impl SymlinkInner {
+    #[doc(hidden)]
+    pub fn new<P: AsRef<str>>(target_path: P) -> Self {
+        Self { target_path: target_path.as_ref().to_owned() }
     }
 }
 

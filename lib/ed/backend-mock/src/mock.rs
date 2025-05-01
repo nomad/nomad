@@ -1,6 +1,6 @@
 use abs_path::AbsPath;
 use ed_core::backend::{AgentId, ApiValue, Backend, Edit};
-use ed_core::fs::FsNode;
+use ed_core::fs::{Fs, FsNode};
 use ed_core::notify::MaybeResult;
 use ed_core::shared::Shared;
 use fxhash::FxHashMap;
@@ -76,7 +76,10 @@ impl Mock {
         assert!(self.buffer_at(path).is_none());
 
         let file =
-            match self.fs.node_at_path_sync(path).expect("no file at path") {
+            match futures_lite::future::block_on(self.fs.node_at_path(path))
+                .expect("infallible")
+                .expect("no file at path")
+            {
                 FsNode::File(file) => file,
                 _ => todo!(),
             };
