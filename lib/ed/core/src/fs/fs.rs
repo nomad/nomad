@@ -3,17 +3,7 @@ use core::fmt::Debug;
 use core::future::Future;
 use core::hash::Hash;
 
-use futures_lite::Stream;
-
-use crate::fs::{
-    AbsPath,
-    Directory,
-    File,
-    FsEvent,
-    FsNode,
-    Metadata,
-    Symlink,
-};
+use crate::fs::{AbsPath, Directory, File, FsNode, Metadata, Symlink};
 
 /// TODO: docs.
 pub trait Fs: Clone + Send + Sync + 'static {
@@ -36,11 +26,6 @@ pub trait Fs: Clone + Send + Sync + 'static {
     type Timestamp: Clone + Ord;
 
     /// TODO: docs.
-    type Watcher: Stream<
-        Item = Result<FsEvent<Self::Timestamp>, Self::WatchError>,
-    >;
-
-    /// TODO: docs.
     type CreateDirectoryError: Error + Send;
 
     /// TODO: docs.
@@ -48,9 +33,6 @@ pub trait Fs: Clone + Send + Sync + 'static {
 
     /// TODO: docs.
     type NodeAtPathError: Error + Send;
-
-    /// TODO: docs.
-    type WatchError: Error + Send;
 
     /// TODO: docs.
     fn create_directory<P: AsRef<AbsPath> + Send>(
@@ -76,12 +58,6 @@ pub trait Fs: Clone + Send + Sync + 'static {
 
     /// TODO: docs.
     fn now(&self) -> Self::Timestamp;
-
-    /// TODO: docs.
-    fn watch<P: AsRef<AbsPath>>(
-        &self,
-        path: P,
-    ) -> impl Future<Output = Result<Self::Watcher, Self::WatchError>>;
 
     /// TODO: docs.
     fn exists<P: AsRef<AbsPath> + Send>(

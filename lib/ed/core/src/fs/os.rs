@@ -12,7 +12,6 @@ use std::time::SystemTime;
 
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{AsyncWriteExt, select};
-use notify::{RecursiveMode, Watcher};
 
 use crate::ByteOffset;
 use crate::fs::{
@@ -137,12 +136,10 @@ impl Fs for OsFs {
     type Metadata = OsMetadata;
     type NodeId = Inode;
     type Timestamp = SystemTime;
-    type Watcher = OsWatcher;
 
     type CreateDirectoryError = io::Error;
     type CreateFileError = io::Error;
     type NodeAtPathError = io::Error;
-    type WatchError = notify::Error;
 
     #[inline]
     async fn create_directory<P: AsRef<AbsPath> + Send>(
@@ -198,28 +195,6 @@ impl Fs for OsFs {
     #[inline]
     fn now(&self) -> Self::Timestamp {
         SystemTime::now()
-    }
-
-    #[inline]
-    async fn watch<P: AsRef<AbsPath>>(
-        &self,
-        path: P,
-    ) -> Result<Self::Watcher, Self::WatchError> {
-        let (tx, rx) = flume::unbounded();
-        let mut watcher = notify::recommended_watcher(
-            move |event_res: Result<_, notify::Error>| {
-                let _ =
-                    tx.send(event_res.map(|event| (event, SystemTime::now())));
-            },
-        )?;
-        watcher.watch(
-            std::path::Path::new(path.as_ref().as_str()),
-            RecursiveMode::Recursive,
-        )?;
-        Ok(OsWatcher {
-            buffered: VecDeque::default(),
-            inner: rx.into_stream(),
-        })
     }
 }
 

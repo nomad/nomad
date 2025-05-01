@@ -17,7 +17,7 @@ pub trait Buffer {
     type Id: Clone;
 
     /// TODO: docs.
-    type Backend: Backend;
+    type Backend: Backend<BufferId = Self::Id>;
 
     /// TODO: docs.
     fn byte_len(&self) -> ByteOffset;
