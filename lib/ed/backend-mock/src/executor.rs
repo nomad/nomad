@@ -18,6 +18,7 @@ pin_project_lite::pin_project! {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Spawner {
     runnable_tx: Sender<Runnable>,
 }
@@ -107,6 +108,12 @@ impl BackgroundExecutor for Executor {
         Fut::Output: Send + 'static,
     {
         self.spawner.spawn_background(fut)
+    }
+}
+
+impl Clone for Executor {
+    fn clone(&self) -> Self {
+        Self { runner: None, spawner: self.spawner.clone() }
     }
 }
 
