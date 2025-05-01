@@ -29,7 +29,9 @@ impl<Fs: fs::Fs> Finder<Fs> {
 
         let mut dir = match node {
             fs::FsNode::Directory(dir) => dir,
-            fs::FsNode::File(file) => file.parent().await,
+            fs::FsNode::File(file) => {
+                file.parent().await.map_err(FindRootError::FileParent)?
+            },
             fs::FsNode::Symlink(_) => todo!("can't handle symlinks yet"),
         };
 
@@ -38,7 +40,7 @@ impl<Fs: fs::Fs> Finder<Fs> {
                 return Ok(Some(dir.path().to_owned()));
             }
 
-            match dir.parent().await {
+            match dir.parent().await.map_err(FindRootError::DirParent)? {
                 Some(new_parent) => dir = new_parent,
                 None => return Ok(None),
             }

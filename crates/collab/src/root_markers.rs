@@ -1,12 +1,11 @@
 use core::error::Error;
 use core::fmt;
-use std::borrow::Cow;
 
+use abs_path::AbsPathBuf;
 use ed::fs::{self, Directory, File, MetadataNameError, Symlink};
 use ed::notify;
 use futures_util::stream::{self, StreamExt};
 use futures_util::{pin_mut, select};
-use smol_str::ToSmolStr;
 
 pub struct FindRootArgs<'a, M> {
     /// The marker used to determine if a directory is the root.
@@ -35,24 +34,20 @@ pub trait RootMarker<Fs: fs::Fs> {
     ) -> impl Future<Output = Result<bool, Self::Error>>;
 }
 
-#[derive(cauchy::Debug, cauchy::PartialEq)]
-pub struct FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
-    /// The path to the file or directory at which the error occurred.
-    pub path: fs::AbsPathBuf,
-
-    /// The kind of error that occurred.
-    pub kind: FindRootErrorKind<Fs, M>,
-}
-
-#[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum FindRootErrorKind<Fs: fs::Fs, M: RootMarker<Fs>> {
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
+pub enum FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
     DirEntry(DirEntryError<Fs>),
+    DirParent(<Fs::Directory as fs::Directory>::ParentError),
+    FileParent(<Fs::File as fs::File>::ParentError),
     FollowSymlink(<Fs::Symlink as fs::Symlink>::FollowError),
-    Marker { dir_entry_name: Option<fs::NodeNameBuf>, err: M::Error },
+    Marker(M::Error),
     NodeAtStartPath(Fs::NodeAtPathError),
     ReadDir(<Fs::Directory as fs::Directory>::ReadError),
-    StartPathNotFound,
-    StartsAtDanglingSymlink,
+    #[display("no file or directory found at {_0:?}")]
+    StartPathNotFound(AbsPathBuf),
+    #[display("starting point at {_0:?} is a dangling symlink")]
+    StartsAtDanglingSymlink(AbsPathBuf),
 }
 
 #[derive(
@@ -76,32 +71,33 @@ impl<M> FindRootArgs<'_, M> {
         let mut node = fs
             .node_at_path(self.start_from)
             .await
-            .map_err(FindRootErrorKind::NodeAtStartPath)
+            .map_err(FindRootError::NodeAtStartPath)
             .and_then(|maybe_node| {
-                maybe_node.ok_or(FindRootErrorKind::StartPathNotFound)
-            })
-            .map_err(|kind| FindRootError {
-                path: self.start_from.to_owned(),
-                kind,
+                maybe_node.ok_or(FindRootError::StartPathNotFound(
+                    self.start_from.to_owned(),
+                ))
             })?;
 
         let mut dir = loop {
             match node {
                 fs::FsNode::Directory(dir) => break dir,
-                fs::FsNode::File(file) => break file.parent().await,
+                fs::FsNode::File(file) => {
+                    break file
+                        .parent()
+                        .await
+                        .map_err(FindRootError::FileParent)?;
+                },
                 fs::FsNode::Symlink(symlink) => {
                     node = symlink
                         .follow_recursively()
                         .await
-                        .map_err(FindRootErrorKind::FollowSymlink)
+                        .map_err(FindRootError::FollowSymlink)
                         .and_then(|maybe_target| {
                             maybe_target.ok_or(
-                                FindRootErrorKind::StartsAtDanglingSymlink,
+                                FindRootError::StartsAtDanglingSymlink(
+                                    self.start_from.to_owned(),
+                                ),
                             )
-                        })
-                        .map_err(|kind| FindRootError {
-                            path: self.start_from.to_owned(),
-                            kind,
                         })?;
                 },
             }
@@ -114,7 +110,11 @@ impl<M> FindRootArgs<'_, M> {
             if self.stop_at == Some(dir.path()) {
                 return Ok(None);
             }
-            let Some(parent) = dir.parent().await else { return Ok(None) };
+            let Some(parent) =
+                dir.parent().await.map_err(FindRootError::DirParent)?
+            else {
+                return Ok(None);
+            };
             dir = parent;
         }
     }
@@ -126,15 +126,8 @@ impl<M> FindRootArgs<'_, M> {
     where
         M: RootMarker<Fs>,
     {
-        use fs::{Directory, Metadata};
-        let read_dir = dir
-            .read()
-            .await
-            .map_err(|err| FindRootError {
-                path: dir.path().to_owned(),
-                kind: FindRootErrorKind::ReadDir(err),
-            })?
-            .fuse();
+        let read_dir =
+            dir.read().await.map_err(FindRootError::ReadDir)?.fuse();
 
         pin_mut!(read_dir);
 
@@ -143,30 +136,15 @@ impl<M> FindRootArgs<'_, M> {
         loop {
             select! {
                 read_res = read_dir.select_next_some() => {
-                    let dir_entry =
-                        read_res.map_err(|err| FindRootError {
-                            path: dir.path().to_owned(),
-                            kind: FindRootErrorKind::DirEntry(
-                                DirEntryError::Access(err),
-                            ),
-                        })?;
+                    let dir_entry = read_res
+                        .map_err(DirEntryError::Access)
+                        .map_err(FindRootError::DirEntry)?;
 
                     let fut = async move {
-                        match self.marker.matches(&dir_entry).await {
-                            Ok(matches) => Ok(matches),
-                            Err(err) => {
-                                Err(FindRootError {
-                                    path: dir.path().to_owned(),
-                                    kind: FindRootErrorKind::Marker {
-                                        dir_entry_name: dir_entry
-                                            .name()
-                                            .ok()
-                                            .map(ToOwned::to_owned),
-                                        err
-                                    },
-                                })
-                            }
-                        }
+                        self.marker
+                            .matches(&dir_entry)
+                            .await
+                            .map_err(FindRootError::Marker)
                     };
 
                     check_marker_matches.push(fut);
@@ -205,120 +183,6 @@ where
     M::Error: fmt::Display,
 {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut message = notify::Message::new();
-
-        let mut path = Cow::Borrowed(&*self.path);
-
-        let err: &dyn fmt::Display = match &self.kind {
-            FindRootErrorKind::DirEntry(err) => {
-                message.push_str("couldn't read file or directory under ");
-                err
-            },
-            FindRootErrorKind::FollowSymlink(err) => {
-                message.push_str("couldn't follow symlink at ");
-                err
-            },
-            FindRootErrorKind::Marker { dir_entry_name, err } => {
-                message.push_str(
-                    "couldn't match markers with file or directory ",
-                );
-                if let Some(entry_name) = dir_entry_name {
-                    message.push_str("at ");
-                    let mut new_path = self.path.to_owned();
-                    new_path.push(entry_name);
-                    path = Cow::Owned(new_path);
-                } else {
-                    message.push_str("under ");
-                }
-                err
-            },
-            FindRootErrorKind::NodeAtStartPath(err) => {
-                message.push_str("couldn't read file or directory at ");
-                err
-            },
-            FindRootErrorKind::ReadDir(err) => {
-                message.push_str("couldn't read directory at ");
-                err
-            },
-            FindRootErrorKind::StartsAtDanglingSymlink => {
-                message
-                    .push_str("no file or directory found at ")
-                    .push_info(path.to_smolstr());
-                return (notify::Level::Error, message);
-            },
-            FindRootErrorKind::StartPathNotFound => {
-                message
-                    .push_str("no file or directory found at ")
-                    .push_info(path.to_smolstr());
-                return (notify::Level::Error, message);
-            },
-        };
-
-        message
-            .push_info(path.to_smolstr())
-            .push_str(": ")
-            .push_str(err.to_smolstr());
-
-        (notify::Level::Error, message)
-    }
-}
-
-impl<Fs: fs::Fs, M: RootMarker<Fs>> fmt::Display for FindRootError<Fs, M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            FindRootErrorKind::DirEntry(err) => {
-                write!(
-                    f,
-                    "couldn't read file or directory at {:?}: {}",
-                    self.path, err
-                )
-            },
-            FindRootErrorKind::FollowSymlink(err) => {
-                write!(
-                    f,
-                    "couldn't follow symlink at {:?}: {}",
-                    self.path, err
-                )
-            },
-            FindRootErrorKind::Marker { dir_entry_name, err } => {
-                let path = match dir_entry_name {
-                    Some(name) => {
-                        let mut path = self.path.clone();
-                        path.push(name);
-                        path
-                    },
-                    None => self.path.clone(),
-                };
-                write!(
-                    f,
-                    "couldn't match marker with file or directory at {:?}: {}",
-                    path, err
-                )
-            },
-            FindRootErrorKind::NodeAtStartPath(err) => {
-                write!(
-                    f,
-                    "couldn't read file or directory at {:?}: {}",
-                    self.path, err
-                )
-            },
-            FindRootErrorKind::ReadDir(err) => {
-                write!(
-                    f,
-                    "couldn't read directory at {:?}: {}",
-                    self.path, err
-                )
-            },
-            FindRootErrorKind::StartPathNotFound => {
-                write!(f, "no file or directory found at {:?}", self.path)
-            },
-            FindRootErrorKind::StartsAtDanglingSymlink => {
-                write!(
-                    f,
-                    "starting point at {:?} is a dangling symlink",
-                    self.path
-                )
-            },
-        }
+        (notify::Level::Error, notify::Message::from_display(self))
     }
 }

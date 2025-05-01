@@ -19,9 +19,6 @@ pub trait Symlink: Send + Sync {
     type FollowError: Error + Send;
 
     /// TODO: docs.
-    type MetadataError: Error + Send;
-
-    /// TODO: docs.
     type ReadError: Error + Send;
 
     /// TODO: docs.
@@ -40,12 +37,13 @@ pub trait Symlink: Send + Sync {
     ) -> impl Future<Output = Result<Option<FsNode<Self::Fs>>, Self::FollowError>>;
 
     /// TODO: docs.
-    fn id(&self) -> <Self::Fs as Fs>::NodeId;
+    #[inline]
+    fn id(&self) -> <Self::Fs as Fs>::NodeId {
+        fs::Metadata::id(&self.meta())
+    }
 
     /// TODO: docs.
-    fn meta(
-        &self,
-    ) -> impl Future<Output = Result<<Self::Fs as Fs>::Metadata, Self::MetadataError>>;
+    fn meta(&self) -> <Self::Fs as Fs>::Metadata;
 
     /// TODO: docs.
     fn name(&self) -> &NodeName {

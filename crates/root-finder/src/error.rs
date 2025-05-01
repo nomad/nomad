@@ -10,6 +10,12 @@ pub enum FindRootError<Fs: fs::Fs> {
     DirEntryName(fs::MetadataNameError),
 
     /// TODO: docs.
+    DirParent(<Fs::Directory as fs::Directory>::ParentError),
+
+    /// TODO: docs.
+    FileParent(<Fs::File as fs::File>::ParentError),
+
+    /// TODO: docs.
     NodeAtStartPath(Fs::NodeAtPathError),
 
     /// TODO: docs.

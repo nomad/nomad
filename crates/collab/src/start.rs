@@ -232,7 +232,8 @@ async fn read_project<B: CollabBackend>(
         // be a directory, so we just use its parent together with a filter
         // that ignores all its siblings.
         FsNode::File(file) => {
-            let parent = file.parent().await;
+            let parent =
+                file.parent().await.map_err(ReadProjectError::FileParent)?;
             let filter = AllButOne::<B::Fs> { id: file.id() };
             (parent, walkdir::Either::Right(filter))
         },
@@ -443,6 +444,9 @@ pub enum ReadProjectError<B: CollabBackend> {
 
     /// TODO: docs.
     NoNodeAtRootPath(AbsPathBuf),
+
+    /// TODO: docs.
+    FileParent(<<B::Fs as Fs>::File as File>::ParentError),
 
     /// TODO: docs.
     ReadNode(ReadNodeError<B::Fs>),

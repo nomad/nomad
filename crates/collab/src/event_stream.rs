@@ -56,7 +56,6 @@ pub(crate) struct Done<F> {
 #[display("{_0}")]
 pub(crate) enum EventRxError<B: CollabBackend, F: Filter<B::Fs>> {
     FsFilter(F::Error),
-    Metadata(fs::NodeMetadataError<B::Fs>),
     NodeAtPath(<B::Fs as Fs>::NodeAtPathError),
 }
 
@@ -341,7 +340,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         debug_assert!(node.path().starts_with(&self.root_path));
 
         let Some(parent_path) = node.path().parent() else { return Ok(false) };
-        let meta = node.meta().await.map_err(EventRxError::Metadata)?;
+        let meta = node.meta();
         Ok(!meta.node_kind().is_symlink()
             && !self
                 .project_filter

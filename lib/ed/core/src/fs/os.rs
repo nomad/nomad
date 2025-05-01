@@ -1,13 +1,11 @@
 //! TODO: docs.
 
-use core::convert::Infallible;
 use core::pin::Pin;
 use core::task::{Context, Poll, ready};
 use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
-use std::sync::OnceLock;
 use std::time::SystemTime;
 
 use futures_util::stream::{self, Stream, StreamExt};
@@ -41,13 +39,15 @@ pub struct OsFs {}
 
 /// TODO: docs.
 pub struct OsDirectory {
-    metadata: LazyOsMetadata,
+    metadata: async_fs::Metadata,
+    path: AbsPathBuf,
 }
 
 /// TODO: docs.
 pub struct OsFile {
     file: Option<async_fs::File>,
-    metadata: LazyOsMetadata,
+    metadata: async_fs::Metadata,
+    path: AbsPathBuf,
 }
 
 /// TODO: docs.
@@ -75,11 +75,6 @@ pin_project_lite::pin_project! {
     }
 }
 
-struct LazyOsMetadata {
-    metadata: OnceLock<async_fs::Metadata>,
-    path: AbsPathBuf,
-}
-
 impl OsFile {
     #[inline]
     fn open_options() -> async_fs::OpenOptions {
@@ -105,30 +100,6 @@ impl OsFile {
     }
 }
 
-impl LazyOsMetadata {
-    #[inline]
-    fn lazy(path: AbsPathBuf) -> Self {
-        Self { metadata: OnceLock::new(), path }
-    }
-
-    #[inline]
-    fn new(metadata: async_fs::Metadata, path: AbsPathBuf) -> Self {
-        Self { metadata: metadata.into(), path }
-    }
-
-    #[inline]
-    async fn with<R>(
-        &self,
-        fun: impl FnOnce(&async_fs::Metadata) -> R,
-    ) -> Result<R, io::Error> {
-        if let Some(meta) = self.metadata.get() {
-            return Ok(fun(meta));
-        }
-        let metadata = async_fs::metadata(&*self.path).await?;
-        Ok(fun(self.metadata.get_or_init(|| metadata)))
-    }
-}
-
 impl Fs for OsFs {
     type Directory = OsDirectory;
     type File = OsFile;
@@ -148,7 +119,8 @@ impl Fs for OsFs {
     ) -> Result<Self::Directory, Self::CreateDirectoryError> {
         let path = path.as_ref();
         async_fs::create_dir(path).await?;
-        Ok(Self::Directory { metadata: LazyOsMetadata::lazy(path.to_owned()) })
+        let metadata = async_fs::metadata(path).await?;
+        Ok(OsDirectory { path: path.to_owned(), metadata })
     }
 
     #[inline]
@@ -158,10 +130,8 @@ impl Fs for OsFs {
     ) -> Result<Self::File, Self::CreateFileError> {
         let path = path.as_ref();
         let file = OsFile::open_options().create_new(true).open(path).await?;
-        Ok(Self::File {
-            file: file.into(),
-            metadata: LazyOsMetadata::lazy(path.to_owned()),
-        })
+        let metadata = file.metadata().await?;
+        Ok(OsFile { file: file.into(), metadata, path: path.to_owned() })
     }
 
     #[inline]
@@ -181,10 +151,12 @@ impl Fs for OsFs {
         Ok(Some(match file_type {
             NodeKind::File => FsNode::File(OsFile {
                 file: None,
-                metadata: LazyOsMetadata::new(metadata, path.to_owned()),
+                metadata,
+                path: path.to_owned(),
             }),
             NodeKind::Directory => FsNode::Directory(OsDirectory {
-                metadata: LazyOsMetadata::new(metadata, path.to_owned()),
+                metadata,
+                path: path.to_owned(),
             }),
             NodeKind::Symlink => {
                 FsNode::Symlink(OsSymlink { metadata, path: path.to_owned() })
@@ -207,7 +179,7 @@ impl Directory for OsDirectory {
     type CreateFileError = io::Error;
     type CreateSymlinkError = io::Error;
     type DeleteError = io::Error;
-    type MetadataError = io::Error;
+    type ParentError = io::Error;
     type ReadEntryError = io::Error;
     type ReadError = io::Error;
 
@@ -251,34 +223,27 @@ impl Directory for OsDirectory {
     }
 
     #[inline]
-    fn id(&self) -> Inode {
-        todo!()
+    fn meta(&self) -> OsMetadata {
+        OsMetadata {
+            inner: self.metadata.clone(),
+            node_kind: NodeKind::Directory,
+            node_name: self
+                .name()
+                .map(|n| n.as_str().into())
+                .unwrap_or_default(),
+        }
     }
 
     #[inline]
-    async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
-        self.metadata
-            .with(|inner| OsMetadata {
-                inner: inner.clone(),
-                node_kind: NodeKind::Directory,
-                node_name: self
-                    .name()
-                    .map(|n| n.as_str().into())
-                    .unwrap_or_default(),
-            })
-            .await
-    }
-
-    #[inline]
-    async fn parent(&self) -> Option<Self> {
-        self.path().parent().map(|parent| Self {
-            metadata: LazyOsMetadata::lazy(parent.to_owned()),
-        })
+    async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
+        let Some(parent_path) = self.path().parent() else { return Ok(None) };
+        let metadata = async_fs::metadata(parent_path).await?;
+        Ok(Some(OsDirectory { path: parent_path.to_owned(), metadata }))
     }
 
     #[inline]
     fn path(&self) -> &AbsPath {
-        &self.metadata.path
+        &self.path
     }
 
     #[inline]
@@ -353,13 +318,13 @@ impl File for OsFile {
 
     type Error = io::Error;
     type DeleteError = io::Error;
-    type MetadataError = io::Error;
+    type ParentError = io::Error;
     type ReadError = io::Error;
     type WriteError = io::Error;
 
     #[inline]
     async fn byte_len(&self) -> Result<ByteOffset, Self::Error> {
-        self.metadata.with(|meta| meta.len().into()).await
+        Ok(self.metadata.len().into())
     }
 
     #[inline]
@@ -368,33 +333,24 @@ impl File for OsFile {
     }
 
     #[inline]
-    fn id(&self) -> Inode {
-        todo!()
-    }
-
-    #[inline]
-    async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
-        self.metadata
-            .with(|inner| OsMetadata {
-                inner: inner.clone(),
-                node_kind: NodeKind::File,
-                node_name: self.name().as_str().into(),
-            })
-            .await
-    }
-
-    #[inline]
-    async fn parent(&self) -> <Self::Fs as Fs>::Directory {
-        OsDirectory {
-            metadata: LazyOsMetadata::lazy(
-                self.path().parent().expect("has a parent").to_owned(),
-            ),
+    fn meta(&self) -> OsMetadata {
+        OsMetadata {
+            inner: self.metadata.clone(),
+            node_kind: NodeKind::File,
+            node_name: self.name().as_str().into(),
         }
     }
 
     #[inline]
+    async fn parent(&self) -> Result<OsDirectory, Self::ParentError> {
+        let parent_path = self.path().parent().expect("has a parent");
+        let metadata = async_fs::metadata(parent_path).await?;
+        Ok(OsDirectory { path: parent_path.to_owned(), metadata })
+    }
+
+    #[inline]
     fn path(&self) -> &AbsPath {
-        &self.metadata.path
+        &self.path
     }
 
     #[inline]
@@ -425,7 +381,6 @@ impl Symlink for OsSymlink {
 
     type DeleteError = io::Error;
     type FollowError = io::Error;
-    type MetadataError = Infallible;
     type ReadError = io::Error;
 
     #[inline]
@@ -457,12 +412,12 @@ impl Symlink for OsSymlink {
     }
 
     #[inline]
-    async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
-        Ok(OsMetadata {
+    fn meta(&self) -> OsMetadata {
+        OsMetadata {
             inner: self.metadata.clone(),
             node_kind: NodeKind::Symlink,
             node_name: self.name().as_str().into(),
-        })
+        }
     }
 
     #[inline]
@@ -537,9 +492,7 @@ impl Metadata for OsMetadata {
     fn name(&self) -> Result<&NodeName, MetadataNameError> {
         self.node_name
             .to_str()
-            .ok_or_else(|| {
-                MetadataNameError::NotUtf8(Some(self.node_name.clone()))
-            })?
+            .ok_or_else(|| MetadataNameError::NotUtf8(self.node_name.clone()))?
             .try_into()
             .map_err(MetadataNameError::Invalid)
     }

@@ -29,7 +29,7 @@ pub trait Directory: Send + Sync + Sized {
     type DeleteError: Error + Send;
 
     /// TODO: docs.
-    type MetadataError: Error + Send;
+    type ParentError: Error + Send;
 
     /// TODO: docs.
     type ReadEntryError: Error + Send;
@@ -69,12 +69,13 @@ pub trait Directory: Send + Sync + Sized {
     ) -> impl Future<Output = Result<(), Self::DeleteError>> + Send;
 
     /// TODO: docs.
-    fn id(&self) -> <Self::Fs as Fs>::NodeId;
+    #[inline]
+    fn id(&self) -> <Self::Fs as Fs>::NodeId {
+        fs::Metadata::id(&self.meta())
+    }
 
     /// TODO: docs.
-    fn meta(
-        &self,
-    ) -> impl Future<Output = Result<<Self::Fs as Fs>::Metadata, Self::MetadataError>>;
+    fn meta(&self) -> <Self::Fs as Fs>::Metadata;
 
     /// TODO: docs.
     #[inline]
@@ -83,7 +84,9 @@ pub trait Directory: Send + Sync + Sized {
     }
 
     /// TODO: docs.
-    fn parent(&self) -> impl Future<Output = Option<Self>>;
+    fn parent(
+        &self,
+    ) -> impl Future<Output = Result<Option<Self>, Self::ParentError>> + Send;
 
     /// TODO: docs.
     fn path(&self) -> &AbsPath;

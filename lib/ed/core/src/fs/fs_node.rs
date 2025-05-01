@@ -31,22 +31,6 @@ pub enum NodeDeleteError<Fs: fs::Fs> {
     Symlink(<Fs::Symlink as Symlink>::DeleteError),
 }
 
-/// TODO: docs.
-#[derive(
-    cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
-)]
-#[display("{_0}")]
-pub enum NodeMetadataError<Fs: fs::Fs> {
-    /// TODO: docs.
-    File(<Fs::File as File>::MetadataError),
-
-    /// TODO: docs.
-    Directory(<Fs::Directory as Directory>::MetadataError),
-
-    /// TODO: docs.
-    Symlink(<Fs::Symlink as Symlink>::MetadataError),
-}
-
 impl<Fs: fs::Fs> FsNode<Fs> {
     /// TODO: docs.
     #[inline]
@@ -98,17 +82,11 @@ impl<Fs: fs::Fs> FsNode<Fs> {
 
     /// TODO: docs.
     #[inline]
-    pub async fn meta(&self) -> Result<Fs::Metadata, NodeMetadataError<Fs>> {
+    pub fn meta(&self) -> Fs::Metadata {
         match self {
-            Self::File(file) => {
-                file.meta().await.map_err(NodeMetadataError::File)
-            },
-            Self::Directory(dir) => {
-                dir.meta().await.map_err(NodeMetadataError::Directory)
-            },
-            Self::Symlink(symlink) => {
-                symlink.meta().await.map_err(NodeMetadataError::Symlink)
-            },
+            Self::File(file) => file.meta(),
+            Self::Directory(dir) => dir.meta(),
+            Self::Symlink(symlink) => symlink.meta(),
         }
     }
 
