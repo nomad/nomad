@@ -42,21 +42,32 @@ impl<B: Backend> Backend for AuthMock<B> {
     type Api = <B as Backend>::Api;
     type Buffer<'a> = <B as Backend>::Buffer<'a>;
     type BufferId = <B as Backend>::BufferId;
+    type Cursor<'a> = <B as Backend>::Cursor<'a>;
+    type CursorId = <B as Backend>::CursorId;
+    type Fs = <B as Backend>::Fs;
     type LocalExecutor = <B as Backend>::LocalExecutor;
     type BackgroundExecutor = <B as Backend>::BackgroundExecutor;
-    type Fs = <B as Backend>::Fs;
     type Emitter<'this> = <B as Backend>::Emitter<'this>;
+    type EventHandle = <B as Backend>::EventHandle;
+    type Selection<'a> = <B as Backend>::Selection<'a>;
+    type SelectionId = <B as Backend>::SelectionId;
     type SerializeError = <B as Backend>::SerializeError;
     type DeserializeError = <B as Backend>::DeserializeError;
 
     fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer<'_>> {
         self.inner.buffer(id)
     }
+    fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
+        self.inner.buffer_at_path(path)
+    }
     fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId<Self>> + use<B> {
         self.inner.buffer_ids()
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
+    }
+    fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>> {
+        self.inner.cursor(id)
     }
     fn fs(&mut self) -> Self::Fs {
         self.inner.fs()
@@ -72,6 +83,18 @@ impl<B: Backend> Backend for AuthMock<B> {
     }
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
         self.inner.background_executor()
+    }
+    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Self::Buffer<'_>) + 'static,
+    {
+        self.inner.on_buffer_created(fun)
+    }
+    fn selection(
+        &mut self,
+        id: Self::SelectionId,
+    ) -> Option<Self::Selection<'_>> {
+        self.inner.selection(id)
     }
     fn serialize<V>(
         &mut self,

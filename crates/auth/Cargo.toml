@@ -16,7 +16,7 @@ collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-feature
 ] }
 ed = { workspace = true }
 event-listener = "5"
-keyring = { version = "4.0.0-beta.2", default-features = false }
+keyring = { version = "4.0.0-rc.1", default-features = false }
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1"
 

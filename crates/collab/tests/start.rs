@@ -76,7 +76,7 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         ctx.focus_buffer_at(path!("/a/foo.txt")).unwrap();
         let err = match collab.start().call((), ctx).await.unwrap_err() {
             StartError::OverlappingProject(err) => err,
-            other => panic!("unexpected error: {:?}", other),
+            other => panic!("unexpected error: {other:?}"),
         };
         assert_eq!(err.existing_root, "/a/b");
         assert_eq!(err.new_root, "/a");

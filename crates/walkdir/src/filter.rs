@@ -42,7 +42,9 @@ pub struct And<F1, F2> {
 }
 
 /// TODO: docs.
-#[derive(Debug, derive_more::Display, cauchy::Error)]
+#[derive(
+    Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq, cauchy::Eq,
+)]
 #[display("{_0}")]
 pub enum Either<L, R> {
     /// TODO: docs.
@@ -52,7 +54,13 @@ pub enum Either<L, R> {
 }
 
 /// TODO: docs.
-#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
 #[display("{_0}")]
 pub enum FilteredEntryError<Fi, Fs, W>
 where

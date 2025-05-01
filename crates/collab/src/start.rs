@@ -205,6 +205,7 @@ async fn search_project_root<B: CollabBackend>(
 
 /// Constructs a [`Project`] by reading the contents of the file or directory
 /// at the given path.
+#[allow(clippy::too_many_lines)]
 async fn read_project<B: CollabBackend>(
     root_path: &AbsPath,
     local_id: PeerId,
@@ -310,6 +311,8 @@ async fn read_project<B: CollabBackend>(
 }
 
 /// TODO: docs.
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 async fn read_node<Fs: fs::Fs>(
     parent_path: &AbsPath,
     node_meta: Fs::Metadata,
@@ -321,7 +324,7 @@ async fn read_node<Fs: fs::Fs>(
 ) -> Result<(), ReadNodeError<Fs>> {
     let node_name = node_meta.name().map_err(ReadNodeError::NodeName)?;
 
-    let node_path = parent_path.join(&node_name);
+    let node_path = parent_path.join(node_name);
 
     let Some(node) =
         fs.node_at_path(&node_path).await.map_err(ReadNodeError::GetNode)?
@@ -455,6 +458,7 @@ pub enum ReadProjectError<B: CollabBackend> {
     RootIsSymlink(AbsPathBuf),
 
     /// TODO: docs.
+    #[allow(clippy::type_complexity)]
     WalkRoot(
         walkdir::WalkError<
             B::Fs,
