@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use ed_core::ByteOffset;
 use ed_core::backend::{AgentId, Buffer, Edit};
 
-use crate::neovim::EventHandle;
+use crate::autocmd::EventHandle;
 use crate::{Neovim, oxi};
 
 /// TODO: docs.
@@ -183,6 +183,13 @@ impl Buffer for NeovimBuffer {
         Fun: FnMut(&Self, AgentId) + 'static,
     {
         todo!();
+    }
+}
+
+impl From<NeovimBuffer> for oxi::api::Buffer {
+    #[inline]
+    fn from(buf: NeovimBuffer) -> Self {
+        buf.inner()
     }
 }
 

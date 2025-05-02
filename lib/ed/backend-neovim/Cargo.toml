@@ -12,6 +12,7 @@ nightly = ["nvim-oxi/neovim-nightly"]
 [dependencies]
 async-oneshot = { git = "https://github.com/irrustible/async-oneshot", rev = "811bedf" }
 async-task = "4.7"
+cauchy = { workspace = true }
 concurrent-queue = "2.5"
 ed-core = { path = "../core", features = ["os-fs"] }
 futures-executor = { version = "0.3", features = ["thread-pool"] }

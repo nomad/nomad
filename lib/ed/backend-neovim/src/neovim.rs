@@ -162,7 +162,7 @@ impl Backend for Neovim {
     where
         Fun: FnMut(&Self::Buffer<'_>) + 'static,
     {
-        self.callbacks.insert_callback_for(autocmd::OnBufferCreated, fun)
+        self.callbacks.insert_callback_for(autocmd::BufReadPost, fun)
     }
 
     #[inline]
