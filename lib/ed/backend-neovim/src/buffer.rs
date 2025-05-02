@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
 use core::ops::Range;
@@ -8,14 +10,14 @@ use compact_str::CompactString;
 use ed_core::ByteOffset;
 use ed_core::backend::{AgentId, Buffer, Edit, Replacement};
 
-use crate::autocmd::EventHandle;
+use crate::Neovim;
+use crate::events::{self, EventHandle};
 use crate::oxi::{BufHandle, api, mlua};
-use crate::{Neovim, autocmd};
 
 /// TODO: docs.
 #[derive(Copy, Clone)]
 pub struct NeovimBuffer<'a> {
-    callbacks: &'a autocmd::Callbacks,
+    callbacks: &'a events::Callbacks,
     id: BufferId,
 }
 
@@ -34,7 +36,7 @@ struct Point {
 
 impl<'a> NeovimBuffer<'a> {
     #[inline]
-    pub(crate) fn current(callbacks: &'a autocmd::Callbacks) -> Self {
+    pub(crate) fn current(callbacks: &'a events::Callbacks) -> Self {
         Self::new(BufferId::of_focused(), callbacks)
     }
 
@@ -52,7 +54,7 @@ impl<'a> NeovimBuffer<'a> {
     #[inline]
     pub(crate) fn new(
         id: BufferId,
-        callbacks: &'a autocmd::Callbacks,
+        callbacks: &'a events::Callbacks,
     ) -> Self {
         debug_assert!(id.is_valid());
         Self { id, callbacks }
@@ -214,6 +216,12 @@ impl<'a> NeovimBuffer<'a> {
 }
 
 impl BufferId {
+    /// TODO: docs.
+    #[inline]
+    pub fn handle(self) -> BufHandle {
+        self.0
+    }
+
     #[inline]
     pub(crate) fn is_valid(self) -> bool {
         api::Buffer::from(self).is_valid()
@@ -263,7 +271,7 @@ impl Buffer for NeovimBuffer<'_> {
         Fun: FnMut(&NeovimBuffer<'_>, &Edit) + 'static,
     {
         self.callbacks.insert_callback_for(
-            autocmd::OnBytes(self.id()),
+            events::OnBytes(self.id()),
             move |(this, edit)| fun(this, edit),
         )
     }
@@ -274,7 +282,7 @@ impl Buffer for NeovimBuffer<'_> {
         Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
     {
         self.callbacks.insert_callback_for(
-            autocmd::BufUnload(self.id()),
+            events::BufUnload(self.id()),
             move |(this, removed_by)| fun(this, removed_by),
         )
     }
@@ -285,7 +293,7 @@ impl Buffer for NeovimBuffer<'_> {
         Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
     {
         self.callbacks.insert_callback_for(
-            autocmd::BufWritePost(self.id()),
+            events::BufWritePost(self.id()),
             move |(this, saved_by)| fun(this, saved_by),
         )
     }
@@ -298,13 +306,6 @@ impl From<NeovimBuffer<'_>> for api::Buffer {
     }
 }
 
-impl mlua::IntoLua for NeovimBuffer<'_> {
-    #[inline]
-    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
-        self.inner().handle().into_lua(lua)
-    }
-}
-
 impl From<BufferId> for api::Buffer {
     #[inline]
     fn from(buf_id: BufferId) -> Self {
@@ -312,10 +313,17 @@ impl From<BufferId> for api::Buffer {
     }
 }
 
+impl mlua::IntoLua for BufferId {
+    #[inline]
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.handle().into_lua(lua)
+    }
+}
+
 impl Hash for BufferId {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_i32(self.0);
+        state.write_i32(self.handle());
     }
 }
 

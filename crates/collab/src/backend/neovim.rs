@@ -10,7 +10,8 @@ use collab_server::message::PeerId;
 use collab_server::nomad::{NomadConfig, NomadSessionId};
 use ed::command::{CommandArgs, Parse};
 use ed::fs::{self, Directory};
-use ed::neovim::{Neovim, NeovimBuffer, mlua, oxi};
+use ed::neovim::buffer::{BufferId, NeovimBuffer};
+use ed::neovim::{Neovim, mlua, oxi};
 use ed::{AsyncCtx, notify};
 use mlua::{Function, Table};
 use smol_str::ToSmolStr;
@@ -169,12 +170,12 @@ impl CollabBackend for Neovim {
     }
 
     fn lsp_root(
-        buffer: NeovimBuffer,
+        buffer_id: BufferId,
         _: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
         /// Returns the root directory of the first language server
         /// attached to the given buffer, if any.
-        fn inner(buffer: NeovimBuffer) -> Option<String> {
+        fn inner(buffer: BufferId) -> Option<String> {
             let lua = mlua::lua();
 
             let opts = lua.create_table().ok()?;
@@ -191,7 +192,7 @@ impl CollabBackend for Neovim {
                 .ok()
         }
 
-        let Some(root_dir) = inner(buffer) else { return Ok(None) };
+        let Some(root_dir) = inner(buffer_id) else { return Ok(None) };
 
         root_dir
             .parse::<AbsPathBuf>()

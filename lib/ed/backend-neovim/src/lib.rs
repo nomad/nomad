@@ -1,10 +1,10 @@
 //! TODO: docs.
 
 pub mod api;
-mod autocmd;
 mod background_executor;
-mod buffer;
+pub mod buffer;
 mod convert;
+mod events;
 mod local_executor;
 mod neovim;
 pub mod notify;
@@ -18,7 +18,6 @@ pub mod executor {
     pub use crate::background_executor::NeovimBackgroundExecutor;
     pub use crate::local_executor::NeovimLocalExecutor;
 }
-pub use buffer::NeovimBuffer;
 pub use neovim::Neovim;
 #[doc(inline)]
 pub use neovim_macros::plugin;

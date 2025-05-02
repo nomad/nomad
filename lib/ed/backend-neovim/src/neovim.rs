@@ -6,12 +6,12 @@ use ed_core::plugin::Plugin;
 use nvim_oxi::api::Window;
 
 use crate::buffer::{BufferId, NeovimBuffer};
-use crate::{api, autocmd, executor, notify, oxi, serde, value};
+use crate::{api, events, executor, notify, oxi, serde, value};
 
 /// TODO: docs.
 pub struct Neovim {
     augroup_id: u32,
-    callbacks: autocmd::Callbacks,
+    callbacks: events::Callbacks,
     emitter: notify::NeovimEmitter,
     local_executor: executor::NeovimLocalExecutor,
     background_executor: executor::NeovimBackgroundExecutor,
@@ -55,7 +55,7 @@ impl Backend for Neovim {
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
-    type EventHandle = autocmd::EventHandle;
+    type EventHandle = events::EventHandle;
     type Selection<'a> = NeovimBuffer<'a>;
     type SelectionId = BufferId;
 
@@ -164,7 +164,7 @@ impl Backend for Neovim {
     where
         Fun: FnMut(&Self::Buffer<'_>) + 'static,
     {
-        self.callbacks.insert_callback_for(autocmd::BufReadPost, fun)
+        self.callbacks.insert_callback_for(events::BufReadPost, fun)
     }
 
     #[inline]

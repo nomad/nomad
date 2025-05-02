@@ -6,8 +6,7 @@ use nohash::IntMap as NoHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smallvec::smallvec_inline;
 
-use crate::NeovimBuffer;
-use crate::buffer::BufferId;
+use crate::buffer::{BufferId, NeovimBuffer};
 use crate::oxi::api::{self, opts, types};
 
 /// TODO: docs.

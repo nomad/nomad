@@ -646,9 +646,9 @@ mod neovim_error_impls {
                 Lsp(err) => return err.to_message(),
                 FindRoot(err) => return err.to_message(),
                 HomeDir(err) => return err.to_message(),
-                InvalidBufId(buf) => {
+                InvalidBufId(buf_id) => {
                     msg.push_str("there's no buffer whose handle is ")
-                        .push_invalid(buf.handle().to_smolstr());
+                        .push_invalid(buf_id.handle().to_smolstr());
                 },
                 CouldntFindRoot(buffer_path) => {
                     msg.push_str("couldn't find project root for buffer at ")
