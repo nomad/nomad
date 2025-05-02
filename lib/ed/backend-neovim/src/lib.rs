@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 pub mod api;
+mod autocmd;
 mod background_executor;
 mod buffer;
 mod convert;

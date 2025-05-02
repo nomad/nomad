@@ -269,10 +269,12 @@ dependencies = [
  "ed-core",
  "futures-executor",
  "neovim-macros",
+ "nohash",
  "nvim-oxi",
  "pin-project-lite",
  "serde",
  "serde_path_to_error",
+ "slotmap",
  "smallvec",
  "strsim",
 ]

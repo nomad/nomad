@@ -1,32 +1,20 @@
 use ::serde::{Deserialize, Serialize};
 use ed_core::backend::{Backend, Buffer};
-use ed_core::fs::AbsPath;
+use ed_core::fs::{self, AbsPath};
 use ed_core::notify::Namespace;
 use ed_core::plugin::Plugin;
 use nvim_oxi::api::Window;
 
-use crate::{
-    NeovimBuffer,
-    NeovimFs,
-    api,
-    executor,
-    notify,
-    oxi,
-    serde,
-    value,
-};
+use crate::buffer::NeovimBuffer;
+use crate::{api, autocmd, executor, notify, oxi, serde, value};
 
 /// TODO: docs.
 pub struct Neovim {
     augroup_id: u32,
+    callbacks: autocmd::Callbacks,
     emitter: notify::NeovimEmitter,
     local_executor: executor::NeovimLocalExecutor,
     background_executor: executor::NeovimBackgroundExecutor,
-}
-
-/// TODO: docs.
-pub struct EventHandle {
-    autocmd_id: u32,
 }
 
 impl Neovim {
@@ -41,6 +29,7 @@ impl Neovim {
                     .build(),
             )
             .expect("couldn't create augroup"),
+            callbacks: Default::default(),
             emitter: notify::NeovimEmitter::default(),
             local_executor: executor::NeovimLocalExecutor::init(),
             background_executor: executor::NeovimBackgroundExecutor::init(),
@@ -62,11 +51,11 @@ impl Backend for Neovim {
     type BufferId = NeovimBuffer;
     type Cursor<'a> = NeovimBuffer;
     type CursorId = NeovimBuffer;
-    type Fs = NeovimFs;
+    type Fs = fs::os::OsFs;
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
-    type EventHandle = EventHandle;
+    type EventHandle = autocmd::EventHandle;
     type Selection<'a> = NeovimBuffer;
     type SelectionId = NeovimBuffer;
 
@@ -169,19 +158,11 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn on_buffer_created<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>),
+        Fun: FnMut(&Self::Buffer<'_>) + 'static,
     {
-        let opts = oxi::api::opts::CreateAutocmdOpts::builder()
-            .group(self.augroup_id)
-            .callback(|_autocmd_args| false)
-            .build();
-
-        let autocmd_id = oxi::api::create_autocmd(["BufReadPost"], &opts)
-            .expect("couldn't create autocmd");
-
-        EventHandle { autocmd_id }
+        self.callbacks.insert_callback_for(autocmd::OnBufferCreated, fun)
     }
 
     #[inline]

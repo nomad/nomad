@@ -1,4 +1,5 @@
 use core::cmp::Ordering;
+use core::hash::{Hash, Hasher};
 use core::ops::Range;
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -10,7 +11,7 @@ use crate::neovim::EventHandle;
 use crate::{Neovim, oxi};
 
 /// TODO: docs.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct NeovimBuffer(oxi::BufHandle);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -194,3 +195,12 @@ impl oxi::mlua::IntoLua for NeovimBuffer {
         self.handle().into_lua(lua)
     }
 }
+
+impl Hash for NeovimBuffer {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_i32(self.handle());
+    }
+}
+
+impl nohash::IsEnabled for NeovimBuffer {}
