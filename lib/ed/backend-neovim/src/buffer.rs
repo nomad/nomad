@@ -4,8 +4,9 @@ use core::ops::Range;
 use std::borrow::Cow;
 use std::path::PathBuf;
 
+use compact_str::CompactString;
 use ed_core::ByteOffset;
-use ed_core::backend::{AgentId, Buffer, Edit};
+use ed_core::backend::{AgentId, Buffer, Edit, Replacement};
 
 use crate::autocmd::EventHandle;
 use crate::oxi::{BufHandle, api, mlua};
@@ -57,6 +58,53 @@ impl<'a> NeovimBuffer<'a> {
         Self { id, callbacks }
     }
 
+    /// Converts the arguments given to the
+    /// [`on_bytes`](api::opts::BufAttachOptsBuilder::on_bytes) callback into
+    /// the corresponding [`Replacement`].
+    #[inline]
+    pub(crate) fn replacement_of_on_bytes(
+        &self,
+        args: api::opts::OnBytesArgs,
+    ) -> Replacement {
+        let (
+            _bytes,
+            buf,
+            _changedtick,
+            start_row,
+            start_col,
+            start_offset,
+            _old_end_row,
+            _old_end_col,
+            old_end_len,
+            new_end_row,
+            new_end_col,
+            _new_end_len,
+        ) = args;
+
+        debug_assert_eq!(buf, self.inner());
+
+        let deleted_range =
+            (start_offset).into()..(start_offset + old_end_len).into();
+
+        let start =
+            Point { line_idx: start_row, byte_offset: start_col.into() };
+
+        let end = Point {
+            line_idx: start_row + new_end_row,
+            byte_offset: (start_col * (new_end_row == 0) as usize
+                + new_end_col)
+                .into(),
+        };
+
+        let inserted_text = if start == end {
+            Default::default()
+        } else {
+            self.get_text_in_point_range(start..end)
+        };
+
+        Replacement::new(deleted_range, &*inserted_text)
+    }
+
     #[inline]
     pub(crate) fn selection(&self) -> Option<Range<ByteOffset>> {
         let mode = api::get_mode().expect("couldn't get mode").mode;
@@ -96,6 +144,38 @@ impl<'a> NeovimBuffer<'a> {
             .expect("couldn't get line offset")
             .into();
         line_offset + point.byte_offset
+    }
+
+    /// Returns the text in the given point range.
+    #[track_caller]
+    fn get_text_in_point_range(
+        &self,
+        point_range: Range<Point>,
+    ) -> CompactString {
+        let lines = self
+            .inner()
+            .get_text(
+                point_range.start.line_idx..point_range.end.line_idx,
+                point_range.start.byte_offset.into(),
+                point_range.end.byte_offset.into(),
+                &Default::default(),
+            )
+            .expect("couldn't get text");
+
+        let mut text = CompactString::default();
+
+        let num_lines = lines.len();
+
+        for (idx, line) in lines.enumerate() {
+            let line = line.to_str().expect("line is not UTF-8");
+            text.push_str(line);
+            let is_last = idx + 1 == num_lines;
+            if !is_last {
+                text.push('\n');
+            }
+        }
+
+        text
     }
 
     /// Returns the [`Point`] at the end of the buffer.
@@ -178,11 +258,14 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_edited<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, &Edit) + 'static,
     {
-        todo!();
+        self.callbacks.insert_callback_for(
+            autocmd::OnBytes(self.id()),
+            move |(this, edit)| fun(this, edit),
+        )
     }
 
     #[inline]

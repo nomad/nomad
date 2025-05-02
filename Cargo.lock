@@ -266,6 +266,7 @@ dependencies = [
  "async-oneshot",
  "async-task",
  "cauchy",
+ "compact_str",
  "concurrent-queue",
  "ed-core",
  "futures-executor",
