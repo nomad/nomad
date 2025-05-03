@@ -141,8 +141,44 @@ impl CursorInner {
 }
 
 impl SelectionInner {
-    pub(crate) fn react_to_replacement(&mut self, _replacement: &Replacement) {
-        todo!();
+    pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
+        if self.offset_range.end <= replacement.removed_range().start {
+            // <selection><deletion>
+            return;
+        }
+
+        if self.offset_range.start <= replacement.removed_range().start {
+            // One of:
+            //
+            // <selection>           <selection>     <----selection---->
+            //       <deletion>      <deletion->         <deletion>
+            self.offset_range.end = replacement.removed_range().start;
+        } else if self.offset_range.start < replacement.removed_range().end {
+            // One of:
+            //
+            //    <selection>            <selection>
+            // <---deletion---->    <deletion>
+            let len_selection =
+                self.offset_range.end - self.offset_range.start;
+            let len_overlap =
+                replacement.removed_range().end.min(self.offset_range.end)
+                    - self.offset_range.start;
+            self.offset_range.start = replacement.removed_range().start
+                + replacement.inserted_text().len();
+            self.offset_range.end =
+                self.offset_range.start + len_selection - len_overlap;
+        } else {
+            // <deletion><selection>
+            let len_deletion = replacement.removed_range().end
+                - replacement.removed_range().start;
+            self.offset_range.start -= len_deletion;
+            self.offset_range.end -= len_deletion;
+
+            let len_insertion =
+                ByteOffset::from(replacement.inserted_text().len());
+            self.offset_range.start += len_insertion;
+            self.offset_range.end += len_insertion;
+        }
     }
 }
 
