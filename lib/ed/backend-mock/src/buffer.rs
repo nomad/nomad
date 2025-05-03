@@ -21,16 +21,16 @@ pub struct Buffer<'a> {
 pub struct BufferId(pub(crate) u64);
 
 /// TODO: docs.
+pub struct Cursor<'a> {
+    pub(crate) buffer: &'a mut BufferInner,
+    pub(crate) cursor_id: CursorId,
+}
+
+/// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct CursorId {
     buffer_id: BufferId,
     id_in_buffer: AnnotationId,
-}
-
-/// TODO: docs.
-pub struct Cursor<'a> {
-    pub(crate) buffer: &'a mut BufferInner,
-    pub(crate) cursor_id: CursorId,
 }
 
 /// TODO: docs.
@@ -69,8 +69,7 @@ impl<'a> Buffer<'a> {
         cursor_id: CursorId,
     ) -> Option<Cursor<'a>> {
         debug_assert_eq!(cursor_id.buffer_id(), self.id());
-        self.inner
-            .cursors
+        self.cursors
             .contains_key(cursor_id.id_in_buffer)
             .then_some(Cursor { buffer: self.inner, cursor_id })
     }
@@ -84,10 +83,17 @@ impl BufferInner {
 
 impl CursorInner {
     pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
-        if replacement.removed_range().start > self.offset {
-            return;
+        if replacement.removed_range().start <= self.offset {
+            self.offset = if self.offset <= replacement.removed_range().end {
+                // The cursor falls within the deleted range.
+                replacement.removed_range().start
+            } else {
+                // The cursor is after the deleted range.
+                let range = replacement.removed_range();
+                let range_len = range.end - range.start;
+                self.offset - range_len
+            } + replacement.inserted_text().len();
         }
-        todo!();
     }
 }
 
