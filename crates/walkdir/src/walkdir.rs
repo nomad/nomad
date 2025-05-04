@@ -4,7 +4,7 @@ use core::pin::Pin;
 use abs_path::{AbsPath, AbsPathBuf};
 use ed::fs::{self, Directory, Metadata};
 use futures_util::stream::{self, FusedStream, StreamExt};
-use futures_util::{FutureExt, select};
+use futures_util::{FutureExt, select_biased};
 
 use crate::filter::{Filter, Filtered};
 
@@ -13,8 +13,8 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     /// The type of error that can occur when reading a directory fails.
     type ListError: Error + Send;
 
-    /// The type of error that can occur when reading a specific entry in a
-    /// directory fails.
+    /// The type of error that can occur when reading the metadata of a node in
+    /// a directory fails.
     type ReadMetadataError: Error + Send;
 
     /// TODO: docs.
@@ -75,12 +75,12 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
                 let mut handle_entries = stream::FuturesUnordered::new();
                 let mut read_children = stream::FuturesUnordered::new();
                 loop {
-                    select! {
+                    select_biased! {
                         res = entries.select_next_some() => {
-                            let entry = res.map_err(WalkError::ReadMetadata)?;
-                            let node_kind = entry.node_kind();
+                            let meta = res.map_err(WalkError::ReadMetadata)?;
+                            let node_kind = meta.node_kind();
                             if node_kind.is_dir() {
-                                let dir_name = entry
+                                let dir_name = meta
                                     .name()
                                     .map_err(WalkError::NodeName)?;
                                 let dir_path = dir_path.join(dir_name);
@@ -91,7 +91,7 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
                             }
                             let handler = handler.clone();
                             handle_entries.push(async move {
-                                handler.async_call_once((dir_path, entry)).await
+                                handler.async_call_once((dir_path, meta)).await
                             });
                         },
                         res = read_children.select_next_some() => res?,
@@ -119,8 +119,8 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     where
         Self: Sync,
     {
-        self.to_stream(dir_path, async move |dir_path, entry| {
-            entry.name().map(|name| dir_path.join(name))
+        self.to_stream(dir_path, async move |dir_path, meta| {
+            meta.name().map(|name| dir_path.join(name))
         })
     }
 
@@ -136,26 +136,28 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     {
         let (tx, rx) = flume::unbounded();
         let for_each = self
-            .for_each(dir_path, async move |dir_path, entry| {
-                let _ = tx.send(handler(dir_path, entry).await?);
+            .for_each(dir_path, async move |dir_path, metadata| {
+                let _ = tx.send(handler(dir_path, metadata).await?);
                 Ok(())
             })
             .boxed()
             .fuse();
         futures_util::stream::unfold(
-            (for_each, rx),
-            move |(mut for_each, rx)| async move {
-                let res = select! {
-                    res = for_each => match res {
-                        Ok(()) => return None,
-                        Err(err) => Err(err),
-                    },
-                    res = rx.recv_async() => match res {
-                        Ok(value) => Ok(value),
-                        Err(_err) => return None,
-                    },
+            (for_each, rx.into_stream()),
+            move |(mut for_each, mut rx_stream)| async move {
+                let res = loop {
+                    select_biased! {
+                        res = &mut for_each => match res {
+                            Ok(()) => {},
+                            Err(err) => break Err(err),
+                        },
+                        value = rx_stream.select_next_some() => {
+                            break Ok(value)
+                        },
+                        complete => return None,
+                    }
                 };
-                Some((res, (for_each, rx)))
+                Some((res, (for_each, rx_stream)))
             },
         )
     }

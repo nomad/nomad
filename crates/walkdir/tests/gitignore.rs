@@ -130,8 +130,7 @@ impl NonIgnoredPaths {
     /// Removes all the paths of files and directories in the `/.git`
     /// directory.
     fn remove_git_dir(mut self) -> Self {
-        use abs_path::path;
-        self.inner.retain(|path| !path.starts_with(path!("/.git")));
+        self.inner.retain(|path| !path.starts_with(abs_path::path!("/.git")));
         self
     }
 }
