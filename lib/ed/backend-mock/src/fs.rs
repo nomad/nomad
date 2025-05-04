@@ -324,7 +324,8 @@ impl FsInner {
             }
         }
 
-        let mut next_node_id = MockNodeId(0);
+        // The root has ID 0, so start from 1.
+        let mut next_node_id = MockNodeId(1);
         update_metadatas(&mut next_node_id, &mut root);
         Self {
             next_node_id,
