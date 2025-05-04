@@ -7,16 +7,9 @@ use std::process::{Command, ExitStatus};
 use std::sync::Mutex;
 use std::time::Instant;
 
+use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use compact_str::CompactString;
-use ed::fs::{
-    self,
-    AbsPath,
-    AbsPathBuf,
-    Metadata,
-    MetadataNameError,
-    NodeName,
-    os,
-};
+use ed::fs::{self, Metadata, MetadataNameError, os};
 
 use crate::{Either, Filter};
 

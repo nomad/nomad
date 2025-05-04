@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
-use abs_path::AbsPath;
+use abs_path::{AbsPath, AbsPathBuf};
 use ed::fs::{self, Directory};
+use futures_util::stream::FusedStream;
 
 use crate::walkdir::ForEachHandler;
 use crate::{Filter, Filtered, WalkDir, WalkError};
@@ -66,6 +67,19 @@ where
     #[inline]
     pub fn new(inner: W, dir: &'dir <Fs as fs::Fs>::Directory) -> Self {
         Self { inner, dir_path: dir.path(), fs: PhantomData }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn paths(
+        &self,
+    ) -> impl FusedStream<
+        Item = Result<AbsPathBuf, WalkError<Fs, W, fs::MetadataNameError>>,
+    > + Send
+    where
+        W: Sync,
+    {
+        self.inner.paths(self.dir_path)
     }
 }
 
