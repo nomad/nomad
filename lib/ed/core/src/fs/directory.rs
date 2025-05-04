@@ -2,6 +2,7 @@ use core::error::Error;
 
 use abs_path::AbsPathBuf;
 use futures_lite::Stream;
+use futures_util::pin_mut;
 
 use crate::fs::{self, AbsPath, Fs, NodeName};
 
@@ -122,11 +123,30 @@ pub trait Directory: Send + Sync + Sized {
     #[inline]
     fn replicate_from<Src: Directory>(
         &self,
-        _src: &Src,
+        src: &Src,
     ) -> impl Future<Output = Result<(), ReplicateError<Self::Fs, Src::Fs>>> + Send
+    where
+        <Src::Fs as Fs>::Directory: Directory<
+                ReadEntryError = Src::ReadEntryError,
+                ReadError = Src::ReadError,
+            >,
     {
+        use fs::Metadata;
+        use futures_util::{StreamExt, pin_mut};
+
         async move {
-            todo!();
+            let metas =
+                src.read().await.map_err(ReplicateError::ReadDirectory)?;
+
+            pin_mut!(metas);
+
+            while let Some(meta_res) = metas.next().await {
+                let node_meta = meta_res.map_err(ReplicateError::ReadEntry)?;
+                let node_name = node_meta.name()?;
+                let _node_path = src.path().join(node_name);
+            }
+
+            Ok(())
         }
     }
 
@@ -192,6 +212,7 @@ pub struct NodeMove<Fs: fs::Fs> {
     cauchy::Error,
     cauchy::PartialEq,
     cauchy::Eq,
+    cauchy::From,
 )]
 #[display("{_0}")]
 pub enum ReplicateError<Dst: Fs, Src: Fs> {
@@ -205,7 +226,13 @@ pub enum ReplicateError<Dst: Fs, Src: Fs> {
     CreateSymlink(<Dst::Directory as fs::Directory>::CreateSymlinkError),
 
     /// TODO: docs.
+    MetadataName(#[from] fs::MetadataNameError),
+
+    /// TODO: docs.
     ReadDirectory(<Src::Directory as Directory>::ReadError),
+
+    /// TODO: docs.
+    ReadEntry(<Src::Directory as Directory>::ReadEntryError),
 
     /// TODO: docs.
     ReadFile(<Src::File as fs::File>::ReadError),
