@@ -22,10 +22,10 @@ pub struct GitIgnore {
 #[derive(Debug, derive_more::Display, cauchy::Error)]
 pub enum GitIgnoreError {
     #[display(
-        "Running {cmd:?} failed with exit code {_0:?}",
+        "Running {cmd:?} failed with status {status:?}: {stderr:?}",
         cmd = GitIgnore::command()
     )]
-    FailedCommand(ExitStatus),
+    FailedCommand { status: ExitStatus, stderr: String },
 
     #[display("Running {cmd:?} failed: {_0}", cmd = GitIgnore::command())]
     GitCommand(io::Error),
@@ -139,7 +139,10 @@ impl GitIgnoreInner {
         if !output.status.success() {
             // TODO: check if the reason is because the directory is not in a
             // Git repository.
-            return Err(GitIgnoreError::FailedCommand(output.status));
+            return Err(GitIgnoreError::FailedCommand {
+                status: output.status,
+                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+            });
         }
 
         let stdout = str::from_utf8(&output.stdout)
