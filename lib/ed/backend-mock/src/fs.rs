@@ -130,6 +130,15 @@ struct WatchChannel {
 }
 
 impl MockFs {
+    /// Returns a handle to the root of the filesystem.
+    pub fn root(&self) -> MockDirectory {
+        MockDirectory {
+            fs: self.clone(),
+            metadata: self.with_inner(|inner| inner.root().metadata.clone()),
+            path: AbsPathBuf::root(),
+        }
+    }
+
     #[doc(hidden)]
     pub fn new(root: DirectoryInner) -> Self {
         Self { inner: Arc::new(Mutex::new(FsInner::new(root))) }

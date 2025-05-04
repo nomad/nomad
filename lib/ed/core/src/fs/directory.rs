@@ -119,6 +119,18 @@ pub trait Directory: Send + Sync + Sized {
     > + Send;
 
     /// TODO: docs.
+    #[inline]
+    fn replicate_from<Src: Directory>(
+        &self,
+        _src: &Src,
+    ) -> impl Future<Output = Result<(), ReplicateError<Self::Fs, Src::Fs>>> + Send
+    {
+        async move {
+            todo!();
+        }
+    }
+
+    /// TODO: docs.
     fn watch(&self) -> Self::EventStream;
 }
 
@@ -171,4 +183,36 @@ pub struct NodeMove<Fs: fs::Fs> {
 
     /// TODO: docs.
     pub move_root_id: Fs::NodeId,
+}
+
+/// TODO: docs.
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
+#[display("{_0}")]
+pub enum ReplicateError<Dst: Fs, Src: Fs> {
+    /// TODO: docs.
+    CreateDirectory(<Dst::Directory as Directory>::CreateDirectoryError),
+
+    /// TODO: docs.
+    CreateFile(<Dst::Directory as fs::Directory>::CreateFileError),
+
+    /// TODO: docs.
+    CreateSymlink(<Dst::Directory as fs::Directory>::CreateSymlinkError),
+
+    /// TODO: docs.
+    ReadDirectory(<Src::Directory as Directory>::ReadError),
+
+    /// TODO: docs.
+    ReadFile(<Src::File as fs::File>::ReadError),
+
+    /// TODO: docs.
+    ReadSymlink(<Src::Symlink as fs::Symlink>::ReadError),
+
+    /// TODO: docs.
+    WriteFile(<Dst::File as fs::File>::WriteError),
 }

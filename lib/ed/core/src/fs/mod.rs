@@ -19,6 +19,7 @@ pub use directory::{
     NodeCreation,
     NodeDeletion,
     NodeMove,
+    ReplicateError,
 };
 pub use file::{File, FileEvent};
 pub use fs::Fs;

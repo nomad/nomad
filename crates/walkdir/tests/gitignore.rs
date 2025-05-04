@@ -66,13 +66,22 @@ trait GitRepository {
 }
 
 impl GitRepository for TempDir {
-    fn create(_fs: mock::fs::MockFs) -> Self {
+    fn create(fs: mock::fs::MockFs) -> Self {
         use tempdir::FsExt;
-        let _tempdir = futures_executor::block_on(async move {
-            OsFs::default().tempdir().await
+
+        futures_executor::block_on(async move {
+            let tempdir = OsFs::default()
+                .tempdir()
+                .await
+                .expect("couldn't create tempdir");
+
+            tempdir
+                .replicate_from(&fs.root())
+                .await
+                .expect("couldn't replicate from mock fs");
+
+            tempdir
         })
-        .expect("couldn't create tempdir");
-        todo!();
     }
 
     fn init(&self) {
@@ -92,9 +101,9 @@ impl GitRepository for TempDir {
         use futures_util::StreamExt;
         use walkdir::FsExt;
 
-        NonIgnoredPaths {
-            inner: futures_executor::block_on(async move {
-                OsFs::default()
+        futures_executor::block_on(async move {
+            NonIgnoredPaths {
+                inner: OsFs::default()
                     .walk(self)
                     .filter(walkdir::GitIgnore::new(self.path().to_owned()))
                     .paths()
@@ -103,9 +112,9 @@ impl GitRepository for TempDir {
                         path.strip_prefix(self.path()).unwrap().to_owned()
                     })
                     .collect::<HashSet<_>>()
-                    .await
-            }),
-        }
+                    .await,
+            }
+        })
     }
 }
 
