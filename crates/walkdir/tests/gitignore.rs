@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 #![allow(clippy::unwrap_used)]
 
+use core::fmt;
 use std::collections::HashSet;
 
 use abs_path::AbsPathBuf;
@@ -118,7 +119,6 @@ impl GitRepository for TempDir {
     }
 }
 
-#[derive(Debug)]
 struct NonIgnoredPaths {
     inner: HashSet<AbsPathBuf>,
 }
@@ -147,5 +147,13 @@ where
             })
             .collect::<HashSet<_>>();
         self.inner == other
+    }
+}
+
+impl fmt::Debug for NonIgnoredPaths {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_set()
+            .entries(self.inner.iter().map(AsRef::<str>::as_ref))
+            .finish()
     }
 }
