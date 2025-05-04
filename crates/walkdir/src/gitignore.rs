@@ -56,7 +56,7 @@ struct IgnoredPaths {
 
 impl GitIgnore {
     /// TODO: docs.
-    const REFRESH_IGNORED_PATHS_AFTER: Duration = Duration::from_secs(10);
+    pub const REFRESH_IGNORED_PATHS_AFTER: Duration = Duration::from_secs(10);
 
     /// TODO: docs.
     pub fn new(dir_path: AbsPathBuf) -> Self {

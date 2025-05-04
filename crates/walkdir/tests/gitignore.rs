@@ -4,11 +4,12 @@
 use core::fmt;
 use std::collections::HashSet;
 
-use abs_path::AbsPathBuf;
+use abs_path::{AbsPathBuf, NodeName, path};
 use ed::fs::Directory;
 use ed::fs::os::OsFs;
 use ed::mock;
 use tempdir::TempDir;
+use walkdir::GitIgnore;
 
 #[test]
 #[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
@@ -49,6 +50,44 @@ fn gitignore_is_ignored_if_git_is_not_in_path() {
     });
 
     assert_eq!(repo.non_ignored_paths(), ["/a.txt", "/b.txt", "/.gitignore"]);
+}
+
+#[test]
+#[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
+fn gitignore_cache_is_refreshed_after_expiration() {
+    let repo = <TempDir as GitRepository>::create(mock::fs! {
+        "a.txt": "",
+        "b.txt": "",
+        ".gitignore": "a.txt",
+    });
+
+    repo.init();
+
+    assert_eq!(
+        repo.non_ignored_paths().remove_git_dir(),
+        ["/b.txt", "/.gitignore"]
+    );
+
+    // Change the .gitignore file.
+    std::fs::write(
+        repo.path().join(<&NodeName>::try_from(".gitignore").unwrap()),
+        "b.txt",
+    )
+    .unwrap();
+
+    // We won't react to the change until the GitIgnore cache expires.
+    std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
+    assert_eq!(
+        repo.non_ignored_paths().remove_git_dir(),
+        ["/b.txt", "/.gitignore"]
+    );
+
+    // Now the cache will be refreshed and we'll detect the change.
+    std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
+    assert_eq!(
+        repo.non_ignored_paths().remove_git_dir(),
+        ["/a.txt", "/.gitignore"]
+    );
 }
 
 trait GitRepository {
@@ -109,7 +148,7 @@ impl GitRepository for TempDir {
             NonIgnoredPaths {
                 inner: OsFs::default()
                     .walk(self)
-                    .filter(walkdir::GitIgnore::new(self.path().to_owned()))
+                    .filter(GitIgnore::new(self.path().to_owned()))
                     .paths()
                     .map(Result::unwrap)
                     .map(|path| {
@@ -130,7 +169,7 @@ impl NonIgnoredPaths {
     /// Removes all the paths of files and directories in the `/.git`
     /// directory.
     fn remove_git_dir(mut self) -> Self {
-        self.inner.retain(|path| !path.starts_with(abs_path::path!("/.git")));
+        self.inner.retain(|path| !path.starts_with(path!("/.git")));
         self
     }
 }
