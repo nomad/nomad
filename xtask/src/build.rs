@@ -2,7 +2,7 @@ use core::{fmt, iter, str};
 use std::borrow::Cow;
 use std::env;
 
-use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
+use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf, node};
 use anyhow::{Context, anyhow};
 use cargo_metadata::TargetKind;
 use ed::fs::os::OsFs;
@@ -110,8 +110,7 @@ impl ParsePackage {
     fn call(&self) -> anyhow::Result<cargo_metadata::Package> {
         let cargo_dot_toml = {
             let mut root = self.project_root.to_owned();
-            #[allow(clippy::unwrap_used)]
-            root.push(<&NodeName>::try_from("Cargo.toml").unwrap());
+            root.push(node!("Cargo.toml"));
             root
         };
         let metadata = cargo_metadata::MetadataCommand::new()
@@ -217,8 +216,7 @@ impl FixLibraryName {
 
 fn artifact_dir(project_root: &AbsPath) -> AbsPathBuf {
     let mut dir = project_root.to_owned();
-    #[allow(clippy::unwrap_used)]
-    dir.push(<&NodeName>::try_from("lua").unwrap());
+    dir.push(node!("lua"));
     dir
 }
 

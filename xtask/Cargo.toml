@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-abs-path = { workspace = true }
+abs-path = { workspace = true, features = ["macros"] }
 anyhow = "1.0"
 cargo_metadata = "0.19"
 clap = { version = "4", features = ["derive"] }

@@ -4,7 +4,7 @@
 use core::fmt;
 use std::collections::HashSet;
 
-use abs_path::{AbsPathBuf, NodeName, path};
+use abs_path::{AbsPathBuf, node, path};
 use ed::fs::Directory;
 use ed::fs::os::OsFs;
 use ed::mock;
@@ -71,11 +71,7 @@ fn gitignore_cache_is_refreshed_after_expiration() {
     );
 
     // Change the .gitignore file.
-    std::fs::write(
-        repo.path().join(<&NodeName>::try_from(".gitignore").unwrap()),
-        "b.txt",
-    )
-    .unwrap();
+    std::fs::write(repo.path().join(node!(".gitignore")), "b.txt").unwrap();
 
     // We won't react to the change until the GitIgnore cache expires.
     std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
