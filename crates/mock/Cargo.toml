@@ -1,0 +1,30 @@
+[package]
+name = "mock"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+
+[dependencies]
+abs-path = { workspace = true }
+async-broadcast = "0.7"
+async-task = "4.7"
+cauchy = { workspace = true }
+crop = "0.4"
+derive_more = { workspace = true }
+ed = { workspace = true }
+flume = { workspace = true, features = ["async"] }
+futures-lite = { workspace = true, features = ["std"] }
+fxhash = { workspace = true }
+indexmap = { workspace = true }
+mock-macros = { path = "./macros" }
+pin-project-lite = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+slotmap = { workspace = true }
+
+[lints]
+workspace = true

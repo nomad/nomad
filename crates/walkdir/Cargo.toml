@@ -12,7 +12,6 @@ gitignore = ["dep:compact_str", "ed/os-fs"]
 
 # Test-related features.
 git-in-PATH = []
-mock = ["ed/mock"]
 
 [dependencies]
 abs-path = { workspace = true }
@@ -28,6 +27,7 @@ compact_str = { workspace = true, optional = true }
 [dev-dependencies]
 abs-path = { workspace = true, features = ["macros"] }
 futures-executor = { workspace = true }
+mock = { workspace = true }
 tempdir = { workspace = true }
 
 [lints]
@@ -35,4 +35,4 @@ workspace = true
 
 [[test]]
 name = "gitignore"
-required-features = ["gitignore", "mock"]
+required-features = ["gitignore"]

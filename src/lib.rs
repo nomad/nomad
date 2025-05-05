@@ -1,8 +1,8 @@
 use ed::EditorCtx;
 use ed::module::{ApiCtx, Empty, Module};
-use ed::neovim::{self, Neovim};
 use ed::notify::Name;
 use ed::plugin::Plugin;
+use neovim::Neovim;
 
 #[neovim::plugin]
 fn mad() -> Mad {

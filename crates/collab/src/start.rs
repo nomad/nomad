@@ -609,7 +609,7 @@ impl<B> notify::Error for UserNotLoggedInError<B> {
 
 #[cfg(feature = "neovim")]
 mod neovim_error_impls {
-    use ed::neovim::Neovim;
+    use neovim::Neovim;
 
     use super::*;
 

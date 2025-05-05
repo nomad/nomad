@@ -1,0 +1,19 @@
+[package]
+name = "benches"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "benches"
+path = "src/main.rs"
+bench = true
+
+[dependencies]
+collab = { workspace = true }
+criterion = "0.5"
+
+[lints]
+workspace = true

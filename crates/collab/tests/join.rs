@@ -6,8 +6,8 @@ use collab::Collab;
 use collab::mock::{CollabMock, CollabServer, SessionId};
 use ed::action::AsyncAction;
 use ed::fs::Fs;
-use ed::mock::{self, BackendExt, Mock};
 use futures_lite::future::{self, FutureExt};
+use mock::{BackendExt, Mock};
 
 #[test]
 fn replicate_simple_project() {

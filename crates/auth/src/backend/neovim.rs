@@ -1,7 +1,7 @@
 use collab_server::message::GitHubHandle;
 use collab_server::nomad::NomadAuthenticateInfos;
-use ed::neovim::Neovim;
 use ed::{AsyncCtx, EditorCtx};
+use neovim::Neovim;
 
 use crate::AuthInfos;
 use crate::backend::AuthBackend;

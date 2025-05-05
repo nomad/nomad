@@ -7,7 +7,6 @@ use std::collections::HashSet;
 use abs_path::{AbsPathBuf, node, path};
 use ed::fs::Directory;
 use ed::fs::os::OsFs;
-use ed::mock;
 use tempdir::TempDir;
 use walkdir::GitIgnore;
 

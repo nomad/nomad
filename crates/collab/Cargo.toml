@@ -12,14 +12,13 @@ mock = [
   "auth/mock",
   "collab-server/server",
   "collab-server/test",
-  "ed/mock",
 ]
 neovim = [
   "dep:async-net",
   "dep:clipboard",
   "dep:home",
+  "dep:neovim",
   "collab-server/nomad",
-  "ed/neovim",
   "walkdir/gitignore",
 ]
 
@@ -52,9 +51,11 @@ duplex-stream = { git = "ssh://git@github.com/nomad/collab.git", optional = true
 async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }
+neovim = { workspace = true, optional = true }
 
 [dev-dependencies]
 futures-lite = { workspace = true, features = ["default"] }
+mock = { workspace = true }
 
 [lints]
 workspace = true

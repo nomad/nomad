@@ -6,8 +6,8 @@ use collab::Collab;
 use collab::mock::{CollabMock, CollabServer, SessionId};
 use collab::start::StartError;
 use ed::action::AsyncAction;
-use ed::mock::{self, BackendExt, Mock};
 use futures_lite::future::{self, FutureExt};
+use mock::{BackendExt, Mock};
 
 #[test]
 fn cannot_start_session_if_not_logged_in() {

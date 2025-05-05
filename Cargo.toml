@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/*", "lib/*", "lib/ed/*", "lib/ed/*/macros", "xtask"]
-exclude = ["lib/ed/src", "lib/nvimx", "crates/collab-old"]
+members = ["benches", "crates/*", "crates/*/macros", "xtask"]
+exclude = ["crates/collab-old"]
 
 [workspace.package]
 version = "0.1.0-dev"
@@ -10,6 +10,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+# Third-party dependencies.
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
 async-net = "2"
 cauchy = { git = "ssh://git@github.com/nomad/cauchy.git" }
@@ -30,11 +31,13 @@ smol_str = "0.3"
 strsim = "0.11"
 tracing = "0.1"
 
-ed = { path = "./lib/ed" }
-
+# Internal dependencies.
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
+ed = { path = "./crates/ed" }
+mock = { path = "./crates/mock" }
+neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 tempdir = { path = "./crates/tempdir" }
@@ -72,10 +75,11 @@ authors.workspace = true
 crate-type = ["cdylib"]
 
 [features]
-neovim-nightly = ["ed/neovim-nightly"]
+neovim-nightly = ["neovim/nightly"]
 
 [dependencies]
 auth = { workspace = true, features = ["neovim"] }
 collab = { workspace = true, features = ["neovim"] }
-ed = { workspace = true, features = ["neovim"] }
+ed = { workspace = true }
+neovim = { workspace = true }
 version = { workspace = true }
