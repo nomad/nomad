@@ -2,7 +2,7 @@ use core::{fmt, iter, str};
 use std::borrow::Cow;
 use std::env;
 
-use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf, node};
+use abs_path::{AbsPath, AbsPathBuf, NodeNameBuf, node};
 use anyhow::{Context, anyhow};
 use cargo_metadata::TargetKind;
 use ed::fs::os::OsFs;
@@ -108,11 +108,8 @@ impl FindProjectRoot {
 
 impl ParsePackage {
     fn call(&self) -> anyhow::Result<cargo_metadata::Package> {
-        let cargo_dot_toml = {
-            let mut root = self.project_root.to_owned();
-            root.push(node!("Cargo.toml"));
-            root
-        };
+        let cargo_dot_toml =
+            self.project_root.clone().join(node!("Cargo.toml"));
         let metadata = cargo_metadata::MetadataCommand::new()
             .manifest_path(cargo_dot_toml.clone())
             .exec()?;
@@ -215,9 +212,7 @@ impl FixLibraryName {
 }
 
 fn artifact_dir(project_root: &AbsPath) -> AbsPathBuf {
-    let mut dir = project_root.to_owned();
-    dir.push(node!("lua"));
-    dir
+    project_root.join(node!("lua"))
 }
 
 fn force_rename(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {
