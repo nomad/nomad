@@ -1,6 +1,6 @@
 use abs_path::AbsPath;
 use ed_core::backend::{AgentId, ApiValue, Backend, Buffer as _, Edit};
-use ed_core::fs::{Fs, FsNode};
+use ed_core::fs::{self, File, FsNode};
 use ed_core::notify::MaybeResult;
 use ed_core::shared::Shared;
 use fxhash::FxHashMap;
@@ -23,13 +23,13 @@ use crate::fs::MockFs;
 use crate::serde::{DeserializeError, SerializeError};
 
 /// TODO: docs.
-pub struct Mock {
+pub struct Mock<Fs = MockFs> {
     buffers: FxHashMap<BufferId, BufferInner>,
     callbacks: Callbacks,
     current_buffer: Option<BufferId>,
     emitter: Emitter,
     executor: Executor,
-    fs: MockFs,
+    fs: Fs,
     next_buffer_id: BufferId,
 }
 
@@ -51,8 +51,8 @@ pub(crate) enum CallbackKind {
     OnBufferSaved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
 }
 
-impl Mock {
-    pub fn new(fs: MockFs) -> Self {
+impl<Fs: fs::Fs> Mock<Fs> {
+    pub fn new(fs: Fs) -> Self {
         Self {
             buffers: Default::default(),
             callbacks: Default::default(),
@@ -80,8 +80,11 @@ impl Mock {
     fn open_buffer(&mut self, path: &AbsPath) -> Buffer<'_> {
         assert!(self.buffer_at(path).is_none());
 
-        let file =
-            match futures_lite::future::block_on(self.fs.node_at_path(path))
+        let contents = futures_lite::future::block_on(async {
+            let file = match self
+                .fs
+                .node_at_path(path)
+                .await
                 .expect("infallible")
                 .expect("no file at path")
             {
@@ -89,10 +92,10 @@ impl Mock {
                 _ => todo!(),
             };
 
-        let contents =
-            str::from_utf8(&file.read_sync().expect("just got file"))
+            str::from_utf8(&file.read().await.expect("just got file"))
                 .expect("file is not valid UTF-8")
-                .into();
+                .into()
+        });
 
         let buffer = BufferInner::new(
             self.next_buffer_id.post_inc(),
@@ -124,7 +127,7 @@ impl Callbacks {
     }
 }
 
-impl Backend for Mock {
+impl<Fs: fs::Fs> Backend for Mock<Fs> {
     const REINSTATE_PANIC_HOOK: bool = true;
 
     type Api = Api;
@@ -135,7 +138,7 @@ impl Backend for Mock {
     type EventHandle = EventHandle;
     type LocalExecutor = Executor;
     type BackgroundExecutor = Executor;
-    type Fs = MockFs;
+    type Fs = Fs;
     type Emitter<'this> = &'this mut Emitter;
     type Selection<'a> = Selection<'a>;
     type SelectionId = SelectionId;
@@ -153,7 +156,7 @@ impl Backend for Mock {
             .map(|id| self.buffer_mut(id))
     }
 
-    fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId> + use<> {
+    fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId> + use<Fs> {
         self.buffers.keys().copied().collect::<Vec<_>>().into_iter()
     }
 
@@ -230,9 +233,9 @@ impl Backend for Mock {
     }
 }
 
-impl Default for Mock {
+impl<Fs: fs::Fs + Default> Default for Mock<Fs> {
     fn default() -> Self {
-        Self::new(MockFs::default())
+        Self::new(Fs::default())
     }
 }
 
