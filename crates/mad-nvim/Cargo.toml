@@ -1,0 +1,24 @@
+[package]
+name = "mad-nvim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+name = "mad"
+
+[features]
+neovim-nightly = ["neovim/nightly"]
+
+[dependencies]
+auth = { workspace = true, features = ["neovim"] }
+collab = { workspace = true, features = ["neovim"] }
+ed = { workspace = true }
+neovim = { workspace = true }
+version = { workspace = true }
+
+[lints]
+workspace = true

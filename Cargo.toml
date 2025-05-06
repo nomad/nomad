@@ -1,6 +1,7 @@
 [workspace]
 members = ["benches", "crates/*", "crates/*/macros", "xtask"]
 exclude = ["crates/collab-old"]
+resolver = "3"
 
 [workspace.package]
 version = "0.1.0-dev"
@@ -64,22 +65,3 @@ refining_impl_trait = { level = "allow", priority = -1 }
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 private_intra_doc_links = "deny"
-
-[package]
-name = "mad"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-
-[lib]
-crate-type = ["cdylib"]
-
-[features]
-neovim-nightly = ["neovim/nightly"]
-
-[dependencies]
-auth = { workspace = true, features = ["neovim"] }
-collab = { workspace = true, features = ["neovim"] }
-ed = { workspace = true }
-neovim = { workspace = true }
-version = { workspace = true }

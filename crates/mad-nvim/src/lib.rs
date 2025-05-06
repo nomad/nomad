@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use ed::EditorCtx;
 use ed::module::{ApiCtx, Empty, Module};
 use ed::notify::Name;
