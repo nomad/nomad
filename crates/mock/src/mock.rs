@@ -1,6 +1,6 @@
 use abs_path::AbsPath;
 use ed::backend::{AgentId, ApiValue, Backend, Buffer as _, Edit};
-use ed::fs::{self, File, FsNode};
+use ed::fs::{File, Fs, FsNode};
 use ed::notify::MaybeResult;
 use ed::shared::Shared;
 use fxhash::FxHashMap;
@@ -18,18 +18,16 @@ use crate::buffer::{
     SelectionId,
 };
 use crate::emitter::Emitter;
-use crate::executor::Executor;
-use crate::fs::MockFs;
 use crate::serde::{DeserializeError, SerializeError};
+use crate::{Config, DefaultConfig};
 
 /// TODO: docs.
-pub struct Mock<Fs = MockFs> {
+pub struct Mock<C: Config = DefaultConfig> {
     buffers: FxHashMap<BufferId, BufferInner>,
     callbacks: Callbacks,
+    config: C,
     current_buffer: Option<BufferId>,
     emitter: Emitter,
-    executor: Executor,
-    fs: Fs,
     next_buffer_id: BufferId,
 }
 
@@ -51,15 +49,14 @@ pub(crate) enum CallbackKind {
     OnBufferSaved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
 }
 
-impl<Fs: fs::Fs> Mock<Fs> {
-    pub fn new(fs: Fs) -> Self {
+impl<C: Config> Mock<C> {
+    pub fn new(config: impl Into<C>) -> Self {
         Self {
             buffers: Default::default(),
             callbacks: Default::default(),
+            config: config.into(),
             current_buffer: None,
             emitter: Default::default(),
-            executor: Default::default(),
-            fs,
             next_buffer_id: BufferId(1),
         }
     }
@@ -82,7 +79,7 @@ impl<Fs: fs::Fs> Mock<Fs> {
 
         let contents = futures_lite::future::block_on(async {
             let file = match self
-                .fs
+                .fs()
                 .node_at_path(path)
                 .await
                 .expect("infallible")
@@ -127,7 +124,7 @@ impl Callbacks {
     }
 }
 
-impl<Fs: fs::Fs> Backend for Mock<Fs> {
+impl<C: Config> Backend for Mock<C> {
     const REINSTATE_PANIC_HOOK: bool = true;
 
     type Api = Api;
@@ -136,9 +133,9 @@ impl<Fs: fs::Fs> Backend for Mock<Fs> {
     type Cursor<'a> = Cursor<'a>;
     type CursorId = CursorId;
     type EventHandle = EventHandle;
-    type LocalExecutor = Executor;
-    type BackgroundExecutor = Executor;
-    type Fs = Fs;
+    type LocalExecutor = C::LocalExecutor;
+    type BackgroundExecutor = C::BackgroundExecutor;
+    type Fs = C::Fs;
     type Emitter<'this> = &'this mut Emitter;
     type Selection<'a> = Selection<'a>;
     type SelectionId = SelectionId;
@@ -156,7 +153,7 @@ impl<Fs: fs::Fs> Backend for Mock<Fs> {
             .map(|id| self.buffer_mut(id))
     }
 
-    fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId> + use<Fs> {
+    fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId> + use<C> {
         self.buffers.keys().copied().collect::<Vec<_>>().into_iter()
     }
 
@@ -173,7 +170,7 @@ impl<Fs: fs::Fs> Backend for Mock<Fs> {
     }
 
     fn fs(&mut self) -> Self::Fs {
-        self.fs.clone()
+        self.config.fs()
     }
 
     fn emitter(&mut self) -> Self::Emitter<'_> {
@@ -181,7 +178,7 @@ impl<Fs: fs::Fs> Backend for Mock<Fs> {
     }
 
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
-        &mut self.executor
+        self.config.local_executor()
     }
 
     fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
@@ -194,7 +191,7 @@ impl<Fs: fs::Fs> Backend for Mock<Fs> {
     }
 
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
-        &mut self.executor
+        self.config.background_executor()
     }
 
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
@@ -233,9 +230,9 @@ impl<Fs: fs::Fs> Backend for Mock<Fs> {
     }
 }
 
-impl<Fs: fs::Fs + Default> Default for Mock<Fs> {
+impl<C: Config + Default> Default for Mock<C> {
     fn default() -> Self {
-        Self::new(Fs::default())
+        Self::new(C::default())
     }
 }
 
