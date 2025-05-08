@@ -20,7 +20,7 @@ use crate::backend::{ActionForSelectedSession, CollabBackend};
 use crate::config;
 
 #[allow(clippy::type_complexity)]
-pub struct CollabMock<B: Backend> {
+pub struct CollabMock<B: Backend, F = ()> {
     inner: B,
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
@@ -29,6 +29,7 @@ pub struct CollabMock<B: Backend> {
     lsp_root_with: Option<
         Box<dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>>,
     >,
+    project_filter_with: Box<dyn FnMut(&<B::Fs as fs::Fs>::Directory) -> F>,
     select_session_with: Option<
         Box<
             dyn FnMut(
@@ -75,7 +76,27 @@ pub struct AnyError {
 #[derive(Debug)]
 pub struct NoDefaultDirForRemoteProjectsError;
 
-impl<B: Backend> CollabMock<B> {
+impl<B: Backend> CollabMock<B, ()> {
+    pub fn new(inner: B) -> Self {
+        Self {
+            clipboard: None,
+            confirm_start_with: None,
+            default_dir_for_remote_projects: None,
+            home_dir: None,
+            inner,
+            lsp_root_with: None,
+            project_filter_with: Box::new(|_| ()),
+            select_session_with: None,
+            server_tx: None,
+        }
+    }
+}
+
+impl<B, F> CollabMock<B, F>
+where
+    B: Backend,
+    F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+{
     pub fn confirm_start_with(
         mut self,
         fun: impl FnMut(&AbsPath) -> bool + 'static,
@@ -91,19 +112,6 @@ impl<B: Backend> CollabMock<B> {
     ) -> Self {
         self.lsp_root_with = Some(Box::new(fun) as _);
         self
-    }
-
-    pub fn new(inner: B) -> Self {
-        Self {
-            clipboard: None,
-            confirm_start_with: None,
-            default_dir_for_remote_projects: None,
-            home_dir: None,
-            inner,
-            lsp_root_with: None,
-            select_session_with: None,
-            server_tx: None,
-        }
     }
 
     pub fn select_session_with(
@@ -130,6 +138,28 @@ impl<B: Backend> CollabMock<B> {
     pub fn with_home_dir(mut self, dir_path: AbsPathBuf) -> Self {
         self.home_dir = Some(dir_path);
         self
+    }
+
+    pub fn with_project_filter<Fun, NewF>(
+        self,
+        project_filter: Fun,
+    ) -> CollabMock<B, NewF>
+    where
+        Fun: FnMut(&<B::Fs as fs::Fs>::Directory) -> NewF + 'static,
+        NewF: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+    {
+        CollabMock {
+            inner: self.inner,
+            confirm_start_with: self.confirm_start_with,
+            clipboard: self.clipboard,
+            default_dir_for_remote_projects: self
+                .default_dir_for_remote_projects,
+            home_dir: self.home_dir,
+            lsp_root_with: self.lsp_root_with,
+            project_filter_with: Box::new(project_filter),
+            select_session_with: self.select_session_with,
+            server_tx: self.server_tx,
+        }
     }
 
     pub fn with_server(mut self, server: &CollabServer) -> Self {
@@ -181,9 +211,13 @@ impl AnyError {
     }
 }
 
-impl<B: Backend> CollabBackend for CollabMock<B> {
+impl<B, F> CollabBackend for CollabMock<B, F>
+where
+    B: Backend,
+    F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+{
     type Io = DuplexStream;
-    type ProjectFilter = ();
+    type ProjectFilter = F;
     type ServerConfig = ServerConfig;
 
     type ConnectToServerError = AnyError;
@@ -252,9 +286,12 @@ impl<B: Backend> CollabBackend for CollabMock<B> {
     }
 
     fn project_filter(
-        _: &<Self::Fs as fs::Fs>::Directory,
-        _: &mut AsyncCtx<'_, Self>,
+        project_root: &<Self::Fs as fs::Fs>::Directory,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Self::ProjectFilter {
+        ctx.with_backend(|this| {
+            this.project_filter_with.as_mut()(project_root)
+        })
     }
 
     async fn select_session<'pairs>(
@@ -268,7 +305,11 @@ impl<B: Backend> CollabBackend for CollabMock<B> {
     }
 }
 
-impl<B: Backend> Backend for CollabMock<B> {
+impl<B, F> Backend for CollabMock<B, F>
+where
+    B: Backend,
+    F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+{
     const REINSTATE_PANIC_HOOK: bool = B::REINSTATE_PANIC_HOOK;
 
     type Api = <B as Backend>::Api;
@@ -292,7 +333,9 @@ impl<B: Backend> Backend for CollabMock<B> {
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
         self.inner.buffer_at_path(path)
     }
-    fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId<Self>> + use<B> {
+    fn buffer_ids(
+        &mut self,
+    ) -> impl Iterator<Item = BufferId<Self>> + use<B, F> {
         self.inner.buffer_ids()
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
@@ -374,7 +417,7 @@ impl Default for CollabServer {
     }
 }
 
-impl<B: Backend + Default> Default for CollabMock<B> {
+impl<B: Backend + Default> Default for CollabMock<B, ()> {
     fn default() -> Self {
         Self::new(B::default())
     }
