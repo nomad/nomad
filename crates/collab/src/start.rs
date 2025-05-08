@@ -57,19 +57,6 @@ pub struct Start<B: CollabBackend> {
     stop_channels: StopChannels<B>,
 }
 
-impl<B: CollabBackend> Start<B> {
-    /// TODO: docs.
-    #[cfg(feature = "benches")]
-    #[inline]
-    pub async fn read_project(
-        &self,
-        project_root: &AbsPath,
-        ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<(), ReadProjectError<B>> {
-        read_project(project_root, PeerId::new(1), ctx).await.map(|_| ())
-    }
-}
-
 impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     const NAME: Name = "start";
 
