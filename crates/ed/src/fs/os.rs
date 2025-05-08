@@ -38,6 +38,7 @@ pub type Inode = u64;
 pub struct OsFs {}
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct OsDirectory {
     metadata: async_fs::Metadata,
     path: AbsPathBuf,

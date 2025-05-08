@@ -27,18 +27,21 @@ pub struct MockFs {
     inner: Arc<Mutex<FsInner>>,
 }
 
+#[derive(Clone)]
 pub struct MockDirectory {
     fs: MockFs,
     metadata: MockMetadata,
     path: AbsPathBuf,
 }
 
+#[derive(Clone)]
 pub struct MockFile {
     fs: MockFs,
     metadata: MockMetadata,
     path: AbsPathBuf,
 }
 
+#[derive(Clone)]
 pub struct MockSymlink {
     fs: MockFs,
     metadata: MockMetadata,

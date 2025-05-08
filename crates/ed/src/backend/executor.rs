@@ -18,7 +18,7 @@ pub trait LocalExecutor {
 }
 
 /// TODO: docs.
-pub trait BackgroundExecutor: Send + Clone {
+pub trait BackgroundExecutor: 'static + Send + Clone {
     /// TODO: docs.
     type Task<T>: Task<T>;
 

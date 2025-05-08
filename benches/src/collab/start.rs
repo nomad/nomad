@@ -43,7 +43,7 @@ mod read_neovim {
                 .with_background_executor(ThreadPool::new()),
         )
         .with_project_filter(|project_root| {
-            GitIgnore::new(project_root.path())
+            GitIgnore::new(project_root.path().to_owned())
         })
         .block_on(async |ctx| {
             bench_read_project(neovim_repo(), "real_fs", ctx, group);

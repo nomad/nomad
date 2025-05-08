@@ -5,7 +5,7 @@ use collab::mock::{CollabMock, CollabServer, SessionId};
 use ed::action::AsyncAction;
 use ed::fs::Fs;
 use futures_lite::future::{self, FutureExt};
-use mock::{BackendExt, DefaultConfig, Mock};
+use mock::{BackendExt, Mock};
 
 #[test]
 fn replicate_simple_project() {
@@ -18,7 +18,7 @@ fn replicate_simple_project() {
 
     let server = CollabServer::default();
 
-    let peer1 = CollabMock::new(Mock::<DefaultConfig>::new(fs1.clone()))
+    let peer1 = CollabMock::new(Mock::new(fs1.clone()))
         .with_home_dir(AbsPathBuf::root())
         .with_server(&server);
 
