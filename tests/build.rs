@@ -18,14 +18,9 @@ fn main() {
         .arg("--version")
         .output()
         .ok()
-        .and_then(|output| {
-            output
-                .status
-                .success()
-                .then(|| String::from_utf8(output.stdout).ok())
-                .flatten()
-        })
-        .and_then(|output| output.parse::<GitVersion>().ok());
+        .and_then(|output| output.status.success().then_some(output.stdout))
+        .and_then(|stdout| String::from_utf8(stdout).ok())
+        .and_then(|stdout| stdout.parse::<GitVersion>().ok());
 
     if let Some(git_version) = maybe_git_version {
         if git_version >= GitVersion(2, 32, 0) {
