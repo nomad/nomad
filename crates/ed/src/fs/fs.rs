@@ -88,11 +88,41 @@ pub trait Fs: Clone + Send + Sync + 'static {
     #[inline]
     fn read<P: AsRef<AbsPath> + Send>(
         &self,
-        _path: P,
+        path: P,
     ) -> impl Future<Output = Result<Vec<u8>, ReadFileError<Self>>> + Send
     {
         async move {
-            todo!();
+            let path = path.as_ref();
+
+            match self
+                .node_at_path(path)
+                .await
+                .map_err(ReadFileError::NodeAtPath)?
+                .ok_or_else(|| ReadFileError::NoNodeAtPath(path.to_owned()))?
+            {
+                FsNode::File(file) => Some(file),
+                FsNode::Directory(_) => None,
+                FsNode::Symlink(symlink) => {
+                    match symlink
+                        .follow_recursively()
+                        .await
+                        .map_err(ReadFileError::FollowSymlink)?
+                        .ok_or_else(|| {
+                            ReadFileError::NoNodeAtPath(path.to_owned())
+                        })? {
+                        FsNode::File(file) => Some(file),
+                        FsNode::Directory(_) => None,
+                        _ => unreachable!(
+                            "recursively following a symlink cannot resolve \
+                             to another symlink"
+                        ),
+                    }
+                },
+            }
+            .ok_or_else(|| ReadFileError::DirectoryAtPath(path.to_owned()))?
+            .read()
+            .await
+            .map_err(ReadFileError::ReadFile)
         }
     }
 
@@ -100,11 +130,20 @@ pub trait Fs: Clone + Send + Sync + 'static {
     #[inline]
     fn read_to_string<P: AsRef<AbsPath> + Send>(
         &self,
-        _path: P,
+        path: P,
     ) -> impl Future<Output = Result<String, ReadFileToStringError<Self>>> + Send
     {
         async move {
-            todo!();
+            let path = path.as_ref();
+
+            self.read(path)
+                .await
+                .map_err(ReadFileToStringError::ReadFile)
+                .and_then(|contents| {
+                    String::from_utf8(contents).map_err(|_| {
+                        ReadFileToStringError::FileIsNotUtf8(path.to_owned())
+                    })
+                })
         }
     }
 }
