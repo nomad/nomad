@@ -35,8 +35,9 @@ impl<B: Backend> AsyncCtx<'_, B> {
     pub async fn create_and_focus(
         &mut self,
         file_path: &AbsPath,
+        agent_id: AgentId,
     ) -> Result<B::BufferId, B::CreateBufferError> {
-        let buffer_id = self.create_buffer(file_path).await?;
+        let buffer_id = self.create_buffer(file_path, agent_id).await?;
         self.with_backend(|backend| {
             if let Some(mut buffer) = backend.buffer(buffer_id.clone()) {
                 buffer.focus()
@@ -50,8 +51,9 @@ impl<B: Backend> AsyncCtx<'_, B> {
     pub async fn create_buffer(
         &mut self,
         file_path: &AbsPath,
+        agent_id: AgentId,
     ) -> Result<B::BufferId, B::CreateBufferError> {
-        B::create_buffer(file_path, self).await
+        B::create_buffer(file_path, agent_id, self).await
     }
 
     /// TODO: docs.

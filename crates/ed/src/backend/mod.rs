@@ -5,6 +5,7 @@ mod api;
 mod backend;
 mod base_backend;
 mod buffer;
+mod cursor;
 mod executor;
 mod value;
 
@@ -13,6 +14,7 @@ pub use api::Api;
 pub use backend::Backend;
 pub use base_backend::BaseBackend;
 pub use buffer::{Buffer, Edit, Replacement};
+pub use cursor::Cursor;
 pub use executor::{
     BackgroundExecutor,
     LocalExecutor,

@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use ed::backend::{ApiValue, Backend, BaseBackend, BufferId};
+use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, BufferId};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
 use ed::{AsyncCtx, EditorCtx};
@@ -67,9 +67,10 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     }
     async fn create_buffer(
         file_path: &AbsPath,
+        agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <B as BaseBackend>::create_buffer(file_path, ctx).await
+        <B as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
@@ -91,7 +92,7 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     }
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>) + 'static,
+        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
         self.inner.on_buffer_created(fun)
     }

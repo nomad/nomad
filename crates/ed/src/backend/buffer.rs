@@ -4,9 +4,8 @@ use std::borrow::Cow;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
-use super::Backend;
 use crate::ByteOffset;
-use crate::backend::AgentId;
+use crate::backend::{AgentId, Backend};
 
 /// TODO: docs.
 pub trait Buffer {
@@ -35,6 +34,11 @@ pub trait Buffer {
 
     /// TODO: docs.
     fn name(&self) -> Cow<'_, str>;
+
+    /// TODO: docs.
+    fn on_cursor_created<Fun>(&self, fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&<Self::Backend as Backend>::Cursor<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle

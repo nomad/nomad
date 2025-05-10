@@ -174,7 +174,7 @@ impl<T: Event> EventCallbacks<T> {
 }
 
 impl Event for BufReadPost {
-    type Args<'a> = &'a NeovimBuffer<'a>;
+    type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
     type RegisterOutput = u32;
 
     #[inline]
@@ -194,14 +194,14 @@ impl Event for BufReadPost {
                     let buffer =
                         NeovimBuffer::new(BufferId::new(args.buffer), &events);
 
-                    let _created_by = inner
+                    let created_by = inner
                         .agent_ids
                         .created_buffer
                         .remove(&buffer.id())
                         .unwrap_or(AgentId::UNKNOWN);
 
                     for callback in inner.on_buffer_created.iter_mut() {
-                        callback(&buffer);
+                        callback((&buffer, created_by));
                     }
 
                     false

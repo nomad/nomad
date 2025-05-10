@@ -91,7 +91,7 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
     #[inline]
     pub fn on_buffer_created<Fun>(&mut self, fun: Fun) -> B::EventHandle
     where
-        Fun: FnMut(&B::Buffer<'_>) + 'static,
+        Fun: FnMut(&B::Buffer<'_>, AgentId) + 'static,
     {
         self.backend_mut().on_buffer_created(fun)
     }

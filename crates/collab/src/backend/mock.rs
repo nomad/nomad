@@ -11,7 +11,7 @@ use collab_server::message::PeerId;
 use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
 use duplex_stream::{DuplexStream, duplex};
 use ed::AsyncCtx;
-use ed::backend::{ApiValue, Backend, BaseBackend, Buffer, BufferId};
+use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, Buffer, BufferId};
 use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::notify::{self, MaybeResult};
 use serde::{Deserialize, Serialize};
@@ -342,9 +342,10 @@ where
     }
     async fn create_buffer(
         file_path: &AbsPath,
+        agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <B as BaseBackend>::create_buffer(file_path, ctx).await
+        <B as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
@@ -366,7 +367,7 @@ where
     }
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>) + 'static,
+        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
         self.inner.on_buffer_created(fun)
     }

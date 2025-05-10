@@ -11,6 +11,7 @@ use ed::backend::{AgentId, Buffer, Edit, Replacement};
 use ed::{ByteOffset, Shared};
 
 use crate::Neovim;
+use crate::cursor::NeovimCursor;
 use crate::events::{self, EventHandle, Events};
 use crate::oxi::{BufHandle, api, mlua};
 
@@ -28,13 +29,26 @@ pub struct BufferId(BufHandle);
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct Point {
     /// The index of the line in the buffer.
-    line_idx: usize,
+    pub(crate) line_idx: usize,
 
     /// The byte offset in the line.
-    byte_offset: ByteOffset,
+    pub(crate) byte_offset: ByteOffset,
 }
 
 impl<'a> NeovimBuffer<'a> {
+    /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
+    /// buffer.
+    #[track_caller]
+    #[inline]
+    pub(crate) fn byte_offset_of_point(self, point: Point) -> ByteOffset {
+        let line_offset: ByteOffset = self
+            .inner()
+            .get_offset(point.line_idx)
+            .expect("couldn't get line offset")
+            .into();
+        line_offset + point.byte_offset
+    }
+
     #[inline]
     pub(crate) fn current(events: &'a Shared<Events>) -> Self {
         Self::new(BufferId::of_focused(), events)
@@ -164,19 +178,6 @@ impl<'a> NeovimBuffer<'a> {
             Ordering::Equal => None,
             Ordering::Greater => Some(head..anchor),
         }
-    }
-
-    /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
-    /// buffer.
-    #[track_caller]
-    #[inline]
-    fn byte_offset_of_point(self, point: Point) -> ByteOffset {
-        let line_offset: ByteOffset = self
-            .inner()
-            .get_offset(point.line_idx)
-            .expect("couldn't get line offset")
-            .into();
-        line_offset + point.byte_offset
     }
 
     /// Returns the text in the given point range.
@@ -342,6 +343,14 @@ impl Buffer for NeovimBuffer<'_> {
     #[inline]
     fn name(&self) -> Cow<'_, str> {
         self.get_name().to_string_lossy().into_owned().into()
+    }
+
+    #[inline]
+    fn on_cursor_created<Fun>(&self, _fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&NeovimCursor<'_>, AgentId) + 'static,
+    {
+        todo!();
     }
 
     #[inline]

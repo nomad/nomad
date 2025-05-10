@@ -6,10 +6,12 @@ use serde::Serialize;
 use serde::de::Deserialize;
 
 use crate::backend::{
+    AgentId,
     Api,
     ApiValue,
     BackgroundExecutor,
     Buffer,
+    Cursor,
     Key,
     LocalExecutor,
     MapAccess,
@@ -35,7 +37,7 @@ pub trait Backend: 'static + Sized {
     type BufferId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
-    type Cursor<'a>;
+    type Cursor<'a>: Cursor<Id = Self::CursorId, EventHandle = Self::EventHandle>;
 
     /// TODO: docs.
     type CursorId: Clone + Debug + Eq + Hash;
@@ -84,6 +86,7 @@ pub trait Backend: 'static + Sized {
     /// TODO: docs.
     fn create_buffer(
         file_path: &AbsPath,
+        agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
 
@@ -108,7 +111,7 @@ pub trait Backend: 'static + Sized {
     /// TODO: docs.
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>) + 'static;
+        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn selection(

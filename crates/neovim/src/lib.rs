@@ -3,6 +3,7 @@
 pub mod api;
 pub mod buffer;
 mod convert;
+pub mod cursor;
 mod events;
 mod local_executor;
 mod neovim;

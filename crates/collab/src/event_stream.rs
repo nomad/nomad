@@ -403,7 +403,7 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
         let (new_buffer_tx, new_buffer_rx) = flume::unbounded();
 
         let new_buffers_handle = ctx.with_ctx(|ctx| {
-            ctx.on_buffer_created(move |buf| {
+            ctx.on_buffer_created(move |buf, _created_by| {
                 let _ = new_buffer_tx.send(buf.id());
             })
         });

@@ -179,8 +179,8 @@ impl SelectionInner {
 
 impl backend::Buffer for Buffer<'_> {
     type Backend = mock::Mock;
-    type Id = BufferId;
     type EventHandle = mock::EventHandle;
+    type Id = BufferId;
 
     fn byte_len(&self) -> ByteOffset {
         self.contents.len().into()
@@ -232,6 +232,13 @@ impl backend::Buffer for Buffer<'_> {
         Cow::Borrowed(&self.name)
     }
 
+    fn on_cursor_created<Fun>(&self, _fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
+    {
+        todo!()
+    }
+
     fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, &Edit) + 'static,
@@ -268,5 +275,53 @@ impl Deref for Buffer<'_> {
 impl DerefMut for Buffer<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
+    }
+}
+
+impl backend::Cursor for Cursor<'_> {
+    type Backend = mock::Mock;
+    type EventHandle = mock::EventHandle;
+    type Id = CursorId;
+
+    fn byte_offset(&self) -> ByteOffset {
+        self.offset
+    }
+
+    fn id(&self) -> Self::Id {
+        self.cursor_id
+    }
+
+    fn on_moved<Fun>(&self, _fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
+    {
+        todo!();
+    }
+
+    fn on_removed<Fun>(&self, _fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
+    {
+        todo!();
+    }
+}
+
+impl Deref for Cursor<'_> {
+    type Target = CursorInner;
+
+    fn deref(&self) -> &Self::Target {
+        self.buffer
+            .cursors
+            .get(self.cursor_id.id_in_buffer)
+            .expect("cursor exists")
+    }
+}
+
+impl DerefMut for Cursor<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.buffer
+            .cursors
+            .get_mut(self.cursor_id.id_in_buffer)
+            .expect("cursor exists")
     }
 }

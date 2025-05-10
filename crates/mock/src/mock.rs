@@ -59,7 +59,7 @@ pub(crate) struct Callbacks {
 
 #[allow(clippy::type_complexity)]
 pub(crate) enum CallbackKind {
-    OnBufferCreated(Box<dyn FnMut(&Buffer<'_>) + 'static>),
+    OnBufferCreated(Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
     OnBufferEdited(BufferId, Box<dyn FnMut(&Buffer<'_>, &Edit) + 'static>),
     OnBufferRemoved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
     OnBufferSaved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
@@ -176,9 +176,10 @@ where
 
     async fn create_buffer(
         file_path: &AbsPath,
+        agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Self as BaseBackend>::create_buffer(file_path, ctx).await
+        <Self as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
@@ -211,7 +212,7 @@ where
 
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>) + 'static,
+        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
         self.callbacks.insert(CallbackKind::OnBufferCreated(Box::new(fun)))
     }
@@ -253,6 +254,7 @@ where
 {
     async fn create_buffer<B: Backend + AsMut<Self>>(
         file_path: &AbsPath,
+        _agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = ctx

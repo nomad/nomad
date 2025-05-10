@@ -1,5 +1,5 @@
 use ::serde::{Deserialize, Serialize};
-use ed::backend::{Backend, BaseBackend, Buffer};
+use ed::backend::{AgentId, Backend, BaseBackend, Buffer};
 use ed::fs::os::OsFs;
 use ed::fs::{self, AbsPath, Fs};
 use ed::notify::Namespace;
@@ -8,6 +8,7 @@ use ed::{AsyncCtx, Shared};
 use thread_pool::ThreadPool;
 
 use crate::buffer::{BufferId, NeovimBuffer, Point};
+use crate::cursor::NeovimCursor;
 use crate::events::{self, EventHandle, Events};
 use crate::{api, executor, notify, oxi, serde, value};
 
@@ -50,7 +51,7 @@ impl Backend for Neovim {
     type Api = api::NeovimApi;
     type Buffer<'a> = NeovimBuffer<'a>;
     type BufferId = BufferId;
-    type Cursor<'a> = NeovimBuffer<'a>;
+    type Cursor<'a> = NeovimCursor<'a>;
     type CursorId = BufferId;
     type Fs = fs::os::OsFs;
     type LocalExecutor = executor::NeovimLocalExecutor;
@@ -94,15 +95,16 @@ impl Backend for Neovim {
     #[inline]
     async fn create_buffer(
         file_path: &AbsPath,
+        agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Self as BaseBackend>::create_buffer(file_path, ctx).await
+        <Self as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
 
     #[inline]
     fn cursor(&mut self, buf_id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         let buffer = self.buffer(buf_id)?;
-        buffer.is_focused().then_some(buffer)
+        buffer.is_focused().then_some(NeovimCursor::new(buffer))
     }
 
     #[inline]
@@ -146,11 +148,15 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_buffer_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>) + 'static,
+        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
-        Events::insert(self.events.clone(), events::BufReadPost, fun)
+        Events::insert(
+            self.events.clone(),
+            events::BufReadPost,
+            move |(this, created_by)| fun(this, created_by),
+        )
     }
 
     #[inline]
@@ -169,6 +175,7 @@ impl BaseBackend for Neovim {
     #[inline]
     async fn create_buffer<B: Backend + AsMut<Self>>(
         file_path: &AbsPath,
+        agent_id: AgentId,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = ctx
@@ -181,8 +188,16 @@ impl BaseBackend for Neovim {
             .expect("couldn't create buf")
             .into();
 
-        ctx.with_backend(|b| {
-            let buffer = NeovimBuffer::new(buf_id, &b.as_mut().events);
+        ctx.with_backend(|backend| {
+            let this = backend.as_mut();
+
+            this.events.with_mut(|events| {
+                let ids = &mut events.agent_ids.created_buffer;
+                let maybe_prev = ids.insert(buf_id, agent_id);
+                debug_assert!(maybe_prev.is_none());
+            });
+
+            let buffer = NeovimBuffer::new(buf_id, &this.events);
 
             buffer.replace_text_in_point_range(
                 Point::zero()..Point::zero(),
