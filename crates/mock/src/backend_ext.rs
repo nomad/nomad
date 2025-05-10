@@ -2,12 +2,15 @@ use core::mem;
 
 use ed::AsyncCtx;
 use ed::backend::Backend;
+use futures_lite::future;
 
 use crate::executor::Executor;
 
-/// TODO: docs.
+/// A [`Backend`] extension trait used to run async closures with an
+/// `AsyncCtx<Self>`.
 pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
-    /// TODO: docs.
+    /// Same as [`run`](BackendExt::run), but it blocks the current thread
+    /// until the future returned by it completes.
     #[inline]
     fn block_on<R>(
         self,
@@ -16,7 +19,8 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
         self.block_on_inner(fun, false)
     }
 
-    /// TODO: docs.
+    /// Same as [`run_all`](BackendExt::run_all), but it blocks the
+    /// current thread until the future returned by it completes.
     #[inline]
     fn block_on_all<R>(
         self,
@@ -25,7 +29,37 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
         self.block_on_inner(fun, true)
     }
 
-    /// TODO: docs.
+    /// Turns the given async closure into a future that resolves to the
+    /// closure's output.
+    ///
+    /// Unlike [`run_all`](BackendExt::run_all), the returned future will
+    /// complete at the same time as future obtained by calling the closure,
+    /// without waiting for any detached task spawned in the closure's body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::time::{Duration, Instant};
+    /// # use mock::{BackendExt, Mock};
+    /// # use mock::fs::MockFs;
+    /// #
+    /// # futures_lite::future::block_on(async {
+    /// let start = Instant::now();
+    ///
+    /// Mock::<MockFs>::default()
+    ///     .run(async |ctx| {
+    ///         ctx.spawn_local(async |_| {
+    ///             async_io::Timer::after(Duration::from_secs(2)).await;
+    ///         })
+    ///         .detach();
+    ///     })
+    ///     .await;
+    ///
+    /// // The future returned by `run()` completes immediately, without
+    /// // waiting for the timer to expire.
+    /// assert!(start.elapsed() < Duration::from_secs(2));
+    /// # });
+    /// ```
     #[inline]
     fn run<R: 'static>(
         self,
@@ -34,7 +68,36 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
         self.run_inner(fun, false)
     }
 
-    /// TODO: docs.
+    /// Turns the given async closure into a future that resolves to the
+    /// closure's output.
+    ///
+    /// Unlike [`run`](BackendExt::run), the returned future will only complete
+    /// once *all* the detached tasks spawned in the closure's body are done.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::time::{Duration, Instant};
+    /// # use mock::{BackendExt, Mock};
+    /// # use mock::fs::MockFs;
+    /// #
+    /// # futures_lite::future::block_on(async {
+    /// let start = Instant::now();
+    ///
+    /// Mock::<MockFs>::default()
+    ///     .run_all(async |ctx| {
+    ///         ctx.spawn_local(async |_| {
+    ///             async_io::Timer::after(Duration::from_secs(2)).await;
+    ///         })
+    ///         .detach();
+    ///     })
+    ///     .await;
+    ///
+    /// // Even though the async closure we passed to `run_all()` completes
+    /// // immediately, the returned future will wait for the timer to expire.
+    /// assert!(start.elapsed() >= Duration::from_secs(2));
+    /// # });
+    /// ```
     #[inline]
     fn run_all<R: 'static>(
         self,
@@ -59,9 +122,7 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
         // being able to pull the rug out from under us.
         let extended = unsafe { extend_lifetime(fun) };
 
-        let out = futures_lite::future::block_on(
-            self.run_inner(extended, block_on_all),
-        );
+        let out = future::block_on(self.run_inner(extended, block_on_all));
 
         // SAFETY: the function is only called once and the pointer was created
         // by a call to `Box::into_raw`.

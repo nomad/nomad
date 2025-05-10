@@ -1799,6 +1799,7 @@ version = "0.1.0-dev"
 dependencies = [
  "abs-path",
  "async-broadcast",
+ "async-io",
  "async-task",
  "cauchy",
  "derive_more",
