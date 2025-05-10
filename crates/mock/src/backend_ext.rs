@@ -33,8 +33,9 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
     /// closure's output.
     ///
     /// Unlike [`run_all`](BackendExt::run_all), the returned future will
-    /// complete at the same time as future obtained by calling the closure,
-    /// without waiting for any detached task spawned in the closure's body.
+    /// complete at the same time as the future obtained by calling the
+    /// closure, without waiting for any detached task spawned in the closure's
+    /// body.
     ///
     /// # Examples
     ///
