@@ -1,31 +1,42 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use syn::{Expr, Ident, Token, braced, parse_macro_input, token};
+use syn::{Expr, Ident, LitStr, Token, braced, parse_macro_input, token};
 
 pub(crate) fn fs(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let root = parse_macro_input!(input as RootDirectory);
+    let MockFs { root } = parse_macro_input!(input as MockFs);
     quote! { ::mock::fs::MockFs::new(#root) }.into()
 }
 
-struct RootDirectory {
-    inner: Directory,
+struct MockFs {
+    root: Directory,
 }
 
 struct Directory {
-    children: Vec<(Expr, FsNode)>,
+    children: Vec<(NodeName, Node)>,
 }
 
 struct File {
     contents: Expr,
 }
 
-enum FsNode {
-    File(File),
-    Directory(Directory),
+struct Symlink {
+    contents: Expr,
 }
 
-impl Parse for RootDirectory {
+enum NodeName {
+    Ident(Ident),
+    Lit(LitStr),
+    Reference(syn::ExprReference),
+}
+
+enum Node {
+    File(File),
+    Directory(Directory),
+    Symlink(Symlink),
+}
+
+impl Parse for MockFs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         // Allow both `fs!({})` and `fs! {}`.
         let inner = if input.peek(token::Brace) {
@@ -35,7 +46,7 @@ impl Parse for RootDirectory {
             syn::parse2::<Directory>(quote!({ #tokens }))?
         };
 
-        Ok(Self { inner })
+        Ok(Self { root: inner })
     }
 }
 
@@ -47,9 +58,8 @@ impl Parse for Directory {
         let mut children = Vec::new();
 
         while !content.is_empty() {
-            let child_name = content.parse::<Expr>()?;
-            content.parse::<Token![:]>()?;
-            let child = content.parse::<FsNode>()?;
+            let child_name = content.parse::<NodeName>()?;
+            let child = content.parse::<Node>()?;
             children.push((child_name, child));
             if !content.is_empty() {
                 content.parse::<Token![,]>()?;
@@ -60,25 +70,38 @@ impl Parse for Directory {
     }
 }
 
-impl Parse for File {
+impl Parse for NodeName {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Expr::parse(input).map(|contents| Self { contents })
-    }
-}
-
-impl Parse for FsNode {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if input.peek(token::Brace) {
-            Directory::parse(input).map(Self::Directory)
+        if input.peek(LitStr) {
+            input.parse::<LitStr>().map(Self::Lit)
+        } else if input.peek(Ident) {
+            input.parse::<Ident>().map(Self::Ident)
+        } else if input.peek(Token![&]) {
+            input.parse::<syn::ExprReference>().map(Self::Reference)
         } else {
-            File::parse(input).map(Self::File)
+            Err(input.error("invalide node name"))
         }
     }
 }
 
-impl ToTokens for RootDirectory {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.inner.to_tokens(tokens);
+impl Parse for Node {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.peek(Token![:]) {
+            input.parse::<Token![:]>().expect("just checked");
+
+            if input.peek(token::Brace) {
+                Directory::parse(input).map(Self::Directory)
+            } else {
+                let contents = input.parse::<Expr>()?;
+                Ok(Self::File(File { contents }))
+            }
+        } else if input.peek(Token![->]) {
+            input.parse::<Token![->]>().expect("just checked");
+            let contents = input.parse::<Expr>()?;
+            Ok(Self::Symlink(Symlink { contents }))
+        } else {
+            Err(input.error("expected `:` or `->`"))
+        }
     }
 }
 
@@ -114,11 +137,29 @@ impl ToTokens for File {
     }
 }
 
-impl ToTokens for FsNode {
+impl ToTokens for Symlink {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let contents = &self.contents;
+        quote! { ::mock::fs::SymlinkInner::new(#contents) }.to_tokens(tokens);
+    }
+}
+
+impl ToTokens for NodeName {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            NodeName::Ident(name) => name.to_tokens(tokens),
+            NodeName::Lit(name) => name.to_tokens(tokens),
+            NodeName::Reference(name) => name.to_tokens(tokens),
+        }
+    }
+}
+
+impl ToTokens for Node {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::File(file) => file.to_tokens(tokens),
             Self::Directory(dir) => dir.to_tokens(tokens),
+            Self::Symlink(symlink) => symlink.to_tokens(tokens),
         }
     }
 }
