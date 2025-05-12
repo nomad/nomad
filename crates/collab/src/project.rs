@@ -3,6 +3,7 @@
 use core::fmt;
 use core::marker::PhantomData;
 
+use abs_path::{AbsPath, AbsPathBuf};
 use collab_project::PeerId;
 use collab_project::fs::{
     DirectoryId,
@@ -13,8 +14,7 @@ use collab_project::fs::{
 use collab_project::text::{self, CursorMut, TextFileMut};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
-use ed::fs::{self, AbsPath, AbsPathBuf, DirectoryEvent};
-use ed::{AsyncCtx, Shared, notify};
+use ed::{AsyncCtx, Shared, fs, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -237,34 +237,89 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_directory(
         &mut self,
-        event: DirectoryEvent<B::Fs>,
+        event: fs::DirectoryEvent<B::Fs>,
     ) -> Message {
         match event {
-            DirectoryEvent::Creation(_creation) => todo!(),
+            fs::DirectoryEvent::Creation(creation) => {
+                self.synchronize_node_creation(creation)
+            },
+            fs::DirectoryEvent::Deletion(deletion) => {
+                self.synchronize_node_deletion(deletion)
+            },
+            fs::DirectoryEvent::Move(r#move) => {
+                self.synchronize_node_move(r#move)
+            },
+        }
+    }
 
-            DirectoryEvent::Deletion(deletion) => {
-                let node_id = deletion.node_id;
-                let deletion = match self.project_node(&node_id) {
-                    ProjectNodeMut::Directory(dir) => {
-                        dir.delete().expect("dir is not the project root")
-                    },
-                    ProjectNodeMut::File(file) => file.delete(),
-                };
+    fn synchronize_node_creation(
+        &mut self,
+        _creation: fs::NodeCreation<B::Fs>,
+    ) -> Message {
+        todo!();
+    }
 
-                let ids = &mut self.id_maps;
-                if let Some(file_id) = ids.node2file.remove(&node_id) {
-                    if let Some(buffer_id) = ids.file2buffer.remove(&file_id) {
-                        ids.buffer2file.remove(&buffer_id);
-                    }
-                } else {
-                    ids.node2dir.remove(&node_id);
-                }
+    fn synchronize_node_deletion(
+        &mut self,
+        deletion: fs::NodeDeletion<B::Fs>,
+    ) -> Message {
+        let node_id = deletion.node_id;
+        let deletion = match self.project_node(&node_id) {
+            ProjectNodeMut::Directory(dir) => {
+                dir.delete().expect("dir is not the project root")
+            },
+            ProjectNodeMut::File(file) => file.delete(),
+        };
 
-                Message::DeletedFsNode(deletion)
+        let ids = &mut self.id_maps;
+        if let Some(file_id) = ids.node2file.remove(&node_id) {
+            if let Some(buffer_id) = ids.file2buffer.remove(&file_id) {
+                ids.buffer2file.remove(&buffer_id);
+            }
+        } else {
+            ids.node2dir.remove(&node_id);
+        }
+
+        Message::DeletedFsNode(deletion)
+    }
+
+    fn synchronize_node_move(
+        &mut self,
+        r#move: fs::NodeMove<B::Fs>,
+    ) -> Message {
+        let parent_path =
+            r#move.new_path.parent().expect("root can't be moved");
+
+        let parent_path_in_project = parent_path
+            .strip_prefix(&self.root_path)
+            .expect("the new parent has to be in the project");
+
+        let Some(parent) =
+            self.project.node_at_path_mut(parent_path_in_project)
+        else {
+            panic!(
+                "parent path {parent_path_in_project:?} doesn't exist in the \
+                 project"
+            );
+        };
+
+        let ProjectNodeMut::Directory(parent) = parent else {
+            panic!("parent is not a directory");
+        };
+
+        let parent_id = parent.as_directory().id();
+
+        let movement = match self.project_node(&r#move.node_id) {
+            ProjectNodeMut::Directory(mut dir) => {
+                dir.r#move(parent_id).expect("invalid move on directory")
             },
 
-            DirectoryEvent::Move(_move) => todo!(),
-        }
+            ProjectNodeMut::File(mut file) => {
+                file.r#move(parent_id).expect("invalid move on file")
+            },
+        };
+
+        Message::MovedFsNode(movement)
     }
 
     /// Returns the [`TextFileMut`] corresponding to the buffer with the given
