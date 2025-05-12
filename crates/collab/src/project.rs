@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 
 use collab_project::PeerId;
 use collab_project::fs::{DirectoryId, FileId, FileMut as ProjectFileMut};
+use collab_project::text::TextFileMut;
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
 use ed::fs::{self, AbsPath, AbsPathBuf};
@@ -108,35 +109,53 @@ impl<B: CollabBackend> Project<B> {
     ) -> Option<Message> {
         match event {
             BufferEvent::Edited(buffer_id, replacements) => {
-                let file_id = *self
-                    .id_maps
-                    .buffer2file
-                    .get(&buffer_id)
-                    .expect("unknown buffer id {buffer_id:?}");
+                let text_edit = self
+                    .text_file_of_buffer(buffer_id)
+                    .edit(replacements.into_iter().map(Convert::convert));
 
-                let mut file = match self
-                    .project
-                    .file_mut(file_id)
-                    .expect("received edit event on a deleted file")
-                {
-                    ProjectFileMut::Text(file) => file,
-                    ProjectFileMut::Binary(_) => {
-                        panic!("received edit event on a binary file")
-                    },
-                    ProjectFileMut::Symlink(_) => {
-                        panic!("received edit event on a symlink")
-                    },
-                };
-
-                Some(Message::EditedText(
-                    file.edit(replacements.into_iter().map(Convert::convert)),
-                ))
+                Some(Message::EditedText(text_edit))
             },
             BufferEvent::Removed(buffer_id) => {
-                self.id_maps.buffer2file.remove(&buffer_id);
+                let ids = &mut self.id_maps;
+
+                if let Some(file_id) = ids.buffer2file.remove(&buffer_id) {
+                    ids.file2buffer.remove(&file_id);
+                }
+
                 None
             },
-            BufferEvent::Saved(_buffer_id) => todo!(),
+            BufferEvent::Saved(buffer_id) => {
+                let file_id =
+                    self.text_file_of_buffer(buffer_id).as_file().global_id();
+
+                Some(Message::SavedTextFile(file_id))
+            },
+        }
+    }
+
+    /// Returns the [`TextFileMut`] corresponding to the buffer with the given
+    /// ID.
+    #[track_caller]
+    fn text_file_of_buffer(
+        &mut self,
+        buffer_id: B::BufferId,
+    ) -> TextFileMut<'_> {
+        let Some(&file_id) = self.id_maps.buffer2file.get(&buffer_id) else {
+            panic!("unknown buffer ID: {buffer_id:?}");
+        };
+
+        let Some(file) = self.project.file_mut(file_id) else {
+            panic!("buffer ID {buffer_id:?} maps to a deleted file")
+        };
+
+        match file {
+            ProjectFileMut::Text(text_file) => text_file,
+            ProjectFileMut::Binary(_) => {
+                panic!("buffer ID {buffer_id:?} maps to a binary file")
+            },
+            ProjectFileMut::Symlink(_) => {
+                panic!("buffer ID {buffer_id:?} maps to a symlink file")
+            },
         }
     }
 }
