@@ -98,6 +98,24 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
+    pub fn on_cursor_created<Fun>(&mut self, fun: Fun) -> B::EventHandle
+    where
+        Fun: FnMut(&B::Cursor<'_>, AgentId) + 'static,
+    {
+        self.backend_mut().on_cursor_created(fun)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn on_selection_created<Fun>(&mut self, fun: Fun) -> B::EventHandle
+    where
+        Fun: FnMut(&B::Selection<'_>, AgentId) + 'static,
+    {
+        self.backend_mut().on_selection_created(fun)
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn new_agent_id(&mut self) -> AgentId {
         self.state.next_agent_id()
     }

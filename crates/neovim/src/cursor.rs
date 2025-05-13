@@ -29,6 +29,11 @@ impl Cursor for NeovimCursor<'_> {
     type Id = BufferId;
 
     #[inline]
+    fn buffer_id(&self) -> BufferId {
+        self.buffer.id()
+    }
+
+    #[inline]
     fn byte_offset(&self) -> ByteOffset {
         let win = api::Window::current();
         let (row, col) = win.get_cursor().expect("couldn't get cursor");

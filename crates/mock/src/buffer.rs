@@ -276,6 +276,10 @@ impl backend::Cursor for Cursor<'_> {
     type EventHandle = mock::EventHandle;
     type Id = CursorId;
 
+    fn buffer_id(&self) -> BufferId {
+        self.buffer.id()
+    }
+
     fn byte_offset(&self) -> ByteOffset {
         self.offset
     }

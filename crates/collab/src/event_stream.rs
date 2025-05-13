@@ -19,12 +19,21 @@ pub(crate) struct EventStream<
 > {
     /// The `AgentId` of the `Session` that owns this `EventRx`.
     agent_id: AgentId,
+
     buffer_handles: FxHashMap<B::BufferId, SmallVec<[B::EventHandle; 3]>>,
     buffer_rx: flume::r#async::RecvStream<'static, BufferEvent<B>>,
     buffer_tx: flume::Sender<BufferEvent<B>>,
-    fs_streams: FsStreams<B::Fs>,
     #[allow(dead_code)]
     new_buffers_handle: B::EventHandle,
+
+    cursor_handles: FxHashMap<B::CursorId, SmallVec<[B::EventHandle; 2]>>,
+    cursor_rx: flume::r#async::RecvStream<'static, CursorEvent<B>>,
+    cursor_tx: flume::Sender<CursorEvent<B>>,
+    #[allow(dead_code)]
+    new_cursors_handle: B::EventHandle,
+
+    /// TODO: docs.
+    fs_streams: FsStreams<B::Fs>,
     /// Map from a file's node ID to the ID of the corresponding buffer.
     node_to_buf_ids: FxHashMap<<B::Fs as Fs>::NodeId, B::BufferId>,
     /// A filter used to check if [`FsNode`]s created under the project root
@@ -81,15 +90,6 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             let mut file_stream = self.fs_streams.files.as_stream(0);
 
             return Ok(select_biased! {
-                dir_event = dir_stream.select_next_some() => {
-                    match self.handle_dir_event(dir_event, ctx).await? {
-                        Some(dir_event) => Event::Directory(dir_event),
-                        None => continue,
-                    }
-                },
-                file_event = file_stream.select_next_some() => {
-                    Event::File(file_event)
-                },
                 buffer_event = self.buffer_rx.select_next_some() => {
                     match &buffer_event {
                         BufferEvent::Created(buffer_id, _) => {
@@ -103,6 +103,21 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                         _ => {},
                     }
                     Event::Buffer(buffer_event)
+                },
+                cursor_event = self.cursor_rx.select_next_some() => {
+                    match self.handle_cursor_event(cursor_event) {
+                        Some(cursor_event) => Event::Cursor(cursor_event),
+                        None => continue,
+                    }
+                },
+                dir_event = dir_stream.select_next_some() => {
+                    match self.handle_dir_event(dir_event, ctx).await? {
+                        Some(dir_event) => Event::Directory(dir_event),
+                        None => continue,
+                    }
+                },
+                file_event = file_stream.select_next_some() => {
+                    Event::File(file_event)
                 },
             });
         }
@@ -251,6 +266,25 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         })
     }
 
+    fn handle_cursor_event(
+        &mut self,
+        event: CursorEvent<B>,
+    ) -> Option<CursorEvent<B>> {
+        match &event.kind {
+            CursorEventKind::Created(_) => self
+                .buffer_handles
+                .contains_key(&event.buffer_id)
+                .then_some(event),
+
+            CursorEventKind::Moved(_) => Some(event),
+
+            CursorEventKind::Removed => {
+                self.cursor_handles.remove(&event.cursor_id);
+                Some(event)
+            },
+        }
+    }
+
     async fn handle_new_buffer(
         &mut self,
         buffer_id: B::BufferId,
@@ -367,14 +401,33 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
             })
         });
 
+        let (cursor_tx, cursor_rx) = flume::unbounded();
+
+        let also_cursor_tx = cursor_tx.clone();
+
+        let new_cursors_handle = ctx.with_ctx(|ctx| {
+            ctx.on_cursor_created(move |cursor, _created_by| {
+                let event = CursorEvent {
+                    buffer_id: cursor.buffer_id(),
+                    cursor_id: cursor.id(),
+                    kind: CursorEventKind::Created(cursor.byte_offset()),
+                };
+                let _ = also_cursor_tx.send(event);
+            })
+        });
+
         EventStream {
             agent_id: ctx.new_agent_id(),
             buffer_handles: Default::default(),
             buffer_rx: buffer_rx.into_stream(),
             buffer_tx,
+            new_buffers_handle,
+            cursor_handles: Default::default(),
+            cursor_rx: cursor_rx.into_stream(),
+            cursor_tx,
+            new_cursors_handle,
             fs_streams: self.fs_streams,
             project_filter: self.state.filter,
-            new_buffers_handle,
             node_to_buf_ids: Default::default(),
             root_id: self.root_id,
             root_path: self.root_path,

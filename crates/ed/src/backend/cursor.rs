@@ -12,6 +12,9 @@ pub trait Cursor {
     /// TODO: docs.
     type Backend: Backend<CursorId = Self::Id>;
 
+    /// TODO: docs.
+    fn buffer_id(&self) -> <Self::Backend as Backend>::BufferId;
+
     /// Returns the cursor's offset in the buffer.
     fn byte_offset(&self) -> ByteOffset;
 
