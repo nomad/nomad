@@ -5,16 +5,11 @@ use core::marker::PhantomData;
 use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_project::fs::{
-    DirectoryId,
-    FileId,
-    FileMut as ProjectFileMut,
-    NodeMut as ProjectNodeMut,
-};
+use collab_project::fs::{DirectoryId, FileId, FileMut, NodeMut};
 use collab_project::{PeerId, text};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
-use ed::fs::{self, File as _, Fs as _, Symlink as _};
+use ed::fs::{self, File as _, Symlink as _};
 use ed::{AsyncCtx, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -164,6 +159,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn synchronize_file_modification(
         &self,
         modification: fs::FileModification<B::Fs>,
@@ -181,23 +177,23 @@ impl<B: CollabBackend> ProjectHandle<B> {
 
         // Get the file's contents before the modification.
         let (file_id, file_path, file_contents) = self.with_mut(|proj| {
+            let root_path = proj.root_path.clone();
+
             match proj.project_node(&modification.file_id) {
-                ProjectNodeMut::File(ProjectFileMut::Binary(file_mut)) => {
+                NodeMut::File(FileMut::Binary(file_mut)) => {
                     let file = file_mut.as_file();
-                    let file_path = proj.root_path.clone().concat(file.path());
                     let content = FileContents::Binary(file.contents().into());
-                    (file.id(), file_path, content)
+                    (file.id(), root_path.concat(file.path()), content)
                 },
-                ProjectNodeMut::File(ProjectFileMut::Text(file_mut)) => {
+                NodeMut::File(FileMut::Text(file_mut)) => {
                     let file = file_mut.as_file();
-                    let file_path = proj.root_path.clone().concat(file.path());
                     let contents = FileContents::Text(file.contents().clone());
-                    (file.id(), file_path, contents)
+                    (file.id(), root_path.concat(file.path()), contents)
                 },
-                ProjectNodeMut::File(ProjectFileMut::Symlink(_)) => {
+                NodeMut::File(FileMut::Symlink(_)) => {
                     panic!("received a FileModification event on a symlink")
                 },
-                ProjectNodeMut::Directory(_) => {
+                NodeMut::Directory(_) => {
                     panic!("received a FileModification event on a directory")
                 },
             }
@@ -214,10 +210,10 @@ impl<B: CollabBackend> ProjectHandle<B> {
 
             Ok(match (file_contents, node_contents) {
                 (FileContents::Binary(lhs), FsNodeContents::Binary(rhs)) => {
-                    (&*lhs != &*rhs).then_some(FileDiff::Binary(rhs))
+                    (*lhs != *rhs).then_some(FileDiff::Binary(rhs))
                 },
                 (FileContents::Text(lhs), FsNodeContents::Text(rhs)) => {
-                    text_diff(lhs, &*rhs).map(FileDiff::Text)
+                    text_diff(lhs, &rhs).map(FileDiff::Text)
                 },
                 _ => None,
             })
@@ -234,10 +230,10 @@ impl<B: CollabBackend> ProjectHandle<B> {
             let file = proj.project.file_mut(file_id)?;
 
             Some(match (file, file_diff) {
-                (ProjectFileMut::Binary(file), FileDiff::Binary(contents)) => {
+                (FileMut::Binary(mut file), FileDiff::Binary(contents)) => {
                     Message::EditedBinary(file.replace(contents))
                 },
-                (ProjectFileMut::Text(file), FileDiff::Text(replacements)) => {
+                (FileMut::Text(mut file), FileDiff::Text(replacements)) => {
                     Message::EditedText(file.edit(replacements))
                 },
                 _ => unreachable!(),
@@ -324,23 +320,23 @@ impl<B: CollabBackend> Project<B> {
         self.project.peer_id() == self.host_id
     }
 
-    /// Returns the [`ProjectNodeMut`] corresponding to the node with the given
+    /// Returns the [`NodeMut`] corresponding to the node with the given
     /// ID.
     #[track_caller]
     fn project_node(
         &mut self,
         node_id: &<B::Fs as fs::Fs>::NodeId,
-    ) -> ProjectNodeMut<'_> {
+    ) -> NodeMut<'_> {
         if let Some(&dir_id) = self.id_maps.node2dir.get(node_id) {
             let Some(dir) = self.project.directory_mut(dir_id) else {
                 panic!("node ID {node_id:?} maps to a deleted directory")
             };
-            ProjectNodeMut::Directory(dir)
+            NodeMut::Directory(dir)
         } else if let Some(&file_id) = self.id_maps.node2file.get(node_id) {
             let Some(file) = self.project.file_mut(file_id) else {
                 panic!("node ID {node_id:?} maps to a deleted file")
             };
-            ProjectNodeMut::File(file)
+            NodeMut::File(file)
         } else {
             panic!("unknown node ID: {node_id:?}")
         }
@@ -519,7 +515,7 @@ impl<B: CollabBackend> Project<B> {
             );
         };
 
-        let ProjectNodeMut::Directory(mut parent) = parent else {
+        let NodeMut::Directory(mut parent) = parent else {
             panic!("parent is not a directory");
         };
 
@@ -557,10 +553,10 @@ impl<B: CollabBackend> Project<B> {
     ) -> Message {
         let node_id = deletion.node_id;
         let deletion = match self.project_node(&node_id) {
-            ProjectNodeMut::Directory(dir) => {
+            NodeMut::Directory(dir) => {
                 dir.delete().expect("dir is not the project root")
             },
-            ProjectNodeMut::File(file) => file.delete(),
+            NodeMut::File(file) => file.delete(),
         };
 
         let ids = &mut self.id_maps;
@@ -595,18 +591,18 @@ impl<B: CollabBackend> Project<B> {
             );
         };
 
-        let ProjectNodeMut::Directory(parent) = parent else {
+        let NodeMut::Directory(parent) = parent else {
             panic!("parent is not a directory");
         };
 
         let parent_id = parent.as_directory().id();
 
         let movement = match self.project_node(&r#move.node_id) {
-            ProjectNodeMut::Directory(mut dir) => {
+            NodeMut::Directory(mut dir) => {
                 dir.r#move(parent_id).expect("invalid move on directory")
             },
 
-            ProjectNodeMut::File(mut file) => {
+            NodeMut::File(mut file) => {
                 file.r#move(parent_id).expect("invalid move on file")
             },
         };
@@ -673,11 +669,11 @@ impl<B: CollabBackend> Project<B> {
         };
 
         match file {
-            ProjectFileMut::Text(text_file) => text_file,
-            ProjectFileMut::Binary(_) => {
+            FileMut::Text(text_file) => text_file,
+            FileMut::Binary(_) => {
                 panic!("buffer ID {buffer_id:?} maps to a binary file")
             },
-            ProjectFileMut::Symlink(_) => {
+            FileMut::Symlink(_) => {
                 panic!("buffer ID {buffer_id:?} maps to a symlink file")
             },
         }

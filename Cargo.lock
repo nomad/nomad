@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "abs-path"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/abs-path.git#0a9421ec66cdca8bc8f78250832efa8d4af091a8"
+source = "git+ssh://git@github.com/nomad/abs-path.git#5942e37256ecbf4fcc075ca3889899f4ffa02461"
 dependencies = [
  "abs-path-core",
  "abs-path-macros",
@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "abs-path-core"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/abs-path.git#0a9421ec66cdca8bc8f78250832efa8d4af091a8"
+source = "git+ssh://git@github.com/nomad/abs-path.git#5942e37256ecbf4fcc075ca3889899f4ffa02461"
 dependencies = [
  "compact_str",
  "serde",
@@ -24,7 +24,7 @@ dependencies = [
 [[package]]
 name = "abs-path-macros"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/abs-path.git#0a9421ec66cdca8bc8f78250832efa8d4af091a8"
+source = "git+ssh://git@github.com/nomad/abs-path.git#5942e37256ecbf4fcc075ca3889899f4ffa02461"
 dependencies = [
  "abs-path-core",
  "quote",
@@ -602,7 +602,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#44cc702f31fdc5c57d9450934d35eb2aaae23b19"
+source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
 dependencies = [
  "bincode",
  "bytes",
@@ -660,7 +660,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#44cc702f31fdc5c57d9450934d35eb2aaae23b19"
+source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
 dependencies = [
  "cauchy",
  "codecs",
@@ -674,7 +674,7 @@ dependencies = [
 [[package]]
 name = "collab-project"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#44cc702f31fdc5c57d9450934d35eb2aaae23b19"
+source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
 dependencies = [
  "cauchy",
  "cola",
@@ -690,7 +690,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#44cc702f31fdc5c57d9450934d35eb2aaae23b19"
+source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -961,7 +961,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#44cc702f31fdc5c57d9450934d35eb2aaae23b19"
+source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1198,7 +1198,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#44cc702f31fdc5c57d9450934d35eb2aaae23b19"
+source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
 dependencies = [
  "flume",
  "futures-util",
