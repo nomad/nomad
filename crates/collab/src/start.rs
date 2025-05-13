@@ -173,14 +173,10 @@ async fn search_project_root<B: CollabBackend>(
         return lsp_res.map_err(SearchProjectRootError::Lsp);
     }
 
-    let buffer_name = ctx.with_ctx(|ctx| {
+    let buffer_path = ctx.with_ctx(|ctx| {
         ctx.buffer(buffer_id.clone())
+            .map(|buf| buf.path().into_owned())
             .ok_or(SearchProjectRootError::InvalidBufId(buffer_id))
-            .map(|buf| buf.name().into_owned())
-    })?;
-
-    let buffer_path = buffer_name.parse::<AbsPathBuf>().map_err(|_| {
-        SearchProjectRootError::BufNameNotAbsolutePath(buffer_name)
     })?;
 
     let home_dir =
@@ -286,20 +282,20 @@ async fn read_project<B: CollabBackend>(
     let mut id_maps = IdMaps::default();
 
     // Start watching the opened buffers that are part of the project.
-    ctx.for_each_buffer(|mut buffer| {
-        let Some(file_id) = <&AbsPath>::try_from(&*buffer.name())
-            .ok()
-            .and_then(|path| path.strip_prefix(root_path))
-            .and_then(|path| match project.node_at_path(path)? {
-                ProjectNode::File(ProjectFile::Text(file)) => Some(file.id()),
-                _ => None,
-            })
-        else {
+    ctx.for_each_buffer(|buffer| {
+        let buffer_path = buffer.path();
+
+        let Some(path_in_proj) = buffer_path.strip_prefix(root_path) else {
             return;
         };
 
+        let file_id = match project.node_at_path(path_in_proj) {
+            Some(ProjectNode::File(ProjectFile::Text(file))) => file.id(),
+            _ => return,
+        };
+
         if let Some(node_id) = node_id_maps.file2node.get(&file_id) {
-            event_stream.watch_buffer(node_id.clone(), &mut buffer);
+            event_stream.watch_buffer(node_id.clone(), &buffer);
             id_maps.buffer2file.insert(buffer.id(), file_id);
             id_maps.file2buffer.insert(file_id, buffer.id());
         }

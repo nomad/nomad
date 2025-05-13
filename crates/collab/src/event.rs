@@ -1,5 +1,6 @@
 use core::ops::Range;
 
+use abs_path::AbsPathBuf;
 use ed::ByteOffset;
 use ed::backend::{Backend, Replacement};
 use ed::fs::{DirectoryEvent, FileEvent};
@@ -24,7 +25,7 @@ pub(crate) enum Event<B: Backend> {
 }
 
 pub(crate) enum BufferEvent<B: Backend> {
-    Created(B::BufferId),
+    Created(B::BufferId, AbsPathBuf),
     Edited(B::BufferId, SmallVec<[Replacement; 1]>),
     Removed(B::BufferId),
     Saved(B::BufferId),

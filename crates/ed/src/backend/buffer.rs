@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
+use abs_path::AbsPath;
 use crate::ByteOffset;
 use crate::backend::{AgentId, Backend};
 
@@ -33,9 +34,6 @@ pub trait Buffer {
     fn focus(&mut self);
 
     /// TODO: docs.
-    fn name(&self) -> Cow<'_, str>;
-
-    /// TODO: docs.
     fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, &Edit) + 'static;
@@ -49,6 +47,9 @@ pub trait Buffer {
     fn on_saved<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
+
+    /// TODO: docs.
+    fn path(&self) -> Cow<'_, AbsPath>;
 }
 
 /// TODO: docs.

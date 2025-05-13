@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_project::fs::{DirectoryId, FileId, FileMut, NodeMut};
+use collab_project::fs::{DirectoryId, FileId, FileMut, Node, NodeMut};
 use collab_project::{PeerId, text};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
@@ -380,6 +380,22 @@ impl<B: CollabBackend> Project<B> {
         event: BufferEvent<B>,
     ) -> Option<Message> {
         match event {
+            BufferEvent::Created(buffer_id, file_path) => {
+                let path_in_proj = file_path
+                    .strip_prefix(&self.root_path)
+                    .expect("the buffer is backed by a file in the project");
+
+                let file_id = match self.project.node_at_path(path_in_proj)? {
+                    Node::File(file) => file.id(),
+                    Node::Directory(_) => return None,
+                };
+
+                let ids = &mut self.id_maps;
+                ids.buffer2file.insert(buffer_id.clone(), file_id);
+                ids.file2buffer.insert(file_id, buffer_id);
+
+                None
+            },
             BufferEvent::Edited(buffer_id, replacements) => {
                 let text_edit = self
                     .text_file_of_buffer(&buffer_id)
@@ -389,11 +405,9 @@ impl<B: CollabBackend> Project<B> {
             },
             BufferEvent::Removed(buffer_id) => {
                 let ids = &mut self.id_maps;
-
                 if let Some(file_id) = ids.buffer2file.remove(&buffer_id) {
                     ids.file2buffer.remove(&file_id);
                 }
-
                 None
             },
             BufferEvent::Saved(buffer_id) => {

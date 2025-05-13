@@ -1,6 +1,7 @@
 use core::ops::{Deref, DerefMut, Range};
 use std::borrow::Cow;
 
+use abs_path::AbsPath;
 use ed::ByteOffset;
 use ed::backend::{self, AgentId, Buffer as _, Edit, Replacement};
 use slotmap::SlotMap;
@@ -226,10 +227,6 @@ impl backend::Buffer for Buffer<'_> {
         *self.current_buffer = Some(self.id);
     }
 
-    fn name(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.name)
-    }
-
     fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, &Edit) + 'static,
@@ -252,6 +249,11 @@ impl backend::Buffer for Buffer<'_> {
     {
         let cb_kind = CallbackKind::BufferSaved(self.id(), Box::new(fun));
         self.callbacks.insert(cb_kind)
+    }
+
+    fn path(&self) -> Cow<'_, AbsPath> {
+        todo!();
+        // Cow::Borrowed(&self.name)
     }
 }
 

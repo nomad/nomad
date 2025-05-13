@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use compact_str::CompactString;
 use ed::backend::{AgentId, Buffer, Edit, Replacement};
+use ed::fs::AbsPath;
 use ed::{ByteOffset, Shared};
 
 use crate::Neovim;
@@ -344,11 +345,6 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn name(&self) -> Cow<'_, str> {
-        self.get_name().to_string_lossy().into_owned().into()
-    }
-
-    #[inline]
     fn on_edited<Fun>(&self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, &Edit) + 'static,
@@ -382,6 +378,12 @@ impl Buffer for NeovimBuffer<'_> {
             events::BufWritePost(self.id()),
             move |(this, saved_by)| fun(this, saved_by),
         )
+    }
+
+    #[inline]
+    fn path(&self) -> Cow<'_, AbsPath> {
+        // self.get_name().to_string_lossy().into_owned().into()
+        todo!();
     }
 }
 

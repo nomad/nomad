@@ -75,7 +75,7 @@ impl Backend for Neovim {
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
         self.buffer_ids()
             .map(|buf_id| NeovimBuffer::new(buf_id, &self.events))
-            .find(|buf| &*buf.name() == path)
+            .find(|buf| &*buf.path() == path)
     }
 
     #[inline]
