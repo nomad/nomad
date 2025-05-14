@@ -4,7 +4,6 @@ use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
 use ed::{AsyncCtx, Shared};
 use futures_util::{StreamExt, select_biased};
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
-use smallvec::{SmallVec, smallvec_inline};
 use walkdir::Filter;
 
 use crate::backend::CollabBackend;
@@ -22,25 +21,20 @@ type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 pub(crate) struct EventStream<
     B: CollabBackend,
-    F: Filter<B::Fs> = <B as CollabBackend>::ProjectFilter,
+    F = <B as CollabBackend>::ProjectFilter,
 > {
-    /// The `AgentId` of the `Session` that owns this `EventRx`.
+    /// The [`AgentId`] of the `Session` that owns `Self`.
     agent_id: AgentId,
 
-    buffer_handles: FxHashMap<B::BufferId, SmallVec<[B::EventHandle; 3]>>,
-    buffer_rx: flume::r#async::RecvStream<'static, BufferEvent<B>>,
-    buffer_tx: flume::Sender<BufferEvent<B>>,
-    #[allow(dead_code)]
-    new_buffers_handle: B::EventHandle,
+    buffer_streams: BufferStreams<B>,
 
-    cursor_handles: FxHashMap<B::CursorId, SmallVec<[B::EventHandle; 2]>>,
+    cursor_handles: FxHashMap<B::CursorId, [B::EventHandle; 2]>,
     cursor_rx: flume::r#async::RecvStream<'static, CursorEvent<B>>,
     cursor_tx: flume::Sender<CursorEvent<B>>,
     #[allow(dead_code)]
     new_cursors_handle: B::EventHandle,
 
-    selection_handles:
-        FxHashMap<B::SelectionId, SmallVec<[B::EventHandle; 2]>>,
+    selection_handles: FxHashMap<B::SelectionId, [B::EventHandle; 2]>,
     selection_rx: flume::r#async::RecvStream<'static, SelectionEvent<B>>,
     selection_tx: flume::Sender<SelectionEvent<B>>,
     #[allow(dead_code)]
@@ -48,17 +42,19 @@ pub(crate) struct EventStream<
 
     /// TODO: docs.
     fs_streams: FsStreams<B::Fs>,
+
     /// Map from a file's node ID to the ID of the corresponding buffer.
-    node_to_buf_ids: FxHashMap<<B::Fs as Fs>::NodeId, B::BufferId>,
+    buf_id_of_file_id: FxHashMap<<B::Fs as Fs>::NodeId, B::BufferId>,
+
     /// A filter used to check if [`FsNode`]s created under the project root
     /// should be part of the project.
     project_filter: F,
-    /// The ID of the root of the project.
+
+    /// The ID of the project root.
     root_id: <B::Fs as Fs>::NodeId,
-    /// The path to the root of the project.
+
+    /// The path to the project root.
     root_path: AbsPathBuf,
-    /// A set of buffer IDs for buffers that have just been saved.
-    saved_buffers: Shared<FxHashSet<B::BufferId>>,
 }
 
 pub(crate) struct EventStreamBuilder<Fs: fs::Fs, State = NeedsProjectFilter> {
@@ -90,6 +86,29 @@ struct FsStreams<Fs: fs::Fs> {
     files: FxIndexMap<Fs::NodeId, <Fs::File as File>::EventStream>,
 }
 
+struct BufferStreams<B: CollabBackend> {
+    /// The receiver of buffer events.
+    event_rx: flume::r#async::RecvStream<'static, BufferEvent<B>>,
+
+    /// The sender of buffer events.
+    event_tx: flume::Sender<BufferEvent<B>>,
+
+    /// Map from a buffer's ID to the event handles corresponding to the 3
+    /// types of buffer events we're interested in: edits, removals, and saves.
+    handles: FxHashMap<B::BufferId, [B::EventHandle; 3]>,
+
+    /// The event handle corresponding to buffer creations.
+    #[allow(dead_code)]
+    new_buffers_handle: B::EventHandle,
+
+    /// A set of buffer IDs for buffers that have just been saved.
+    ///
+    /// When we receive a [`fs::FileEvent::Modification`] event, we first check
+    /// if its node ID maps to a buffer ID in this set. If it does, we know the
+    /// event was caused by a text buffer being saved, and we can ignore it.
+    saved_buffers: Shared<FxHashSet<B::BufferId>>,
+}
+
 impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     pub(crate) fn agent_id(&self) -> AgentId {
         self.agent_id
@@ -104,19 +123,19 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             let mut file_stream = self.fs_streams.files.as_stream(0);
 
             return Ok(select_biased! {
-                buffer_event = self.buffer_rx.select_next_some() => {
-                    match &buffer_event {
+                event = self.buffer_streams.event_rx.select_next_some() => {
+                    match &event {
                         BufferEvent::Created(buffer_id, _) => {
                             if !self.handle_new_buffer(buffer_id.clone(), ctx).await? {
                                 continue;
                             }
                         },
                         BufferEvent::Removed(buffer_id) => {
-                            self.buffer_handles.remove(buffer_id);
+                            self.buffer_streams.remove(buffer_id);
                         },
                         _ => {},
                     }
-                    Event::Buffer(buffer_event)
+                    Event::Buffer(event)
                 },
                 cursor_event = self.cursor_rx.select_next_some() => {
                     match self.handle_cursor_event(cursor_event, ctx) {
@@ -131,7 +150,10 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                     }
                 },
                 file_event = file_stream.select_next_some() => {
-                    Event::File(file_event)
+                    match self.handle_file_event(file_event) {
+                        Some(event) => Event::File(event),
+                        None => continue,
+                    }
                 },
                 selection_event = self.selection_rx.select_next_some() => {
                     match self.handle_selection_event(selection_event, ctx) {
@@ -148,40 +170,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         file_id: <B::Fs as fs::Fs>::NodeId,
         buffer: &B::Buffer<'_>,
     ) {
-        let agent_id = self.agent_id;
-
-        let tx = self.buffer_tx.clone();
-        let edits_handle = buffer.on_edited(move |buf, edit| {
-            if edit.made_by != agent_id {
-                return;
-            }
-            let event =
-                BufferEvent::Edited(buf.id(), edit.replacements.clone());
-            let _ = tx.send(event);
-        });
-
-        let tx = self.buffer_tx.clone();
-        let removed_handle = buffer.on_removed(move |buf, _removed_by| {
-            let event = BufferEvent::Removed(buf.id());
-            let _ = tx.send(event);
-        });
-
-        let saved_buffers = self.saved_buffers.clone();
-        let tx = self.buffer_tx.clone();
-        let saved_handle = buffer.on_saved(move |buf, saved_by| {
-            saved_buffers.with_mut(|buffers| buffers.insert(buf.id()));
-            if saved_by != agent_id {
-                let event = BufferEvent::Saved(buf.id());
-                let _ = tx.send(event);
-            }
-        });
-
-        self.buffer_handles.insert(
-            buffer.id(),
-            smallvec_inline![edits_handle, removed_handle, saved_handle],
-        );
-
-        self.node_to_buf_ids.insert(file_id, buffer.id());
+        self.buffer_streams.insert(buffer, self.agent_id);
+        self.buf_id_of_file_id.insert(file_id, buffer.id());
     }
 
     #[allow(clippy::too_many_lines)]
@@ -212,9 +202,9 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
             fs::DirectoryEvent::Deletion(ref deletion) => {
                 if let Some(buf_id) =
-                    self.node_to_buf_ids.get(&deletion.node_id)
+                    self.buf_id_of_file_id.get(&deletion.node_id)
                 {
-                    self.buffer_handles.remove(buf_id);
+                    self.buffer_streams.remove(buf_id);
                 }
 
                 if deletion.node_id != deletion.deletion_root_id {
@@ -254,9 +244,9 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                         .is_some()
                     {
                         if let Some(buf_id) =
-                            self.node_to_buf_ids.get(&r#move.node_id)
+                            self.buf_id_of_file_id.get(&r#move.node_id)
                         {
-                            self.buffer_handles.remove(buf_id);
+                            self.buffer_streams.remove(buf_id);
                         }
                     } else {
                         self.fs_streams
@@ -274,6 +264,21 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         })
     }
 
+    fn handle_file_event(
+        &self,
+        event: fs::FileEvent<B::Fs>,
+    ) -> Option<fs::FileEvent<B::Fs>> {
+        if let fs::FileEvent::Modification(modif) = &event {
+            if let Some(buf_id) = self.buf_id_of_file_id.get(&modif.file_id) {
+                if self.buffer_streams.has_buffer_been_saved(buf_id) {
+                    return None;
+                }
+            }
+        }
+
+        Some(event)
+    }
+
     fn handle_cursor_event(
         &mut self,
         event: CursorEvent<B>,
@@ -281,7 +286,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     ) -> Option<CursorEvent<B>> {
         match &event.kind {
             CursorEventKind::Created(_) => {
-                if !self.buffer_handles.contains_key(&event.buffer_id) {
+                if self.buffer_streams.is_watched(&event.buffer_id) {
                     ctx.with_ctx(|ctx| {
                         let cursor = ctx.cursor(event.cursor_id.clone())?;
                         self.watch_cursor(&cursor);
@@ -346,7 +351,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     ) -> Option<SelectionEvent<B>> {
         match &event.kind {
             SelectionEventKind::Created(_) => {
-                if !self.buffer_handles.contains_key(&event.buffer_id) {
+                if self.buffer_streams.is_watched(&event.buffer_id) {
                     ctx.with_ctx(|ctx| {
                         let selection =
                             ctx.selection(event.selection_id.clone())?;
@@ -407,10 +412,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             let _ = tx.send(event);
         });
 
-        self.cursor_handles.insert(
-            cursor.id(),
-            smallvec_inline![moved_handle, removed_handle],
-        );
+        self.cursor_handles
+            .insert(cursor.id(), [moved_handle, removed_handle]);
     }
 
     fn watch_selection(&mut self, selection: &B::Selection<'_>) {
@@ -435,10 +438,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                 let _ = tx.send(event);
             });
 
-        self.selection_handles.insert(
-            selection.id(),
-            smallvec_inline![moved_handle, removed_handle],
-        );
+        self.selection_handles
+            .insert(selection.id(), [moved_handle, removed_handle]);
     }
 
     fn watch(&mut self, node: &FsNode<B::Fs>, ctx: &AsyncCtx<'_, B>) {
@@ -451,6 +452,86 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                 }
             });
         }
+    }
+}
+
+impl<B: CollabBackend> BufferStreams<B> {
+    /// Starts receiving [`BufferEvent`]s on the given buffer.
+    fn insert(&mut self, buffer: &B::Buffer<'_>, agent_id: AgentId) {
+        let edits_handle = buffer.on_edited({
+            let event_tx = self.event_tx.clone();
+            move |buf, edit| {
+                if edit.made_by != agent_id {
+                    return;
+                }
+                let _ = event_tx.send(BufferEvent::Edited(
+                    buf.id(),
+                    edit.replacements.clone(),
+                ));
+            }
+        });
+
+        let removed_handle = buffer.on_removed({
+            let event_tx = self.event_tx.clone();
+            move |buf, _removed_by| {
+                let _ = event_tx.send(BufferEvent::Removed(buf.id()));
+            }
+        });
+
+        let saved_handle = buffer.on_saved({
+            let event_tx = self.event_tx.clone();
+            let saved_buffers = self.saved_buffers.clone();
+            move |buf, saved_by| {
+                saved_buffers.with_mut(|buffers| buffers.insert(buf.id()));
+                if saved_by != agent_id {
+                    let _ = event_tx.send(BufferEvent::Saved(buf.id()));
+                }
+            }
+        });
+
+        let buffer_handles = [edits_handle, removed_handle, saved_handle];
+
+        self.handles.insert(buffer.id(), buffer_handles);
+    }
+
+    /// Returns whether the buffer with the given ID is currently being
+    /// watched.
+    fn is_watched(&self, buffer_id: &B::BufferId) -> bool {
+        self.handles.contains_key(buffer_id)
+    }
+
+    /// Returns whether the buffer with the given ID has just been saved.
+    fn has_buffer_been_saved(&self, buffer_id: &B::BufferId) -> bool {
+        self.saved_buffers.with_mut(|buffer_ids| buffer_ids.remove(buffer_id))
+    }
+
+    fn new(ctx: &mut AsyncCtx<'_, B>) -> Self {
+        let (event_tx, event_rx) = flume::unbounded();
+
+        let new_buffers_handle = {
+            let event_tx = event_tx.clone();
+            ctx.with_ctx(|ctx| {
+                ctx.on_buffer_created(move |buf, _created_by| {
+                    let _ = event_tx.send(BufferEvent::Created(
+                        buf.id(),
+                        buf.path().into_owned(),
+                    ));
+                })
+            })
+        };
+
+        Self {
+            event_rx: event_rx.into_stream(),
+            event_tx,
+            handles: Default::default(),
+            new_buffers_handle,
+            saved_buffers: Default::default(),
+        }
+    }
+
+    /// Removes the event handle corresponding to the buffer with the given ID.
+    fn remove(&mut self, buffer_id: &B::BufferId) {
+        self.handles.remove(buffer_id);
     }
 }
 
@@ -496,18 +577,6 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
     where
         B: CollabBackend<Fs = Fs>,
     {
-        let (buffer_tx, buffer_rx) = flume::unbounded();
-
-        let also_buffer_tx = buffer_tx.clone();
-
-        let new_buffers_handle = ctx.with_ctx(|ctx| {
-            ctx.on_buffer_created(move |buf, _created_by| {
-                let event =
-                    BufferEvent::Created(buf.id(), buf.path().into_owned());
-                let _ = also_buffer_tx.send(event);
-            })
-        });
-
         let (cursor_tx, cursor_rx) = flume::unbounded();
 
         let also_cursor_tx = cursor_tx.clone();
@@ -541,10 +610,7 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
         EventStream {
             agent_id: ctx.new_agent_id(),
 
-            buffer_handles: Default::default(),
-            buffer_rx: buffer_rx.into_stream(),
-            buffer_tx,
-            new_buffers_handle,
+            buffer_streams: BufferStreams::new(ctx),
 
             cursor_handles: Default::default(),
             cursor_rx: cursor_rx.into_stream(),
@@ -558,10 +624,9 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
 
             fs_streams: self.fs_streams,
             project_filter: self.state.filter,
-            node_to_buf_ids: Default::default(),
+            buf_id_of_file_id: Default::default(),
             root_id: self.root_id,
             root_path: self.root_path,
-            saved_buffers: Default::default(),
         }
     }
 }
