@@ -323,8 +323,6 @@ impl DerefMut for Cursor<'_> {
 
 impl backend::Selection for Selection<'_> {
     type Backend = mock::Mock;
-    type EventHandle = mock::EventHandle;
-    type Id = SelectionId;
 
     fn buffer_id(&self) -> BufferId {
         self.buffer.id()
@@ -334,11 +332,11 @@ impl backend::Selection for Selection<'_> {
         self.offset_range.clone()
     }
 
-    fn id(&self) -> Self::Id {
+    fn id(&self) -> SelectionId {
         self.selection_id
     }
 
-    fn on_moved<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_moved<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Selection<'_>, AgentId) + 'static,
     {
@@ -346,7 +344,7 @@ impl backend::Selection for Selection<'_> {
         self.buffer.callbacks.insert(cb_kind)
     }
 
-    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Selection<'_>, AgentId) + 'static,
     {

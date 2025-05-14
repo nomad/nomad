@@ -6,13 +6,7 @@ use crate::backend::{AgentId, Backend};
 /// TODO: docs.
 pub trait Selection {
     /// TODO: docs.
-    type EventHandle;
-
-    /// TODO: docs.
-    type Id: Clone;
-
-    /// TODO: docs.
-    type Backend: Backend<SelectionId = Self::Id>;
+    type Backend: Backend;
 
     /// TODO: docs.
     fn buffer_id(&self) -> <Self::Backend as Backend>::BufferId;
@@ -21,14 +15,17 @@ pub trait Selection {
     fn byte_range(&self) -> Range<ByteOffset>;
 
     /// Returns the selection's ID.
-    fn id(&self) -> Self::Id;
+    fn id(&self) -> <Self::Backend as Backend>::SelectionId;
 
     /// Registers the given callback to be executed everytime the selection is
     /// moved, i.e. every time its start or end offset is changed.
     ///
     /// The callback is provided with a reference to this selection, plus the
     /// [`AgentId`] of the agent that moved it.
-    fn on_moved<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_moved<Fun>(
+        &self,
+        fun: Fun,
+    ) -> <Self::Backend as Backend>::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Selection<'_>, AgentId)
             + 'static;
@@ -38,7 +35,10 @@ pub trait Selection {
     ///
     /// The callback is provided with a reference to this selection, plus the
     /// [`AgentId`] of the agent that removed it.
-    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(
+        &self,
+        fun: Fun,
+    ) -> <Self::Backend as Backend>::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Selection<'_>, AgentId)
             + 'static;

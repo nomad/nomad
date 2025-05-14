@@ -25,9 +25,7 @@ impl<'a> NeovimSelection<'a> {
 }
 
 impl Selection for NeovimSelection<'_> {
-    type EventHandle = EventHandle;
     type Backend = Neovim;
-    type Id = BufferId;
 
     #[inline]
     fn buffer_id(&self) -> BufferId {
@@ -40,12 +38,12 @@ impl Selection for NeovimSelection<'_> {
     }
 
     #[inline]
-    fn id(&self) -> Self::Id {
+    fn id(&self) -> BufferId {
         self.buffer.id()
     }
 
     #[inline]
-    fn on_moved<Fun>(&self, _fun: Fun) -> Self::EventHandle
+    fn on_moved<Fun>(&self, _fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimSelection<'_>, AgentId) + 'static,
     {
@@ -53,7 +51,7 @@ impl Selection for NeovimSelection<'_> {
     }
 
     #[inline]
-    fn on_removed<Fun>(&self, _fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, _fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimSelection<'_>, AgentId) + 'static,
     {
