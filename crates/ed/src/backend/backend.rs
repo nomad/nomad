@@ -44,10 +44,12 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     type Cursor<'a>: Cursor<
-            Id = Self::CursorId,
+        Backend: Backend<
+            BufferId = Self::BufferId,
+            CursorId = Self::CursorId,
             EventHandle = Self::EventHandle,
-            Backend: Backend<BufferId = Self::BufferId>,
-        >;
+        >,
+    >;
 
     /// TODO: docs.
     type CursorId: Clone + Debug + Eq + Hash;

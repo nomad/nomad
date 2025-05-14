@@ -271,8 +271,6 @@ impl DerefMut for Buffer<'_> {
 
 impl backend::Cursor for Cursor<'_> {
     type Backend = mock::Mock;
-    type EventHandle = mock::EventHandle;
-    type Id = CursorId;
 
     fn buffer_id(&self) -> BufferId {
         self.buffer.id()
@@ -282,11 +280,11 @@ impl backend::Cursor for Cursor<'_> {
         self.offset
     }
 
-    fn id(&self) -> Self::Id {
+    fn id(&self) -> CursorId {
         self.cursor_id
     }
 
-    fn on_moved<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_moved<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
     {
@@ -294,7 +292,7 @@ impl backend::Cursor for Cursor<'_> {
         self.buffer.callbacks.insert(cb_kind)
     }
 
-    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
     {
