@@ -3,8 +3,7 @@ use neovim::Neovim;
 
 use crate::ed::cursor;
 
-#[test]
-fn on_cursor_created() {
-    let ctx: &mut EditorCtx<'_, Neovim> = todo!();
+#[neovim::test]
+fn on_cursor_created(ctx: &mut EditorCtx<Neovim>) {
     cursor::on_cursor_created(ctx);
 }

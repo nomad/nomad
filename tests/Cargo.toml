@@ -10,6 +10,7 @@ publish.workspace = true
 auth = ["dep:auth"]
 collab = ["dep:auth", "dep:collab", "dep:flume"]
 neovim = ["dep:neovim"]
+neovim-nightly = ["neovim", "neovim/nightly"]
 walkdir = ["dep:futures-executor", "dep:tempdir", "dep:walkdir"]
 
 # Features that should only be enabled by the build script.
@@ -29,7 +30,7 @@ collab = { workspace = true, optional = true, features = ["mock"] }
 flume = { workspace = true, optional = true }
 
 # Neovim-related dependencies.
-neovim = { workspace = true, optional = true }
+neovim = { workspace = true, optional = true, features = ["test"] }
 
 # Walkdir-related dependencies.
 futures-executor = { workspace = true, optional = true }

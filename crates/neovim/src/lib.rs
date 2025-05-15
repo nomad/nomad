@@ -20,7 +20,7 @@ pub mod executor {
 }
 pub use neovim::Neovim;
 #[doc(inline)]
-pub use neovim_macros::plugin;
+pub use neovim_macros::{plugin, test};
 #[doc(hidden)]
 pub use nvim_oxi as oxi;
 pub use nvim_oxi::mlua;

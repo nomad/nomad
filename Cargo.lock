@@ -1983,6 +1983,7 @@ name = "nvim-oxi"
 version = "0.5.1"
 source = "git+https://github.com/noib3/nvim-oxi#d7334112a00c7295e5248302be25227817a506b6"
 dependencies = [
+ "cargo_metadata",
  "mlua",
  "nvim-oxi-api",
  "nvim-oxi-libuv",

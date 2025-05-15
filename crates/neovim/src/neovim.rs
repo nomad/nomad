@@ -30,9 +30,9 @@ pub struct CreateBufferError {
 impl Neovim {
     /// TODO: docs.
     #[inline]
-    pub fn init() -> Self {
+    pub fn init(augroup_name: &str) -> Self {
         Self {
-            events: Shared::new(Events::new("")),
+            events: Shared::new(Events::new(augroup_name)),
             emitter: notify::NeovimEmitter::default(),
             local_executor: executor::NeovimLocalExecutor::init(),
             background_executor: ThreadPool::new(),
