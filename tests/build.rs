@@ -12,10 +12,6 @@ fn main() {
     }
 }
 
-fn setup_neovim() {
-    neovim::oxi::tests::build().expect("couldn't build neovim tests");
-}
-
 /// Enables the `git-in-PATH` feature iff git is in $PATH and its version is
 /// at least 2.32.
 ///
@@ -40,6 +36,10 @@ fn setup_git() {
             println!("cargo:rustc-cfg=feature=\"git-in-PATH\"");
         }
     }
+}
+
+fn setup_neovim() {
+    neovim::oxi::tests::build().expect("couldn't build neovim tests");
 }
 
 #[derive(PartialEq, Eq)]
