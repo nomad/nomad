@@ -9,9 +9,6 @@
 // - block_on()
 // - run()
 // - spawn_and_block_on()
-//
-// - spawn_local()
-// - spawn_local_unprotected()
 
 use core::any::Any;
 use core::marker::PhantomData;
@@ -234,7 +231,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
     ) -> TaskLocal<Option<T>, Ed> {
-        self.spawn_local_inner_unprotected(async move |ctx| {
+        self.spawn_local_unprotected_inner(async move |ctx| {
             match panic::AssertUnwindSafe(fun(ctx)).catch_unwind().await {
                 Ok(ret) => Some(ret),
                 Err(payload) => {
@@ -246,7 +243,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     }
 
     #[inline]
-    fn spawn_local_inner_unprotected<T: 'static>(
+    fn spawn_local_unprotected_inner<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
     ) -> TaskLocal<T, Ed> {
@@ -333,6 +330,24 @@ where
 }
 
 impl<Ed: Backend> Context<Ed, NotBorrowed> {
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_local<T: 'static>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
+    ) -> TaskLocal<Option<T>, Ed> {
+        self.spawn_local_inner(fun)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_local_unprotected<T: 'static>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
+    ) -> TaskLocal<T, Ed> {
+        self.spawn_local_unprotected_inner(fun)
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn with_borrowed<T>(
