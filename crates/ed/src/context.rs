@@ -9,8 +9,9 @@ use core::ops::{Deref, DerefMut};
 
 use abs_path::AbsPath;
 
+use crate::backend::AgentId;
 use crate::module::Module;
-use crate::notify::{Name, Namespace};
+use crate::notify::{self, Emitter, Name, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
 use crate::{Backend, Shared};
@@ -65,6 +66,92 @@ pub struct BorrowedInner<'a, Ed: Backend> {
 }
 
 impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
+    /// TODO: docs.
+    #[inline]
+    pub fn emit_error(&mut self, message: notify::Message) -> NotificationId {
+        self.emit_message(notify::Level::Error, message)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
+        self.emit_message(notify::Level::Info, message)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn for_each_buffer(&mut self, fun: impl FnMut(Ed::Buffer<'_>)) {
+        self.borrow.with_state(|state| {
+            state.for_each_buffer(fun);
+        });
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn fs(&mut self) -> Ed::Fs {
+        self.borrow.with_state(|state| state.fs())
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Ed::EventHandle
+    where
+        Fun: FnMut(&Ed::Buffer<'_>, AgentId) + 'static,
+    {
+        self.borrow.with_state(move |state| state.on_buffer_created(fun))
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn on_cursor_created<Fun>(&mut self, fun: Fun) -> Ed::EventHandle
+    where
+        Fun: FnMut(&Ed::Cursor<'_>, AgentId) + 'static,
+    {
+        self.borrow.with_state(move |state| state.on_cursor_created(fun))
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn on_selection_created<Fun>(&mut self, fun: Fun) -> Ed::EventHandle
+    where
+        Fun: FnMut(&Ed::Selection<'_>, AgentId) + 'static,
+    {
+        self.borrow.with_state(move |state| state.on_selection_created(fun))
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn new_agent_id(&mut self) -> AgentId {
+        self.borrow.with_state(|state| state.next_agent_id())
+    }
+
+    #[inline]
+    pub(crate) fn emit_err<Err>(&mut self, err: Err) -> NotificationId
+    where
+        Err: notify::Error,
+    {
+        let namespace = self.namespace().clone();
+        self.borrow.with_state(move |state| state.emit_err(&namespace, err))
+    }
+
+    #[inline]
+    pub(crate) fn emit_message(
+        &mut self,
+        level: notify::Level,
+        message: notify::Message,
+    ) -> NotificationId {
+        let namespace = self.namespace().clone();
+
+        self.borrow.with_state(move |state| {
+            state.emitter().emit(notify::Notification {
+                level,
+                namespace: &namespace,
+                message,
+                updates_prev: None,
+            })
+        })
+    }
+
     #[inline]
     fn namespace(&self) -> &Namespace {
         self.borrow.namespace()
