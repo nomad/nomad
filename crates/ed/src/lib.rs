@@ -7,6 +7,7 @@ mod async_ctx;
 pub mod backend;
 mod byte_offset;
 pub mod command;
+mod context;
 mod editor_ctx;
 pub mod fs;
 pub mod module;
