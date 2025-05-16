@@ -5,6 +5,7 @@
 // - plugin;
 
 use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
 
 use crate::notify::{Name, Namespace};
 use crate::plugin::{Plugin, PluginId};
@@ -105,6 +106,28 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     }
 }
 
+impl<Ed: Backend, B: BorrowState> Deref for Context<Ed, B>
+where
+    B::Borrow<Ed>: Deref<Target = Ed>,
+{
+    type Target = Ed;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.borrow.deref()
+    }
+}
+
+impl<Ed: Backend, B: BorrowState> DerefMut for Context<Ed, B>
+where
+    B::Borrow<Ed>: DerefMut<Target = Ed>,
+{
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.borrow.deref_mut()
+    }
+}
+
 impl BorrowState for NotBorrowed {
     type Borrow<Ed: Backend> = NotBorrowedInner<Ed>;
 }
@@ -144,5 +167,21 @@ impl<Ed: Backend> Borrow<Ed> for BorrowedInner<'_, Ed> {
     #[inline]
     fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
         f(self.state)
+    }
+}
+
+impl<Ed: Backend> Deref for BorrowedInner<'_, Ed> {
+    type Target = Ed;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.state.deref()
+    }
+}
+
+impl<Ed: Backend> DerefMut for BorrowedInner<'_, Ed> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.state.deref_mut()
     }
 }
