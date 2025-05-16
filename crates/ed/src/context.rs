@@ -9,6 +9,7 @@
 // - block_on()
 // - run()
 // - spawn_and_block_on()
+//
 // - spawn_background()
 // - spawn_local()
 // - spawn_local_unprotected()
@@ -19,7 +20,13 @@ use core::ops::{Deref, DerefMut};
 use abs_path::AbsPath;
 
 use crate::Shared;
-use crate::backend::{AgentId, Backend, Buffer};
+use crate::backend::{
+    AgentId,
+    Backend,
+    BackgroundExecutor,
+    Buffer,
+    TaskBackground,
+};
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
@@ -156,6 +163,21 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     #[inline]
     pub fn new_agent_id(&mut self) -> AgentId {
         self.borrow.with_state(|state| state.next_agent_id())
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_background<Fut>(
+        &mut self,
+        fut: Fut,
+    ) -> TaskBackground<Fut::Output, Ed>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
+    {
+        TaskBackground::new(
+            self.with_editor(move |ed| ed.background_executor().spawn(fut)),
+        )
     }
 
     /// TODO: docs.
