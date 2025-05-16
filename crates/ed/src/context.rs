@@ -3,18 +3,27 @@
 // - api_ctx;
 // - command_builder;
 // - plugin;
+//
+// Methods to re-implement:
+//
+// - block_on()
+// - run()
+// - spawn_and_block_on()
+// - spawn_background()
+// - spawn_local()
+// - spawn_local_unprotected()
 
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
 use abs_path::AbsPath;
 
-use crate::backend::AgentId;
+use crate::Shared;
+use crate::backend::{AgentId, Backend, Buffer};
 use crate::module::Module;
-use crate::notify::{self, Emitter, Name, Namespace, NotificationId};
+use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
-use crate::{Backend, Shared};
 
 /// TODO: docs.
 pub trait BorrowState {
@@ -68,6 +77,32 @@ pub struct BorrowedInner<'a, Ed: Backend> {
 impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     /// TODO: docs.
     #[inline]
+    pub async fn create_and_focus(
+        &mut self,
+        file_path: &AbsPath,
+        agent_id: AgentId,
+    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
+        let buffer_id = self.create_buffer(file_path, agent_id).await?;
+        self.with_editor(|ed| {
+            if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
+                buffer.focus()
+            }
+        });
+        Ok(buffer_id)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub async fn create_buffer(
+        &mut self,
+        file_path: &AbsPath,
+        agent_id: AgentId,
+    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
+        Ed::create_buffer(file_path, agent_id, self).await
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn emit_error(&mut self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Error, message)
     }
@@ -81,15 +116,13 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     /// TODO: docs.
     #[inline]
     pub fn for_each_buffer(&mut self, fun: impl FnMut(Ed::Buffer<'_>)) {
-        self.borrow.with_state(|state| {
-            state.for_each_buffer(fun);
-        });
+        self.with_editor(move |ed| ed.for_each_buffer(fun));
     }
 
     /// TODO: docs.
     #[inline]
     pub fn fs(&mut self) -> Ed::Fs {
-        self.borrow.with_state(|state| state.fs())
+        self.with_editor(|ed| ed.fs())
     }
 
     /// TODO: docs.
@@ -98,7 +131,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     where
         Fun: FnMut(&Ed::Buffer<'_>, AgentId) + 'static,
     {
-        self.borrow.with_state(move |state| state.on_buffer_created(fun))
+        self.with_editor(move |ed| ed.on_buffer_created(fun))
     }
 
     /// TODO: docs.
@@ -107,7 +140,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     where
         Fun: FnMut(&Ed::Cursor<'_>, AgentId) + 'static,
     {
-        self.borrow.with_state(move |state| state.on_cursor_created(fun))
+        self.with_editor(move |ed| ed.on_cursor_created(fun))
     }
 
     /// TODO: docs.
@@ -116,7 +149,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     where
         Fun: FnMut(&Ed::Selection<'_>, AgentId) + 'static,
     {
-        self.borrow.with_state(move |state| state.on_selection_created(fun))
+        self.with_editor(move |ed| ed.on_selection_created(fun))
     }
 
     /// TODO: docs.
@@ -125,13 +158,19 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
         self.borrow.with_state(|state| state.next_agent_id())
     }
 
+    /// TODO: docs.
+    #[inline]
+    pub fn with_editor<T>(&mut self, fun: impl FnOnce(&mut Ed) -> T) -> T {
+        self.borrow.with_state(move |state| fun(state))
+    }
+
     #[inline]
     pub(crate) fn emit_err<Err>(&mut self, err: Err) -> NotificationId
     where
         Err: notify::Error,
     {
         let namespace = self.namespace().clone();
-        self.borrow.with_state(move |state| state.emit_err(&namespace, err))
+        self.with_editor(move |ed| ed.emit_err(&namespace, err))
     }
 
     #[inline]
@@ -141,9 +180,8 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
         message: notify::Message,
     ) -> NotificationId {
         let namespace = self.namespace().clone();
-
-        self.borrow.with_state(move |state| {
-            state.emitter().emit(notify::Notification {
+        self.with_editor(move |ed| {
+            ed.emitter().emit(notify::Notification {
                 level,
                 namespace: &namespace,
                 message,

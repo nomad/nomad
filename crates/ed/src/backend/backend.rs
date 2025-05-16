@@ -21,7 +21,7 @@ use crate::backend::{
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
 use crate::state::StateHandle;
-use crate::{AsyncCtx, EditorCtx, fs};
+use crate::{BorrowState, Context, EditorCtx, fs};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
@@ -105,7 +105,7 @@ pub trait Backend: 'static + Sized {
     fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self, impl BorrowState>,
     ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
 
     /// TODO: docs.
