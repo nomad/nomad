@@ -188,13 +188,13 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
                     Err(payload) => payload,
                 };
 
-            ctx.state().with_mut(|mut state| {
-                state.handle_panic(
-                    ctx.namespace(),
-                    ctx.plugin_id(),
-                    panic_payload,
-                );
-            });
+            // ctx.state().with_mut(|mut state| {
+            //     state.handle_panic(
+            //         ctx.namespace(),
+            //         ctx.plugin_id(),
+            //         panic_payload,
+            //     );
+            // });
 
             None
         };

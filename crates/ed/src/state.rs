@@ -12,7 +12,7 @@ use crate::backend::{AgentId, Backend};
 use crate::module::{Module, ModuleId};
 use crate::notify::{Name, Namespace};
 use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
-use crate::{EditorCtx, Shared};
+use crate::{Borrowed, Context, EditorCtx, Shared};
 
 /// TODO: docs.
 #[doc(hidden)]
@@ -42,8 +42,12 @@ struct PanicHook<B: Backend> {
     backend: PhantomData<B>,
 }
 
-trait PanicHandler<B: Backend> {
-    fn handle_panic(&self, info: PanicInfo, ctx: &mut EditorCtx<B>);
+trait PanicHandler<Ed: Backend> {
+    fn handle_panic(
+        &self,
+        info: PanicInfo,
+        ctx: &mut Context<Ed, Borrowed<'_>>,
+    );
 }
 
 impl<B: Backend> State<B> {
@@ -97,6 +101,21 @@ impl<B: Backend> State<B> {
     }
 
     #[inline]
+    pub(crate) fn handle_panic(
+        payload: Box<dyn Any + Send>,
+        ctx: &mut Context<B, Borrowed<'_>>,
+    ) {
+        let plugin_id = ctx.plugin_id();
+        let this = ctx.state_mut();
+        let handler = *this
+            .panic_handlers
+            .get(&plugin_id)
+            .expect("no handler matching the given ID");
+        let info = this.panic_hook.to_info(payload);
+        handler.handle_panic(info, ctx);
+    }
+
+    #[inline]
     pub(crate) fn new(backend: B) -> Self {
         const RESUME_UNWINDING: &ResumeUnwinding = &ResumeUnwinding;
         Self {
@@ -144,40 +163,15 @@ impl<B: Backend> StateMut<'_, B> {
         self.handle.clone()
     }
 
-    #[inline]
-    pub(crate) fn handle_panic(
-        &mut self,
-        namespace: &Namespace,
-        plugin_id: PluginId,
-        payload: Box<dyn Any + Send>,
-    ) {
-        let handler = *self
-            .panic_handlers
-            .get(&plugin_id)
-            .expect("no handler matching the given ID");
-        let info = self.panic_hook.to_info(payload);
-        #[allow(deprecated)]
-        let mut ctx = EditorCtx::new(namespace, plugin_id, self.as_mut());
-        handler.handle_panic(info, &mut ctx);
-    }
-
     #[track_caller]
     #[inline]
     pub(crate) fn with_ctx<R>(
         &mut self,
-        namespace: &Namespace,
-        plugin_id: PluginId,
-        fun: impl FnOnce(&mut EditorCtx<B>) -> R,
+        _namespace: &Namespace,
+        _plugin_id: PluginId,
+        _fun: impl FnOnce(&mut EditorCtx<B>) -> R,
     ) -> Option<R> {
-        #[allow(deprecated)]
-        let mut ctx = EditorCtx::new(namespace, plugin_id, self.as_mut());
-        match panic::catch_unwind(panic::AssertUnwindSafe(|| fun(&mut ctx))) {
-            Ok(ret) => Some(ret),
-            Err(payload) => {
-                self.handle_panic(namespace, plugin_id, payload);
-                None
-            },
-        }
+        todo!();
     }
 }
 
@@ -259,32 +253,40 @@ impl<B: Backend> DerefMut for StateMut<'_, B> {
     }
 }
 
-impl<P, B> PanicHandler<B> for P
+impl<P, Ed> PanicHandler<Ed> for P
 where
-    P: Plugin<B>,
-    B: Backend,
+    P: Plugin<Ed>,
+    Ed: Backend,
 {
     #[inline]
-    fn handle_panic(&self, info: PanicInfo, ctx: &mut EditorCtx<B>) {
+    fn handle_panic(
+        &self,
+        info: PanicInfo,
+        ctx: &mut Context<Ed, Borrowed<'_>>,
+    ) {
         Plugin::handle_panic(self, info, ctx);
     }
 }
 
-impl<B: Backend> Module<B> for ResumeUnwinding {
+impl<Ed: Backend> Module<Ed> for ResumeUnwinding {
     const NAME: Name = "";
     type Config = ();
 
-    fn api(&self, _: &mut crate::module::ApiCtx<B>) {
+    fn api(&self, _: &mut crate::module::ApiCtx<Ed>) {
         unreachable!()
     }
-    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<B>) {
+    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<Ed>) {
         unreachable!()
     }
 }
 
-impl<B: Backend> Plugin<B> for ResumeUnwinding {
+impl<Ed: Backend> Plugin<Ed> for ResumeUnwinding {
     #[inline]
-    fn handle_panic(&self, info: PanicInfo, _: &mut EditorCtx<B>) {
+    fn handle_panic(
+        &self,
+        info: PanicInfo,
+        _: &mut Context<Ed, Borrowed<'_>>,
+    ) {
         panic::resume_unwind(info.payload);
     }
 }

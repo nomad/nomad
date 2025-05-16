@@ -4,10 +4,10 @@ use smol_str::ToSmolStr;
 
 use crate::backend::Backend;
 use crate::module::{self, Module};
-use crate::notify::Name;
+use crate::notify::{self, Name};
 use crate::plugin::PanicInfo;
 use crate::state::StateHandle;
-use crate::{EditorCtx, notify};
+use crate::{Borrowed, Context};
 
 pub(crate) const NO_COMMAND_NAME: &str = "�";
 
@@ -20,7 +20,11 @@ pub trait Plugin<B: Backend>: Module<B> {
     const CONFIG_FN_NAME: Name = "setup";
 
     /// TODO: docs.
-    fn handle_panic(&self, panic_info: PanicInfo, ctx: &mut EditorCtx<B>) {
+    fn handle_panic(
+        &self,
+        panic_info: PanicInfo,
+        ctx: &mut Context<B, Borrowed<'_>>,
+    ) {
         let mut message = notify::Message::from_str("panicked");
 
         if let Some(location) = &panic_info.location {

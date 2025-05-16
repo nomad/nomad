@@ -220,13 +220,13 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     }
 
     #[inline]
-    fn namespace(&self) -> &Namespace {
-        self.borrow.namespace()
+    pub(crate) fn plugin_id(&self) -> PluginId {
+        self.borrow.plugin_id()
     }
 
     #[inline]
-    fn plugin_id(&self) -> PluginId {
-        self.borrow.plugin_id()
+    fn namespace(&self) -> &Namespace {
+        self.borrow.namespace()
     }
 
     #[inline]
@@ -377,15 +377,15 @@ impl<Ed: Backend> Context<Ed, Borrowed<'_>> {
             //
             // - the local executor immediately polls the future when a new
             //   task is spawned, and
-            // - `AsyncCtx::with_ctx()` is called before the first `.await`
+            // - Context::with_borrowed() is called before the first .await
             //   point is reached
             //
-            // In that case, `with_ctx()` would panic because `State` is
-            // already mutably borrowed in this `EditorCtx`.
+            // In that case, with_borrowed() would panic because the state is
+            // already mutably borrowed by Self.
             //
-            // Yielding guarantees that by the time `with_ctx()` is called,
-            // the synchronous code in which the `AsyncCtx` was created
-            // will have already finished running.
+            // Yielding guarantees that by the time with_borrowed() is called,
+            // the synchronous code containing Self will have already finished
+            // running.
             future::yield_now().await;
 
             fun(ctx).await
@@ -394,16 +394,13 @@ impl<Ed: Backend> Context<Ed, Borrowed<'_>> {
     }
 
     #[inline]
-    fn handle_panic(&mut self, _panic_payload: Box<dyn Any + Send>) {
-        // ctx.borrow.state_handle.with_mut(|state| {
-        //     state.handle_panic(
-        //         ctx.namespace(),
-        //         ctx.plugin_id(),
-        //         panic_payload,
-        //     );
-        // });
+    pub(crate) fn state_mut(&mut self) -> &mut State<Ed> {
+        self.borrow.state
+    }
 
-        todo!();
+    #[inline]
+    fn handle_panic(&mut self, panic_payload: Box<dyn Any + Send>) {
+        State::handle_panic(panic_payload, self);
     }
 }
 
