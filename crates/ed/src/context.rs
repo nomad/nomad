@@ -10,14 +10,16 @@
 // - run()
 // - spawn_and_block_on()
 //
-// - spawn_background()
 // - spawn_local()
 // - spawn_local_unprotected()
 
+use core::any::Any;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use core::panic;
 
 use abs_path::AbsPath;
+use futures_lite::future::{self, FutureExt};
 
 use crate::Shared;
 use crate::backend::{
@@ -25,7 +27,9 @@ use crate::backend::{
     Backend,
     BackgroundExecutor,
     Buffer,
+    LocalExecutor,
     TaskBackground,
+    TaskLocal,
 };
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
@@ -59,6 +63,9 @@ pub trait Borrow<Ed: Backend> {
 
     /// TODO: docs.
     fn plugin_id(&self) -> PluginId;
+
+    /// TODO: docs.
+    fn state_handle(&self) -> Shared<State<Ed>>;
 
     /// TODO: docs.
     fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T;
@@ -221,6 +228,39 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     fn plugin_id(&self) -> PluginId {
         self.borrow.plugin_id()
     }
+
+    #[inline]
+    fn spawn_local_inner<T: 'static>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
+    ) -> TaskLocal<Option<T>, Ed> {
+        self.spawn_local_inner_unprotected(async move |ctx| {
+            match panic::AssertUnwindSafe(fun(ctx)).catch_unwind().await {
+                Ok(ret) => Some(ret),
+                Err(payload) => {
+                    ctx.with_borrowed(|ctx| ctx.handle_panic(payload));
+                    None
+                },
+            }
+        })
+    }
+
+    #[inline]
+    fn spawn_local_inner_unprotected<T: 'static>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
+    ) -> TaskLocal<T, Ed> {
+        let mut ctx = Context {
+            borrow: NotBorrowedInner {
+                namespace: self.namespace().clone(),
+                plugin_id: self.plugin_id(),
+                state_handle: self.borrow.state_handle(),
+            },
+        };
+        TaskLocal::new(self.with_editor(move |ed| {
+            ed.local_executor().spawn(async move { fun(&mut ctx).await })
+        }))
+    }
 }
 
 impl<Ed: Backend, B: BorrowState> Context<Ed, B>
@@ -295,7 +335,7 @@ where
 impl<Ed: Backend> Context<Ed, NotBorrowed> {
     /// TODO: docs.
     #[inline]
-    pub fn with_mut<T>(
+    pub fn with_borrowed<T>(
         &self,
         fun: impl FnOnce(&mut Context<Ed, Borrowed<'_>>) -> T,
     ) -> T {
@@ -322,6 +362,48 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
                 state_handle: Shared::new(State::new(editor)),
             },
         }
+    }
+}
+
+impl<Ed: Backend> Context<Ed, Borrowed<'_>> {
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_and_detach(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Context<Ed>) + 'static,
+    ) {
+        self.spawn_local_inner(async move |ctx| {
+            // Yielding prevents a panic that would occur when:
+            //
+            // - the local executor immediately polls the future when a new
+            //   task is spawned, and
+            // - `AsyncCtx::with_ctx()` is called before the first `.await`
+            //   point is reached
+            //
+            // In that case, `with_ctx()` would panic because `State` is
+            // already mutably borrowed in this `EditorCtx`.
+            //
+            // Yielding guarantees that by the time `with_ctx()` is called,
+            // the synchronous code in which the `AsyncCtx` was created
+            // will have already finished running.
+            future::yield_now().await;
+
+            fun(ctx).await
+        })
+        .detach();
+    }
+
+    #[inline]
+    fn handle_panic(&mut self, _panic_payload: Box<dyn Any + Send>) {
+        // ctx.borrow.state_handle.with_mut(|state| {
+        //     state.handle_panic(
+        //         ctx.namespace(),
+        //         ctx.plugin_id(),
+        //         panic_payload,
+        //     );
+        // });
+
+        todo!();
     }
 }
 
@@ -367,6 +449,11 @@ impl<Ed: Backend> Borrow<Ed> for NotBorrowedInner<Ed> {
     }
 
     #[inline]
+    fn state_handle(&self) -> Shared<State<Ed>> {
+        self.state_handle.clone()
+    }
+
+    #[inline]
     fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
         self.state_handle.with_mut(f)
     }
@@ -381,6 +468,11 @@ impl<Ed: Backend> Borrow<Ed> for BorrowedInner<'_, Ed> {
     #[inline]
     fn plugin_id(&self) -> PluginId {
         self.plugin_id
+    }
+
+    #[inline]
+    fn state_handle(&self) -> Shared<State<Ed>> {
+        self.state_handle.clone()
     }
 
     #[inline]

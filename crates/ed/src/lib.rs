@@ -20,6 +20,6 @@ mod util;
 pub use async_ctx::AsyncCtx;
 pub use backend::Backend;
 pub use byte_offset::ByteOffset;
-pub use context::{BorrowState, Context};
+pub use context::{BorrowState, Borrowed, Context, NotBorrowed};
 pub use editor_ctx::EditorCtx;
 pub use shared::Shared;
