@@ -7,7 +7,7 @@
 use core::marker::PhantomData;
 
 use crate::notify::{Name, Namespace};
-use crate::plugin::PluginId;
+use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
 use crate::{Backend, Shared};
 
@@ -28,14 +28,6 @@ pub struct NotBorrowed;
 /// TODO: docs.
 pub struct Borrowed<'a> {
     _lifetime: PhantomData<&'a ()>,
-}
-
-impl BorrowState for NotBorrowed {
-    type Borrow<Ed: Backend> = NotBorrowedInner<Ed>;
-}
-
-impl<'a> BorrowState for Borrowed<'a> {
-    type Borrow<Ed: Backend> = BorrowedInner<'a, Ed>;
 }
 
 /// TODO: docs.
@@ -64,8 +56,61 @@ pub struct NotBorrowedInner<Ed: Backend> {
 pub struct BorrowedInner<'a, Ed: Backend> {
     namespace: &'a Namespace,
     plugin_id: PluginId,
-    state_handle: Shared<State<Ed>>,
-    state_mut: &'a mut State<Ed>,
+    state_handle: &'a Shared<State<Ed>>,
+    state: &'a mut State<Ed>,
+}
+
+impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
+    #[inline]
+    fn namespace(&self) -> &Namespace {
+        self.borrow.namespace()
+    }
+
+    #[inline]
+    fn plugin_id(&self) -> PluginId {
+        self.borrow.plugin_id()
+    }
+}
+
+impl<Ed: Backend> Context<Ed, NotBorrowed> {
+    /// TODO: docs.
+    #[inline]
+    pub fn with_mut<T>(
+        &self,
+        fun: impl FnOnce(&mut Context<Ed, Borrowed<'_>>) -> T,
+    ) -> T {
+        self.borrow.state_handle.with_mut(|state| {
+            let mut ctx = Context {
+                borrow: BorrowedInner {
+                    namespace: self.namespace(),
+                    plugin_id: self.plugin_id(),
+                    state_handle: &self.borrow.state_handle,
+                    state,
+                },
+            };
+            fun(&mut ctx)
+        })
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub(crate) fn from_editor(editor: Ed) -> Self {
+        Self {
+            borrow: NotBorrowedInner {
+                namespace: Namespace::default(),
+                plugin_id: <crate::state::ResumeUnwinding as Plugin<Ed>>::id(),
+                state_handle: Shared::new(State::new(editor)),
+            },
+        }
+    }
+}
+
+impl BorrowState for NotBorrowed {
+    type Borrow<Ed: Backend> = NotBorrowedInner<Ed>;
+}
+
+impl<'a> BorrowState for Borrowed<'a> {
+    type Borrow<Ed: Backend> = BorrowedInner<'a, Ed>;
 }
 
 impl<Ed: Backend> Borrow<Ed> for NotBorrowedInner<Ed> {
@@ -98,6 +143,6 @@ impl<Ed: Backend> Borrow<Ed> for BorrowedInner<'_, Ed> {
 
     #[inline]
     fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
-        f(self.state_mut)
+        f(self.state)
     }
 }
