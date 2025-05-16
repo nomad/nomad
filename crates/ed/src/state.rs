@@ -15,7 +15,8 @@ use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
 use crate::{EditorCtx, Shared};
 
 /// TODO: docs.
-pub(crate) struct State<B: Backend> {
+#[doc(hidden)]
+pub struct State<B: Backend> {
     backend: B,
     modules: FxHashMap<ModuleId, &'static dyn Any>,
     next_agent_id: AgentId,

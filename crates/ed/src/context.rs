@@ -7,6 +7,9 @@
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
+use abs_path::AbsPath;
+
+use crate::module::Module;
 use crate::notify::{Name, Namespace};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
@@ -73,6 +76,75 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     }
 }
 
+impl<Ed: Backend, B: BorrowState> Context<Ed, B>
+where
+    B::Borrow<Ed>: DerefMut<Target = State<Ed>>,
+{
+    /// TODO: docs.
+    #[inline]
+    pub fn buffer(
+        &mut self,
+        buffer_id: Ed::BufferId,
+    ) -> Option<Ed::Buffer<'_>> {
+        Ed::buffer(self, buffer_id)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn buffer_at_path(
+        &mut self,
+        path: &AbsPath,
+    ) -> Option<Ed::Buffer<'_>> {
+        Ed::buffer_at_path(self, path)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn current_buffer(&mut self) -> Option<Ed::Buffer<'_>> {
+        Ed::current_buffer(self)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn cursor(
+        &mut self,
+        cursor_id: Ed::CursorId,
+    ) -> Option<Ed::Cursor<'_>> {
+        Ed::cursor(self, cursor_id)
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn get_module<M>(&self) -> &M
+    where
+        M: Module<Ed>,
+    {
+        match self.try_get_module::<M>() {
+            Some(module) => module,
+            None => panic!("module {:?} not found", M::NAME),
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn selection(
+        &mut self,
+        selection_id: Ed::SelectionId,
+    ) -> Option<Ed::Selection<'_>> {
+        Ed::selection(self, selection_id)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn try_get_module<M>(&self) -> Option<&M>
+    where
+        M: Module<Ed>,
+    {
+        self.borrow.get_module::<M>()
+    }
+}
+
 impl<Ed: Backend> Context<Ed, NotBorrowed> {
     /// TODO: docs.
     #[inline]
@@ -108,7 +180,7 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
 
 impl<Ed: Backend, B: BorrowState> Deref for Context<Ed, B>
 where
-    B::Borrow<Ed>: Deref<Target = Ed>,
+    B::Borrow<Ed>: Deref<Target = State<Ed>>,
 {
     type Target = Ed;
 
@@ -120,7 +192,7 @@ where
 
 impl<Ed: Backend, B: BorrowState> DerefMut for Context<Ed, B>
 where
-    B::Borrow<Ed>: DerefMut<Target = Ed>,
+    B::Borrow<Ed>: DerefMut<Target = State<Ed>>,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -171,17 +243,17 @@ impl<Ed: Backend> Borrow<Ed> for BorrowedInner<'_, Ed> {
 }
 
 impl<Ed: Backend> Deref for BorrowedInner<'_, Ed> {
-    type Target = Ed;
+    type Target = State<Ed>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.state.deref()
+        self.state
     }
 }
 
 impl<Ed: Backend> DerefMut for BorrowedInner<'_, Ed> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.state.deref_mut()
+        self.state
     }
 }
