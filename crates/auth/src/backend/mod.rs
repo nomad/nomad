@@ -6,7 +6,7 @@ mod neovim;
 use core::fmt::Debug;
 
 use ed::backend::Backend;
-use ed::{AsyncCtx, EditorCtx, notify};
+use ed::{Borrowed, Context, notify};
 
 use crate::AuthInfos;
 
@@ -17,11 +17,11 @@ pub trait AuthBackend: Backend {
 
     /// TODO: docs.
     fn credential_builder(
-        ctx: &mut EditorCtx<Self>,
+        ctx: &mut Context<Self, Borrowed>,
     ) -> impl Future<Output = Box<keyring::CredentialBuilder>> + Send + 'static;
 
     /// TODO: docs.
     fn login(
-        ctx: &mut AsyncCtx<Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<AuthInfos, Self::LoginError>>;
 }

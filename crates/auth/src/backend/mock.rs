@@ -3,7 +3,7 @@
 use ed::backend::{AgentId, ApiValue, Backend, BaseBackend};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
-use ed::{AsyncCtx, EditorCtx};
+use ed::{BorrowState, Borrowed, Context};
 use serde::{Deserialize, Serialize};
 
 use crate::{AuthBackend, AuthInfos};
@@ -23,14 +23,14 @@ impl<B: BaseBackend> AuthBackend for AuthMock<B> {
 
     #[allow(clippy::manual_async_fn)]
     fn credential_builder(
-        _: &mut EditorCtx<Self>,
+        _: &mut Context<Self, Borrowed>,
     ) -> impl Future<Output = Box<keyring::CredentialBuilder>> + Send + 'static
     {
         async move { todo!() }
     }
 
     async fn login(
-        _: &mut AsyncCtx<'_, Self>,
+        _: &mut Context<Self>,
     ) -> Result<AuthInfos, Self::LoginError> {
         todo!()
     }
@@ -45,9 +45,8 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     type Cursor<'a> = <B as Backend>::Cursor<'a>;
     type CursorId = <B as Backend>::CursorId;
     type Fs = <B as Backend>::Fs;
-    type LocalExecutor = <B as Backend>::LocalExecutor;
-    type BackgroundExecutor = <B as Backend>::BackgroundExecutor;
     type Emitter<'this> = <B as Backend>::Emitter<'this>;
+    type Executor = <B as Backend>::Executor;
     type EventHandle = <B as Backend>::EventHandle;
     type Selection<'a> = <B as Backend>::Selection<'a>;
     type SelectionId = <B as Backend>::SelectionId;
@@ -68,7 +67,7 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         <B as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
@@ -84,11 +83,8 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     fn emitter(&mut self) -> Self::Emitter<'_> {
         self.inner.emitter()
     }
-    fn local_executor(&mut self) -> &mut Self::LocalExecutor {
-        self.inner.local_executor()
-    }
-    fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
-        self.inner.background_executor()
+    fn executor(&mut self) -> &mut Self::Executor {
+        self.inner.executor()
     }
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where

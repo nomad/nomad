@@ -4,7 +4,7 @@ use collab_server::message::GitHubHandle;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
-use ed::{AsyncCtx, Shared};
+use ed::{Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
 use crate::{Auth, AuthBackend, AuthInfos};
@@ -24,7 +24,7 @@ impl<B: AuthBackend> AsyncAction<B> for Login {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), LoginError<B>> {
         if let Some(handle) = self.infos.with(|maybe_infos| {
             maybe_infos.as_ref().map(|infos| infos.handle().clone())

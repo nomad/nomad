@@ -4,7 +4,7 @@ use ed::action::AsyncAction;
 use ed::backend::Backend;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
-use ed::{AsyncCtx, Shared};
+use ed::{Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
 use crate::{Auth, AuthInfos};
@@ -24,7 +24,7 @@ impl<B: Backend> AsyncAction<B> for Logout {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), LogoutError> {
         self.infos.with_mut(|maybe_infos| {
             if maybe_infos.is_some() {

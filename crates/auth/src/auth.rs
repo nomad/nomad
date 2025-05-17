@@ -1,6 +1,6 @@
 use ed::module::{ApiCtx, Module};
 use ed::notify::Name;
-use ed::{EditorCtx, Shared};
+use ed::{Borrowed, Context, Shared};
 
 use crate::AuthBackend;
 use crate::auth_infos::AuthInfos;
@@ -56,7 +56,7 @@ impl<B: AuthBackend> Module<B> for Auth {
         ctx.with_function(self.login()).with_function(self.logout());
     }
 
-    fn on_init(&self, ctx: &mut EditorCtx<B>) {
+    fn on_init(&self, ctx: &mut Context<B, Borrowed>) {
         let credential_builder = B::credential_builder(ctx);
         let store = self.credential_store.clone();
         ctx.spawn_background(async move {
@@ -66,7 +66,7 @@ impl<B: AuthBackend> Module<B> for Auth {
 
         let auth_infos = self.infos.clone();
         let store = self.credential_store.clone();
-        ctx.spawn_local(async move |ctx| {
+        ctx.spawn_and_detach(async move |ctx| {
             if let Some(infos) = ctx
                 // Retrieving the credentials blocks, so do it in the
                 // background.
@@ -77,9 +77,8 @@ impl<B: AuthBackend> Module<B> for Auth {
             {
                 auth_infos.set(Some(infos));
             }
-        })
-        .detach();
+        });
     }
 
-    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<B>) {}
+    fn on_new_config(&self, _: Self::Config, _: &mut Context<B, Borrowed>) {}
 }
