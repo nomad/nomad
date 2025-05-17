@@ -7,7 +7,6 @@
 // Methods to re-implement:
 //
 // - block_on()
-// - run()
 // - spawn_and_block_on()
 
 use core::any::Any;
@@ -86,6 +85,12 @@ pub struct BorrowedInner<'a, Ed: Backend> {
 }
 
 impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
+    /// TODO: docs.
+    #[inline]
+    pub fn block_on<T>(&mut self, fun: impl AsyncFnOnce(&mut Self) -> T) -> T {
+        future::block_on(self.run(fun))
+    }
+
     /// TODO: docs.
     #[inline]
     pub async fn create_and_focus(
@@ -167,6 +172,17 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     #[inline]
     pub fn new_agent_id(&mut self) -> AgentId {
         self.borrow.with_state(|state| state.next_agent_id())
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub async fn run<T>(
+        &mut self,
+        _fun: impl AsyncFnOnce(&mut Self) -> T,
+    ) -> T {
+        todo!();
+        // self.with_editor(|ed| ed.executor().runner().clone())
+        //     .run(async move { fun(self).await })
     }
 
     /// TODO: docs.
@@ -300,11 +316,11 @@ where
     /// TODO: docs.
     #[track_caller]
     #[inline]
-    pub fn get_module<M>(&self) -> &M
+    pub fn module<M>(&self) -> &M
     where
         M: Module<Ed>,
     {
-        match self.try_get_module::<M>() {
+        match self.try_module::<M>() {
             Some(module) => module,
             None => panic!("module {:?} not found", M::NAME),
         }
@@ -321,7 +337,7 @@ where
 
     /// TODO: docs.
     #[inline]
-    pub fn try_get_module<M>(&self) -> Option<&M>
+    pub fn try_module<M>(&self) -> Option<&M>
     where
         M: Module<Ed>,
     {
@@ -334,7 +350,7 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     #[inline]
     pub fn spawn_local<T: 'static>(
         &mut self,
-        fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
+        fun: impl AsyncFnOnce(&mut Self) -> T + 'static,
     ) -> TaskLocal<Option<T>, Ed> {
         self.spawn_local_inner(fun)
     }
@@ -343,7 +359,7 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     #[inline]
     pub fn spawn_local_unprotected<T: 'static>(
         &mut self,
-        fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
+        fun: impl AsyncFnOnce(&mut Self) -> T + 'static,
     ) -> TaskLocal<T, Ed> {
         self.spawn_local_unprotected_inner(fun)
     }
