@@ -2,9 +2,11 @@ use core::mem;
 
 use abs_path::path;
 use ed::backend::{Backend, Buffer, Cursor, Replacement};
-use ed::{ByteOffset, EditorCtx, Shared};
+use ed::{Borrowed, ByteOffset, Context, Shared};
 
-pub(crate) fn on_cursor_created_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
+pub(crate) fn on_cursor_created_1<Ed: Backend>(
+    ctx: &mut Context<Ed, Borrowed>,
+) {
     let agent_id = ctx.new_agent_id();
 
     let num_created = Shared::<usize>::new(0);
@@ -17,7 +19,7 @@ pub(crate) fn on_cursor_created_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
         }
     });
 
-    ctx.spawn_and_block_on(async move |ctx| {
+    ctx.block_on(async move |ctx| {
         // Focusing the buffer should create a cursor.
         ctx.create_and_focus(path!("/foo.txt"), agent_id).await.unwrap();
     });
@@ -25,14 +27,16 @@ pub(crate) fn on_cursor_created_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
     assert_eq!(num_created.copied(), 1);
 }
 
-pub(crate) fn on_cursor_created_2<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
+pub(crate) fn on_cursor_created_2<Ed: Backend>(
+    ctx: &mut Context<Ed, Borrowed>,
+) {
     let agent_id = ctx.new_agent_id();
 
-    let foo_id = ctx.spawn_and_block_on(async move |ctx| {
+    let foo_id = ctx.block_on(async move |ctx| {
         ctx.create_and_focus(path!("/foo.txt"), agent_id).await.unwrap()
     });
 
-    let bar_id = ctx.spawn_and_block_on(async move |ctx| {
+    let bar_id = ctx.block_on(async move |ctx| {
         ctx.create_and_focus(path!("/bar.txt"), agent_id).await.unwrap()
     });
 
@@ -60,7 +64,7 @@ pub(crate) fn on_cursor_created_2<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
     assert_eq!(num_created.copied(), 2);
 }
 
-pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
+pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut Context<Ed, Borrowed>) {
     let agent_id = ctx.new_agent_id();
 
     let num_created = Shared::<usize>::new(0);
@@ -84,7 +88,7 @@ pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
         }
     });
 
-    let foo_id = ctx.spawn_and_block_on(async move |ctx| {
+    let foo_id = ctx.block_on(async move |ctx| {
         ctx.create_and_focus(path!("/foo.txt"), agent_id).await.unwrap()
     });
 

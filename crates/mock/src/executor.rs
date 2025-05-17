@@ -127,6 +127,12 @@ impl<BgSpawner: BackgroundSpawner> executor::Executor for Executor<BgSpawner> {
     }
 }
 
+impl AsMut<Self> for Runner {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl executor::Runner for Runner {
     async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
         self.run_inner(future, false).await
@@ -159,12 +165,6 @@ impl BackgroundSpawner for Spawner {
 
 impl AsRef<Self> for Executor {
     fn as_ref(&self) -> &Self {
-        self
-    }
-}
-
-impl AsMut<Self> for Executor {
-    fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
