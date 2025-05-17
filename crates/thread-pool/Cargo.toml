@@ -7,8 +7,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-async-oneshot = { git = "https://github.com/irrustible/async-oneshot", rev = "811bedf" }
 ed = { workspace = true }
+flume = { workspace = true }
 futures-executor = { workspace = true, features = ["thread-pool"] }
 pin-project-lite = { workspace = true }
 

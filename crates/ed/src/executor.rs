@@ -50,7 +50,7 @@ pub trait LocalSpawner {
 /// TODO: docs.
 pub trait BackgroundSpawner: Clone + Send + 'static {
     /// TODO: docs.
-    type Task<T>: Task<T> + Send;
+    type Task<T: Send + 'static>: Task<T> + Send;
 
     /// TODO: docs.
     fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
@@ -75,7 +75,7 @@ pin_project_lite::pin_project! {
 
 pin_project_lite::pin_project! {
     /// TODO: docs.
-    pub struct BackgroundTask<T, Ed: Backend> {
+    pub struct BackgroundTask<T, Ed: Backend> where T: 'static, T: Send {
         #[pin]
         inner: <<<Ed as Backend>::Executor as Executor>::BackgroundSpawner as BackgroundSpawner>::Task<T>,
     }
@@ -96,7 +96,7 @@ impl<T, Ed: Backend> LocalTask<T, Ed> {
     }
 }
 
-impl<T, Ed: Backend> BackgroundTask<T, Ed> {
+impl<T: Send + 'static, Ed: Backend> BackgroundTask<T, Ed> {
     /// TODO: docs.
     #[inline]
     pub fn detach(self) {
@@ -120,7 +120,7 @@ impl<T, Ed: Backend> Future for LocalTask<T, Ed> {
     }
 }
 
-impl<T, Ed: Backend> Future for BackgroundTask<T, Ed> {
+impl<T: Send + 'static, Ed: Backend> Future for BackgroundTask<T, Ed> {
     type Output = T;
 
     #[inline]

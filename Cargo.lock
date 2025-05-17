@@ -218,11 +218,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-oneshot"
-version = "0.6.0"
-source = "git+https://github.com/irrustible/async-oneshot?rev=811bedf#811bedf9aaebecc4dd09c140aa4a04a41b3d4d1c"
-
-[[package]]
 name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2940,8 +2935,8 @@ dependencies = [
 name = "thread-pool"
 version = "0.1.0-dev"
 dependencies = [
- "async-oneshot",
  "ed",
+ "flume",
  "futures-executor",
  "pin-project-lite",
 ]
