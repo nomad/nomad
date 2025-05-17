@@ -36,7 +36,7 @@ impl Module<Neovim> for Mad {
     }
 
     fn on_init(&self, ctx: &mut Context<Neovim, Borrowed>) {
-        ctx.backend_mut().set_emitter(neovim::notify::detect());
+        ctx.set_emitter(neovim::notify::detect());
     }
 
     fn on_new_config(

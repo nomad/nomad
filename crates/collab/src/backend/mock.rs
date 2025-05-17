@@ -227,7 +227,7 @@ where
         project_root: &AbsPath,
         ctx: &mut Context<Self>,
     ) -> bool {
-        ctx.with_backend(|this| match &mut this.confirm_start_with {
+        ctx.with_editor(|this| match &mut this.confirm_start_with {
             Some(fun) => fun(project_root),
             None => true,
         })
@@ -238,7 +238,7 @@ where
         ctx: &mut Context<Self>,
     ) -> Result<Self::Io, Self::ConnectToServerError> {
         let server_tx = ctx
-            .with_backend(|this| this.server_tx.clone())
+            .with_editor(|this| this.server_tx.clone())
             .ok_or(AnyError::from_str("no server set"))?;
 
         let (client_io, server_io) = duplex(usize::MAX);
@@ -252,14 +252,14 @@ where
         session_id: SessionId,
         ctx: &mut Context<Self>,
     ) -> Result<(), Self::CopySessionIdError> {
-        ctx.with_backend(|this| this.clipboard = Some(session_id));
+        ctx.with_editor(|this| this.clipboard = Some(session_id));
         Ok(())
     }
 
     async fn default_dir_for_remote_projects(
         ctx: &mut Context<Self>,
     ) -> Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError> {
-        ctx.with_backend(|this| {
+        ctx.with_editor(|this| {
             this.default_dir_for_remote_projects
                 .clone()
                 .ok_or(NoDefaultDirForRemoteProjectsError)
@@ -269,7 +269,7 @@ where
     async fn home_dir(
         ctx: &mut Context<Self>,
     ) -> Result<AbsPathBuf, Self::HomeDirError> {
-        ctx.with_backend(|this| match &this.home_dir {
+        ctx.with_editor(|this| match &this.home_dir {
             Some(path) => Ok(path.clone()),
             None => Err(AnyError::from_str("no home directory configured")),
         })
@@ -279,16 +279,14 @@ where
         buffer_id: Self::BufferId,
         ctx: &mut Context<Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
-        Ok(ctx.with_backend(|this| this.lsp_root_with.as_mut()?(buffer_id)))
+        Ok(ctx.with_editor(|this| this.lsp_root_with.as_mut()?(buffer_id)))
     }
 
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
     ) -> Self::ProjectFilter {
-        ctx.with_backend(|this| {
-            this.project_filter_with.as_mut()(project_root)
-        })
+        ctx.with_editor(|this| this.project_filter_with.as_mut()(project_root))
     }
 
     async fn select_session<'pairs>(
@@ -296,7 +294,7 @@ where
         action: ActionForSelectedSession,
         ctx: &mut Context<Self>,
     ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
-        ctx.with_backend(|this| {
+        ctx.with_editor(|this| {
             this.select_session_with.as_mut()?(sessions, action)
         })
     }

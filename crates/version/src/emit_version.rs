@@ -1,8 +1,8 @@
-use ed::EditorCtx;
 use ed::action::Action;
 use ed::backend::Backend;
 use ed::command::ToCompletionFn;
 use ed::notify::{Message, Name};
+use ed::{Borrowed, Context};
 
 use crate::VERSION;
 
@@ -26,7 +26,7 @@ impl<B: Backend> Action<B> for EmitVersion {
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         _: Self::Args<'_>,
-        ctx: &mut EditorCtx<B>,
+        ctx: &mut Context<B, Borrowed>,
     ) {
         ctx.emit_info(Message::from_display(VERSION));
     }
