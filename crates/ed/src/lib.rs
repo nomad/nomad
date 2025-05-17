@@ -9,6 +9,7 @@ mod byte_offset;
 pub mod command;
 mod context;
 mod editor_ctx;
+pub mod executor;
 pub mod fs;
 pub mod module;
 pub mod notify;

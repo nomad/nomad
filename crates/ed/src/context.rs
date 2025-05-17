@@ -3,11 +3,6 @@
 // - api_ctx;
 // - command_builder;
 // - plugin;
-//
-// Methods to re-implement:
-//
-// - block_on()
-// - spawn_and_block_on()
 
 use core::any::Any;
 use core::marker::PhantomData;
@@ -18,14 +13,14 @@ use abs_path::AbsPath;
 use futures_lite::future::{self, FutureExt};
 
 use crate::Shared;
-use crate::backend::{
-    AgentId,
-    Backend,
-    BackgroundExecutor,
-    Buffer,
-    LocalExecutor,
-    TaskBackground,
-    TaskLocal,
+use crate::backend::{AgentId, Backend, Buffer};
+use crate::executor::{
+    BackgroundSpawner,
+    BackgroundTask,
+    Executor,
+    LocalSpawner,
+    LocalTask,
+    Runner,
 };
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
@@ -178,11 +173,11 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     #[inline]
     pub async fn run<T>(
         &mut self,
-        _fun: impl AsyncFnOnce(&mut Self) -> T,
+        fun: impl AsyncFnOnce(&mut Self) -> T,
     ) -> T {
-        todo!();
-        // self.with_editor(|ed| ed.executor().runner().clone())
-        //     .run(async move { fun(self).await })
+        self.with_editor(|ed| ed.executor().runner().clone())
+            .run(async move { fun(self).await })
+            .await
     }
 
     /// TODO: docs.
@@ -190,14 +185,14 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     pub fn spawn_background<Fut>(
         &mut self,
         fut: Fut,
-    ) -> TaskBackground<Fut::Output, Ed>
+    ) -> BackgroundTask<Fut::Output, Ed>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        TaskBackground::new(
-            self.with_editor(move |ed| ed.background_executor().spawn(fut)),
-        )
+        BackgroundTask::new(self.with_editor(move |ed| {
+            ed.executor().background_spawner().spawn(fut)
+        }))
     }
 
     /// TODO: docs.
@@ -246,7 +241,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     fn spawn_local_inner<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
-    ) -> TaskLocal<Option<T>, Ed> {
+    ) -> LocalTask<Option<T>, Ed> {
         self.spawn_local_unprotected_inner(async move |ctx| {
             match panic::AssertUnwindSafe(fun(ctx)).catch_unwind().await {
                 Ok(ret) => Some(ret),
@@ -262,7 +257,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     fn spawn_local_unprotected_inner<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
-    ) -> TaskLocal<T, Ed> {
+    ) -> LocalTask<T, Ed> {
         let mut ctx = Context {
             borrow: NotBorrowedInner {
                 namespace: self.namespace().clone(),
@@ -270,8 +265,10 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
                 state_handle: self.borrow.state_handle(),
             },
         };
-        TaskLocal::new(self.with_editor(move |ed| {
-            ed.local_executor().spawn(async move { fun(&mut ctx).await })
+        LocalTask::new(self.with_editor(move |ed| {
+            ed.executor()
+                .local_spawner()
+                .spawn(async move { fun(&mut ctx).await })
         }))
     }
 }
@@ -351,7 +348,7 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     pub fn spawn_local<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Self) -> T + 'static,
-    ) -> TaskLocal<Option<T>, Ed> {
+    ) -> LocalTask<Option<T>, Ed> {
         self.spawn_local_inner(fun)
     }
 
@@ -360,7 +357,7 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     pub fn spawn_local_unprotected<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Self) -> T + 'static,
-    ) -> TaskLocal<T, Ed> {
+    ) -> LocalTask<T, Ed> {
         self.spawn_local_unprotected_inner(fun)
     }
 

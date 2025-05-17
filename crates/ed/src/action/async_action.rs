@@ -35,12 +35,13 @@ where
         args: Self::Args<'_>,
         ctx: &mut EditorCtx<B>,
     ) {
-        let mut this = self.clone();
-        ctx.spawn_local(async move |ctx| {
-            if let Err(err) = this.call(args, ctx).await.into_result() {
-                ctx.emit_err(err);
-            }
-        })
-        .detach();
+        // let mut this = self.clone();
+        // ctx.spawn_local(async move |ctx| {
+        //     if let Err(err) = this.call(args, ctx).await.into_result() {
+        //         ctx.emit_err(err);
+        //     }
+        // })
+        // .detach();
+        todo!();
     }
 }

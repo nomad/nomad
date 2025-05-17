@@ -1,16 +1,6 @@
 use core::panic;
 
-use futures_lite::future::{self, FutureExt};
-
-use crate::AsyncCtx;
-use crate::backend::{
-    AgentId,
-    Backend,
-    BackgroundExecutor,
-    LocalExecutor,
-    TaskBackground,
-    TaskLocal,
-};
+use crate::backend::{AgentId, Backend};
 use crate::fs::AbsPath;
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
@@ -29,12 +19,6 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
     #[inline]
     pub fn backend_mut(&mut self) -> &mut B {
         &mut self.state
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn block_on<T>(&mut self, fut: impl Future<Output = T>) -> T {
-        future::block_on(self.run(fut))
     }
 
     /// TODO: docs.
@@ -133,111 +117,11 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub async fn run<T>(&mut self, fut: impl Future<Output = T>) -> T {
-        self.backend_mut().local_executor().run(fut).await
-    }
-
-    /// TODO: docs.
-    #[inline]
     pub fn selection(
         &mut self,
         selection_id: B::SelectionId,
     ) -> Option<B::Selection<'_>> {
         self.backend_mut().selection(selection_id)
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn spawn_and_block_on<T: 'static>(
-        &mut self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> T + 'static,
-    ) -> T {
-        let task = self.spawn_local_unprotected(fun);
-        self.block_on(task)
-    }
-
-    /// TODO: docs.
-    #[must_use = "task handles do nothing unless awaited or detached"]
-    #[inline]
-    pub fn spawn_background<Fut>(
-        &mut self,
-        fut: Fut,
-    ) -> TaskBackground<Fut::Output, B>
-    where
-        Fut: Future + Send + 'static,
-        Fut::Output: Send + 'static,
-    {
-        let task = self.backend_mut().background_executor().spawn(fut);
-        TaskBackground::<_, B>::new(task)
-    }
-
-    /// TODO: docs.
-    #[must_use = "task handles do nothing unless awaited or detached"]
-    #[inline]
-    pub fn spawn_local<Out>(
-        &mut self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
-    ) -> TaskLocal<Option<Out>, B>
-    where
-        Out: 'static,
-    {
-        let fun = async move |ctx: &mut AsyncCtx<B>| {
-            let panic_payload =
-                match panic::AssertUnwindSafe(fun(ctx)).catch_unwind().await {
-                    Ok(ret) => return Some(ret),
-                    Err(payload) => payload,
-                };
-
-            // ctx.state().with_mut(|mut state| {
-            //     state.handle_panic(
-            //         ctx.namespace(),
-            //         ctx.plugin_id(),
-            //         panic_payload,
-            //     );
-            // });
-
-            None
-        };
-
-        self.spawn_local_unprotected(fun)
-    }
-
-    /// TODO: docs.
-    #[must_use = "task handles do nothing unless awaited or detached"]
-    #[inline]
-    pub fn spawn_local_unprotected<Out>(
-        &mut self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
-    ) -> TaskLocal<Out, B>
-    where
-        Out: 'static,
-    {
-        let mut ctx = AsyncCtx::new(
-            self.namespace.clone(),
-            self.plugin_id,
-            self.state.handle(),
-        );
-
-        let task = self.local_executor().spawn(async move {
-            // Yielding prevents a panic that would occur when:
-            //
-            // - the local executor immediately polls the future when a new
-            //   task is spawned, and
-            // - `AsyncCtx::with_ctx()` is called before the first `.await`
-            //   point is reached
-            //
-            // In that case, `with_ctx()` would panic because `State` is
-            // already mutably borrowed in this `EditorCtx`.
-            //
-            // Yielding guarantees that by the time `with_ctx()` is called,
-            // the synchronous code in which the `AsyncCtx` was created
-            // will have already finished running.
-            futures_lite::future::yield_now().await;
-
-            fun(&mut ctx).await
-        });
-
-        TaskLocal::<_, B>::new(task)
     }
 
     /// TODO: docs.
@@ -269,11 +153,6 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
             message,
             updates_prev: None,
         })
-    }
-
-    #[inline]
-    pub(crate) fn local_executor(&mut self) -> &mut B::LocalExecutor {
-        self.state.local_executor()
     }
 
     #[doc(hidden)]

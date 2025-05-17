@@ -2,14 +2,7 @@ use core::marker::PhantomData;
 
 use abs_path::AbsPath;
 
-use crate::backend::{
-    AgentId,
-    Backend,
-    BackgroundExecutor,
-    Buffer,
-    TaskBackground,
-    TaskLocal,
-};
+use crate::backend::{AgentId, Backend};
 use crate::notify::{Namespace, NotificationId};
 use crate::plugin::PluginId;
 use crate::state::StateHandle;
@@ -24,12 +17,6 @@ pub struct AsyncCtx<'a, B: Backend> {
 }
 
 impl<B: Backend> AsyncCtx<'_, B> {
-    /// TODO: docs.
-    #[inline]
-    pub fn background_executor(&self) -> B::BackgroundExecutor {
-        self.state.with_mut(|mut state| state.background_executor().clone())
-    }
-
     /// TODO: docs.
     #[inline]
     pub async fn create_and_focus(
@@ -81,36 +68,6 @@ impl<B: Backend> AsyncCtx<'_, B> {
     #[inline]
     pub fn new_agent_id(&self) -> AgentId {
         self.with_ctx(|ctx| ctx.new_agent_id())
-    }
-
-    /// TODO: docs.
-    #[must_use = "task handles do nothing unless awaited or detached"]
-    #[inline]
-    pub fn spawn_background<Fut>(
-        &self,
-        fut: Fut,
-    ) -> TaskBackground<Fut::Output, B>
-    where
-        Fut: Future + Send + 'static,
-        Fut::Output: Send + 'static,
-    {
-        let task = self
-            .state
-            .with_mut(|mut state| state.background_executor().spawn(fut));
-        TaskBackground::new(task)
-    }
-
-    /// TODO: docs.
-    #[must_use = "task handles do nothing unless awaited or detached"]
-    #[inline]
-    pub fn spawn_local<Out>(
-        &self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
-    ) -> TaskLocal<Option<Out>, B>
-    where
-        Out: 'static,
-    {
-        self.with_ctx(move |ctx| ctx.spawn_local(fun))
     }
 
     /// TODO: docs.
