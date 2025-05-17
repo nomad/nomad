@@ -1,7 +1,7 @@
 use core::pin::Pin;
 use core::task::{Context, Poll, ready};
 
-use ed::backend::{BackgroundExecutor, Task};
+use ed::executor::Task;
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -30,8 +30,9 @@ impl ThreadPool {
         }
     }
 
+    /// TODO: docs.
     #[inline]
-    fn spawn_inner<Fut>(&self, future: Fut) -> ThreadPoolTask<Fut::Output>
+    pub fn spawn<Fut>(&self, future: Fut) -> ThreadPoolTask<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
@@ -56,19 +57,6 @@ impl Default for ThreadPool {
     #[inline]
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl BackgroundExecutor for ThreadPool {
-    type Task<T> = ThreadPoolTask<T>;
-
-    #[inline]
-    fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
-    where
-        Fut: Future + Send + 'static,
-        Fut::Output: Send + 'static,
-    {
-        self.spawn_inner(future)
     }
 }
 
