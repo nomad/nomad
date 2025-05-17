@@ -4,8 +4,7 @@ use ed::fs::os::OsFs;
 use ed::fs::{self, AbsPath, Fs};
 use ed::notify::Namespace;
 use ed::plugin::Plugin;
-use ed::{AsyncCtx, Shared};
-use thread_pool::ThreadPool;
+use ed::{BorrowState, Context, Shared};
 
 use crate::buffer::{BufferId, NeovimBuffer, Point};
 use crate::cursor::NeovimCursor;
@@ -17,8 +16,7 @@ use crate::{api, executor, notify, oxi, serde, value};
 pub struct Neovim {
     emitter: notify::NeovimEmitter,
     events: Shared<Events>,
-    local_executor: executor::NeovimLocalExecutor,
-    background_executor: ThreadPool,
+    executor: executor::NeovimExecutor,
 }
 
 /// TODO: docs.
@@ -33,9 +31,8 @@ impl Neovim {
     pub fn init(augroup_name: &str) -> Self {
         Self {
             events: Shared::new(Events::new(augroup_name)),
-            emitter: notify::NeovimEmitter::default(),
-            local_executor: executor::NeovimLocalExecutor::init(),
-            background_executor: ThreadPool::new(),
+            emitter: Default::default(),
+            executor: Default::default(),
         }
     }
 
@@ -55,9 +52,8 @@ impl Backend for Neovim {
     type Cursor<'a> = NeovimCursor<'a>;
     type CursorId = BufferId;
     type Fs = fs::os::OsFs;
-    type LocalExecutor = executor::NeovimLocalExecutor;
-    type BackgroundExecutor = ThreadPool;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
+    type Executor = executor::NeovimExecutor;
     type EventHandle = EventHandle;
     type Selection<'a> = NeovimSelection<'a>;
     type SelectionId = BufferId;
@@ -97,7 +93,7 @@ impl Backend for Neovim {
     async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         <Self as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
@@ -114,13 +110,8 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn local_executor(&mut self) -> &mut Self::LocalExecutor {
-        &mut self.local_executor
-    }
-
-    #[inline]
-    fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
-        &mut self.background_executor
+    fn executor(&mut self) -> &mut Self::Executor {
+        &mut self.executor
     }
 
     #[inline]
@@ -194,13 +185,13 @@ impl Backend for Neovim {
 
 impl BaseBackend for Neovim {
     #[inline]
-    async fn create_buffer<B: Backend + AsMut<Self>>(
+    async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<impl AsMut<Self> + Backend, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = ctx
-            .with_backend(|b| b.as_mut().fs())
+            .with_editor(|ed| ed.as_mut().fs())
             .read_to_string(file_path)
             .await
             .map_err(|inner| CreateBufferError { inner })?;
@@ -209,8 +200,8 @@ impl BaseBackend for Neovim {
             .expect("couldn't create buf")
             .into();
 
-        ctx.with_backend(|backend| {
-            let this = backend.as_mut();
+        ctx.with_editor(|ed| {
+            let this = ed.as_mut();
 
             this.events.with_mut(|events| {
                 let ids = &mut events.agent_ids.created_buffer;

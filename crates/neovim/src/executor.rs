@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -5,15 +7,28 @@ use std::rc::Rc;
 
 use async_task::Builder;
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use ed::backend::{LocalExecutor, Task};
+use ed::executor::{Executor, LocalSpawner, Runner, Task};
+use thread_pool::ThreadPool;
 
 use crate::oxi;
 
 type Runnable = async_task::Runnable<()>;
 
 /// TODO: docs.
+#[derive(Default)]
+pub struct NeovimExecutor {
+    runner: NeovimRunner,
+    local_spawner: NeovimLocalSpawner,
+    background_spawner: ThreadPool,
+}
+
+/// TODO: docs.
+#[derive(Default, Copy, Clone)]
+pub struct NeovimRunner;
+
+/// TODO: docs.
 #[derive(Clone)]
-pub struct NeovimLocalExecutor {
+pub struct NeovimLocalSpawner {
     /// TODO: docs
     async_handle: oxi::libuv::AsyncHandle,
 
@@ -34,10 +49,9 @@ struct RunnableQueue {
     inner: ConcurrentQueue<Runnable>,
 }
 
-impl NeovimLocalExecutor {
-    /// TODO: docs
+impl NeovimLocalSpawner {
     #[inline]
-    pub fn init() -> Self {
+    fn init() -> Self {
         let runnable_queue = Rc::new(RunnableQueue::new());
 
         // This callback will be registered to be executed on the next tick of
@@ -96,15 +110,45 @@ impl RunnableQueue {
     }
 }
 
-impl LocalExecutor for NeovimLocalExecutor {
-    type Task<T> = NeovimLocalTask<T>;
+impl Executor for NeovimExecutor {
+    type Runner = NeovimRunner;
+    type LocalSpawner = NeovimLocalSpawner;
+    type BackgroundSpawner = ThreadPool;
 
+    #[inline]
+    fn runner(&mut self) -> &mut Self::Runner {
+        &mut self.runner
+    }
+
+    #[inline]
+    fn local_spawner(&mut self) -> &mut Self::LocalSpawner {
+        &mut self.local_spawner
+    }
+
+    #[inline]
+    fn background_spawner(&mut self) -> &mut Self::BackgroundSpawner {
+        &mut self.background_spawner
+    }
+}
+
+impl Runner for NeovimRunner {
     #[inline]
     async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
         // Scheduling a task also notifies the libuv event loop, so we don't
         // have to do anything else here.
         future.await
     }
+}
+
+impl Default for NeovimLocalSpawner {
+    #[inline]
+    fn default() -> Self {
+        Self::init()
+    }
+}
+
+impl LocalSpawner for NeovimLocalSpawner {
+    type Task<T> = NeovimLocalTask<T>;
 
     #[inline]
     fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>

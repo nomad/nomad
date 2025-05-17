@@ -29,7 +29,7 @@ mod read_neovim {
     pub(super) fn from_mock_fs(group: &mut BenchmarkGroup<'_, WallTime>) {
         CollabMock::new(
             Mock::<MockFs>::default()
-                .with_background_spawner(ThreadPool::new()),
+                .with_background_spawner(ThreadPool::default()),
         )
         .with_ctx(|ctx| {
             // Replicate the Neovim repo into the root of the mock filesystem.
@@ -44,7 +44,7 @@ mod read_neovim {
     pub(super) fn from_real_fs(group: &mut BenchmarkGroup<'_, WallTime>) {
         CollabMock::new(
             Mock::<OsFs>::default()
-                .with_background_spawner(ThreadPool::new()),
+                .with_background_spawner(ThreadPool::default()),
         )
         .with_project_filter(|project_root| {
             GitIgnore::new(project_root.path().to_owned())

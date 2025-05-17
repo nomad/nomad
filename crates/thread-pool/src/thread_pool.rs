@@ -19,17 +19,6 @@ pin_project_lite::pin_project! {
 }
 
 impl ThreadPool {
-    /// TODO: docs.
-    #[track_caller]
-    #[inline]
-    pub fn new() -> Self {
-        Self {
-            inner: futures_executor::ThreadPool::builder()
-                .create()
-                .expect("couldn't create thread pool"),
-        }
-    }
-
     #[inline]
     fn spawn_inner<Fut>(&self, future: Fut) -> ThreadPoolTask<Fut::Output>
     where
@@ -53,9 +42,14 @@ impl<T> ThreadPoolTask<T> {
 }
 
 impl Default for ThreadPool {
+    #[track_caller]
     #[inline]
     fn default() -> Self {
-        Self::new()
+        Self {
+            inner: futures_executor::ThreadPool::builder()
+                .create()
+                .expect("couldn't create thread pool"),
+        }
     }
 }
 
