@@ -9,10 +9,11 @@ use std::panic;
 use fxhash::FxHashMap;
 
 use crate::backend::{AgentId, Backend};
+use crate::context::BorrowedInner;
 use crate::module::{Module, ModuleId};
 use crate::notify::{Name, Namespace};
 use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
-use crate::{Borrowed, Context, EditorCtx, Shared};
+use crate::{Borrowed, Context, Shared};
 
 /// TODO: docs.
 #[doc(hidden)]
@@ -167,11 +168,23 @@ impl<B: Backend> StateMut<'_, B> {
     #[inline]
     pub(crate) fn with_ctx<R>(
         &mut self,
-        _namespace: &Namespace,
-        _plugin_id: PluginId,
-        _fun: impl FnOnce(&mut EditorCtx<B>) -> R,
+        namespace: &Namespace,
+        plugin_id: PluginId,
+        fun: impl FnOnce(&mut Context<B, Borrowed<'_>>) -> R,
     ) -> Option<R> {
-        todo!();
+        let mut ctx = Context::new(BorrowedInner {
+            namespace,
+            plugin_id,
+            state_handle: &self.handle.inner,
+            state: self.state,
+        });
+        match panic::catch_unwind(panic::AssertUnwindSafe(|| fun(&mut ctx))) {
+            Ok(ret) => Some(ret),
+            Err(payload) => {
+                State::handle_panic(payload, &mut ctx);
+                None
+            },
+        }
     }
 }
 
@@ -275,7 +288,11 @@ impl<Ed: Backend> Module<Ed> for ResumeUnwinding {
     fn api(&self, _: &mut crate::module::ApiCtx<Ed>) {
         unreachable!()
     }
-    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<Ed>) {
+    fn on_new_config(
+        &self,
+        _: Self::Config,
+        _: &mut Context<Ed, Borrowed<'_>>,
+    ) {
         unreachable!()
     }
 }

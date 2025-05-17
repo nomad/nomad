@@ -19,8 +19,7 @@ use crate::backend::{
 use crate::executor::Executor;
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
-use crate::state::StateHandle;
-use crate::{BorrowState, Context, EditorCtx, fs};
+use crate::{BorrowState, Context, fs};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
@@ -229,14 +228,7 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     #[inline]
-    fn with_ctx<R>(self, fun: impl FnOnce(&mut EditorCtx<Self>) -> R) -> R {
-        StateHandle::new(self).with_mut(|mut s| {
-            s.with_ctx(
-                &notify::Namespace::default(),
-                <crate::state::ResumeUnwinding as Plugin<Self>>::id(),
-                fun,
-            )
-            .expect("panics are resumed")
-        })
+    fn with_ctx<R>(self, fun: impl FnOnce(&mut Context<Self>) -> R) -> R {
+        fun(&mut Context::from_editor(self))
     }
 }

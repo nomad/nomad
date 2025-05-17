@@ -1,4 +1,3 @@
-use crate::EditorCtx;
 use crate::backend::{Api, ApiValue, Backend, Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder, CommandCompletionsBuilder};
 use crate::module::{Constant, Function, Module};
@@ -6,6 +5,7 @@ use crate::notify::{self, Error, MaybeResult, Name, Namespace};
 use crate::plugin::{self, Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
+use crate::{Borrowed, Context};
 
 /// TODO: docs.
 pub(crate) fn build_api<P, B>(plugin: P, mut state: StateMut<B>) -> B::Api
@@ -62,7 +62,7 @@ pub struct ApiCtx<'a, B: Backend> {
 type ConfigHandler<B> = Box<
     dyn FnMut(
         ApiValue<B>,
-        &mut EditorCtx<B>,
+        &mut Context<B, Borrowed<'_>>,
     ) -> Result<(), <B as Backend>::DeserializeError>,
 >;
 
@@ -273,7 +273,7 @@ impl<B: Backend> ConfigBuilder<B> {
         if let Some(Err(err)) = state.with_ctx(
             config_path,
             <P as Plugin<_>>::id(),
-            |ctx: &mut EditorCtx<B>| (self.handler)(config, ctx),
+            |ctx: &mut Context<B, Borrowed<'_>>| (self.handler)(config, ctx),
         ) {
             state.emit_deserialize_error_in_config::<P>(
                 config_path,
@@ -287,12 +287,11 @@ impl<B: Backend> ConfigBuilder<B> {
     fn new<M: Module<B>>(module: &'static M) -> Self {
         Self {
             handler: Box::new(|config, ctx| {
-                ctx.backend_mut()
-                    .deserialize::<M::Config>(config)
-                    .into_result()
-                    .map(|config| {
+                ctx.deserialize::<M::Config>(config).into_result().map(
+                    |config| {
                         module.on_new_config(config, ctx);
-                    })
+                    },
+                )
             }),
             module_name: M::NAME,
             is_config_unit: M::Config::is_unit(),

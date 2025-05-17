@@ -13,9 +13,10 @@ use crate::notify::{self, MaybeResult, Name, Namespace};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
-use crate::{ByteOffset, EditorCtx};
+use crate::{Borrowed, ByteOffset, Context};
 
-type CommandHandler<B> = Box<dyn FnMut(CommandArgs, &mut EditorCtx<B>)>;
+type CommandHandler<B> =
+    Box<dyn FnMut(CommandArgs, &mut Context<B, Borrowed<'_>>)>;
 
 type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;

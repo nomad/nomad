@@ -73,10 +73,10 @@ pub struct NotBorrowedInner<Ed: Backend> {
 /// TODO: docs.
 #[doc(hidden)]
 pub struct BorrowedInner<'a, Ed: Backend> {
-    namespace: &'a Namespace,
-    plugin_id: PluginId,
-    state_handle: &'a Shared<State<Ed>>,
-    state: &'a mut State<Ed>,
+    pub(crate) namespace: &'a Namespace,
+    pub(crate) plugin_id: PluginId,
+    pub(crate) state_handle: &'a Shared<State<Ed>>,
+    pub(crate) state: &'a mut State<Ed>,
 }
 
 impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
@@ -228,6 +228,11 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     }
 
     #[inline]
+    pub(crate) fn new(borrow: B::Borrow<Ed>) -> Self {
+        Self { borrow }
+    }
+
+    #[inline]
     pub(crate) fn plugin_id(&self) -> PluginId {
         self.borrow.plugin_id()
     }
@@ -258,13 +263,11 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
     ) -> LocalTask<T, Ed> {
-        let mut ctx = Context {
-            borrow: NotBorrowedInner {
-                namespace: self.namespace().clone(),
-                plugin_id: self.plugin_id(),
-                state_handle: self.borrow.state_handle(),
-            },
-        };
+        let mut ctx = Context::new(NotBorrowedInner {
+            namespace: self.namespace().clone(),
+            plugin_id: self.plugin_id(),
+            state_handle: self.borrow.state_handle(),
+        });
         LocalTask::new(self.with_editor(move |ed| {
             ed.executor()
                 .local_spawner()
@@ -368,14 +371,12 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
         fun: impl FnOnce(&mut Context<Ed, Borrowed<'_>>) -> T,
     ) -> T {
         self.borrow.state_handle.with_mut(|state| {
-            let mut ctx = Context {
-                borrow: BorrowedInner {
-                    namespace: self.namespace(),
-                    plugin_id: self.plugin_id(),
-                    state_handle: &self.borrow.state_handle,
-                    state,
-                },
-            };
+            let mut ctx = Context::new(BorrowedInner {
+                namespace: self.namespace(),
+                plugin_id: self.plugin_id(),
+                state_handle: &self.borrow.state_handle,
+                state,
+            });
             fun(&mut ctx)
         })
     }
@@ -383,13 +384,11 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     /// TODO: docs.
     #[inline]
     pub(crate) fn from_editor(editor: Ed) -> Self {
-        Self {
-            borrow: NotBorrowedInner {
-                namespace: Namespace::default(),
-                plugin_id: <crate::state::ResumeUnwinding as Plugin<Ed>>::id(),
-                state_handle: Shared::new(State::new(editor)),
-            },
-        }
+        Self::new(NotBorrowedInner {
+            namespace: Namespace::default(),
+            plugin_id: <crate::state::ResumeUnwinding as Plugin<Ed>>::id(),
+            state_handle: Shared::new(State::new(editor)),
+        })
     }
 }
 

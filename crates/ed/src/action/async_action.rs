@@ -1,7 +1,7 @@
 use crate::action::Action;
 use crate::backend::Backend;
 use crate::notify::{MaybeResult, Name};
-use crate::{AsyncCtx, EditorCtx};
+use crate::{Borrowed, Context};
 
 /// TODO: docs.
 pub trait AsyncAction<B: Backend>: 'static {
@@ -15,7 +15,7 @@ pub trait AsyncAction<B: Backend>: 'static {
     fn call<'this>(
         &'this mut self,
         args: Self::Args,
-        ctx: &mut AsyncCtx<B>,
+        ctx: &mut Context<B>,
     ) -> impl Future<Output = impl MaybeResult<()> + 'this>;
 }
 
@@ -33,15 +33,13 @@ where
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         args: Self::Args<'_>,
-        ctx: &mut EditorCtx<B>,
+        ctx: &mut Context<B, Borrowed<'_>>,
     ) {
-        // let mut this = self.clone();
-        // ctx.spawn_local(async move |ctx| {
-        //     if let Err(err) = this.call(args, ctx).await.into_result() {
-        //         ctx.emit_err(err);
-        //     }
-        // })
-        // .detach();
-        todo!();
+        let mut this = self.clone();
+        ctx.spawn_and_detach(async move |ctx| {
+            if let Err(err) = this.call(args, ctx).await.into_result() {
+                ctx.emit_err(err);
+            }
+        });
     }
 }

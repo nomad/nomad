@@ -4,7 +4,7 @@ use crate::action::Action;
 use crate::backend::Backend;
 use crate::command::CommandArgs;
 use crate::notify::{self, MaybeResult, Name};
-use crate::{ByteOffset, EditorCtx};
+use crate::{Borrowed, ByteOffset, Context};
 
 /// TODO: docs.
 pub trait Command<B: Backend>: 'static {
@@ -18,7 +18,7 @@ pub trait Command<B: Backend>: 'static {
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut EditorCtx<B>,
+        ctx: &mut Context<B, Borrowed<'_>>,
     ) -> impl MaybeResult<()> + use<'this, 'args, Self, B>;
 
     /// TODO: docs.
@@ -91,7 +91,7 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut EditorCtx<B>,
+        ctx: &mut Context<B, Borrowed<'_>>,
     ) -> impl MaybeResult<()> + use<'this, 'args, A, B> {
         A::call(self, args, ctx)
     }

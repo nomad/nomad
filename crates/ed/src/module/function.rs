@@ -1,10 +1,10 @@
 use serde::de::Deserialize;
 use serde::ser::Serialize;
 
-use crate::EditorCtx;
 use crate::action::Action;
 use crate::backend::Backend;
 use crate::notify::{MaybeResult, Name};
+use crate::{Borrowed, Context};
 
 /// TODO: docs.
 pub trait Function<B: Backend>: 'static {
@@ -21,7 +21,7 @@ pub trait Function<B: Backend>: 'static {
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut EditorCtx<B>,
+        ctx: &mut Context<B, Borrowed<'_>>,
     ) -> impl MaybeResult<Self::Return> + use<'this, 'args, Self, B>;
 }
 
@@ -41,7 +41,7 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: A::Args<'args>,
-        ctx: &mut EditorCtx<B>,
+        ctx: &mut Context<B, Borrowed<'_>>,
     ) -> impl MaybeResult<Self::Return> + use<'this, 'args, A, B> {
         A::call(self, args, ctx)
     }
