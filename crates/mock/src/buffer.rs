@@ -81,6 +81,30 @@ impl<'a> Buffer<'a> {
             .then_some(Selection { buffer: self, selection_id })
     }
 
+    fn create_cursor(
+        &mut self,
+        byte_offset: ByteOffset,
+        agent_id: AgentId,
+    ) -> Cursor<'_> {
+        let id_in_buffer =
+            self.cursors.insert(CursorInner { offset: byte_offset });
+
+        self.for_each_cursor(|cursor| {
+            cursor.buffer.callbacks.with_mut(|callbacks| {
+                for cb_kind in callbacks.values_mut() {
+                    if let CallbackKind::CursorCreated(fun) = cb_kind {
+                        fun(&cursor, agent_id);
+                    }
+                }
+            });
+        });
+
+        Cursor {
+            cursor_id: CursorId { buffer_id: self.id(), id_in_buffer },
+            buffer: self.reborrow(),
+        }
+    }
+
     fn reborrow(&mut self) -> Buffer<'_> {
         Buffer {
             inner: self.inner,
@@ -231,6 +255,10 @@ impl backend::Buffer for Buffer<'_> {
 
     fn focus(&mut self, agent_id: AgentId) {
         *self.current_buffer = Some(self.id);
+
+        if self.cursors.is_empty() {
+            self.create_cursor(0usize.into(), agent_id);
+        }
     }
 
     fn for_each_cursor<Fun>(&mut self, mut fun: Fun)
