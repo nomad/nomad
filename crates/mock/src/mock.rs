@@ -1,16 +1,9 @@
 use abs_path::AbsPath;
-use ed::backend::{
-    AgentId,
-    ApiValue,
-    Backend,
-    BackgroundExecutor,
-    BaseBackend,
-    Edit,
-    LocalExecutor,
-};
+use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, Edit};
+use ed::executor::BackgroundSpawner;
 use ed::notify::{self, MaybeResult};
 use ed::shared::Shared;
-use ed::{AsyncCtx, fs};
+use ed::{BorrowState, Context, fs};
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use slotmap::{DefaultKey, SlotMap};
@@ -26,19 +19,18 @@ use crate::buffer::{
     SelectionId,
 };
 use crate::emitter::Emitter;
-use crate::executor::Executor;
+use crate::executor::{Executor, Spawner};
 use crate::fs::MockFs;
 use crate::serde::{DeserializeError, SerializeError};
 
 /// TODO: docs.
-pub struct Mock<Fs = MockFs, LocalEx = Executor, BackgroundEx = Executor> {
-    background_executor: BackgroundEx,
+pub struct Mock<Fs = MockFs, BgSpawner = Spawner> {
     buffers: FxHashMap<BufferId, BufferInner>,
     callbacks: Callbacks,
     current_buffer: Option<BufferId>,
     emitter: Emitter,
+    executor: Executor<BgSpawner>,
     fs: Fs,
-    local_executor: LocalEx,
     next_buffer_id: BufferId,
 }
 
@@ -87,38 +79,34 @@ pub(crate) enum CallbackKind {
 
 impl<Fs> Mock<Fs> {
     pub fn new(fs: Fs) -> Self {
-        let local_executor = Executor::default();
         Self {
-            background_executor: local_executor.clone(),
             buffers: Default::default(),
             callbacks: Default::default(),
             current_buffer: None,
             emitter: Default::default(),
+            executor: Default::default(),
             fs,
-            local_executor,
             next_buffer_id: BufferId(1),
         }
     }
 }
 
-impl<Fs, LocalEx, BackgroundEx> Mock<Fs, LocalEx, BackgroundEx>
+impl<Fs, BgSpawner> Mock<Fs, BgSpawner>
 where
     Fs: fs::Fs,
-    LocalEx: LocalExecutor + 'static,
-    BackgroundEx: BackgroundExecutor,
+    BgSpawner: BackgroundSpawner,
 {
-    pub fn with_background_executor<NewBackgroundEx>(
+    pub fn with_background_spawner<NewBgSpawner>(
         self,
-        background_executor: NewBackgroundEx,
-    ) -> Mock<Fs, LocalEx, NewBackgroundEx> {
+        spawner: NewBgSpawner,
+    ) -> Mock<Fs, NewBgSpawner> {
         Mock {
-            background_executor,
             buffers: self.buffers,
             callbacks: self.callbacks,
             current_buffer: self.current_buffer,
             emitter: self.emitter,
+            executor: self.executor.with_background_spawner(spawner),
             fs: self.fs,
-            local_executor: self.local_executor,
             next_buffer_id: self.next_buffer_id,
         }
     }
@@ -153,11 +141,10 @@ impl Callbacks {
     }
 }
 
-impl<Fs, LocalEx, BackgroundEx> Backend for Mock<Fs, LocalEx, BackgroundEx>
+impl<Fs, BgSpawner> Backend for Mock<Fs, BgSpawner>
 where
     Fs: fs::Fs,
-    LocalEx: LocalExecutor + 'static,
-    BackgroundEx: BackgroundExecutor,
+    BgSpawner: BackgroundSpawner,
 {
     const REINSTATE_PANIC_HOOK: bool = true;
 
@@ -167,8 +154,7 @@ where
     type Cursor<'a> = Cursor<'a>;
     type CursorId = CursorId;
     type EventHandle = EventHandle;
-    type LocalExecutor = LocalEx;
-    type BackgroundExecutor = BackgroundEx;
+    type Executor = Executor<BgSpawner>;
     type Fs = Fs;
     type Emitter<'this> = &'this mut Emitter;
     type Selection<'a> = Selection<'a>;
@@ -190,14 +176,14 @@ where
 
     fn buffer_ids(
         &mut self,
-    ) -> impl Iterator<Item = BufferId> + use<Fs, LocalEx, BackgroundEx> {
+    ) -> impl Iterator<Item = BufferId> + use<Fs, BgSpawner> {
         self.buffers.keys().copied().collect::<Vec<_>>().into_iter()
     }
 
     async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         <Self as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
     }
@@ -222,12 +208,8 @@ where
         &mut self.emitter
     }
 
-    fn local_executor(&mut self) -> &mut Self::LocalExecutor {
-        &mut self.local_executor
-    }
-
-    fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
-        &mut self.background_executor
+    fn executor(&mut self) -> &mut Self::Executor {
+        &mut self.executor
     }
 
     fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
@@ -282,25 +264,24 @@ where
     }
 }
 
-impl<Fs, LocalEx, BackgroundEx> BaseBackend for Mock<Fs, LocalEx, BackgroundEx>
+impl<Fs, BgSpawner> BaseBackend for Mock<Fs, BgSpawner>
 where
     Fs: fs::Fs,
-    LocalEx: LocalExecutor + 'static,
-    BackgroundEx: BackgroundExecutor,
+    BgSpawner: BackgroundSpawner,
 {
-    async fn create_buffer<B: Backend + AsMut<Self>>(
+    async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<impl AsMut<Self> + Backend, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = ctx
-            .with_backend(|b| b.as_mut().fs())
+            .with_editor(|ed| ed.as_mut().fs())
             .read_to_string(file_path)
             .await
             .map_err(|inner| CreateBufferError { inner })?;
 
-        ctx.with_backend(|backend| {
-            let this = backend.as_mut();
+        ctx.with_editor(|ed| {
+            let this = ed.as_mut();
 
             let buffer_id = this.next_buffer_id.post_inc();
 
@@ -330,9 +311,7 @@ impl<Fs: Default> Default for Mock<Fs> {
     }
 }
 
-impl<Fs, LocalEx, BackgroundEx> AsMut<Self>
-    for Mock<Fs, LocalEx, BackgroundEx>
-{
+impl<Fs, BgSpawner> AsMut<Self> for Mock<Fs, BgSpawner> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }

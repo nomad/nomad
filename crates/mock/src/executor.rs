@@ -1,13 +1,15 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use std::rc::Rc;
 
 use async_task::Runnable;
-use ed::backend::{self, BackgroundExecutor, LocalExecutor};
+use ed::executor::{self, BackgroundSpawner, LocalSpawner};
 use futures_lite::future::{self, FutureExt};
 
-pub struct Executor {
-    runner: Option<Runner>,
-    spawner: Spawner,
+pub struct Executor<BackgroundSpawner = Spawner> {
+    runner: Runner,
+    local_spawner: Spawner,
+    background_spawner: BackgroundSpawner,
 }
 
 pin_project_lite::pin_project! {
@@ -17,27 +19,31 @@ pin_project_lite::pin_project! {
     }
 }
 
-pub(crate) struct Runner {
-    runnable_rx: flume::Receiver<Runnable>,
+#[derive(Clone)]
+pub struct Runner {
+    runnable_rx: Rc<flume::Receiver<Runnable>>,
 }
 
 #[derive(Clone)]
-pub(crate) struct Spawner {
+pub struct Spawner {
     runnable_tx: flume::Sender<Runnable>,
 }
 
-impl Executor {
-    pub(crate) fn runner(&self) -> &Runner {
-        self.runner.as_ref().expect("runner has not been taken")
-    }
-
-    pub(crate) fn take_runner(&mut self) -> Runner {
-        self.runner.take().expect("runner has not been taken")
+impl<BgSpawner> Executor<BgSpawner> {
+    pub(crate) fn with_background_spawner<NewBgSpawner>(
+        self,
+        spawner: NewBgSpawner,
+    ) -> Executor<NewBgSpawner> {
+        Executor {
+            runner: self.runner,
+            local_spawner: self.local_spawner,
+            background_spawner: spawner,
+        }
     }
 }
 
 impl Runner {
-    pub(crate) async fn run<Fut: Future>(
+    pub(crate) async fn run_inner<Fut: Future>(
         &self,
         future: Fut,
         run_all: bool,
@@ -90,37 +96,64 @@ impl Spawner {
     }
 }
 
-impl LocalExecutor for Executor {
-    type Task<T> = Task<T>;
-
-    async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
-        self.runner().run(future, false).await
+impl Default for Executor {
+    fn default() -> Self {
+        let (runnable_tx, runnable_rx) = flume::unbounded();
+        let runner = Runner { runnable_rx: Rc::new(runnable_rx) };
+        let spawner = Spawner { runnable_tx };
+        Self {
+            runner,
+            local_spawner: spawner.clone(),
+            background_spawner: spawner,
+        }
     }
+}
+
+impl<BgSpawner: BackgroundSpawner> executor::Executor for Executor<BgSpawner> {
+    type Runner = Runner;
+    type LocalSpawner = Spawner;
+    type BackgroundSpawner = BgSpawner;
+
+    fn runner(&mut self) -> &mut Self::Runner {
+        &mut self.runner
+    }
+
+    fn local_spawner(&mut self) -> &mut Self::LocalSpawner {
+        &mut self.local_spawner
+    }
+
+    fn background_spawner(&mut self) -> &mut Self::BackgroundSpawner {
+        &mut self.background_spawner
+    }
+}
+
+impl executor::Runner for Runner {
+    async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
+        self.run_inner(future, false).await
+    }
+}
+
+impl LocalSpawner for Spawner {
+    type Task<T> = Task<T>;
 
     fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        self.spawner.spawn_local(fut)
+        self.spawn_local(fut)
     }
 }
 
-impl BackgroundExecutor for Executor {
-    type Task<T> = Task<T>;
+impl BackgroundSpawner for Spawner {
+    type Task<T: Send + 'static> = Task<T>;
 
     fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        self.spawner.spawn_background(fut)
-    }
-}
-
-impl Clone for Executor {
-    fn clone(&self) -> Self {
-        Self { runner: None, spawner: self.spawner.clone() }
+        self.spawn_background(fut)
     }
 }
 
@@ -136,16 +169,6 @@ impl AsMut<Self> for Executor {
     }
 }
 
-impl Default for Executor {
-    fn default() -> Self {
-        let (runnable_tx, runnable_rx) = flume::unbounded();
-        Self {
-            runner: Some(Runner { runnable_rx }),
-            spawner: Spawner { runnable_tx },
-        }
-    }
-}
-
 impl<T> Future for Task<T> {
     type Output = T;
 
@@ -157,7 +180,7 @@ impl<T> Future for Task<T> {
     }
 }
 
-impl<T> backend::Task<T> for Task<T> {
+impl<T> executor::Task<T> for Task<T> {
     fn detach(self) {
         self.inner.detach();
     }

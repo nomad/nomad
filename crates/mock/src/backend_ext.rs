@@ -1,31 +1,28 @@
 use core::mem;
 
-use ed::AsyncCtx;
-use ed::backend::Backend;
+use ed::executor::Executor;
+use ed::{Backend, Context};
 use futures_lite::future;
 
-use crate::executor::Executor;
-
 /// A [`Backend`] extension trait used to run async closures with an
-/// `AsyncCtx<Self>`.
-pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
+/// `Context<Self>`.
+pub trait BackendExt:
+    Backend<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
+{
     /// Same as [`run`](BackendExt::run), but it blocks the current thread
     /// until the future returned by it completes.
     #[inline]
-    fn block_on<R>(
-        self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R,
-    ) -> R {
+    fn block_on<T>(self, fun: impl AsyncFnOnce(&mut Context<Self>) -> T) -> T {
         self.block_on_inner(fun, false)
     }
 
     /// Same as [`run_all`](BackendExt::run_all), but it blocks the
     /// current thread until the future returned by it completes.
     #[inline]
-    fn block_on_all<R>(
+    fn block_on_all<T>(
         self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R,
-    ) -> R {
+        fun: impl AsyncFnOnce(&mut Context<Self>) -> T,
+    ) -> T {
         self.block_on_inner(fun, true)
     }
 
@@ -62,10 +59,10 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
     /// # });
     /// ```
     #[inline]
-    fn run<R: 'static>(
+    fn run<T: 'static>(
         self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R + 'static,
-    ) -> impl Future<Output = R> {
+        fun: impl AsyncFnOnce(&mut Context<Self>) -> T + 'static,
+    ) -> impl Future<Output = T> {
         self.run_inner(fun, false)
     }
 
@@ -100,21 +97,21 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
     /// # });
     /// ```
     #[inline]
-    fn run_all<R: 'static>(
+    fn run_all<T: 'static>(
         self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R + 'static,
-    ) -> impl Future<Output = R> {
+        fun: impl AsyncFnOnce(&mut Context<Self>) -> T + 'static,
+    ) -> impl Future<Output = T> {
         self.run_inner(fun, true)
     }
 
     #[inline]
     #[doc(hidden)]
-    fn block_on_inner<R>(
+    fn block_on_inner<T>(
         self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R,
+        fun: impl AsyncFnOnce(&mut Context<Self>) -> T,
         block_on_all: bool,
-    ) -> R {
-        let fun = async move |ctx: &mut AsyncCtx<Self>| {
+    ) -> T {
+        let fun = async move |ctx: &mut Context<Self>| {
             Box::into_raw(Box::new(fun(ctx).await)) as *mut ()
         };
 
@@ -127,29 +124,30 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
 
         // SAFETY: the function is only called once and the pointer was created
         // by a call to `Box::into_raw`.
-        *unsafe { Box::from_raw(out as *mut R) }
+        *unsafe { Box::from_raw(out as *mut T) }
     }
 
     #[inline]
     #[doc(hidden)]
-    fn run_inner<R: 'static>(
+    fn run_inner<T: 'static>(
         self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R + 'static,
+        fun: impl AsyncFnOnce(&mut Context<Self>) -> T + 'static,
         run_all: bool,
-    ) -> impl Future<Output = R> {
+    ) -> impl Future<Output = T> {
         let (runner, task) = Backend::with_ctx(self, move |ctx| {
             let task = ctx.spawn_local_unprotected(fun);
-            let ex = ctx.backend_mut().local_executor().as_mut();
-            (ex.take_runner(), task)
+            let runner =
+                ctx.with_editor(|ed| ed.executor().runner().as_mut().clone());
+            (runner, task)
         });
 
-        async move { runner.run(task, run_all).await }
+        async move { runner.run_inner(task, run_all).await }
     }
 }
 
 unsafe fn extend_lifetime<B: Backend, T: 'static>(
-    fun: impl for<'a, 'b> AsyncFnOnce(&'a mut AsyncCtx<'b, B>) -> T,
-) -> impl for<'a, 'b> AsyncFnOnce(&'a mut AsyncCtx<'b, B>) -> T + 'static {
+    fun: impl for<'a> AsyncFnOnce(&'a mut Context<B>) -> T,
+) -> impl for<'a> AsyncFnOnce(&'a mut Context<B>) -> T + 'static {
     use core::marker::PhantomData;
     use core::pin::Pin;
 
@@ -198,9 +196,9 @@ unsafe fn extend_lifetime<B: Backend, T: 'static>(
 
     let boxed = Boxed(
         async move |args: *mut ()| {
-            // SAFETY: the pointer points to an `AsyncCtx<T>`, we just cast it
+            // SAFETY: the pointer points to a Context<T>, we just cast it
             // to `*mut ()` to type-erase the async closure's input.
-            let args = unsafe { &mut *(args as *mut AsyncCtx<B>) };
+            let args = unsafe { &mut *(args as *mut Context<B>) };
             fun(args).await
         },
         PhantomData,
@@ -214,9 +212,12 @@ unsafe fn extend_lifetime<B: Backend, T: 'static>(
         >(TypeErased(Box::new(boxed)))
     };
 
-    async move |args: &mut AsyncCtx<B>| {
-        erased(args as *mut AsyncCtx<B> as *mut ()).await
+    async move |args: &mut Context<B>| {
+        erased(args as *mut Context<B> as *mut ()).await
     }
 }
 
-impl<B: Backend> BackendExt for B where B::LocalExecutor: AsMut<Executor> {}
+impl<B> BackendExt for B where
+    B: Backend<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
+{
+}
