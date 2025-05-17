@@ -52,15 +52,15 @@ pub(crate) fn on_cursor_created_2<Ed: Backend>(
 
     // /bar.txt is currently focused, so focusing it again shouldn't do
     // anything.
-    ctx.buffer(bar_id.clone()).unwrap().focus();
+    ctx.buffer(bar_id.clone()).unwrap().focus(agent_id);
     assert_eq!(num_created.copied(), 0);
 
     // Now focus /foo.txt, which should create a cursor.
-    ctx.buffer(foo_id).unwrap().focus();
+    ctx.buffer(foo_id).unwrap().focus(agent_id);
     assert_eq!(num_created.copied(), 1);
 
     // Now focus /bar.txt again, which should create a cursor.
-    ctx.buffer(bar_id).unwrap().focus();
+    ctx.buffer(bar_id).unwrap().focus(agent_id);
     assert_eq!(num_created.copied(), 2);
 }
 

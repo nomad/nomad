@@ -96,7 +96,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
         let buffer_id = self.create_buffer(file_path, agent_id).await?;
         self.with_editor(|ed| {
             if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
-                buffer.focus()
+                buffer.focus(agent_id);
             }
         });
         Ok(buffer_id)

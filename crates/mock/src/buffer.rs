@@ -229,7 +229,7 @@ impl backend::Buffer for Buffer<'_> {
         self.id
     }
 
-    fn focus(&mut self) {
+    fn focus(&mut self, agent_id: AgentId) {
         *self.current_buffer = Some(self.id);
     }
 

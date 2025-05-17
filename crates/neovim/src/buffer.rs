@@ -345,7 +345,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn focus(&mut self) {
+    fn focus(&mut self, _agent_id: AgentId) {
         api::Window::current()
             .set_buf(&self.inner())
             .expect("buffer is valid");

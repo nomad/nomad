@@ -25,7 +25,7 @@ pub trait Buffer {
     fn id(&self) -> <Self::Backend as Backend>::BufferId;
 
     /// TODO: docs.
-    fn focus(&mut self);
+    fn focus(&mut self, agent_id: AgentId);
 
     /// TODO: docs.
     fn for_each_cursor<Fun>(&mut self, fun: Fun)
