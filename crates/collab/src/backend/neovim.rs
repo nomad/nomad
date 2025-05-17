@@ -84,7 +84,7 @@ impl CollabBackend for Neovim {
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> bool {
         let prompt = format!(
             "Start collaborating on the project at \"{}\"?",
@@ -112,7 +112,7 @@ impl CollabBackend for Neovim {
 
     async fn connect_to_server(
         server_addr: config::ServerAddress,
-        _: &mut AsyncCtx<'_, Self>,
+        _: &mut Context<Self>,
     ) -> Result<Self::Io, Self::ConnectToServerError> {
         async_net::TcpStream::connect(&*server_addr)
             .await
@@ -121,14 +121,14 @@ impl CollabBackend for Neovim {
 
     async fn copy_session_id(
         session_id: SessionId,
-        _: &mut AsyncCtx<'_, Self>,
+        _: &mut Context<Self>,
     ) -> Result<(), Self::CopySessionIdError> {
         clipboard::set(session_id)
             .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
     }
 
     async fn default_dir_for_remote_projects(
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError> {
         let data_dir = match env::var("XDG_DATA_HOME") {
             Ok(xdg_data_home) => {
@@ -152,7 +152,7 @@ impl CollabBackend for Neovim {
     }
 
     async fn home_dir(
-        _: &mut AsyncCtx<'_, Self>,
+        _: &mut Context<Self>,
     ) -> Result<AbsPathBuf, Self::HomeDirError> {
         match home::home_dir() {
             Some(home_dir) if !home_dir.as_os_str().is_empty() => {
@@ -171,7 +171,7 @@ impl CollabBackend for Neovim {
 
     fn lsp_root(
         buffer_id: BufferId,
-        _: &mut AsyncCtx<'_, Self>,
+        _: &mut Context<Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
         /// Returns the root directory of the first language server
         /// attached to the given buffer, if any.
@@ -202,7 +202,7 @@ impl CollabBackend for Neovim {
 
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
-        _: &mut AsyncCtx<'_, Self>,
+        _: &mut Context<Self>,
     ) -> Self::ProjectFilter {
         walkdir::GitIgnore::new(project_root.path().to_owned())
     }
@@ -210,7 +210,7 @@ impl CollabBackend for Neovim {
     async fn select_session<'pairs>(
         sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
         action: ActionForSelectedSession,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
         let select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
 

@@ -1,7 +1,7 @@
 use std::io;
 
 use collab_server::client::ClientRxError;
-use ed::{AsyncCtx, notify};
+use ed::{Context, notify};
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
 use walkdir::Filter;
@@ -42,7 +42,7 @@ pub(crate) enum SessionError<B: CollabBackend, F: Filter<B::Fs>> {
 impl<B: CollabBackend, F: Filter<B::Fs>> Session<B, F> {
     pub(crate) async fn run(
         self,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), SessionError<B, F>> {
         let Self {
             mut event_stream,

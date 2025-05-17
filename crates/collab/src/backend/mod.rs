@@ -9,7 +9,7 @@ use collab_server::Authenticator;
 use ed::backend::Backend;
 use ed::command::CommandArgs;
 use ed::fs::{self, AbsPath, AbsPathBuf};
-use ed::{AsyncCtx, notify};
+use ed::{Context, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::config;
@@ -51,31 +51,31 @@ pub trait CollabBackend: Backend {
     /// rooted at the given path.
     fn confirm_start(
         project_root: &AbsPath,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<Output = bool>;
 
     /// TODO: docs.
     fn connect_to_server(
         server_addr: config::ServerAddress,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<Self::Io, Self::ConnectToServerError>>;
 
     /// Copies the given [`SessionId`] to the user's clipboard.
     fn copy_session_id(
         session_id: SessionId<Self>,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
 
     /// TODO: docs.
     fn default_dir_for_remote_projects(
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<
         Output = Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError>,
     >;
 
     /// Returns the absolute path to the user's home directory.
     fn home_dir(
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
 
     /// Returns the path to the root of the workspace containing the buffer
@@ -83,13 +83,13 @@ pub trait CollabBackend: Backend {
     /// it.
     fn lsp_root(
         id: Self::BufferId,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
 
     /// TODO: docs.
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> Self::ProjectFilter;
 
     /// Prompts the user to select one of the given `(project_root,
@@ -97,7 +97,7 @@ pub trait CollabBackend: Backend {
     fn select_session<'pairs>(
         sessions: &'pairs [(AbsPathBuf, SessionId<Self>)],
         action: ActionForSelectedSession,
-        ctx: &mut AsyncCtx<'_, Self>,
+        ctx: &mut Context<Self>,
     ) -> impl Future<Output = Option<&'pairs (AbsPathBuf, SessionId<Self>)>>;
 }
 

@@ -17,7 +17,7 @@ use collab_project::fs::{
 };
 use collab_server::message::{Message, Peer, ProjectRequest};
 use collab_server::{SessionIntent, client};
-use ed::AsyncCtx;
+use ed::Context;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, Symlink};
@@ -58,7 +58,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
     async fn call(
         &mut self,
         session_id: Self::Args,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), JoinError<B>> {
         let auth_infos =
             self.auth_infos.cloned().ok_or(JoinError::UserNotLoggedIn)?;
@@ -205,7 +205,7 @@ async fn request_project<B: CollabBackend>(
 async fn write_project<B: CollabBackend>(
     project: &Project,
     root_path: AbsPathBuf,
-    ctx: &mut AsyncCtx<'_, B>,
+    ctx: &mut Context<B>,
 ) -> Result<(EventStream<B>, IdMaps<B>), WriteProjectError<B::Fs>> {
     let fs = ctx.fs();
 

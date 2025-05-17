@@ -14,7 +14,7 @@ use collab_project::fs::{
 use collab_project::{Project, ProjectBuilder};
 use collab_server::message::{Peer, PeerId};
 use collab_server::{SessionIntent, client};
-use ed::AsyncCtx;
+use ed::Context;
 use ed::action::AsyncAction;
 use ed::backend::{Backend, Buffer};
 use ed::command::ToCompletionFn;
@@ -66,12 +66,12 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), StartError<B>> {
         let auth_infos =
             self.auth_infos.cloned().ok_or(StartError::UserNotLoggedIn)?;
 
-        let buffer_id = ctx.with_ctx(|ctx| {
+        let buffer_id = ctx.with_borrowed(|ctx| {
             ctx.current_buffer()
                 .map(|buf| buf.id())
                 .ok_or(StartError::NoBufferFocused)
@@ -167,13 +167,13 @@ impl<B: CollabBackend> ToCompletionFn<B> for Start<B> {
 /// ID.
 async fn search_project_root<B: CollabBackend>(
     buffer_id: B::BufferId,
-    ctx: &mut AsyncCtx<'_, B>,
+    ctx: &mut Context<B>,
 ) -> Result<AbsPathBuf, SearchProjectRootError<B>> {
     if let Some(lsp_res) = B::lsp_root(buffer_id.clone(), ctx).transpose() {
         return lsp_res.map_err(SearchProjectRootError::Lsp);
     }
 
-    let buffer_path = ctx.with_ctx(|ctx| {
+    let buffer_path = ctx.with_borrowed(|ctx| {
         ctx.buffer(buffer_id.clone())
             .map(|buf| buf.path().into_owned())
             .ok_or(SearchProjectRootError::InvalidBufId(buffer_id))
@@ -206,7 +206,7 @@ async fn search_project_root<B: CollabBackend>(
 async fn read_project<B: CollabBackend>(
     root_path: &AbsPath,
     local_id: PeerId,
-    ctx: &mut AsyncCtx<'_, B>,
+    ctx: &mut Context<B>,
 ) -> Result<
     (Project, EventStream<B, ProjectFilter<B>>, IdMaps<B>),
     ReadProjectError<B>,
@@ -683,7 +683,7 @@ pub mod benches {
     #[inline]
     pub async fn read_project<B>(
         project_root: <B::Fs as fs::Fs>::Directory,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), ReadProjectError<B>>
     where
         B: CollabBackend,

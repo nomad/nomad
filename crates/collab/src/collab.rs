@@ -1,7 +1,7 @@
 use auth::AuthInfos;
 use ed::module::{ApiCtx, Module};
 use ed::notify::Name;
-use ed::{EditorCtx, Shared};
+use ed::{Borrowed, Context, Shared};
 
 use crate::backend::{CollabBackend, SessionId};
 use crate::config::Config;
@@ -65,7 +65,11 @@ impl<B: CollabBackend> Module<B> for Collab<B> {
             .with_function(self.yank());
     }
 
-    fn on_new_config(&self, new_config: Self::Config, _: &mut EditorCtx<B>) {
+    fn on_new_config(
+        &self,
+        new_config: Self::Config,
+        _ctx: &mut Context<B, Borrowed>,
+    ) {
         self.config.set(new_config);
     }
 }

@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use ed::AsyncCtx;
+use ed::Context;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
@@ -24,7 +24,7 @@ impl<B: CollabBackend> AsyncAction<B> for Yank<B> {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), YankError<B>> {
         let Some((_, session_id)) = self
             .projects

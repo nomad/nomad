@@ -114,6 +114,16 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
 
     /// TODO: docs.
     #[inline]
+    pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
+    where
+        Err: notify::Error,
+    {
+        let namespace = self.namespace().clone();
+        self.with_editor(move |ed| ed.emit_err(&namespace, err))
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn emit_error(&mut self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Error, message)
     }
@@ -199,15 +209,6 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     #[inline]
     pub fn with_editor<T>(&mut self, fun: impl FnOnce(&mut Ed) -> T) -> T {
         self.borrow.with_state(move |state| fun(state))
-    }
-
-    #[inline]
-    pub(crate) fn emit_err<Err>(&mut self, err: Err) -> NotificationId
-    where
-        Err: notify::Error,
-    {
-        let namespace = self.namespace().clone();
-        self.with_editor(move |ed| ed.emit_err(&namespace, err))
     }
 
     #[inline]

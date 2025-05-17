@@ -5,7 +5,7 @@ use std::collections::hash_map::Entry;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::Name;
-use ed::{AsyncCtx, Shared};
+use ed::{Context, Shared};
 use flume::{Receiver, Sender};
 use fxhash::FxHashMap;
 
@@ -37,7 +37,7 @@ impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<(), NoActiveSessionError<B>> {
         let Some(stop_sender) = self
             .projects

@@ -1,7 +1,7 @@
 use abs_path::AbsPathBuf;
 use ed::backend::{AgentId, Buffer, Cursor, Selection};
 use ed::fs::{self, Directory, File, Fs};
-use ed::{AsyncCtx, Shared};
+use ed::{Context, Shared};
 use futures_util::future::FusedFuture;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;
@@ -149,7 +149,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
     pub(crate) async fn next(
         &mut self,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Event<B>, EventError<B::Fs, F>> {
         loop {
             let mut dir_streams = self.dir_streams.inner.as_stream(0);
@@ -210,11 +210,11 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     async fn handle_buffer_event(
         &mut self,
         event: event::BufferEvent<B>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Option<event::BufferEvent<B>>, EventError<B::Fs, F>> {
         match &event {
             event::BufferEvent::Created(buffer_id, _) => {
-                let Some(buffer_path) = ctx.with_ctx(|ctx| {
+                let Some(buffer_path) = ctx.with_borrowed(|ctx| {
                     let buf = ctx.buffer(buffer_id.clone())?;
                     Some(buf.path().into_owned())
                 }) else {
@@ -240,7 +240,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
                 let fs::FsNode::File(file) = node else { return Ok(None) };
 
-                let is_watched = ctx.with_ctx(|ctx| {
+                let is_watched = ctx.with_borrowed(|ctx| {
                     if let Some(buffer) = ctx.buffer(buffer_id.clone()) {
                         self.watch_buffer(&buffer, file.id());
                         true
@@ -267,12 +267,12 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     fn handle_cursor_event(
         &mut self,
         event: event::CursorEvent<B>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Option<event::CursorEvent<B>> {
         match &event.kind {
             event::CursorEventKind::Created(_) => {
                 if self.buffer_streams.is_watched(&event.buffer_id) {
-                    ctx.with_ctx(|ctx| {
+                    ctx.with_borrowed(|ctx| {
                         let cursor = ctx.cursor(event.cursor_id.clone())?;
                         self.watch_cursor(&cursor);
                         Some(event)
@@ -293,7 +293,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     async fn handle_dir_event(
         &mut self,
         event: fs::DirectoryEvent<B::Fs>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Option<fs::DirectoryEvent<B::Fs>>, EventError<B::Fs, F>> {
         Ok(match event {
             fs::DirectoryEvent::Creation(ref creation) => {
@@ -390,12 +390,12 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     fn handle_selection_event(
         &mut self,
         event: event::SelectionEvent<B>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Option<event::SelectionEvent<B>> {
         match &event.kind {
             event::SelectionEventKind::Created(_) => {
                 if self.buffer_streams.is_watched(&event.buffer_id) {
-                    ctx.with_ctx(|ctx| {
+                    ctx.with_borrowed(|ctx| {
                         let selection =
                             ctx.selection(event.selection_id.clone())?;
                         self.watch_selection(&selection);
@@ -432,16 +432,12 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             .map_err(EventError::Filter)
     }
 
-    fn watch_node(
-        &mut self,
-        node: &fs::FsNode<B::Fs>,
-        ctx: &mut AsyncCtx<'_, B>,
-    ) {
+    fn watch_node(&mut self, node: &fs::FsNode<B::Fs>, ctx: &mut Context<B>) {
         match node {
             fs::FsNode::Directory(dir) => self.dir_streams.insert(dir),
             fs::FsNode::File(file) => {
                 self.file_streams.insert(file);
-                ctx.with_ctx(|ctx| {
+                ctx.with_borrowed(|ctx| {
                     if let Some(buffer) = ctx.buffer_at_path(file.path()) {
                         self.watch_buffer(&buffer, file.id());
                     }
@@ -488,7 +484,7 @@ impl<Fs: fs::Fs> EventStreamBuilder<Fs, NeedsProjectFilter> {
 }
 
 impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
-    pub(crate) fn build<B>(self, ctx: &mut AsyncCtx<B>) -> EventStream<B, F>
+    pub(crate) fn build<B>(self, ctx: &mut Context<B>) -> EventStream<B, F>
     where
         B: CollabBackend<Fs = Fs>,
     {
@@ -557,18 +553,16 @@ impl<B: CollabBackend> BufferStreams<B> {
         self.saved_buffers.with_mut(|buffer_ids| buffer_ids.remove(buffer_id))
     }
 
-    fn new(ctx: &mut AsyncCtx<'_, B>) -> Self {
+    fn new(ctx: &mut Context<B>) -> Self {
         let (event_tx, event_rx) = flume::unbounded();
 
         let new_buffers_handle = {
             let event_tx = event_tx.clone();
-            ctx.with_ctx(|ctx| {
-                ctx.on_buffer_created(move |buf, _created_by| {
-                    let _ = event_tx.send(event::BufferEvent::Created(
-                        buf.id(),
-                        buf.path().into_owned(),
-                    ));
-                })
+            ctx.on_buffer_created(move |buf, _created_by| {
+                let _ = event_tx.send(event::BufferEvent::Created(
+                    buf.id(),
+                    buf.path().into_owned(),
+                ));
             })
         };
 
@@ -624,21 +618,19 @@ impl<Ed: CollabBackend> CursorStreams<Ed> {
         self.handles.insert(cursor.id(), cursor_handles);
     }
 
-    fn new(ctx: &mut AsyncCtx<'_, Ed>) -> Self {
+    fn new(ctx: &mut Context<Ed>) -> Self {
         let (event_tx, event_rx) = flume::unbounded();
 
         let new_cursors_handle = {
             let event_tx = event_tx.clone();
-            ctx.with_ctx(|ctx| {
-                ctx.on_cursor_created(move |cursor, _created_by| {
-                    let _ = event_tx.send(event::CursorEvent {
-                        buffer_id: cursor.buffer_id(),
-                        cursor_id: cursor.id(),
-                        kind: event::CursorEventKind::Created(
-                            cursor.byte_offset(),
-                        ),
-                    });
-                })
+            ctx.on_cursor_created(move |cursor, _created_by| {
+                let _ = event_tx.send(event::CursorEvent {
+                    buffer_id: cursor.buffer_id(),
+                    cursor_id: cursor.id(),
+                    kind: event::CursorEventKind::Created(
+                        cursor.byte_offset(),
+                    ),
+                });
             })
         };
 
@@ -721,21 +713,19 @@ impl<Ed: CollabBackend> SelectionStreams<Ed> {
         self.handles.insert(selection.id(), selection_handles);
     }
 
-    fn new(ctx: &mut AsyncCtx<'_, Ed>) -> Self {
+    fn new(ctx: &mut Context<Ed>) -> Self {
         let (event_tx, event_rx) = flume::unbounded();
 
         let new_selections_handle = {
             let event_tx = event_tx.clone();
-            ctx.with_ctx(|ctx| {
-                ctx.on_selection_created(move |selection, _created_by| {
-                    let _ = event_tx.send(event::SelectionEvent {
-                        buffer_id: selection.buffer_id(),
-                        selection_id: selection.id(),
-                        kind: event::SelectionEventKind::Created(
-                            selection.byte_range(),
-                        ),
-                    });
-                })
+            ctx.on_selection_created(move |selection, _created_by| {
+                let _ = event_tx.send(event::SelectionEvent {
+                    buffer_id: selection.buffer_id(),
+                    selection_id: selection.id(),
+                    kind: event::SelectionEventKind::Created(
+                        selection.byte_range(),
+                    ),
+                });
             })
         };
 

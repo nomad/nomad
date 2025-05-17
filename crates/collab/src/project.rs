@@ -10,7 +10,7 @@ use collab_project::{PeerId, text};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
 use ed::fs::{self, File as _, Symlink as _};
-use ed::{AsyncCtx, Shared, notify};
+use ed::{Context, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -137,7 +137,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
     pub(crate) async fn integrate(
         &self,
         _message: Message,
-        _ctx: &mut AsyncCtx<'_, B>,
+        _ctx: &mut Context<B>,
     ) {
         todo!();
     }
@@ -146,7 +146,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
     pub(crate) async fn synchronize(
         &self,
         event: Event<B>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Option<Message>, SynchronizeError<B>> {
         match event {
             Event::Directory(fs::DirectoryEvent::Creation(creation)) => {
@@ -163,7 +163,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
     async fn synchronize_file_modification(
         &self,
         modification: fs::FileModification<B::Fs>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Option<Message>, SynchronizeError<B>> {
         enum FileContents {
             Binary(Arc<[u8]>),
@@ -244,7 +244,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
     async fn synchronize_node_creation(
         &self,
         creation: fs::NodeCreation<B::Fs>,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Option<Message>, SynchronizeError<B>> {
         match ctx.fs().contents_at_path(&creation.node_path).await {
             Ok(Some(node_contents)) => Ok(Some(self.with_mut(|proj| {
@@ -751,7 +751,7 @@ impl<B: CollabBackend> Projects<B> {
     pub(crate) async fn select(
         &self,
         action: ActionForSelectedSession,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut Context<B>,
     ) -> Result<Option<(AbsPathBuf, SessionId<B>)>, NoActiveSessionError<B>>
     {
         let active_sessions = self.active.with(|map| {
