@@ -1,9 +1,9 @@
 //! TODO: docs.
 
-use ed::EditorCtx;
 use ed::module::{ApiCtx, Empty, Module};
 use ed::notify::Name;
 use ed::plugin::Plugin;
+use ed::{Borrowed, Context};
 use neovim::Neovim;
 
 #[neovim::plugin]
@@ -35,9 +35,14 @@ impl Module<Neovim> for Mad {
             .with_module(collab);
     }
 
-    fn on_init(&self, ctx: &mut EditorCtx<Neovim>) {
+    fn on_init(&self, ctx: &mut Context<Neovim, Borrowed>) {
         ctx.backend_mut().set_emitter(neovim::notify::detect());
     }
 
-    fn on_new_config(&self, _: Self::Config, _: &mut EditorCtx<Neovim>) {}
+    fn on_new_config(
+        &self,
+        _: Self::Config,
+        _: &mut Context<Neovim, Borrowed>,
+    ) {
+    }
 }
