@@ -31,10 +31,10 @@ fn setup_git() {
         .and_then(|stdout| String::from_utf8(stdout).ok())
         .and_then(|stdout| stdout.parse::<GitVersion>().ok());
 
-    if let Some(git_version) = maybe_git_version {
-        if git_version >= GitVersion(2, 32, 0) {
-            println!("cargo:rustc-cfg=feature=\"git-in-PATH\"");
-        }
+    if let Some(git_version) = maybe_git_version
+        && git_version >= GitVersion(2, 32, 0)
+    {
+        println!("cargo:rustc-cfg=feature=\"git-in-PATH\"");
     }
 }
 

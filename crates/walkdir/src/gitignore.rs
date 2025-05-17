@@ -301,10 +301,10 @@ impl<'a> Cursor<'a> {
         self.start_idx = Some(new_start_idx);
         self.paths = &self.paths[idx_first_match..idx_last_match + 1];
 
-        if let [path] = self.paths {
-            if &path[self.num_bytes_already_matched..] == node_name {
-                return Some(SeekResult::FoundAt(new_start_idx));
-            }
+        if let [path] = self.paths
+            && &path[self.num_bytes_already_matched..] == node_name
+        {
+            return Some(SeekResult::FoundAt(new_start_idx));
         }
 
         self.num_bytes_already_matched +=

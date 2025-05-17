@@ -376,15 +376,14 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         &self,
         event: fs::FileEvent<B::Fs>,
     ) -> Option<fs::FileEvent<B::Fs>> {
-        if let fs::FileEvent::Modification(modif) = &event {
-            if let Some(buf_id) = self.buf_id_of_file_id.get(&modif.file_id) {
-                if self.buffer_streams.has_buffer_been_saved(buf_id) {
-                    return None;
-                }
-            }
+        if let fs::FileEvent::Modification(modif) = &event
+            && let Some(buf_id) = self.buf_id_of_file_id.get(&modif.file_id)
+            && self.buffer_streams.has_buffer_been_saved(buf_id)
+        {
+            None
+        } else {
+            Some(event)
         }
-
-        Some(event)
     }
 
     fn handle_selection_event(

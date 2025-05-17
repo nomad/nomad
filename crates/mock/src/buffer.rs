@@ -216,10 +216,10 @@ impl backend::Buffer for Buffer<'_> {
 
         self.callbacks.with_mut(|callbacks| {
             for cb_kind in callbacks.values_mut() {
-                if let CallbackKind::BufferEdited(buf_id, fun) = cb_kind {
-                    if *buf_id == self.id() {
-                        fun(self, &edit);
-                    }
+                if let CallbackKind::BufferEdited(buf_id, fun) = cb_kind
+                    && *buf_id == self.id()
+                {
+                    fun(self, &edit);
                 }
             }
         });
@@ -313,10 +313,10 @@ impl backend::Cursor for Cursor<'_> {
 
         self.buffer.callbacks.with_mut(|callbacks| {
             for cb_kind in callbacks.values_mut() {
-                if let CallbackKind::CursorMoved(cursor_id, fun) = cb_kind {
-                    if *cursor_id == self.id() {
-                        fun(self, agent_id);
-                    }
+                if let CallbackKind::CursorMoved(cursor_id, fun) = cb_kind
+                    && *cursor_id == self.id()
+                {
+                    fun(self, agent_id);
                 }
             }
         });
