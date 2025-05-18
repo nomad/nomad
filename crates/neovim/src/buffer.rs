@@ -93,14 +93,33 @@ impl<'a> NeovimBuffer<'a> {
         self,
         byte_offset: ByteOffset,
     ) -> Point {
+        if byte_offset == 0 {
+            // `byte2line` can't handle 0.
+            return Point::zero();
+        }
+
+        let buf = self.inner();
+
         let line_idx = self
             .inner()
-            .call(move |_| {
-                api::call_function::<_, usize>(
+            .call(move |()| {
+                let line_idx = api::call_function::<_, usize>(
                     "byte2line",
                     (byte_offset.into_u64() as u32,),
-                )
-                .expect("args are valid")
+                ).expect("offset is within bounds")
+                // byte2line returns 1-based line numbers.
+                - 1;
+
+                // Whether the character immediately to the left of the given
+                // byte offset is a newline.
+                let is_offset_after_newline = buf
+                    .get_offset(line_idx + 1)
+                    .expect("line index is within bounds")
+                    == byte_offset;
+
+                // byte2line interprets newlines as being the last character
+                // of the previous line instead of starting a new one.
+                line_idx + is_offset_after_newline as usize
             })
             .expect("todo");
 
