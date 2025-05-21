@@ -20,7 +20,7 @@ impl<'a> ModeStr<'a> {
 
     #[inline]
     pub(crate) fn is_select_blockwise(&self) -> bool {
-        todo!();
+        self.first_char() == '\u{13}' // CTRL-S
     }
 
     #[inline]
@@ -42,7 +42,7 @@ impl<'a> ModeStr<'a> {
 
     #[inline]
     pub(crate) fn is_visual_blockwise(&self) -> bool {
-        todo!();
+        self.first_char() == '\u{16}' // CTRL-V
     }
 
     #[inline]
