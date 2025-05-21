@@ -6,6 +6,7 @@ mod convert;
 pub mod cursor;
 mod events;
 pub mod executor;
+mod mode;
 mod neovim;
 pub mod notify;
 pub mod selection;

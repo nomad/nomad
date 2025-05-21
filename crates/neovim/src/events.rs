@@ -12,6 +12,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::cursor::NeovimCursor;
+use crate::mode::ModeStr;
 use crate::oxi::api::{self, opts, types};
 
 type AugroupId = u32;
@@ -77,6 +78,7 @@ pub(crate) struct Events {
     on_buffer_saved: NoHashMap<BufferId, Callbacks<BufWritePost>>,
     on_buffer_unfocused: NoHashMap<BufferId, Callbacks<BufLeave>>,
     on_cursor_moved: NoHashMap<BufferId, Callbacks<CursorMoved>>,
+    on_mode_changed: Option<Callbacks<ModeChanged>>,
 }
 
 #[derive(Default)]
@@ -114,6 +116,9 @@ pub(crate) struct BufWritePost(pub(crate) BufferId);
 pub(crate) struct CursorMoved(pub(crate) BufferId);
 
 #[derive(Clone, Copy)]
+pub(crate) struct ModeChanged;
+
+#[derive(Clone, Copy)]
 pub(crate) struct OnBytes(pub(crate) BufferId);
 
 #[derive(cauchy::From)]
@@ -124,6 +129,7 @@ pub(crate) enum EventKind {
     BufUnload(#[from] BufUnload),
     BufWritePost(#[from] BufWritePost),
     CursorMoved(#[from] CursorMoved),
+    ModeChanged(#[from] ModeChanged),
     OnBytes(#[from] OnBytes),
 }
 
@@ -179,6 +185,7 @@ impl Events {
             on_buffer_saved: Default::default(),
             on_buffer_unfocused: Default::default(),
             on_cursor_moved: Default::default(),
+            on_mode_changed: Default::default(),
         }
     }
 }
@@ -591,6 +598,64 @@ impl Event for CursorMoved {
     }
 }
 
+impl Event for ModeChanged {
+    type Args<'a> = (NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
+    type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
+    type RegisterOutput = AutocmdId;
+
+    #[inline]
+    fn container<'ev>(&self, events: &'ev mut Events) -> Self::Container<'ev> {
+        &mut events.on_mode_changed
+    }
+
+    #[inline]
+    fn key(&self) {}
+
+    #[inline]
+    fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
+        let augroup_id = events.augroup_id;
+
+        let events = events.handle;
+
+        let opts = opts::CreateAutocmdOpts::builder()
+            .group(augroup_id)
+            .callback(move |args: types::AutocmdCallbackArgs| {
+                let buffer_id = BufferId::new(args.buffer);
+
+                let Some(callbacks) = events.with(|ev| {
+                    ev.on_mode_changed.as_ref().map(Callbacks::cloned)
+                }) else {
+                    return true;
+                };
+
+                let (old_mode, new_mode) =
+                    args.r#match.split_once(':').expect(
+                        "expected a string with format \
+                         \"{{old_mode}}:{{new_mode}}\"",
+                    );
+
+                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let old_mode = ModeStr::new(old_mode);
+                let new_mode = ModeStr::new(new_mode);
+
+                for callback in callbacks {
+                    callback((buffer, old_mode, new_mode, AgentId::UNKNOWN));
+                }
+
+                false
+            })
+            .build();
+
+        api::create_autocmd(["ModeChanged"], &opts)
+            .expect("couldn't create autocmd on ModeChanged")
+    }
+
+    #[inline]
+    fn unregister(autocmd_id: Self::RegisterOutput) {
+        let _ = api::del_autocmd(autocmd_id);
+    }
+}
+
 impl Event for OnBytes {
     type Args<'a> = (&'a NeovimBuffer<'a>, &'a Edit);
     type Container<'ev> = &'ev mut NoHashMap<BufferId, Callbacks<Self>>;
@@ -665,6 +730,7 @@ impl Drop for EventHandle {
             EventKind::BufUnload(event) => event.cleanup(key, events),
             EventKind::BufWritePost(event) => event.cleanup(key, events),
             EventKind::CursorMoved(event) => event.cleanup(key, events),
+            EventKind::ModeChanged(event) => event.cleanup(key, events),
             EventKind::OnBytes(event) => event.cleanup(key, events),
         })
     }
