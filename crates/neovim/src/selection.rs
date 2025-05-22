@@ -55,46 +55,46 @@ impl Selection for NeovimSelection<'_> {
     {
         let is_selection_alive = Shared::<bool>::new(true);
 
+        let selection_removed_handle = self.on_removed({
+            let is_selection_alive = is_selection_alive.clone();
+            move |_buf_id, _removed_by| is_selection_alive.set(false)
+        });
+
         let cursor_moved_handle = Events::insert(
             self.buffer().events(),
             events::CursorMoved(self.buffer_id()),
-            {
-                let is_selection_alive = is_selection_alive.clone();
-                move |(cursor, moved_by)| {
-                    // Make sure that the selection is still alive before
-                    // calling the user's function.
-                    if is_selection_alive.copied() {
-                        fun(&NeovimSelection::new(cursor.buffer()), moved_by)
-                    }
+            move |(cursor, moved_by)| {
+                // Make sure the selection is still alive before calling the
+                // user's function.
+                if is_selection_alive.copied() {
+                    fun(&NeovimSelection::new(cursor.buffer()), moved_by)
                 }
             },
         );
 
+        cursor_moved_handle.merge(selection_removed_handle)
+    }
+
+    #[inline]
+    fn on_removed<Fun>(&self, mut fun: Fun) -> EventHandle
+    where
+        Fun: FnMut(BufferId, AgentId) + 'static,
+    {
         let buffer_id = self.buffer_id();
 
-        let mode_changed_handle = Events::insert(
+        Events::insert(
             self.buffer().events(),
             events::ModeChanged,
-            move |(buf, old_mode, new_mode, _changed_by)| {
+            move |(buf, old_mode, new_mode, changed_by)| {
                 if buf.id() == buffer_id
                     && old_mode.is_select_or_visual()
                     // A selection is only removed if the new mode isn't also
                     // displaying a selected range.
                     && !new_mode.is_select_or_visual()
                 {
-                    is_selection_alive.set(false);
+                    fun(buffer_id, changed_by);
                 }
             },
-        );
-
-        cursor_moved_handle.merge(mode_changed_handle)
-    }
-
-    #[inline]
-    fn on_removed<Fun>(&self, _fun: Fun) -> EventHandle
-    where
-        Fun: FnMut(BufferId, AgentId) + 'static,
-    {
-        todo!()
+        )
     }
 }
