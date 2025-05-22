@@ -27,7 +27,7 @@ pub struct NeovimBuffer<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BufferId(BufHandle);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) struct Point {
     /// The index of the line in the buffer.
     pub(crate) line_idx: usize,
@@ -460,3 +460,19 @@ impl Hash for BufferId {
 }
 
 impl nohash::IsEnabled for BufferId {}
+
+impl PartialOrd for Point {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Point {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.line_idx
+            .cmp(&other.line_idx)
+            .then(self.byte_offset.cmp(&other.byte_offset))
+    }
+}
