@@ -7,7 +7,7 @@ use std::rc::Rc;
 use ed::Shared;
 use ed::backend::{AgentId, Edit};
 use nohash::IntMap as NoHashMap;
-use slotmap::{DefaultKey, SlotMap};
+use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::buffer::{BufferId, NeovimBuffer};
@@ -20,9 +20,10 @@ type AutocmdId = u32;
 
 /// TODO: docs.
 pub struct EventHandle {
-    event_key: DefaultKey,
-    event_kind: EventKind,
     events: Shared<Events>,
+    /// A list of `(callback_key, event_kind)` pairs, where the `callback_key`
+    /// is the key of the callback stored in the [`Callbacks`]' [`SlotMap`].
+    event_keys_kind: SmallVec<[(slotmap::DefaultKey, EventKind); 1]>,
 }
 
 pub(crate) trait Event: Clone + Into<EventKind> {
@@ -50,7 +51,7 @@ pub(crate) trait Event: Clone + Into<EventKind> {
 
     /// TODO: docs.
     #[inline]
-    fn cleanup(&self, event_key: DefaultKey, events: &mut Events) {
+    fn cleanup(&self, event_key: slotmap::DefaultKey, events: &mut Events) {
         let mut container = self.container(events);
         let Some(callbacks) = container.get_mut(self.key()) else { return };
         callbacks.remove(event_key);
@@ -93,7 +94,7 @@ pub(crate) struct AgentIds {
 #[doc(hidden)]
 pub(crate) struct Callbacks<T: Event> {
     #[allow(clippy::type_complexity)]
-    inner: SlotMap<DefaultKey, Rc<dyn Fn(T::Args<'_>) + 'static>>,
+    inner: SlotMap<slotmap::DefaultKey, Rc<dyn Fn(T::Args<'_>) + 'static>>,
     output: T::RegisterOutput,
 }
 
@@ -133,6 +134,27 @@ pub(crate) enum EventKind {
     OnBytes(#[from] OnBytes),
 }
 
+impl EventHandle {
+    /// Merges two [`EventHandle`]s into one.
+    #[inline]
+    pub(crate) fn merge(mut self, mut other: Self) -> Self {
+        self.event_keys_kind.extend(other.event_keys_kind.drain(..));
+        self
+    }
+
+    #[inline]
+    fn new(
+        event_key: slotmap::DefaultKey,
+        event_kind: EventKind,
+        events: Shared<Events>,
+    ) -> Self {
+        Self {
+            events,
+            event_keys_kind: smallvec_inline![(event_key, event_kind)],
+        }
+    }
+}
+
 impl Events {
     pub(crate) fn contains(&mut self, event: &impl Event) -> bool {
         event.container(self).get_mut(event.key()).is_some()
@@ -165,7 +187,7 @@ impl Events {
             event_key
         });
 
-        EventHandle { event_key, event_kind, events }
+        EventHandle::new(event_key, event_kind, events)
     }
 
     pub(crate) fn new(augroup_name: &str) -> Self {
@@ -203,7 +225,7 @@ impl<T: Event> Callbacks<T> {
     fn insert(
         &mut self,
         fun: impl FnMut(T::Args<'_>) + 'static,
-    ) -> DefaultKey {
+    ) -> slotmap::DefaultKey {
         let fun = RefCell::new(fun);
 
         self.inner.insert(Rc::new(move |args| {
@@ -222,7 +244,7 @@ impl<T: Event> Callbacks<T> {
     }
 
     #[inline]
-    fn remove(&mut self, callback_key: DefaultKey) {
+    fn remove(&mut self, callback_key: slotmap::DefaultKey) {
         self.inner.remove(callback_key);
     }
 }
@@ -722,16 +744,19 @@ impl Event for OnBytes {
 impl Drop for EventHandle {
     #[inline]
     fn drop(&mut self) {
-        let key = self.event_key;
-        self.events.with_mut(|events| match self.event_kind {
-            EventKind::BufEnter(event) => event.cleanup(key, events),
-            EventKind::BufLeave(event) => event.cleanup(key, events),
-            EventKind::BufReadPost(event) => event.cleanup(key, events),
-            EventKind::BufUnload(event) => event.cleanup(key, events),
-            EventKind::BufWritePost(event) => event.cleanup(key, events),
-            EventKind::CursorMoved(event) => event.cleanup(key, events),
-            EventKind::ModeChanged(event) => event.cleanup(key, events),
-            EventKind::OnBytes(event) => event.cleanup(key, events),
+        self.events.with_mut(|events| {
+            for (key, kind) in self.event_keys_kind.drain(..) {
+                match kind {
+                    EventKind::BufEnter(ev) => ev.cleanup(key, events),
+                    EventKind::BufLeave(ev) => ev.cleanup(key, events),
+                    EventKind::BufReadPost(ev) => ev.cleanup(key, events),
+                    EventKind::BufUnload(ev) => ev.cleanup(key, events),
+                    EventKind::BufWritePost(ev) => ev.cleanup(key, events),
+                    EventKind::CursorMoved(ev) => ev.cleanup(key, events),
+                    EventKind::ModeChanged(ev) => ev.cleanup(key, events),
+                    EventKind::OnBytes(ev) => ev.cleanup(key, events),
+                }
+            }
         })
     }
 }
