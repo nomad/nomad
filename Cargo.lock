@@ -2860,7 +2860,6 @@ dependencies = [
  "collab",
  "ed",
  "flume",
- "futures-executor",
  "futures-lite",
  "mock",
  "neovim",

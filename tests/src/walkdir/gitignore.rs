@@ -114,7 +114,7 @@ impl GitRepository for TempDir {
     fn create(fs: mock::fs::MockFs) -> Self {
         use tempdir::FsExt;
 
-        futures_executor::block_on(async move {
+        futures_lite::future::block_on(async move {
             let tempdir = OsFs::default()
                 .tempdir()
                 .await
@@ -152,7 +152,7 @@ impl GitRepository for TempDir {
         use futures_lite::StreamExt;
         use walkdir::FsExt;
 
-        futures_executor::block_on(async move {
+        futures_lite::future::block_on(async move {
             NonIgnoredPaths {
                 inner: OsFs::default()
                     .walk(self)
