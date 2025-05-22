@@ -50,6 +50,23 @@ impl<'a> NeovimBuffer<'a> {
         line_offset + point.byte_offset
     }
 
+    #[track_caller]
+    #[inline]
+    pub(crate) fn call<R: 'static>(
+        &self,
+        fun: impl FnOnce(api::Buffer) -> R + 'static,
+    ) -> R {
+        let out = Shared::<Option<R>>::new(None);
+        let buf = self.inner();
+        buf.clone()
+            .call({
+                let out = out.clone();
+                move |()| out.set(Some(fun(buf)))
+            })
+            .expect("couldn't call function in buffer");
+        out.with_mut(Option::take).expect("function wasn't called")
+    }
+
     #[inline]
     pub(crate) fn current(events: &'a Shared<Events>) -> Self {
         Self::new(BufferId::of_focused(), events)
@@ -131,30 +148,25 @@ impl<'a> NeovimBuffer<'a> {
             return Point::zero();
         }
 
-        let buf = self.inner();
-
-        let line_idx = self
-            .inner()
-            .call(move |()| {
-                let line_idx = api::call_function::<_, usize>(
+        let line_idx = self.call(move |this| {
+            let line_idx = api::call_function::<_, usize>(
                     "byte2line",
                     (byte_offset.into_u64() as u32,),
                 ).expect("offset is within bounds")
                 // byte2line returns 1-based line numbers.
                 - 1;
 
-                // Whether the character immediately to the left of the given
-                // byte offset is a newline.
-                let is_offset_after_newline = buf
-                    .get_offset(line_idx + 1)
-                    .expect("line index is within bounds")
-                    == byte_offset;
+            // Whether the character immediately to the left of the given
+            // byte offset is a newline.
+            let is_offset_after_newline = this
+                .get_offset(line_idx + 1)
+                .expect("line index is within bounds")
+                == byte_offset;
 
-                // byte2line interprets newlines as being the last character
-                // of the previous line instead of starting a new one.
-                line_idx + is_offset_after_newline as usize
-            })
-            .expect("todo");
+            // byte2line interprets newlines as being the last character
+            // of the previous line instead of starting a new one.
+            line_idx + is_offset_after_newline as usize
+        });
 
         let line_byte_offset =
             self.inner().get_offset(line_idx).expect("todo");
@@ -276,26 +288,38 @@ impl<'a> NeovimBuffer<'a> {
             return None;
         }
 
-        // NOTE: get_mark() returns (0, 0) if the mark is not set.
-        let (anchor_row, anchor_col) = self.inner().get_mark('<').ok()?;
+        let (start, end) = self.call(|_this| {
+            let (_bufnum, anchor_row, anchor_col) =
+                api::call_function::<_, (u32, usize, usize)>("getpos", ('v',))
+                    .expect("couldn't call getpos");
 
-        let anchor = self.byte_offset_of_point(Point {
-            line_idx: anchor_row.checked_sub(1)?,
-            byte_offset: ByteOffset::new(anchor_col),
+            let (_bufnum, head_row, head_col) =
+                api::call_function::<_, (u32, usize, usize)>("getpos", ('.',))
+                    .expect("couldn't call getpos");
+
+            let mut anchor = Point {
+                line_idx: anchor_row - 1,
+                byte_offset: ByteOffset::new(anchor_col),
+            };
+
+            let mut head = Point {
+                line_idx: head_row - 1,
+                byte_offset: ByteOffset::new(head_col),
+            };
+
+            // The column of the side of the selection that comes first
+            // seems to always be off by one, even if it's surrounded by
+            // multi-byte characters.
+            if anchor <= head {
+                anchor.byte_offset -= 1;
+                (anchor, head)
+            } else {
+                head.byte_offset -= 1;
+                (head, anchor)
+            }
         });
 
-        let (head_row, head_col) = self.inner().get_mark('>').ok()?;
-
-        let head = self.byte_offset_of_point(Point {
-            line_idx: head_row.checked_sub(1)?,
-            byte_offset: ByteOffset::new(head_col),
-        });
-
-        match anchor.cmp(&head) {
-            Ordering::Less => Some(anchor..head),
-            Ordering::Equal => None,
-            Ordering::Greater => Some(head..anchor),
-        }
+        Some(self.byte_offset_of_point(start)..self.byte_offset_of_point(end))
     }
 }
 
