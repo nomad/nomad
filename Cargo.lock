@@ -2861,6 +2861,7 @@ dependencies = [
  "ed",
  "flume",
  "futures-lite",
+ "futures-util",
  "mock",
  "neovim",
  "tempdir 0.1.0-dev",

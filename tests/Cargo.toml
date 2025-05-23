@@ -33,6 +33,7 @@ abs-path = { workspace = true, features = ["macros"] }
 ed = { workspace = true }
 flume = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
+futures-util = { workspace = true, features = ["default"] }
 mock = { workspace = true }
 
 # Auth-related dependencies.

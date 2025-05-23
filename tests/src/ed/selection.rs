@@ -3,7 +3,7 @@ use core::ops::Range;
 
 use ed::backend::{Buffer, Selection};
 use ed::{Backend, Context};
-use futures_lite::Stream;
+use futures_util::stream::FusedStream;
 
 use crate::utils::Convert;
 
@@ -20,7 +20,7 @@ impl SelectionEvent {
     #[track_caller]
     pub(crate) fn new_stream<Ed: Backend>(
         ctx: &mut Context<Ed>,
-    ) -> impl Stream<Item = Self> + Unpin + use<Ed> {
+    ) -> impl FusedStream<Item = Self> + Unpin + use<Ed> {
         let (tx, rx) = flume::unbounded();
 
         let buffer_id = ctx.with_borrowed(|ctx| {
