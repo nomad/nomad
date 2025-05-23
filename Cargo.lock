@@ -1943,8 +1943,8 @@ dependencies = [
 
 [[package]]
 name = "nvim-oxi"
-version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#75e4b36478fb2b1f73192c600f22a99d1081ec71"
+version = "0.6.0"
+source = "git+https://github.com/noib3/nvim-oxi#dfdfe59d9d8328452019f697292d4bd2eed95a56"
 dependencies = [
  "cargo_metadata",
  "mlua",
@@ -1958,8 +1958,8 @@ dependencies = [
 
 [[package]]
 name = "nvim-oxi-api"
-version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#75e4b36478fb2b1f73192c600f22a99d1081ec71"
+version = "0.6.0"
+source = "git+https://github.com/noib3/nvim-oxi#dfdfe59d9d8328452019f697292d4bd2eed95a56"
 dependencies = [
  "nvim-oxi-luajit",
  "nvim-oxi-macros",
@@ -1971,8 +1971,8 @@ dependencies = [
 
 [[package]]
 name = "nvim-oxi-libuv"
-version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#75e4b36478fb2b1f73192c600f22a99d1081ec71"
+version = "0.6.0"
+source = "git+https://github.com/noib3/nvim-oxi#dfdfe59d9d8328452019f697292d4bd2eed95a56"
 dependencies = [
  "nvim-oxi-luajit",
  "thiserror 2.0.12",
@@ -1980,16 +1980,16 @@ dependencies = [
 
 [[package]]
 name = "nvim-oxi-luajit"
-version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#75e4b36478fb2b1f73192c600f22a99d1081ec71"
+version = "0.6.0"
+source = "git+https://github.com/noib3/nvim-oxi#dfdfe59d9d8328452019f697292d4bd2eed95a56"
 dependencies = [
  "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "nvim-oxi-macros"
-version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#75e4b36478fb2b1f73192c600f22a99d1081ec71"
+version = "0.6.0"
+source = "git+https://github.com/noib3/nvim-oxi#dfdfe59d9d8328452019f697292d4bd2eed95a56"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1998,8 +1998,8 @@ dependencies = [
 
 [[package]]
 name = "nvim-oxi-types"
-version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#75e4b36478fb2b1f73192c600f22a99d1081ec71"
+version = "0.6.0"
+source = "git+https://github.com/noib3/nvim-oxi#dfdfe59d9d8328452019f697292d4bd2eed95a56"
 dependencies = [
  "libc",
  "nvim-oxi-luajit",

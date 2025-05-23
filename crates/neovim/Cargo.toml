@@ -22,7 +22,7 @@ nohash = { workspace = true }
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [
   "libuv",
   "mlua",
-  "neovim-0-10",
+  "neovim-0-11",
   "__vendored_luajit",
 ] }
 pin-project-lite = { workspace = true }

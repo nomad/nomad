@@ -278,13 +278,7 @@ impl<'a> NeovimBuffer<'a> {
     #[track_caller]
     #[inline]
     pub(crate) fn selection(&self) -> Option<Range<ByteOffset>> {
-        if !self.is_focused() {
-            return None;
-        }
-
-        let mode = api::get_mode().expect("couldn't get mode").mode;
-
-        if !(mode.is_visual() || mode.is_visual_select()) {
+        if !self.is_focused() || !api::get_mode().mode.is_select_or_visual() {
             return None;
         }
 
