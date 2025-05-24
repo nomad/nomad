@@ -282,7 +282,7 @@ impl<'a> NeovimBuffer<'a> {
             return None;
         }
 
-        let (start, end) = self.call(|_this| {
+        let (start, end) = {
             let (_bufnum, anchor_row, anchor_col) =
                 api::call_function::<_, (u32, usize, usize)>("getpos", ('v',))
                     .expect("couldn't call getpos");
@@ -311,7 +311,7 @@ impl<'a> NeovimBuffer<'a> {
                 head.byte_offset -= 1;
                 (head, anchor)
             }
-        });
+        };
 
         Some(self.byte_offset_of_point(start)..self.byte_offset_of_point(end))
     }

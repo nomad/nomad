@@ -1,5 +1,5 @@
 use ed::Context;
-use futures_lite::StreamExt;
+use futures_util::StreamExt;
 use neovim::Neovim;
 use neovim::tests::ContextExt;
 
