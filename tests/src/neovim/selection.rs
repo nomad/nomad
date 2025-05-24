@@ -6,7 +6,7 @@ use neovim::tests::ContextExt;
 use crate::ed::selection::SelectionEvent;
 
 #[neovim::test]
-async fn selection_events_1(ctx: &mut Context<Neovim>) {
+async fn charwise_simple(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("ihello<Esc>b");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -22,7 +22,7 @@ async fn selection_events_1(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
-async fn selection_events_past_eof(ctx: &mut Context<Neovim>) {
+async fn charwise_past_eof(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("iHello<Esc>0");
 
     let mut events = SelectionEvent::new_stream(ctx);
