@@ -1,3 +1,4 @@
+use core::mem;
 use core::time::Duration;
 
 use ed::{ByteOffset, Context};
@@ -8,7 +9,7 @@ use neovim::tests::ContextExt;
 
 #[neovim::test]
 async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
-    ctx.feedkeys("ihello<Esc>2<Left>");
+    ctx.feedkeys("ihello<Esc>");
 
     let mut offsets = ByteOffset::new_stream(ctx);
 
@@ -18,14 +19,16 @@ async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
 
     let sleep = async_io::Timer::after(Duration::from_millis(500));
     select_biased! {
-        _offset = offsets.select_next_some() => panic!("expected no offsets"),
+        offset = offsets.select_next_some() => {
+            panic!("expected no offsets, got {offset:?}");
+        },
         _now = FutureExt::fuse(sleep) => {},
     }
 }
 
 #[neovim::test]
 async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
-    ctx.feedkeys("ihello<Esc>2<Left>");
+    ctx.feedkeys("ihello<Esc>");
 
     let mut offsets = ByteOffset::new_stream(ctx);
 
@@ -33,7 +36,7 @@ async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
     // insert mode with "a" should move the offset to its right side.
     ctx.feedkeys("a");
 
-    assert_eq!(offsets.next().await.unwrap(), 3usize);
+    assert_eq!(offsets.next().await.unwrap(), 5usize);
 }
 
 #[neovim::test]
@@ -58,12 +61,12 @@ trait ByteOffsetExt {
 
         ctx.with_borrowed(|ctx| {
             ctx.current_buffer().unwrap().for_each_cursor(move |cursor| {
-                cursor.on_moved({
+                mem::forget(cursor.on_moved({
                     let tx = tx.clone();
                     move |cursor, _moved_by| {
                         let _ = tx.send(cursor.byte_offset());
                     }
-                });
+                }));
             })
         });
 
