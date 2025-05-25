@@ -49,30 +49,52 @@ impl Selection for NeovimSelection<'_> {
     }
 
     #[inline]
-    fn on_moved<Fun>(&self, mut fun: Fun) -> EventHandle
+    fn on_moved<Fun>(&self, fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimSelection, AgentId) + 'static,
     {
         let is_selection_alive = Shared::<bool>::new(true);
-
-        let selection_removed_handle = self.on_removed({
-            let is_selection_alive = is_selection_alive.clone();
-            move |_buf_id, _removed_by| is_selection_alive.set(false)
-        });
+        let fun = Shared::<Fun>::new(fun);
 
         let cursor_moved_handle = Events::insert(
             self.buffer().events(),
             events::CursorMoved(self.buffer_id()),
-            move |(cursor, moved_by)| {
-                // Make sure the selection is still alive before calling the
-                // user's function.
-                if is_selection_alive.copied() {
-                    fun(&NeovimSelection::new(cursor.buffer()), moved_by)
+            {
+                let is_selection_alive = is_selection_alive.clone();
+                let fun = fun.clone();
+                move |(cursor, moved_by)| {
+                    // Make sure the selection is still alive before calling
+                    // the user's function.
+                    if is_selection_alive.copied() {
+                        let this = NeovimSelection::new(cursor.buffer());
+                        fun.with_mut(|fun| {
+                            fun(&this, moved_by);
+                        })
+                    }
                 }
             },
         );
 
-        cursor_moved_handle.merge(selection_removed_handle)
+        let buffer_id = self.buffer_id();
+
+        let mode_changed_handle = Events::insert(
+            self.buffer().events(),
+            events::ModeChanged,
+            move |(buf, _old_mode, new_mode, changed_by)| {
+                if buf.id() != buffer_id || !is_selection_alive.copied() {
+                    return;
+                }
+
+                if new_mode.has_selected_range() {
+                    let this = NeovimSelection::new(buf);
+                    fun.with_mut(|fun| fun(&this, changed_by));
+                } else {
+                    is_selection_alive.set(false);
+                }
+            },
+        );
+
+        cursor_moved_handle.merge(mode_changed_handle)
     }
 
     #[inline]
@@ -87,10 +109,10 @@ impl Selection for NeovimSelection<'_> {
             events::ModeChanged,
             move |(buf, old_mode, new_mode, changed_by)| {
                 if buf.id() == buffer_id
-                    && old_mode.is_select_or_visual()
+                    && old_mode.has_selected_range()
                     // A selection is only removed if the new mode isn't also
                     // displaying a selected range.
-                    && !new_mode.is_select_or_visual()
+                    && !new_mode.has_selected_range()
                 {
                     fun(buffer_id, changed_by);
                 }

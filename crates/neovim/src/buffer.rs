@@ -272,6 +272,10 @@ impl<'a> NeovimBuffer<'a> {
             Some(self.selection_by_character())
         } else if mode.is_select_by_line() || mode.is_visual_by_line() {
             Some(self.selection_by_line())
+        } else if mode.is_select_blockwise() || mode.is_visual_blockwise() {
+            // We don't yet support visual block mode because the corresponding
+            // selection could span several disjoint byte ranges.
+            None
         } else {
             None
         }

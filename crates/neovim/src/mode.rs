@@ -6,11 +6,20 @@ use core::ops::Deref;
 pub(crate) struct ModeStr<'a>(&'a str);
 
 impl<'a> ModeStr<'a> {
+    /// Whether the mode corresponds to a single, contiguous byte range being
+    /// selected in a buffer.
+    ///
+    /// Note that this currently excludes visual|select blockwise mode because
+    /// their selections could span several disjoint byte ranges.
     #[inline]
-    pub(crate) fn is_select_or_visual(&self) -> bool {
-        self.is_select() || self.is_visual()
+    pub(crate) fn has_selected_range(&self) -> bool {
+        self.is_select_by_character()
+            || self.is_select_by_line()
+            || self.is_visual_by_character()
+            || self.is_visual_by_line()
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn is_select(&self) -> bool {
         self.is_select_blockwise()
@@ -18,6 +27,7 @@ impl<'a> ModeStr<'a> {
             || self.is_select_by_line()
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn is_select_blockwise(&self) -> bool {
         self.first_char() == '\u{13}' // CTRL-S
@@ -33,6 +43,7 @@ impl<'a> ModeStr<'a> {
         self.first_char() == 'S'
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn is_visual(&self) -> bool {
         self.is_visual_blockwise()

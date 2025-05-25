@@ -190,14 +190,10 @@ impl Backend for Neovim {
             self.events.clone(),
             events::ModeChanged,
             move |(buf, old_mode, new_mode, changed_by)| {
-                if new_mode.is_select_or_visual()
+                if new_mode.has_selected_range()
                     // A selection is only created if the old mode wasn't
                     // already displaying a selected range.
-                    && !old_mode.is_select_or_visual()
-                    // We don't yet support visual block mode because the
-                    // corresponding selection could span several disjoint byte
-                    // ranges.
-                    && !new_mode.is_visual_blockwise()
+                    && !old_mode.has_selected_range()
                 {
                     fun(&NeovimSelection::new(buf), changed_by);
                 }

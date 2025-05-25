@@ -90,6 +90,57 @@ async fn charwise_multibyte(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
+async fn charwise_to_linewise_to_charwise(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("iHello<CR>World<Esc><Left>");
+
+    let mut events = SelectionEvent::new_stream(ctx);
+
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Created(9..10));
+    ctx.feedkeys("2<Left>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(7..10));
+    ctx.feedkeys("<Up>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(1..10));
+
+    // Switch to linewise visual mode.
+    ctx.feedkeys("<S-v>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..12));
+
+    // Switch back to charwise visual mode.
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(1..10));
+
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
+}
+
+#[neovim::test]
+async fn charwise_to_blockwise_to_charwise(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("iHello<CR>World<Esc><Left>");
+
+    let mut events = SelectionEvent::new_stream(ctx);
+
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Created(9..10));
+    ctx.feedkeys("2<Left>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(7..10));
+    ctx.feedkeys("<Up>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(1..10));
+
+    // Switch to blockwise visual mode. Because we don't yet support it, it
+    // should be as if we ended visual mode.
+    ctx.feedkeys("<C-v>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
+
+    // Switch back to charwise visual mode.
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Created(1..10));
+
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
+}
+
+#[neovim::test]
 async fn linewise_simple(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("iHello<Esc>2<Left>");
 
