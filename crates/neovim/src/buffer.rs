@@ -2,6 +2,7 @@
 
 use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
+use core::num::NonZeroUsize;
 use core::ops::Range;
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -175,17 +176,15 @@ impl<'a> NeovimBuffer<'a> {
     #[track_caller]
     #[inline]
     pub(crate) fn point_of_eof(self) -> Point {
-        let line_len = self.line_len();
+        let line_len = usize::from(self.line_len());
 
-        if line_len == 0 {
-            Point::zero()
+        let byte_offset = if self.has_trailing_newline() {
+            0usize.into()
         } else {
-            Point {
-                line_idx: line_len - 1,
-                byte_offset: self.byte_of_line(line_len)
-                    - self.byte_of_line(line_len - 1),
-            }
-        }
+            self.byte_of_line(line_len) - self.byte_of_line(line_len - 1)
+        };
+
+        Point { line_idx: line_len - 1, byte_offset }
     }
 
     /// Replaces the text in the given point range with the new text.
@@ -281,18 +280,18 @@ impl<'a> NeovimBuffer<'a> {
         }
     }
 
-    /// Returns the [`ByteOffset`] of start of the line at the given index.
+    /// Returns the [`ByteOffset`] corresponding to the given line offset.
     ///
     /// # Panics
     ///
-    /// Panics if the line index is out of bounds (i.e. greater than
+    /// Panics if the line offset is out of bounds (i.e. greater than
     /// [`line_len()`](Self::line_len)).
     #[inline]
-    fn byte_of_line(&self, line_idx: usize) -> ByteOffset {
+    fn byte_of_line(&self, line_offset: usize) -> ByteOffset {
         // get_offset() already takes care of only counting the final newline
         // if `eol` is enabled.
         self.inner()
-            .get_offset(line_idx)
+            .get_offset(line_offset)
             .expect("line index out of bounds")
             .into()
     }
@@ -308,10 +307,29 @@ impl<'a> NeovimBuffer<'a> {
         .expect("could not call getbufoneline()")
     }
 
-    /// Returns the number of lines in the buffer.
+    /// TODO: docs.
     #[inline]
-    fn line_len(&self) -> usize {
-        self.inner().line_count().expect("buffer is valid")
+    fn has_trailing_newline(&self) -> bool {
+        let bool_opt = |opt_name: &str| {
+            api::get_option_value::<bool>(
+                opt_name,
+                &api::opts::OptionOpts::builder().buffer(self.inner()).build(),
+            )
+            .expect("buffer is valid")
+        };
+
+        bool_opt("fixeol") && (bool_opt("eol") || !bool_opt("binary"))
+    }
+
+    /// Returns the number of lines in the buffer, which is defined as being
+    /// one more than the number of newline characters in the buffer.
+    ///
+    /// Note that an empty empty buffer will a `line_len` of 1.
+    #[inline]
+    fn line_len(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.inner().line_count().expect("buffer is valid"))
+            .expect("the output of line_count() is always >=1 ")
+            .saturating_add(self.has_implicit_trailing_newline() as usize)
     }
 
     /// Returns the selected byte range in the buffer, assuming:
@@ -454,7 +472,7 @@ impl Buffer for NeovimBuffer<'_> {
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
-        self.byte_of_line(self.line_len())
+        self.byte_of_line(self.line_len().into())
     }
 
     #[inline]
