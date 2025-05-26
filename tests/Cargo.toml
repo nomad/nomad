@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 auth = ["dep:auth", "__any"]
 collab = ["dep:auth", "dep:collab", "__any"]
 mock = ["__any", "__editor"]
-neovim = ["dep:async-io", "dep:neovim", "__any", "__editor"]
+neovim = ["dep:neovim", "__any", "__editor"]
 walkdir = ["dep:tempdir", "dep:walkdir", "__any"]
 
 # Features that should only be enabled by the build script.
@@ -30,12 +30,14 @@ neovim-nightly = ["neovim", "neovim/nightly"]
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
+async-io = { version = "2" }
 cauchy = { workspace = true }
 ed = { workspace = true }
 flume = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
 futures-util = { workspace = true, features = ["default"] }
 mock = { workspace = true }
+pin-project-lite = { workspace = true }
 rand = "0.9"
 rand_chacha = "0.9"
 
@@ -46,7 +48,6 @@ auth = { workspace = true, optional = true, features = ["mock"] }
 collab = { workspace = true, optional = true, features = ["mock"] }
 
 # Neovim-related dependencies.
-async-io = { version = "2", optional = true }
 neovim = { workspace = true, optional = true, features = ["test"] }
 
 # Walkdir-related dependencies.

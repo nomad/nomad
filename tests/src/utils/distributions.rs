@@ -54,7 +54,7 @@ impl Distribution<char> for CodeDistribution {
         let space_range = newline_range.end
             ..(newline_range.end + 1f32 / (Self::AVG_WORD_LEN as f32));
 
-        match rng.random_range(0f32..=1.0f32) {
+        match rng.random_range(0f32..=1f32) {
             x if emoji_range.contains(&x) => EmojiDistribution.sample(rng),
             x if newline_range.contains(&x) => '\n',
             x if space_range.contains(&x) => ' ',

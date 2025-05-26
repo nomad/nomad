@@ -113,21 +113,21 @@ fn gen_replacement(s: &str, rng: &mut impl Rng) -> Replacement {
     };
 
     // Make the average number of inserted bytes greater than the average
-    // number of deleted bytes to cause the buffer to grow over time.
+    // number of deleted bytes to let the buffer grow over time.
     let delete_num = rng.random_range(0..3);
     let insert_num = rng.random_range(0..5);
 
-    let delete_from = clip_to_char_boundary(rng.random_range(0..s.len()));
+    let delete_from = clip_to_char_boundary(rng.random_range(0..=s.len()));
     let delete_to = clip_to_char_boundary(delete_from + delete_num);
-    let insertion_str = iter::repeat_with(|| rng.sample(CodeDistribution))
+    let insert_str = iter::repeat_with(|| rng.sample(CodeDistribution))
         .take(insert_num)
         .collect::<String>();
 
-    Replacement::new(delete_from.into()..delete_to.into(), insertion_str)
+    Replacement::new(delete_from.into()..delete_to.into(), insert_str)
 }
 
 trait EditExt {
-    /// Returns a never-endign stream of [`Edit`]s on the buffer with the given
+    /// Returns a never-ending stream of [`Edit`]s on the buffer with the given
     /// ID.
     fn new_stream<Ed: Backend>(
         buf_id: Ed::BufferId,

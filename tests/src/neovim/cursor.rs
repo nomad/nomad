@@ -58,7 +58,7 @@ async fn insert_to_normal(ctx: &mut Context<Neovim>) {
 }
 
 trait ByteOffsetExt {
-    /// Returns a never-endign stream of [`ByteOffset`]s on the current buffer
+    /// Returns a never-ending stream of [`ByteOffset`]s on the current buffer
     /// corresponding to the cursor positions.
     fn new_stream(
         ctx: &mut Context<Neovim>,
