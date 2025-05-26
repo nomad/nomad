@@ -89,8 +89,27 @@ impl<'a> NeovimBuffer<'a> {
     #[inline]
     pub(crate) fn get_text_in_point_range(
         &self,
-        point_range: Range<Point>,
+        mut point_range: Range<Point>,
     ) -> CompactString {
+        // If the buffer has a trailing newline and the end of the range is
+        // after it, we need to clamp the end back to the end of the previous
+        // line or get_text() will return an out-of-bounds error.
+        //
+        // For example, if the buffer contains "Hello\nWorld\n" and the point
+        // range is `(0, 0)..(2, 0)`, we need to clamp the end to `(1, 5)`.
+        //
+        // However, because get_text() seems to already clamp offsets in lines,
+        // we just set the end to `(line_idx - 1, Integer::MAX)` and let it
+        // figure out the offset.
+
+        let needs_to_clamp_end = self.has_trailing_newline()
+            && point_range.end == self.point_of_eof();
+
+        if needs_to_clamp_end {
+            point_range.end.line_idx -= 1;
+            point_range.end.byte_offset = (oxi::Integer::MAX as usize).into();
+        }
+
         let lines = self
             .inner()
             .get_text(
@@ -112,6 +131,10 @@ impl<'a> NeovimBuffer<'a> {
             if !is_last {
                 text.push('\n');
             }
+        }
+
+        if needs_to_clamp_end {
+            text.push('\n');
         }
 
         text
@@ -329,7 +352,7 @@ impl<'a> NeovimBuffer<'a> {
     fn line_len(&self) -> NonZeroUsize {
         NonZeroUsize::new(self.inner().line_count().expect("buffer is valid"))
             .expect("the output of line_count() is always >=1 ")
-            .saturating_add(self.has_implicit_trailing_newline() as usize)
+            .saturating_add(self.has_trailing_newline() as usize)
     }
 
     /// Returns the selected byte range in the buffer, assuming:
@@ -472,7 +495,9 @@ impl Buffer for NeovimBuffer<'_> {
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
-        self.byte_of_line(self.line_len().into())
+        let buf = self.inner();
+        let line_count = buf.line_count().expect("buffer is valid");
+        buf.get_offset(line_count).expect("buffer is valid").into()
     }
 
     #[inline]
