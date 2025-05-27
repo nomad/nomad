@@ -55,7 +55,7 @@ pub(crate) struct Project<Ed: CollabBackend> {
     host_id: PeerId,
     id_maps: IdMaps<Ed>,
     local_peer: Peer,
-    peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltipId>,
+    peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltip>,
     project: collab_project::Project,
     remote_peers: FxHashMap<PeerId, Peer>,
     root_path: AbsPathBuf,
@@ -212,11 +212,11 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
             return;
         };
 
-        let peer_tooltip_id =
+        let peer_tooltip =
             Ed::create_peer_tooltip(peer, offset.into(), buf_id, ctx).await;
 
         self.with_project(|proj| {
-            proj.peer_tooltips.insert(cur_id, peer_tooltip_id);
+            proj.peer_tooltips.insert(cur_id, peer_tooltip);
         });
     }
 
@@ -225,7 +225,7 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
         deletion: text::CursorDeletion,
         ctx: &mut Context<Ed>,
     ) {
-        let Some(tooltip_id) = self.with_project(|proj| {
+        let Some(tooltip) = self.with_project(|proj| {
             proj.project
                 .integrate_cursor_deletion(deletion)
                 .and_then(|cursor_id| proj.peer_tooltips.remove(&cursor_id))
@@ -233,7 +233,7 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
             return;
         };
 
-        Ed::remove_peer_tooltip(tooltip_id, ctx).await;
+        Ed::remove_peer_tooltip(tooltip, ctx).await;
     }
 
     async fn integrate_cursor_movement(
@@ -241,15 +241,15 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
         movement: text::CursorMovement,
         ctx: &mut Context<Ed>,
     ) {
-        let Some((new_offset, tooltip_id)) = self.with_project(|proj| {
+        let Some(move_tooltip) = self.with_project(|proj| {
             let cursor = proj.project.integrate_cursor_movement(movement)?;
-            let tooltip_id = proj.peer_tooltips.get(&cursor.id())?;
-            Some((cursor.offset(), tooltip_id.clone()))
+            let tooltip = proj.peer_tooltips.get_mut(&cursor.id())?;
+            Some(Ed::move_peer_tooltip(tooltip, cursor.offset().into(), ctx))
         }) else {
             return;
         };
 
-        Ed::move_peer_tooltip(tooltip_id, new_offset.into(), ctx).await;
+        move_tooltip.await;
     }
 
     async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
@@ -268,11 +268,11 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
         peer_id: PeerId,
         ctx: &mut Context<Ed>,
     ) {
-        let (tooltip_ids, _peer) = self.with_project(|proj| {
+        let (tooltips, _peer) = self.with_project(|proj| {
             let (cursor_ids, _selection_ids) =
                 proj.project.integrate_peer_disconnection(peer_id);
 
-            let tooltip_ids = cursor_ids
+            let tooltips = cursor_ids
                 .into_iter()
                 .flat_map(|cursor_id| proj.peer_tooltips.remove(&cursor_id))
                 .collect::<SmallVec<[_; 1]>>();
@@ -282,11 +282,11 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
                 None => panic!("peer ID {:?} doesn't exist", peer_id),
             };
 
-            (tooltip_ids, peer)
+            (tooltips, peer)
         });
 
-        for tooltip_id in tooltip_ids {
-            Ed::remove_peer_tooltip(tooltip_id, ctx).await;
+        for tooltip in tooltips {
+            Ed::remove_peer_tooltip(tooltip, ctx).await;
         }
     }
 

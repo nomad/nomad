@@ -73,7 +73,7 @@ struct TildePath<'a> {
 
 impl CollabBackend for Neovim {
     type Io = async_net::TcpStream;
-    type PeerTooltipId = ();
+    type PeerTooltip = ();
     type ProjectFilter = walkdir::GitIgnore;
     type ServerConfig = ServerConfig;
 
@@ -133,7 +133,7 @@ impl CollabBackend for Neovim {
         _tooltip_offset: ByteOffset,
         _buffer_id: Self::BufferId,
         _ctx: &mut Context<Self>,
-    ) -> Self::PeerTooltipId {
+    ) -> Self::PeerTooltip {
     }
 
     async fn default_dir_for_remote_projects(
@@ -209,11 +209,12 @@ impl CollabBackend for Neovim {
             .map_err(|_| NeovimLspRootError { root_dir })
     }
 
-    async fn move_peer_tooltip(
-        _tooltip_id: Self::PeerTooltipId,
+    fn move_peer_tooltip<'ctx>(
+        _tooltip: &mut Self::PeerTooltip,
         _tooltip_offset: ByteOffset,
-        _ctx: &mut Context<Self>,
-    ) {
+        _ctx: &'ctx mut Context<Self>,
+    ) -> impl Future<Output = ()> + use<'ctx> {
+        async move {}
     }
 
     fn project_filter(
@@ -224,7 +225,7 @@ impl CollabBackend for Neovim {
     }
 
     async fn remove_peer_tooltip(
-        _tooltip_id: Self::PeerTooltipId,
+        _tooltip: Self::PeerTooltip,
         _ctx: &mut Context<Self>,
     ) {
     }

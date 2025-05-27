@@ -214,7 +214,7 @@ where
     F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
-    type PeerTooltipId = ();
+    type PeerTooltip = ();
     type ProjectFilter = F;
     type ServerConfig = ServerConfig;
 
@@ -262,7 +262,7 @@ where
         _tooltip_offset: ByteOffset,
         _buffer_id: Self::BufferId,
         _ctx: &mut Context<Self>,
-    ) -> Self::PeerTooltipId {
+    ) -> Self::PeerTooltip {
     }
 
     async fn default_dir_for_remote_projects(
@@ -291,11 +291,12 @@ where
         Ok(ctx.with_editor(|this| this.lsp_root_with.as_mut()?(buffer_id)))
     }
 
-    async fn move_peer_tooltip(
-        _tooltip_id: Self::PeerTooltipId,
+    fn move_peer_tooltip<'ctx>(
+        _tooltip: &mut Self::PeerTooltip,
         _tooltip_offset: ByteOffset,
-        _ctx: &mut Context<Self>,
-    ) {
+        _ctx: &'ctx mut Context<Self>,
+    ) -> impl Future<Output = ()> + use<'ctx, B, F> {
+        async move {}
     }
 
     fn project_filter(
@@ -306,7 +307,7 @@ where
     }
 
     async fn remove_peer_tooltip(
-        _tooltip_id: Self::PeerTooltipId,
+        _tooltip: Self::PeerTooltip,
         _ctx: &mut Context<Self>,
     ) {
     }

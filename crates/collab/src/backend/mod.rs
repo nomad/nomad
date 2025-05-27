@@ -22,7 +22,7 @@ pub trait CollabBackend: Backend {
     type Io: AsyncRead + AsyncWrite + Unpin;
 
     /// TODO: docs.
-    type PeerTooltipId: Clone;
+    type PeerTooltip;
 
     /// TODO: docs.
     type ProjectFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
@@ -76,7 +76,7 @@ pub trait CollabBackend: Backend {
         tooltip_offset: ByteOffset,
         buffer_id: Self::BufferId,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Self::PeerTooltipId>;
+    ) -> impl Future<Output = Self::PeerTooltip>;
 
     /// TODO: docs.
     fn default_dir_for_remote_projects(
@@ -99,11 +99,11 @@ pub trait CollabBackend: Backend {
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
 
     /// TODO: docs.
-    fn move_peer_tooltip(
-        tooltip_id: Self::PeerTooltipId,
+    fn move_peer_tooltip<'ctx>(
+        tooltip: &mut Self::PeerTooltip,
         tooltip_offset: ByteOffset,
-        ctx: &mut Context<Self>,
-    ) -> impl Future<Output = ()>;
+        ctx: &'ctx mut Context<Self>,
+    ) -> impl Future<Output = ()> + use<'ctx, Self>;
 
     /// TODO: docs.
     fn project_filter(
@@ -113,7 +113,7 @@ pub trait CollabBackend: Backend {
 
     /// TODO: docs.
     fn remove_peer_tooltip(
-        tooltip_id: Self::PeerTooltipId,
+        tooltip: Self::PeerTooltip,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
 
