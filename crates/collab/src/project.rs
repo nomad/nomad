@@ -50,15 +50,16 @@ pub struct OverlappingProjectError {
 pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 /// TODO: docs.
-pub(crate) struct Project<B: CollabBackend> {
+pub(crate) struct Project<Ed: CollabBackend> {
     agent_id: AgentId,
     host_id: PeerId,
-    id_maps: IdMaps<B>,
+    id_maps: IdMaps<Ed>,
     local_peer: Peer,
+    peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltipId>,
     project: collab_project::Project,
     remote_peers: FxHashMap<PeerId, Peer>,
     root_path: AbsPathBuf,
-    session_id: SessionId<B>,
+    session_id: SessionId<Ed>,
 }
 
 #[derive(cauchy::Clone, cauchy::Default)]
@@ -146,7 +147,9 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
             Message::DeletedSelection(selection_deletion) => todo!(),
             Message::EditedBinary(binary_edit) => todo!(),
             Message::EditedText(text_edit) => todo!(),
-            Message::MovedCursor(cursor_movement) => todo!(),
+            Message::MovedCursor(cursor_movement) => {
+                self.integrate_cursor_movement(cursor_movement, ctx).await
+            },
             Message::MovedFsNode(movement) => {
                 self.integrate_fs_op(movement, ctx).await
             },
@@ -192,20 +195,43 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
         creation: text::CursorCreation,
         ctx: &mut Context<Ed>,
     ) {
-        let Some((owner, offset, buf_id)) = self.with_project(|proj| {
+        let Some((peer, offset, buf_id, cur_id)) = self.with_project(|proj| {
             let cursor = proj.project.integrate_cursor_creation(creation)?;
             let cursor_file = cursor.file()?;
             let cursor_owner = proj.remote_peers.get(&cursor.owner())?;
             let buf_id = proj.id_maps.file2buffer.get(&cursor_file.id())?;
-            Some((cursor_owner.clone(), cursor.offset(), buf_id.clone()))
+            Some((
+                cursor_owner.clone(),
+                cursor.offset(),
+                buf_id.clone(),
+                cursor.id(),
+            ))
         }) else {
             return;
         };
 
-        let _peer_tooltip =
-            Ed::create_peer_tooltip(owner, offset.into(), buf_id, ctx).await;
+        let peer_tooltip_id =
+            Ed::create_peer_tooltip(peer, offset.into(), buf_id, ctx).await;
 
-        todo!("store peer")
+        self.with_project(|proj| {
+            proj.peer_tooltips.insert(cur_id, peer_tooltip_id);
+        });
+    }
+
+    async fn integrate_cursor_movement(
+        &self,
+        movement: text::CursorMovement,
+        ctx: &mut Context<Ed>,
+    ) {
+        let Some((new_offset, tooltip_id)) = self.with_project(|proj| {
+            let cursor = proj.project.integrate_cursor_movement(movement)?;
+            let tooltip_id = proj.peer_tooltips.get(&cursor.id())?;
+            Some((cursor.offset(), tooltip_id.clone()))
+        }) else {
+            return;
+        };
+
+        Ed::move_peer_tooltip(tooltip_id, new_offset.into(), ctx).await;
     }
 
     async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
@@ -222,14 +248,28 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
     async fn integrate_peer_left(
         &self,
         peer_id: PeerId,
-        _ctx: &mut Context<Ed>,
+        ctx: &mut Context<Ed>,
     ) {
-        self.with_project(|proj| match proj.remote_peers.remove(&peer_id) {
-            Some(_peer) => {},
-            None => panic!("peer ID {:?} doesn't exist", peer_id),
+        let (tooltip_ids, _peer) = self.with_project(|proj| {
+            let (cursor_ids, _selection_ids) =
+                proj.project.integrate_peer_disconnection(peer_id);
+
+            let tooltip_ids = cursor_ids
+                .into_iter()
+                .flat_map(|cursor_id| proj.peer_tooltips.remove(&cursor_id))
+                .collect::<SmallVec<[_; 1]>>();
+
+            let peer = match proj.remote_peers.remove(&peer_id) {
+                Some(peer) => peer,
+                None => panic!("peer ID {:?} doesn't exist", peer_id),
+            };
+
+            (tooltip_ids, peer)
         });
 
-        todo!("remove peer tooltips")
+        for tooltip_id in tooltip_ids {
+            Ed::remove_peer_tooltip(tooltip_id, ctx).await;
+        }
     }
 
     async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
@@ -860,8 +900,9 @@ impl<B: CollabBackend> ProjectGuard<B> {
             host_id: args.host_id,
             id_maps: args.id_maps,
             local_peer: args.local_peer,
-            remote_peers,
+            peer_tooltips: FxHashMap::default(),
             project: args.project,
+            remote_peers,
             root_path: self.root.clone(),
             session_id: args.session_id,
         })

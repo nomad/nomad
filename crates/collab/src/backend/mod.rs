@@ -22,7 +22,7 @@ pub trait CollabBackend: Backend {
     type Io: AsyncRead + AsyncWrite + Unpin;
 
     /// TODO: docs.
-    type PeerTooltip;
+    type PeerTooltipId: Clone;
 
     /// TODO: docs.
     type ProjectFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
@@ -76,7 +76,7 @@ pub trait CollabBackend: Backend {
         tooltip_offset: ByteOffset,
         buffer_id: Self::BufferId,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Self::PeerTooltip>;
+    ) -> impl Future<Output = Self::PeerTooltipId>;
 
     /// TODO: docs.
     fn default_dir_for_remote_projects(
@@ -99,10 +99,23 @@ pub trait CollabBackend: Backend {
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
 
     /// TODO: docs.
+    fn move_peer_tooltip(
+        tooltip_id: Self::PeerTooltipId,
+        tooltip_offset: ByteOffset,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = ()>;
+
+    /// TODO: docs.
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
     ) -> Self::ProjectFilter;
+
+    /// TODO: docs.
+    fn remove_peer_tooltip(
+        tooltip_id: Self::PeerTooltipId,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = ()>;
 
     /// Prompts the user to select one of the given `(project_root,
     /// session_id)` pairs.
