@@ -185,11 +185,11 @@ impl<'a> NeovimBuffer<'a> {
     #[inline]
     pub(crate) fn new(
         id: BufferId,
-        // decoration_provider: &'a DecorationProvider,
+        decoration_provider: &'a DecorationProvider,
         events: &'a Shared<Events>,
     ) -> Self {
         debug_assert!(id.is_valid());
-        Self { id, decoration_provider: todo!(), events }
+        Self { id, decoration_provider, events }
     }
 
     /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the

@@ -53,18 +53,22 @@ impl Neovim {
     fn buffer_inner(&self, buf_id: BufferId) -> Option<NeovimBuffer<'_>> {
         buf_id.is_valid().then_some(NeovimBuffer::new(
             buf_id,
-            // &self.decoration_provider,
+            &self.decoration_provider,
             &self.events,
         ))
     }
 
     #[inline]
     fn new_inner(augroup_name: &str, reinstate_panic_hook: bool) -> Self {
+        let decoration_provider = DecorationProvider::new(augroup_name);
+        let buf_fields = events::BufferFields {
+            decoration_provider: decoration_provider.clone(),
+        };
         Self {
-            events: Shared::new(Events::new(augroup_name)),
+            events: Shared::new(Events::new(augroup_name, buf_fields)),
             emitter: Default::default(),
             executor: Default::default(),
-            decoration_provider: DecorationProvider::new(augroup_name),
+            decoration_provider,
             reinstate_panic_hook,
         }
     }

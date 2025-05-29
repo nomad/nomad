@@ -12,6 +12,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::cursor::NeovimCursor;
+use crate::decoration_provider::DecorationProvider;
 use crate::mode::ModeStr;
 use crate::oxi::api::{self, opts, types};
 
@@ -72,6 +73,7 @@ pub(crate) struct EventsBorrow<'a> {
 pub(crate) struct Events {
     pub(crate) agent_ids: AgentIds,
     augroup_id: AugroupId,
+    buffer_fields: BufferFields,
     on_buffer_created: Option<Callbacks<BufReadPost>>,
     on_buffer_edited: NoHashMap<BufferId, Callbacks<OnBytes>>,
     on_buffer_focused: Option<Callbacks<BufEnter>>,
@@ -89,6 +91,12 @@ pub(crate) struct AgentIds {
     pub(crate) focused_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) removed_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) saved_buffer: NoHashMap<BufferId, AgentId>,
+}
+
+/// Additional fields needed to call [`NeovimBuffer::new`].
+#[derive(Clone)]
+pub(crate) struct BufferFields {
+    pub(crate) decoration_provider: DecorationProvider,
 }
 
 #[doc(hidden)]
@@ -190,7 +198,10 @@ impl Events {
         EventHandle::new(event_key, event_kind, events)
     }
 
-    pub(crate) fn new(augroup_name: &str) -> Self {
+    pub(crate) fn new(
+        augroup_name: &str,
+        buffer_fields: BufferFields,
+    ) -> Self {
         let augroup_id = api::create_augroup(
             augroup_name,
             &opts::CreateAugroupOpts::builder().clear(true).build(),
@@ -200,6 +211,7 @@ impl Events {
         Self {
             augroup_id,
             agent_ids: Default::default(),
+            buffer_fields,
             on_buffer_created: Default::default(),
             on_buffer_edited: Default::default(),
             on_buffer_focused: Default::default(),
@@ -209,6 +221,14 @@ impl Events {
             on_cursor_moved: Default::default(),
             on_mode_changed: Default::default(),
         }
+    }
+
+    pub(crate) fn buffer<'a>(
+        buffer_id: BufferId,
+        events: &'a Shared<Events>,
+        buf_fields: &'a BufferFields,
+    ) -> NeovimBuffer<'a> {
+        NeovimBuffer::new(buffer_id, &buf_fields.decoration_provider, &events)
     }
 }
 
@@ -282,6 +302,7 @@ impl Event for BufEnter {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -303,7 +324,7 @@ impl Event for BufEnter {
                     return true;
                 };
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
 
                 for callback in callbacks {
                     callback((&buffer, focused_by));
@@ -342,6 +363,7 @@ impl Event for BufLeave {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -357,7 +379,7 @@ impl Event for BufLeave {
                     return true;
                 };
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
 
                 for callback in callbacks {
                     callback((&buffer, removed_by));
@@ -394,6 +416,7 @@ impl Event for BufReadPost {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -415,7 +438,7 @@ impl Event for BufReadPost {
                     return true;
                 };
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
 
                 for callback in callbacks {
                     callback((&buffer, created_by));
@@ -454,6 +477,7 @@ impl Event for BufUnload {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -476,7 +500,7 @@ impl Event for BufUnload {
                     return true;
                 };
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
 
                 for callback in callbacks {
                     callback((&buffer, removed_by));
@@ -515,6 +539,7 @@ impl Event for BufWritePost {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -537,7 +562,7 @@ impl Event for BufWritePost {
                     return true;
                 };
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
 
                 for callback in callbacks {
                     callback((&buffer, saved_by));
@@ -576,6 +601,7 @@ impl Event for CursorMoved {
     fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -591,8 +617,11 @@ impl Event for CursorMoved {
                     return true;
                 };
 
-                let cursor =
-                    NeovimCursor::new(NeovimBuffer::new(buffer_id, &events));
+                let cursor = NeovimCursor::new(Events::buffer(
+                    buffer_id,
+                    &events,
+                    &buf_fields,
+                ));
 
                 for callback in callbacks {
                     callback((&cursor, moved_by));
@@ -637,6 +666,7 @@ impl Event for ModeChanged {
     fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
         let augroup_id = events.augroup_id;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::CreateAutocmdOpts::builder()
@@ -656,7 +686,7 @@ impl Event for ModeChanged {
                          \"{{old_mode}}:{{new_mode}}\"",
                     );
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
                 let old_mode = ModeStr::new(old_mode);
                 let new_mode = ModeStr::new(new_mode);
 
@@ -697,6 +727,7 @@ impl Event for OnBytes {
     fn register(&self, events: EventsBorrow) {
         let buffer_id = self.0;
 
+        let buf_fields = events.borrow.buffer_fields.clone();
         let events = events.handle;
 
         let opts = opts::BufAttachOpts::builder()
@@ -715,7 +746,7 @@ impl Event for OnBytes {
                     return true;
                 };
 
-                let buffer = NeovimBuffer::new(buffer_id, &events);
+                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
 
                 let edit = Edit {
                     made_by: edited_by,
