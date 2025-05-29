@@ -3,6 +3,7 @@
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
+use core::iter::FusedIterator;
 use core::ops::Range;
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -41,6 +42,29 @@ pub struct HighlightRangeHandle {
     inner: decoration_provider::HighlightRange,
 }
 
+/// TODO: docs.
+pub struct GraphemeOffsets<'a> {
+    /// The [`NeovimBuffer`] `Self` iterates over.
+    buffer: &'a NeovimBuffer<'a>,
+
+    /// The [`buffer`](Self::buffer)'s byte length.
+    byte_len: ByteOffset,
+
+    /// The [`ByteOffset`] `Self` is currently parked at.
+    byte_offset: ByteOffset,
+
+    /// The line (or a part of it from/up to some offset) whose grapheme
+    /// offsets we're currently iterating over, or `None` if the last call to
+    /// [`next()`](Iterator::next) made us move past a newline.
+    current_line: Option<NvimString>,
+
+    /// The [`Point`] `Self` is currently parked at.
+    ///
+    /// This should always refer to the same buffer position as
+    /// [`byte_offset`](Self::byte_offset).
+    point: Point,
+}
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) struct Point {
     /// The index of the line in the buffer.
@@ -51,6 +75,29 @@ pub(crate) struct Point {
 }
 
 impl<'a> NeovimBuffer<'a> {
+    /// TODO: docs.
+    #[inline]
+    pub fn grapheme_offsets(&self) -> GraphemeOffsets<'_> {
+        self.grapheme_offsets_from(0usize.into())
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn grapheme_offsets_from(
+        &self,
+        byte_offset: ByteOffset,
+    ) -> GraphemeOffsets<'_> {
+        debug_assert!(byte_offset <= self.byte_len());
+        let point = self.point_of_byte(byte_offset);
+        GraphemeOffsets {
+            buffer: self,
+            byte_len: self.byte_len(),
+            byte_offset,
+            current_line: Some(self.get_line(point.line_idx)),
+            point,
+        }
+    }
+
     /// TODO: docs.
     #[track_caller]
     #[inline]
@@ -716,31 +763,10 @@ impl Buffer for NeovimBuffer<'_> {
     }
 }
 
-impl From<NeovimBuffer<'_>> for api::Buffer {
-    #[inline]
-    fn from(buf: NeovimBuffer) -> Self {
-        buf.id().into()
-    }
-}
-
 impl From<api::Buffer> for BufferId {
     #[inline]
     fn from(buf: api::Buffer) -> Self {
         Self(buf.handle())
-    }
-}
-
-impl From<BufferId> for api::Buffer {
-    #[inline]
-    fn from(buf_id: BufferId) -> Self {
-        buf_id.0.into()
-    }
-}
-
-impl From<BufferId> for oxi::Object {
-    #[inline]
-    fn from(buf_id: BufferId) -> Self {
-        buf_id.0.into()
     }
 }
 
@@ -759,6 +785,66 @@ impl Hash for BufferId {
 }
 
 impl nohash::IsEnabled for BufferId {}
+
+impl Iterator for GraphemeOffsets<'_> {
+    type Item = ByteOffset;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        // We're at the end of the buffer.
+        if self.byte_offset == self.byte_len {
+            return None;
+        }
+
+        let line_from_offset = &self
+            .current_line
+            .get_or_insert_with(|| self.buffer.get_line(self.point.line_idx))
+            .as_bytes()[usize::from(self.point.byte_offset)..];
+
+        if line_from_offset.is_empty() {
+            // We're at the end of the current line, so the next grapheme
+            // must be a newline character.
+            self.byte_offset += 1;
+            self.point.line_idx += 1;
+            self.point.byte_offset = 0usize.into();
+            self.current_line = None;
+            Some(self.byte_offset)
+        } else {
+            // TODO: avoid allocating a new NvimString every time.
+            let grapheme_len = api::call_function::<_, usize>(
+                "byteidx",
+                (NvimString::from_bytes(line_from_offset), 1),
+            )
+            .expect("couldn't call byteidx()");
+            self.byte_offset += grapheme_len;
+            self.point.byte_offset += grapheme_len;
+            Some(self.byte_offset)
+        }
+    }
+}
+
+impl FusedIterator for GraphemeOffsets<'_> {}
+
+impl From<NeovimBuffer<'_>> for api::Buffer {
+    #[inline]
+    fn from(buf: NeovimBuffer) -> Self {
+        buf.id().into()
+    }
+}
+
+impl From<BufferId> for api::Buffer {
+    #[inline]
+    fn from(buf_id: BufferId) -> Self {
+        buf_id.0.into()
+    }
+}
+
+impl From<BufferId> for oxi::Object {
+    #[inline]
+    fn from(buf_id: BufferId) -> Self {
+        buf_id.0.into()
+    }
+}
 
 impl fmt::Debug for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
