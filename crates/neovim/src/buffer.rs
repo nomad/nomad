@@ -323,7 +323,7 @@ impl<'a> NeovimBuffer<'a> {
         let last_line_len = if has_trailing_newline {
             0
         } else {
-            self.get_line(num_rows - 1).len()
+            self.line_len(num_rows - 1).into()
         };
 
         Point::new(num_lines, last_line_len)
@@ -337,6 +337,13 @@ impl<'a> NeovimBuffer<'a> {
         mut delete_range: Range<Point>,
         insert_text: &str,
     ) {
+        debug_assert!(delete_range.start <= delete_range.end);
+        debug_assert!(delete_range.end <= self.point_of_eof());
+
+        if delete_range.is_empty() {
+            return;
+        }
+
         // We need to clamp the end in the same way we do in
         // get_text_in_point_range(). See that comment for more details.
         //
@@ -346,10 +353,9 @@ impl<'a> NeovimBuffer<'a> {
             && delete_range.end == self.point_of_eof();
 
         if needs_to_clamp_end {
-            delete_range.end.line_idx -= 1;
-            let penultimate_line = self.get_line(delete_range.end.line_idx);
-            delete_range.end.byte_offset = penultimate_line.len().into();
-            delete_range.start = delete_range.start.min(delete_range.end);
+            let end = &mut delete_range.end;
+            end.line_idx -= 1;
+            end.byte_offset = self.line_len(end.line_idx);
         }
 
         // If the text has a trailing newline, Neovim expects an additional
@@ -455,6 +461,9 @@ impl<'a> NeovimBuffer<'a> {
 
     /// Returns the contents of the line at the given index, *without* any
     /// trailing newline character.
+    ///
+    /// Note that if you just want to know the *length* of the line, you should
+    /// use [`line_len()`](Self::line_len) instead.
     #[inline]
     fn get_line(&self, line_idx: usize) -> NvimString {
         api::call_function(
@@ -467,15 +476,38 @@ impl<'a> NeovimBuffer<'a> {
     /// TODO: docs.
     #[inline]
     fn has_trailing_newline(&self) -> bool {
+        let opts =
+            api::opts::OptionOpts::builder().buffer(self.inner()).build();
+
         let bool_opt = |opt_name: &str| {
-            api::get_option_value::<bool>(
-                opt_name,
-                &api::opts::OptionOpts::builder().buffer(self.inner()).build(),
-            )
-            .expect("buffer is valid")
+            api::get_option_value::<bool>(opt_name, &opts)
+                .expect("buffer is valid")
         };
 
         bool_opt("eol") || (bool_opt("fixeol") && !bool_opt("binary"))
+    }
+
+    /// Returns the byte length of the line at the given index, *without* any
+    /// trailing newline character.
+    ///
+    /// This is equivalent to `self.get_line(line_idx).len()`, but faster.
+    #[inline]
+    fn line_len(&self, line_idx: usize) -> ByteOffset {
+        // TODO: benchmark whether this is actually faster than
+        // `self.get_line(line_idx).len()`.
+
+        let row = (line_idx + 1) as oxi::Integer;
+
+        let col = api::call_function::<_, usize>(
+            "col",
+            oxi::Array::from_iter([
+                oxi::Object::from(row),
+                oxi::Object::from("$"),
+            ]),
+        )
+        .expect("could not call getbufoneline()");
+
+        (col - 1).into()
     }
 
     /// Returns the selected byte range in the buffer, assuming:
@@ -512,34 +544,18 @@ impl<'a> NeovimBuffer<'a> {
             byte_offset: ByteOffset::new(head_col - 1),
         };
 
-        let (start, mut end) =
+        let (start, end) =
             if anchor <= head { (anchor, head) } else { (head, anchor) };
 
-        // The length of the last selected grapheme is never included in the
-        // coordinates returned by getpos(), so we need to add it ourselves.
-        let final_grapheme_len = {
-            let end_line = self.get_line(end.line_idx);
-            let cursor_to_eol = &end_line.as_bytes()[end.byte_offset.into()..];
-            String::from_utf8_lossy(cursor_to_eol)
-                // FIXME: use graphemes.
-                .chars()
-                .next()
-                .map(char::len_utf8)
-                // The cursor is already at EOL, so the next grapheme must
-                // be a \n.
-                .unwrap_or(1)
+        let end_offset = {
+            let offset = self.byte_of_point(end);
+            // The length of the last selected grapheme is not included in the
+            // coordinates returned by getpos(), so we need to add it
+            // ourselves.
+            self.grapheme_offsets_from(offset).next().unwrap_or(offset)
         };
 
-        end.byte_offset += final_grapheme_len;
-
-        // Neovim always allows you to select one more character past the end
-        // of the line, which is usually interpreted as having selected the
-        // following newline.
-        //
-        // Clearly that doesn't work if you're already at the end of the file.
-        end = end.min(self.point_of_eof());
-
-        self.byte_of_point(start)..self.byte_of_point(end)
+        self.byte_of_point(start)..end_offset
     }
 
     /// Returns the selected byte range in the buffer, assuming:
