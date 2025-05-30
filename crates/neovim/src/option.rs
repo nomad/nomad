@@ -59,10 +59,17 @@ pub(crate) struct EndOfLine;
 pub(crate) struct FixEndOfLine;
 
 /// TODO: docs.
-pub(crate) struct OptionSet<T: NeovimOption>(PhantomData<T>);
+pub(crate) struct OptionSet<T>(PhantomData<T>);
 
 /// The [`Opts`](NeovimOption::Opts) for all buffer-local options.
 pub(crate) struct BufferLocalOpts(api::opts::OptionOpts);
+
+impl<T: WatchedOption> OptionSet<T> {
+    #[inline]
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
+    }
+}
 
 impl NeovimOption for Binary {
     const LONG_NAME: &'static str = "binary";
@@ -85,28 +92,28 @@ impl NeovimOption for FixEndOfLine {
 impl WatchedOption for EndOfLine {
     #[inline]
     fn callbacks(
-        _events: &mut Events,
+        events: &mut Events,
     ) -> &mut Option<Callbacks<OptionSet<Self>>> {
-        todo!();
+        &mut events.on_end_of_line_set
     }
 
     #[inline]
     fn event_kind() -> EventKind {
-        todo!();
+        EventKind::EndOfLineSet(OptionSet::<Self>::new())
     }
 }
 
 impl WatchedOption for FixEndOfLine {
     #[inline]
     fn callbacks(
-        _events: &mut Events,
+        events: &mut Events,
     ) -> &mut Option<Callbacks<OptionSet<Self>>> {
-        todo!();
+        &mut events.on_fix_end_of_line_set
     }
 
     #[inline]
     fn event_kind() -> EventKind {
-        todo!();
+        EventKind::FixEndOfLineSet(OptionSet::<Self>::new())
     }
 }
 

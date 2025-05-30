@@ -14,6 +14,7 @@ use crate::buffer::{BufferId, NeovimBuffer};
 use crate::cursor::NeovimCursor;
 use crate::decoration_provider::DecorationProvider;
 use crate::mode::ModeStr;
+use crate::option::{EndOfLine, FixEndOfLine, OptionSet};
 use crate::oxi::api;
 
 type AugroupId = u32;
@@ -77,6 +78,9 @@ pub(crate) struct Events {
     pub(crate) agent_ids: AgentIds,
     pub(crate) augroup_id: AugroupId,
     pub(crate) buffer_fields: BufferFields,
+    pub(crate) on_end_of_line_set: Option<Callbacks<OptionSet<EndOfLine>>>,
+    pub(crate) on_fix_end_of_line_set:
+        Option<Callbacks<OptionSet<FixEndOfLine>>>,
     on_buffer_created: Option<Callbacks<BufReadPost>>,
     on_buffer_edited: NoHashMap<BufferId, Callbacks<OnBytes>>,
     on_buffer_focused: Option<Callbacks<BufEnter>>,
@@ -140,6 +144,8 @@ pub(crate) enum EventKind {
     BufUnload(BufUnload),
     BufWritePost(BufWritePost),
     CursorMoved(CursorMoved),
+    EndOfLineSet(OptionSet<EndOfLine>),
+    FixEndOfLineSet(OptionSet<FixEndOfLine>),
     ModeChanged(ModeChanged),
     OnBytes(OnBytes),
 }
@@ -221,6 +227,8 @@ impl Events {
             on_buffer_saved: Default::default(),
             on_buffer_unfocused: Default::default(),
             on_cursor_moved: Default::default(),
+            on_end_of_line_set: Default::default(),
+            on_fix_end_of_line_set: Default::default(),
             on_mode_changed: Default::default(),
         }
     }
@@ -826,6 +834,8 @@ impl Drop for EventHandle {
                     EventKind::BufUnload(ev) => ev.cleanup(key, events),
                     EventKind::BufWritePost(ev) => ev.cleanup(key, events),
                     EventKind::CursorMoved(ev) => ev.cleanup(key, events),
+                    EventKind::EndOfLineSet(ev) => ev.cleanup(key, events),
+                    EventKind::FixEndOfLineSet(ev) => ev.cleanup(key, events),
                     EventKind::ModeChanged(ev) => ev.cleanup(key, events),
                     EventKind::OnBytes(ev) => ev.cleanup(key, events),
                 }
