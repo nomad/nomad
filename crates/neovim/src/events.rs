@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use ed::Shared;
 use ed::backend::{AgentId, Edit};
-use nohash::{IntMap as NoHashMap, IntSet as NoHashSet};
+use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -14,7 +14,7 @@ use crate::buffer::{BufferId, NeovimBuffer};
 use crate::cursor::NeovimCursor;
 use crate::decoration_provider::DecorationProvider;
 use crate::mode::ModeStr;
-use crate::option::{EndOfLine, FixEndOfLine, OptionSet};
+use crate::option::{Binary, EndOfLine, FixEndOfLine, OptionSet};
 use crate::oxi::api;
 
 type AugroupId = u32;
@@ -78,6 +78,7 @@ pub(crate) struct Events {
     pub(crate) agent_ids: AgentIds,
     pub(crate) augroup_id: AugroupId,
     pub(crate) buffer_fields: BufferFields,
+    pub(crate) on_binary_set: Option<Callbacks<OptionSet<Binary>>>,
     pub(crate) on_end_of_line_set: Option<Callbacks<OptionSet<EndOfLine>>>,
     pub(crate) on_fix_end_of_line_set:
         Option<Callbacks<OptionSet<FixEndOfLine>>>,
@@ -96,7 +97,7 @@ pub(crate) struct AgentIds {
     pub(crate) created_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) edited_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) focused_buffer: NoHashMap<BufferId, AgentId>,
-    pub(crate) has_just_deleted_trailing_newline: NoHashSet<BufferId>,
+    pub(crate) has_just_deleted_trailing_newline: Option<BufferId>,
     pub(crate) removed_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) saved_buffer: NoHashMap<BufferId, AgentId>,
 }
@@ -138,6 +139,7 @@ pub(crate) struct ModeChanged;
 pub(crate) struct OnBytes(pub(crate) BufferId);
 
 pub(crate) enum EventKind {
+    BinarySet(OptionSet<Binary>),
     BufEnter(BufEnter),
     BufLeave(BufLeave),
     BufReadPost(BufReadPost),
@@ -220,6 +222,7 @@ impl Events {
             augroup_id,
             agent_ids: Default::default(),
             buffer_fields,
+            on_binary_set: Default::default(),
             on_buffer_created: Default::default(),
             on_buffer_edited: Default::default(),
             on_buffer_focused: Default::default(),
@@ -828,6 +831,7 @@ impl Drop for EventHandle {
         self.events.with_mut(|events| {
             for (key, kind) in self.event_keys_kind.drain(..) {
                 match kind {
+                    EventKind::BinarySet(ev) => ev.cleanup(key, events),
                     EventKind::BufEnter(ev) => ev.cleanup(key, events),
                     EventKind::BufLeave(ev) => ev.cleanup(key, events),
                     EventKind::BufReadPost(ev) => ev.cleanup(key, events),

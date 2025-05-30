@@ -89,6 +89,20 @@ impl NeovimOption for FixEndOfLine {
     type Opts = BufferLocalOpts;
 }
 
+impl WatchedOption for Binary {
+    #[inline]
+    fn callbacks(
+        events: &mut Events,
+    ) -> &mut Option<Callbacks<OptionSet<Self>>> {
+        &mut events.on_binary_set
+    }
+
+    #[inline]
+    fn event_kind() -> EventKind {
+        EventKind::BinarySet(OptionSet::<Self>::new())
+    }
+}
+
 impl WatchedOption for EndOfLine {
     #[inline]
     fn callbacks(

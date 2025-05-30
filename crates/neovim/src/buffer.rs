@@ -12,12 +12,19 @@ use compact_str::CompactString;
 use ed::backend::{AgentId, Buffer, Chunks, Edit, Replacement};
 use ed::fs::AbsPath;
 use ed::{ByteOffset, Shared};
+use smallvec::smallvec_inline;
 
 use crate::Neovim;
 use crate::cursor::NeovimCursor;
 use crate::decoration_provider::{self, DecorationProvider};
 use crate::events::{self, EventHandle, Events};
-use crate::option::{Binary, EndOfLine, FixEndOfLine, NeovimOption};
+use crate::option::{
+    Binary,
+    EndOfLine,
+    FixEndOfLine,
+    NeovimOption,
+    OptionSet,
+};
 use crate::oxi::{self, BufHandle, String as NvimString, api, mlua};
 
 /// TODO: docs.
@@ -382,8 +389,8 @@ impl<'a> NeovimBuffer<'a> {
 
         if should_unset_eol_fixeol {
             // If someone is receiving edit events for this buffer, we need to
-            // store this buffer's ID in the set of buffers that just had their
-            // trailing newline deleted so that:
+            // mark this buffer's ID as the one that just had their trailing
+            // newline deleted so that:
             //
             // 1) in `Self::replacement_of_on_bytes()` we'll know to extend the
             //    deleted range by 1;
@@ -392,10 +399,8 @@ impl<'a> NeovimBuffer<'a> {
             //    will be triggered when we unset "eol" and "fixeol";
             self.events.with_mut(|events| {
                 if events.contains(&events::OnBytes(self.id())) {
-                    events
-                        .agent_ids
-                        .has_just_deleted_trailing_newline
-                        .insert(self.id());
+                    events.agent_ids.has_just_deleted_trailing_newline =
+                        Some(self.id());
                 }
             });
         }
@@ -413,6 +418,12 @@ impl<'a> NeovimBuffer<'a> {
             let opts = self.into();
             EndOfLine.set(false, &opts);
             FixEndOfLine.set(false, &opts);
+
+            // All the callbacks registered to `OnBytes`, "eol" and "fixeol"
+            // have now been executed, so we can cleanup the state.
+            self.events.with_mut(|events| {
+                events.agent_ids.has_just_deleted_trailing_newline = None;
+            });
         }
     }
 
@@ -442,10 +453,8 @@ impl<'a> NeovimBuffer<'a> {
         debug_assert_eq!(buf, self.inner());
 
         let has_just_deleted_trailing_newline = self.events.with(|events| {
-            events
-                .agent_ids
-                .has_just_deleted_trailing_newline
-                .contains(&self.id())
+            events.agent_ids.has_just_deleted_trailing_newline
+                == Some(self.id())
         });
 
         let deletion_start = start_offset.into();
@@ -530,7 +539,11 @@ impl<'a> NeovimBuffer<'a> {
     #[inline]
     fn is_eol_on(&self) -> bool {
         let opts = self.into();
-        EndOfLine.get(&opts) || (FixEndOfLine.get(&opts) && !Binary.get(&opts))
+        is_eol_on(
+            EndOfLine.get(&opts),
+            FixEndOfLine.get(&opts),
+            Binary.get(&opts),
+        )
     }
 
     /// Returns the byte length of the line at the given index, *without* any
@@ -783,15 +796,103 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_edited<Fun>(&self, mut fun: Fun) -> EventHandle
+    fn on_edited<Fun>(&self, fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimBuffer, &Edit) + 'static,
     {
-        Events::insert(
+        let fun = Shared::<Fun>::new(fun);
+
+        let on_bytes_handle =
+            Events::insert(self.events.clone(), events::OnBytes(self.id()), {
+                let fun = fun.clone();
+                move |(this, edit)| fun.with_mut(|fun| fun(this, edit))
+            });
+
+        // Setting/unsetting the right combination of "endofline",
+        // "fixendofline" and "binary" behaves as if deleting/inserting a
+        // trailing newline, so we need to listen for all three events.
+
+        let buffer_id = self.id();
+
+        let end_of_line_set_handle = Events::insert(
             self.events.clone(),
-            events::OnBytes(self.id()),
-            move |(this, edit)| fun(this, edit),
-        )
+            OptionSet::<EndOfLine>::new(),
+            {
+                let fun = fun.clone();
+                move |(buf, &old_value, &new_value)| {
+                    let buf = buf.expect("endofline is buffer-local");
+                    if buf.id() != buffer_id {
+                        return;
+                    }
+
+                    let opts = (&buf).into();
+                    let fix_end_of_line = FixEndOfLine.get(&opts);
+                    let binary = Binary.get(&opts);
+
+                    react_to_eol_changes(
+                        &buf,
+                        (old_value, new_value),
+                        (fix_end_of_line, fix_end_of_line),
+                        (binary, binary),
+                        &fun,
+                    );
+                }
+            },
+        );
+
+        let fix_end_of_line_set_handle = Events::insert(
+            self.events.clone(),
+            OptionSet::<FixEndOfLine>::new(),
+            {
+                let fun = fun.clone();
+                move |(buf, &old_value, &new_value)| {
+                    let buf = buf.expect("fixendofline is buffer-local");
+                    if buf.id() != buffer_id {
+                        return;
+                    }
+
+                    let opts = (&buf).into();
+                    let end_of_line = EndOfLine.get(&opts);
+                    let binary = Binary.get(&opts);
+
+                    react_to_eol_changes(
+                        &buf,
+                        (end_of_line, end_of_line),
+                        (old_value, new_value),
+                        (binary, binary),
+                        &fun,
+                    );
+                }
+            },
+        );
+
+        let binary_set_handle =
+            Events::insert(self.events.clone(), OptionSet::<Binary>::new(), {
+                let fun = fun.clone();
+                move |(buf, &old_value, &new_value)| {
+                    let buf = buf.expect("binary is buffer-local");
+                    if buf.id() != buffer_id {
+                        return;
+                    }
+
+                    let opts = (&buf).into();
+                    let end_of_line = EndOfLine.get(&opts);
+                    let fix_end_of_line = FixEndOfLine.get(&opts);
+
+                    react_to_eol_changes(
+                        &buf,
+                        (end_of_line, end_of_line),
+                        (fix_end_of_line, fix_end_of_line),
+                        (old_value, new_value),
+                        &fun,
+                    );
+                }
+            });
+
+        on_bytes_handle
+            .merge(end_of_line_set_handle)
+            .merge(fix_end_of_line_set_handle)
+            .merge(binary_set_handle)
     }
 
     #[inline]
@@ -931,4 +1032,47 @@ impl Ord for Point {
             .cmp(&other.line_idx)
             .then(self.byte_offset.cmp(&other.byte_offset))
     }
+}
+
+fn is_eol_on(eol: bool, fixeol: bool, binary: bool) -> bool {
+    eol || (fixeol && !binary)
+}
+
+fn react_to_eol_changes(
+    buf: &NeovimBuffer,
+    (old_eol, new_eol): (bool, bool),
+    (old_fixeol, new_fixeol): (bool, bool),
+    (old_binary, new_binary): (bool, bool),
+    fun: &Shared<impl FnMut(&NeovimBuffer, &Edit)>,
+) {
+    // If 'endofline' and 'fixendofline' were turned off by us in
+    // `NeovimBuffer::replace_text_in_point_range()`, the callback registered
+    // to `OnBytes` already took care of including the trailing newline in the
+    // deleted range, so we don't need to do anything here.
+    if buf.events.with(|events| {
+        events.agent_ids.has_just_deleted_trailing_newline == Some(buf.id())
+    }) {
+        return;
+    }
+
+    let was_eol_on = is_eol_on(old_eol, old_fixeol, old_binary);
+
+    let is_eol_on = is_eol_on(new_eol, new_fixeol, new_binary);
+
+    let byte_len = buf.byte_len();
+
+    let replacement = match (was_eol_on, is_eol_on) {
+        // The trailing newline was deleted.
+        (true, false) => Replacement::removal(byte_len..byte_len + 1),
+        // The trailing newline was added.
+        (false, true) => Replacement::insertion(byte_len - 1, "\n"),
+        _ => return,
+    };
+
+    let edit = Edit {
+        made_by: AgentId::UNKNOWN,
+        replacements: smallvec_inline![replacement],
+    };
+
+    fun.with_mut(|fun| fun(buf, &edit));
 }
