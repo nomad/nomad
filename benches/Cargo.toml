@@ -14,7 +14,7 @@ neovim-repo = []
 
 [dependencies]
 abs-path = { workspace = true }
-criterion = "0.5"
+criterion = "0.6"
 ed = { workspace = true, features = ["os-fs"] }
 futures-lite = { workspace = true }
 mock = { workspace = true }

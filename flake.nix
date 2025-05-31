@@ -39,20 +39,14 @@
             pkgs.mkShell {
               buildInputs =
                 with pkgs;
-                [
-                  # Needed to build mlua's vendored version of LuaJIT.
-                  gcc
-                  make
-                ]
-                ++ lib.optional stdenv.isDarwin [
+                lib.optional stdenv.isDarwin [
                   # Not sure who needs these
                   darwin.apple_sdk.frameworks.AppKit
                   libiconv
                 ];
 
               packages = with pkgs; [
-                # neovim
-                pkg-config
+                neovim
               ];
             }
           );
