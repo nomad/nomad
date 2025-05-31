@@ -158,7 +158,7 @@ impl DecorationProvider {
     fn on_buf(&self) -> impl Fn(api::opts::OnBufArgs) + 'static {
         let inner = self.inner.clone();
 
-        move |(_, buf)| {
+        move |(_, buf, _)| {
             let buf_id = BufferId::from(buf);
             inner.with_mut(|inner| {
                 // Draw the highlight ranges for the given buffer.

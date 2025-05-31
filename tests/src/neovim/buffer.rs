@@ -72,7 +72,6 @@ async fn setting_eol_is_like_inserting_trailing_newline(
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
     api::set_option_value("eol", true, &opts).unwrap();
 
     let edit = edit_stream.next().await.unwrap();
