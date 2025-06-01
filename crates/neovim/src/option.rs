@@ -106,7 +106,7 @@ impl<T: NeovimOption> OptionSet<T> {
             + 'static,
     {
         let augroup_id = events.augroup_id;
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -121,7 +121,7 @@ impl<T: NeovimOption> OptionSet<T> {
                     Events::buffer(
                         BufferId::of_focused(),
                         &events,
-                        &buf_fields,
+                        &bufs_state,
                     )
                 });
 

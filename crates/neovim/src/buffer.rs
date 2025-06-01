@@ -24,9 +24,9 @@ use crate::oxi::{self, BufHandle, String as NvimString, api, mlua};
 /// TODO: docs.
 #[derive(Copy, Clone)]
 pub struct NeovimBuffer<'a> {
-    decoration_provider: &'a DecorationProvider,
-    events: &'a Shared<Events>,
     id: BufferId,
+    events: &'a Shared<Events>,
+    state: &'a BuffersState,
 }
 
 /// TODO: docs.
@@ -65,6 +65,12 @@ pub struct GraphemeOffsets<'a> {
     /// This should always refer to the same buffer position as
     /// [`byte_offset`](Self::byte_offset).
     point: Point,
+}
+
+#[derive(Clone)]
+pub(crate) struct BuffersState {
+    pub(crate) decoration_provider: DecorationProvider,
+    pub(crate) skip_next_uneditable_eol: Shared<Option<BufferId>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -113,7 +119,7 @@ impl<'a> NeovimBuffer<'a> {
         let start = self.point_of_byte(byte_range.start);
         let end = self.point_of_byte(byte_range.end);
         HighlightRangeHandle {
-            inner: self.decoration_provider.highlight_range(
+            inner: self.state.decoration_provider.highlight_range(
                 self.id(),
                 start..end,
                 highlight_group_name,
@@ -237,11 +243,11 @@ impl<'a> NeovimBuffer<'a> {
     #[inline]
     pub(crate) fn new(
         id: BufferId,
-        decoration_provider: &'a DecorationProvider,
         events: &'a Shared<Events>,
+        state: &'a BuffersState,
     ) -> Self {
         debug_assert!(id.is_valid());
-        Self { id, decoration_provider, events }
+        Self { id, events, state }
     }
 
     /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the
@@ -337,7 +343,7 @@ impl<'a> NeovimBuffer<'a> {
         &self,
         mut delete_range: Range<Point>,
         insert_text: &str,
-        _agent_id: AgentId,
+        agent_id: AgentId,
     ) {
         debug_assert!(delete_range.start <= delete_range.end);
         debug_assert!(delete_range.end <= self.point_of_eof());
@@ -356,12 +362,6 @@ impl<'a> NeovimBuffer<'a> {
             end.line_idx -= 1;
             end.byte_offset = self.line_len(end.line_idx);
         }
-
-        // If the text has a trailing newline, Neovim expects an additional
-        // empty line to be included.
-        let lines = insert_text
-            .lines()
-            .chain(insert_text.ends_with('\n').then_some(""));
 
         // If we needed to clamp the end of the range, it means the user also
         // wanted to delete the trailing newline.
@@ -383,22 +383,36 @@ impl<'a> NeovimBuffer<'a> {
         // intent.
         let should_unset_uneditable_eol = needs_to_clamp_end;
 
-        if should_unset_uneditable_eol && !delete_range.is_empty() {
-            // If someone is receiving edit events for this buffer, we need to
-            // mark this buffer's ID as the one that just had their trailing
-            // newline deleted so that:
-            //
-            // 1) in `Self::replacement_of_on_bytes()` we'll know to extend the
-            //    deleted range by 1;
-            //
-            // 2) we'll know to ignore the next event for UneditableEndOfLine;
+        if should_unset_uneditable_eol {
             self.events.with_mut(|events| {
-                if events.contains(&events::OnBytes(self.id())) {
-                    events.agent_ids.has_just_deleted_trailing_newline =
-                        Some(self.id());
+                if !events.contains(&events::OnBytes(self.id)) {
+                    return;
+                }
+
+                events.agent_ids.set_uneditable_eol.insert(self.id, agent_id);
+
+                // We're about to call set_text() and unset the buffer's
+                // uneditable eol setting, which will trigger two events:
+                // OnBytes and UneditableEndOfLine (in that order).
+                //
+                // Since they're both triggered by the same replacement,
+                // the edit event handlers should only be called once,
+                // so we skip the next UneditableEndOfLine event if OnBytes
+                // is triggered.
+                let is_on_bytes_triggered =
+                    !delete_range.is_empty() || !insert_text.is_empty();
+
+                if is_on_bytes_triggered {
+                    self.state.skip_next_uneditable_eol.set(Some(self.id));
                 }
             });
         }
+
+        // If the text has a trailing newline, Neovim expects an additional
+        // empty line to be included.
+        let lines = insert_text
+            .lines()
+            .chain(insert_text.ends_with('\n').then_some(""));
 
         self.inner()
             .set_text(
@@ -411,12 +425,9 @@ impl<'a> NeovimBuffer<'a> {
 
         if should_unset_uneditable_eol {
             UneditableEndOfLine.set(false, &self.into());
-
-            // The callbacks registered to OnBytes and UneditableEndOfLine have
-            // now been executed, so we can cleanup the state.
-            self.events.with_mut(|events| {
-                events.agent_ids.has_just_deleted_trailing_newline = None;
-            });
+            // All callbacks registered to UneditableEndOfLine have now been
+            // executed, so we can cleanup the state.
+            self.state.skip_next_uneditable_eol.set(None);
         }
     }
 
@@ -445,9 +456,8 @@ impl<'a> NeovimBuffer<'a> {
 
         debug_assert_eq!(buf, self.inner());
 
-        let has_just_deleted_trailing_newline = self.events.with(|events| {
-            events.agent_ids.has_just_deleted_trailing_newline
-                == Some(self.id())
+        let has_just_deleted_uneditable_eol = self.events.with(|events| {
+            events.agent_ids.set_uneditable_eol.contains_key(&self.id())
         });
 
         let deletion_start = start_offset.into();
@@ -455,9 +465,9 @@ impl<'a> NeovimBuffer<'a> {
         let deletion_end = (start_offset
             + old_end_len
             // Add 1 if the user just called
-            // `Self::replace_text_in_point_range()` with a byte range that
-            // included the trailing newline.
-            + has_just_deleted_trailing_newline as usize)
+            // Self::replace_text_in_point_range() with a deletion range that
+            // included the uneditable eol.
+            + has_just_deleted_uneditable_eol as usize)
             .into();
 
         let insertion_start =
@@ -811,15 +821,12 @@ impl Buffer for NeovimBuffer<'_> {
                     return;
                 }
 
-                // If 'endofline' and 'fixendofline' were turned off by us in
-                // `NeovimBuffer::replace_text_in_point_range()`, the callback
-                // registered to `OnBytes` already took care of including the
-                // trailing newline in the deleted range, so we don't need to
-                // do anything here.
-                if buf.events.with(|events| {
-                    events.agent_ids.has_just_deleted_trailing_newline
-                        == Some(buf.id())
-                }) {
+                // We should skip this event.
+                if buf
+                    .state
+                    .skip_next_uneditable_eol
+                    .with(|&maybe_buf_id| maybe_buf_id == Some(buf.id()))
+                {
                     return;
                 }
 

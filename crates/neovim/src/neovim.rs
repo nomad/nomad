@@ -8,6 +8,7 @@ use ed::{BorrowState, Context, Shared};
 
 use crate::buffer::{
     BufferId,
+    BuffersState,
     HighlightRange,
     HighlightRangeHandle,
     NeovimBuffer,
@@ -21,10 +22,10 @@ use crate::{api, executor, notify, oxi, serde, value};
 
 /// TODO: docs.
 pub struct Neovim {
+    buffers_state: BuffersState,
     emitter: notify::NeovimEmitter,
     events: Shared<Events>,
     executor: executor::NeovimExecutor,
-    decoration_provider: DecorationProvider,
     reinstate_panic_hook: bool,
 }
 
@@ -69,22 +70,22 @@ impl Neovim {
     fn buffer_inner(&self, buf_id: BufferId) -> Option<NeovimBuffer<'_>> {
         buf_id.is_valid().then_some(NeovimBuffer::new(
             buf_id,
-            &self.decoration_provider,
             &self.events,
+            &self.buffers_state,
         ))
     }
 
     #[inline]
     fn new_inner(augroup_name: &str, reinstate_panic_hook: bool) -> Self {
-        let decoration_provider = DecorationProvider::new(augroup_name);
-        let buf_fields = events::BufferFields {
-            decoration_provider: decoration_provider.clone(),
+        let buffers_state = BuffersState {
+            decoration_provider: DecorationProvider::new(augroup_name),
+            skip_next_uneditable_eol: Default::default(),
         };
         Self {
-            events: Shared::new(Events::new(augroup_name, buf_fields)),
+            buffers_state: buffers_state.clone(),
+            events: Shared::new(Events::new(augroup_name, buffers_state)),
             emitter: Default::default(),
             executor: Default::default(),
-            decoration_provider,
             reinstate_panic_hook,
         }
     }

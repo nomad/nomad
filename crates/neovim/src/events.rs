@@ -10,9 +10,8 @@ use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};
 
-use crate::buffer::{BufferId, NeovimBuffer};
+use crate::buffer::{BufferId, BuffersState, NeovimBuffer};
 use crate::cursor::NeovimCursor;
-use crate::decoration_provider::DecorationProvider;
 use crate::mode::ModeStr;
 use crate::option::UneditableEndOfLine;
 use crate::oxi::api;
@@ -77,7 +76,7 @@ pub(crate) struct EventsBorrow<'a> {
 pub(crate) struct Events {
     pub(crate) agent_ids: AgentIds,
     pub(crate) augroup_id: AugroupId,
-    pub(crate) buffer_fields: BufferFields,
+    pub(crate) buffers_state: BuffersState,
     pub(crate) on_uneditable_eol_set: Option<Callbacks<UneditableEndOfLine>>,
     on_buffer_created: Option<Callbacks<BufReadPost>>,
     on_buffer_edited: NoHashMap<BufferId, Callbacks<OnBytes>>,
@@ -94,16 +93,9 @@ pub(crate) struct AgentIds {
     pub(crate) created_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) edited_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) focused_buffer: NoHashMap<BufferId, AgentId>,
-    pub(crate) has_just_deleted_trailing_newline: Option<BufferId>,
     pub(crate) removed_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) saved_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) set_uneditable_eol: NoHashMap<BufferId, AgentId>,
-}
-
-/// Additional fields needed to call [`NeovimBuffer::new`].
-#[derive(Clone)]
-pub(crate) struct BufferFields {
-    pub(crate) decoration_provider: DecorationProvider,
 }
 
 pub(crate) struct Callbacks<T: Event> {
@@ -213,7 +205,7 @@ impl Events {
 
     pub(crate) fn new(
         augroup_name: &str,
-        buffer_fields: BufferFields,
+        buffers_state: BuffersState,
     ) -> Self {
         let augroup_id = api::create_augroup(
             augroup_name,
@@ -224,7 +216,7 @@ impl Events {
         Self {
             augroup_id,
             agent_ids: Default::default(),
-            buffer_fields,
+            buffers_state,
             on_buffer_created: Default::default(),
             on_buffer_edited: Default::default(),
             on_buffer_focused: Default::default(),
@@ -240,9 +232,9 @@ impl Events {
     pub(crate) fn buffer<'a>(
         buffer_id: BufferId,
         events: &'a Shared<Events>,
-        buf_fields: &'a BufferFields,
+        bufs_state: &'a BuffersState,
     ) -> NeovimBuffer<'a> {
-        NeovimBuffer::new(buffer_id, &buf_fields.decoration_provider, &events)
+        NeovimBuffer::new(buffer_id, events, bufs_state)
     }
 }
 
@@ -321,7 +313,7 @@ impl Event for BufEnter {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -343,7 +335,7 @@ impl Event for BufEnter {
                     return true;
                 };
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 for callback in callbacks {
                     callback((&buffer, focused_by));
@@ -387,7 +379,7 @@ impl Event for BufLeave {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -403,7 +395,7 @@ impl Event for BufLeave {
                     return true;
                 };
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 for callback in callbacks {
                     callback((&buffer, removed_by));
@@ -445,7 +437,7 @@ impl Event for BufReadPost {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -467,7 +459,7 @@ impl Event for BufReadPost {
                     return true;
                 };
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 for callback in callbacks {
                     callback((&buffer, created_by));
@@ -511,7 +503,7 @@ impl Event for BufUnload {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -534,7 +526,7 @@ impl Event for BufUnload {
                     return true;
                 };
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 for callback in callbacks {
                     callback((&buffer, removed_by));
@@ -578,7 +570,7 @@ impl Event for BufWritePost {
     fn register(&self, events: EventsBorrow) -> AutocmdId {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -601,7 +593,7 @@ impl Event for BufWritePost {
                     return true;
                 };
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 for callback in callbacks {
                     callback((&buffer, saved_by));
@@ -645,7 +637,7 @@ impl Event for CursorMoved {
     fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -664,7 +656,7 @@ impl Event for CursorMoved {
                 let cursor = NeovimCursor::new(Events::buffer(
                     buffer_id,
                     &events,
-                    &buf_fields,
+                    &bufs_state,
                 ));
 
                 for callback in callbacks {
@@ -715,7 +707,7 @@ impl Event for ModeChanged {
     fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
         let augroup_id = events.augroup_id;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::CreateAutocmdOpts::builder()
@@ -735,7 +727,7 @@ impl Event for ModeChanged {
                          \"{{old_mode}}:{{new_mode}}\"",
                     );
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
                 let old_mode = ModeStr::new(old_mode);
                 let new_mode = ModeStr::new(new_mode);
 
@@ -781,7 +773,7 @@ impl Event for OnBytes {
     fn register(&self, events: EventsBorrow) {
         let buffer_id = self.0;
 
-        let buf_fields = events.borrow.buffer_fields.clone();
+        let bufs_state = events.borrow.buffers_state.clone();
         let events = events.handle;
 
         let opts = api::opts::BufAttachOpts::builder()
@@ -800,7 +792,7 @@ impl Event for OnBytes {
                     return true;
                 };
 
-                let buffer = Events::buffer(buffer_id, &events, &buf_fields);
+                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 let edit = Edit {
                     made_by: edited_by,
