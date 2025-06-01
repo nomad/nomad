@@ -131,7 +131,7 @@ impl<'a> NeovimBuffer<'a> {
     /// buffer.
     #[track_caller]
     #[inline]
-    pub(crate) fn byte_of_point(self, point: Point) -> ByteOffset {
+    pub(crate) fn byte_of_point(&self, point: Point) -> ByteOffset {
         let line_offset: ByteOffset = self
             .inner()
             .get_offset(point.line_idx)
@@ -164,7 +164,7 @@ impl<'a> NeovimBuffer<'a> {
 
     #[track_caller]
     #[inline]
-    pub(crate) fn get_name(self) -> PathBuf {
+    pub(crate) fn get_name(&self) -> PathBuf {
         self.inner().get_name().expect("buffer exists")
     }
 
@@ -235,7 +235,7 @@ impl<'a> NeovimBuffer<'a> {
 
     #[track_caller]
     #[inline]
-    pub(crate) fn is_focused(self) -> bool {
+    pub(crate) fn is_focused(&self) -> bool {
         api::Window::current().get_buf().expect("window is valid")
             == self.inner()
     }
@@ -254,39 +254,32 @@ impl<'a> NeovimBuffer<'a> {
     /// buffer.
     #[track_caller]
     #[inline]
-    pub(crate) fn point_of_byte(self, byte_offset: ByteOffset) -> Point {
+    pub(crate) fn point_of_byte(&self, byte_offset: ByteOffset) -> Point {
         debug_assert!(byte_offset <= self.byte_len());
 
+        // byte2line(1) has a bug where it returns -1 if the buffer's "memline"
+        // (i.e. the object that stores its contents in memory) is not
+        // initialized.
+        //
+        // Because the memline seems to be lazily initialized when the user
+        // first edits the buffer, byte2line(1) will always return -1 on newly
+        // created, empty buffers.
+        //
+        // I brought this up here
+        // https://github.com/neovim/neovim/issues/34199, but it was almost
+        // immediately closed as a "wontfix" for reasons that are still
+        // completely opaque to me.
+        //
+        // The TLDR of that issue is that the maintainers are not only not
+        // willing to fix the bug, but they don't even recognize it as such, so
+        // we have to special-case it.
         if byte_offset == 0 {
             return Point::zero();
-        } else if byte_offset == 1 && self.byte_len() == 1 {
-            // byte2line() has a bug where it returns -1 if the buffer's
-            // "memline" (i.e. the object that stores its contents in memory)
-            // is not initialized.
-            //
-            // Because the memline seems to be lazily initialized when the user
-            // first edits the buffer, byte2line() will always return -1 on
-            // newly created buffers.
-            //
-            // I brought this up here
-            // https://github.com/neovim/neovim/issues/34199, but it was almost
-            // immediately closed as a "wontfix" for reasons that are still
-            // completely opaque to me.
-            //
-            // The TLDR of that issue is that the maintainers are not only not
-            // willing to fix the bug, but they don't even recognize it as
-            // such, so we have to handle it ourselves.
-            //
-            // Unfortunately there's no public API to check if a memline is
-            // initialized, however we can use the fact that in a buffer with
-            // an uninitialized memline there can only be up to two possible
-            // valid byte offsets: 0 (which we already checked), and — if the
-            // buffer has an uneditable eol — 1.
-            return if self.has_uneditable_eol() {
-                Point::new(1, 0)
-            } else {
-                Point::new(0, 1)
-            };
+        }
+        // byte2line() always returns -1 if the buffer has an uneditable eol
+        // and the byte offset is past it.
+        else if byte_offset == self.byte_len() {
+            return self.point_of_eof();
         }
 
         let line_idx = self.call(move |this| {
@@ -320,7 +313,7 @@ impl<'a> NeovimBuffer<'a> {
     /// Returns the [`Point`] at the end of the buffer.
     #[track_caller]
     #[inline]
-    pub(crate) fn point_of_eof(self) -> Point {
+    pub(crate) fn point_of_eof(&self) -> Point {
         let num_rows = self.inner().line_count().expect("buffer is valid");
 
         let has_uneditable_eol = self.has_uneditable_eol();
@@ -389,7 +382,7 @@ impl<'a> NeovimBuffer<'a> {
                     return;
                 }
 
-                events.agent_ids.set_uneditable_eol.insert(self.id, agent_id);
+                events.agent_ids.set_uneditable_eol.set(agent_id);
 
                 // We're about to call set_text() and unset the buffer's
                 // uneditable eol setting, which will trigger two events:
@@ -456,9 +449,9 @@ impl<'a> NeovimBuffer<'a> {
 
         debug_assert_eq!(buf, self.inner());
 
-        let has_just_deleted_uneditable_eol = self.events.with(|events| {
-            events.agent_ids.set_uneditable_eol.contains_key(&self.id())
-        });
+        let has_just_deleted_uneditable_eol = self
+            .events
+            .with(|events| events.agent_ids.set_uneditable_eol.is_set());
 
         let deletion_start = start_offset.into();
 
@@ -821,11 +814,9 @@ impl Buffer for NeovimBuffer<'_> {
                     return;
                 }
 
-                // We should skip this event.
-                if buf
-                    .state
-                    .skip_next_uneditable_eol
-                    .with(|&maybe_buf_id| maybe_buf_id == Some(buf.id()))
+                // Check if we should skip this event.
+                if buf.state.skip_next_uneditable_eol.copied()
+                    == Some(buf.id())
                 {
                     return;
                 }

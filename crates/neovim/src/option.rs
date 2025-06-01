@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use core::mem;
 use core::ops::Deref;
 
 use ed::Shared;
@@ -242,6 +243,30 @@ impl<T: WatchedOption> Event for OptionSet<T> {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct SetUneditableEolAgentIds {
+    set_eol: AgentId,
+    set_fix_eol: AgentId,
+}
+
+impl SetUneditableEolAgentIds {
+    #[inline]
+    pub(crate) fn is_set(&self) -> bool {
+        debug_assert!(
+            self.set_eol == self.set_fix_eol
+                || self.set_eol.is_unknown() && self.set_fix_eol.is_unknown()
+        );
+        !self.set_eol.is_unknown()
+    }
+
+    #[inline]
+    pub(crate) fn set(&mut self, agent_id: AgentId) {
+        debug_assert!(!agent_id.is_unknown());
+        self.set_eol = agent_id;
+        self.set_fix_eol = agent_id;
+    }
+}
+
 impl Event for UneditableEndOfLine {
     type Args<'a> = (NeovimBuffer<'a>, bool, bool, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
@@ -263,18 +288,49 @@ impl Event for UneditableEndOfLine {
     #[allow(clippy::too_many_lines)]
     #[inline]
     fn register(&self, mut events: EventsBorrow) -> Self::RegisterOutput {
+        enum Option {
+            Binary,
+            Eol,
+            FixEol,
+        }
+
         let on_option_set =
             |buffer: NeovimBuffer,
-             old_value: bool,
-             new_value: bool,
+             old_option_value: bool,
+             new_option_value: bool,
+             option: Option,
              events: &Shared<Events>| {
+                let opts = (&buffer).into();
+
+                let value = |option_value: bool| match option {
+                    Option::Binary => UneditableEndOfLine::get_inner(
+                        || EndOfLine.get(&opts),
+                        || FixEndOfLine.get(&opts),
+                        || option_value,
+                    ),
+                    Option::Eol => UneditableEndOfLine::get_inner(
+                        || option_value,
+                        || FixEndOfLine.get(&opts),
+                        || Binary.get(&opts),
+                    ),
+                    Option::FixEol => UneditableEndOfLine::get_inner(
+                        || EndOfLine.get(&opts),
+                        || option_value,
+                        || Binary.get(&opts),
+                    ),
+                };
+
+                let old_value = value(old_option_value);
+                let new_value = value(new_option_value);
+
                 let Some((callbacks, set_by)) = events.with_mut(|events| {
                     let callbacks = events.on_uneditable_eol_set.as_ref()?;
-                    let set_by = events
-                        .agent_ids
-                        .set_uneditable_eol
-                        .remove(&buffer.id())
-                        .unwrap_or(AgentId::UNKNOWN);
+                    let ids = &mut events.agent_ids.set_uneditable_eol;
+                    let set_by = match option {
+                        Option::Eol => mem::take(&mut ids.set_eol),
+                        Option::FixEol => mem::take(&mut ids.set_fix_eol),
+                        Option::Binary => AgentId::UNKNOWN,
+                    };
                     Some((callbacks.cloned(), set_by))
                 }) else {
                     return true;
@@ -290,63 +346,39 @@ impl Event for UneditableEndOfLine {
         let eol_autocmd_id = OptionSet::<EndOfLine>::register_inner(
             events.reborrow(),
             move |maybe_buffer, &old_eol, &new_eol, events| {
-                let buffer = maybe_buffer.expect("'eol' is buffer-local");
-                let opts = (&buffer).into();
-                let fix_eol = FixEndOfLine.get(&opts);
-                let binary = Binary.get(&opts);
-                let old_value = UneditableEndOfLine::get_inner(
-                    || old_eol,
-                    || fix_eol,
-                    || binary,
-                );
-                let new_value = UneditableEndOfLine::get_inner(
-                    || new_eol,
-                    || fix_eol,
-                    || binary,
-                );
-                on_option_set(buffer, old_value, new_value, events)
+                on_option_set(
+                    maybe_buffer.expect("'eol' is buffer-local"),
+                    old_eol,
+                    new_eol,
+                    Option::Eol,
+                    events,
+                )
             },
         );
 
         let fixeol_autocmd_id = OptionSet::<FixEndOfLine>::register_inner(
             events.reborrow(),
             move |maybe_buffer, &old_fix_eol, &new_fix_eol, events| {
-                let buffer = maybe_buffer.expect("'fixeol' is buffer-local");
-                let opts = (&buffer).into();
-                let eol = EndOfLine.get(&opts);
-                let binary = Binary.get(&opts);
-                let old_value = UneditableEndOfLine::get_inner(
-                    || eol,
-                    || old_fix_eol,
-                    || binary,
-                );
-                let new_value = UneditableEndOfLine::get_inner(
-                    || eol,
-                    || new_fix_eol,
-                    || binary,
-                );
-                on_option_set(buffer, old_value, new_value, events)
+                on_option_set(
+                    maybe_buffer.expect("'fixeol' is buffer-local"),
+                    old_fix_eol,
+                    new_fix_eol,
+                    Option::FixEol,
+                    events,
+                )
             },
         );
 
         let binary_autocmd_id = OptionSet::<Binary>::register_inner(
             events.reborrow(),
             move |maybe_buffer, &old_binary, &new_binary, events| {
-                let buffer = maybe_buffer.expect("'binary' is buffer-local");
-                let opts = (&buffer).into();
-                let eol = EndOfLine.get(&opts);
-                let fix_eol = FixEndOfLine.get(&opts);
-                let old_value = UneditableEndOfLine::get_inner(
-                    || eol,
-                    || fix_eol,
-                    || old_binary,
-                );
-                let new_value = UneditableEndOfLine::get_inner(
-                    || eol,
-                    || fix_eol,
-                    || new_binary,
-                );
-                on_option_set(buffer, old_value, new_value, events)
+                on_option_set(
+                    maybe_buffer.expect("'binary' is buffer-local"),
+                    old_binary,
+                    new_binary,
+                    Option::Binary,
+                    events,
+                )
             },
         );
 

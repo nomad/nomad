@@ -13,7 +13,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use crate::buffer::{BufferId, BuffersState, NeovimBuffer};
 use crate::cursor::NeovimCursor;
 use crate::mode::ModeStr;
-use crate::option::UneditableEndOfLine;
+use crate::option::{SetUneditableEolAgentIds, UneditableEndOfLine};
 use crate::oxi::api;
 
 pub(crate) type AugroupId = u32;
@@ -95,7 +95,7 @@ pub(crate) struct AgentIds {
     pub(crate) focused_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) removed_buffer: NoHashMap<BufferId, AgentId>,
     pub(crate) saved_buffer: NoHashMap<BufferId, AgentId>,
-    pub(crate) set_uneditable_eol: NoHashMap<BufferId, AgentId>,
+    pub(crate) set_uneditable_eol: SetUneditableEolAgentIds,
 }
 
 pub(crate) struct Callbacks<T: Event> {
