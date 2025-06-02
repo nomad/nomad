@@ -12,17 +12,6 @@ pub trait ContextExt {
         api::command(cmd).expect("couldn't execute command");
     }
 
-    /// Enters insert mode as if "a" was typed in normal mode.
-    ///
-    /// # Panics
-    ///
-    /// Panics if Neovim is not in normal mode.
-    #[track_caller]
-    fn enter_insert_with_a(&self) {
-        assert!(api::get_mode().mode == "n", "not in normal mode");
-        api::feedkeys(c"a", c"n", false);
-    }
-
     /// Enters insert mode as if "i" was typed in normal mode.
     ///
     /// # Panics

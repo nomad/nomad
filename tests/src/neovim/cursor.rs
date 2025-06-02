@@ -34,7 +34,7 @@ async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
 
     // The offset of a block cursor is set to its left-hand side, so entering
     // insert mode with "a" should move the offset to its right side.
-    ctx.enter_insert_with_a();
+    ctx.feedkeys("a<Esc>");
 
     assert_eq!(offsets.next().await.unwrap(), 5usize);
 }
@@ -43,14 +43,16 @@ async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
 async fn insert_to_normal(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("ihello<Esc>");
 
+    // The cursor is now between the second "l" and the "o".
+    ctx.enter_insert_with_i();
+
     let mut offsets = ByteOffset::new_stream(ctx);
 
-    ctx.enter_insert_with_a();
-    let _five = offsets.next().await.unwrap();
-
-    // The cursor is now on top of the "o".
+    // When we switch from insert to normal mode, the cursor is moved on top
+    // of the second "l", which is at offset 3.
     ctx.feedkeys("<Esc>");
-    assert_eq!(offsets.next().await.unwrap(), 4usize);
+
+    assert_eq!(offsets.next().await.unwrap(), 3usize);
 }
 
 trait ByteOffsetExt {
