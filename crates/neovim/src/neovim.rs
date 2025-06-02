@@ -283,15 +283,24 @@ impl BaseBackend for Neovim {
 
             let buffer = this.buffer_inner(buf_id).expect("just created");
 
-            buffer.replace_text_in_point_range(
-                Point::zero()..Point::zero(),
-                &contents,
-                agent_id,
-            );
+            // 'eol' is turned on by default, so avoid inserting the file's
+            // trailing newline or we'll get an extra line.
+            let contents = contents
+                .ends_with('\n')
+                .then(|| &contents[..contents.len() - 1])
+                .unwrap_or(&contents);
+
+            if !contents.is_empty() {
+                buffer.replace_text_in_point_range(
+                    Point::zero()..Point::zero(),
+                    &contents,
+                    agent_id,
+                );
+            }
 
             buffer.inner().set_name(file_path).expect("couldn't set name");
 
-            // TODO: do we have to set the buffer's filename?
+            // TODO: do we have to set the buffer's filetype?
             // vim.filetype.match(buffer.inner())
 
             Ok(buffer.id())
