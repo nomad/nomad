@@ -69,10 +69,10 @@ pub struct GraphemeOffsets<'a> {
 
 #[derive(Clone)]
 pub(crate) struct BuffersState {
-    pub(crate) skip_next_uneditable_eol: Shared<Option<BufferId>>,
     decoration_provider: DecorationProvider,
-    on_bytes_replacement_deletion_end_extend_by_one: Shared<bool>,
+    on_bytes_replacement_extend_deletion_end_by_one: Shared<bool>,
     on_bytes_replacement_insertion_starts_at_next_line: Shared<bool>,
+    skip_next_uneditable_eol: Shared<bool>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -395,11 +395,11 @@ impl<'a> NeovimBuffer<'a> {
 
         if should_unset_uneditable_eol {
             self.events.with_mut(|events| {
-                if !events.contains(&events::OnBytes(self.id)) {
+                if !events.contains(&events::OnBytes(self.id())) {
                     return;
                 }
 
-                // We're about unset the buffer's uneditable eol setting and
+                // We're about to unset the buffer's uneditable eol setting and
                 // call set_text(), which will trigger two events:
                 // UneditableEndOfLine and OnBytes (in that order).
                 //
@@ -411,13 +411,13 @@ impl<'a> NeovimBuffer<'a> {
                     !delete_range.is_empty() || !insert_text.is_empty();
 
                 if is_on_bytes_triggered {
-                    self.state.skip_next_uneditable_eol.set(Some(self.id));
+                    self.state.skip_next_uneditable_eol.set(true);
 
                     if !delete_range.is_empty() {
                         // Extend the end of the deleted range by one byte
                         // to account for having deleted the trailing newline.
                         self.state
-                            .on_bytes_replacement_deletion_end_extend_by_one
+                            .on_bytes_replacement_extend_deletion_end_by_one
                             .set(true);
                     } else if insert_after_uneditable_eol {
                         // Make the inserted text start at the next line to
@@ -435,9 +435,6 @@ impl<'a> NeovimBuffer<'a> {
             });
 
             UneditableEndOfLine.set(false, &self.into());
-            // All the callbacks registered to UneditableEndOfLine have now
-            // been executed, so we can cleanup the state.
-            self.state.skip_next_uneditable_eol.set(None);
         }
 
         let lines =
@@ -487,7 +484,7 @@ impl<'a> NeovimBuffer<'a> {
         let deletion_start = start_offset.into();
 
         let should_extend_end =
-            self.state.on_bytes_replacement_deletion_end_extend_by_one.take();
+            self.state.on_bytes_replacement_extend_deletion_end_by_one.take();
 
         let deletion_end =
             (start_offset + old_end_len + should_extend_end as usize).into();
@@ -758,7 +755,7 @@ impl BuffersState {
     pub(crate) fn new(decoration_provider: DecorationProvider) -> Self {
         Self {
             decoration_provider,
-            on_bytes_replacement_deletion_end_extend_by_one: Default::default(
+            on_bytes_replacement_extend_deletion_end_by_one: Default::default(
             ),
             on_bytes_replacement_insertion_starts_at_next_line:
                 Default::default(),
@@ -868,9 +865,7 @@ impl Buffer for NeovimBuffer<'_> {
                 }
 
                 // Check if we should skip this event.
-                if buf.state.skip_next_uneditable_eol.copied()
-                    == Some(buf.id())
-                {
+                if buf.state.skip_next_uneditable_eol.take() {
                     return;
                 }
 
