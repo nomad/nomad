@@ -177,6 +177,9 @@ impl<'a> NeovimBuffer<'a> {
         &self,
         mut point_range: Range<Point>,
     ) -> CompactString {
+        debug_assert!(point_range.start <= point_range.end);
+        debug_assert!(point_range.end <= self.point_of_eof());
+
         // If the buffer has an uneditable eol and the end of the range
         // includes it, we need to clamp the end back to the end of the
         // previous line or get_text() will return an out-of-bounds error.
@@ -193,7 +196,13 @@ impl<'a> NeovimBuffer<'a> {
         if needs_to_clamp_end {
             point_range.end.line_idx -= 1;
             point_range.end.byte_offset = (oxi::Integer::MAX as usize).into();
-            point_range.start = point_range.start.min(point_range.end);
+
+            // The original start was <= than the end, so if it's now greater
+            // it means they were both equal to the point of eof, i.e. the
+            // range was empty.
+            if point_range.start > point_range.end {
+                return CompactString::default();
+            }
         }
 
         let lines = self
@@ -329,6 +338,11 @@ impl<'a> NeovimBuffer<'a> {
     }
 
     /// Replaces the text in the given point range with the new text.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the replacement is a no-op, i.e. if the both the range to
+    /// delete and the text to insert are empty.
     #[track_caller]
     #[inline]
     pub(crate) fn replace_text_in_point_range(
@@ -339,12 +353,7 @@ impl<'a> NeovimBuffer<'a> {
     ) {
         debug_assert!(delete_range.start <= delete_range.end);
         debug_assert!(delete_range.end <= self.point_of_eof());
-
-        // Special-casing no-op replacements makes the rest of the code easier
-        // to reason about.
-        if delete_range.is_empty() && insert_text.is_empty() {
-            return;
-        }
+        debug_assert!(!delete_range.is_empty() || !insert_text.is_empty());
 
         // If the buffer has an uneditable eol, we might need to clamp the
         // points of the deleted range in the same way we do in
@@ -368,8 +377,8 @@ impl<'a> NeovimBuffer<'a> {
             delete_range.start = delete_range.end;
         }
 
-        // If we needed to clamp the end of the range, it means the user also
-        // wanted to delete the trailing newline.
+        // If we needed to clamp the end of the range it means the user wants
+        // to delete the trailing newline or insert text after it.
         //
         // However, Neovim made the unfortunate design decision of assuming
         // that every buffer ends in `\n`, and all the buffer-editing APIs will
@@ -399,27 +408,28 @@ impl<'a> NeovimBuffer<'a> {
                     return;
                 }
 
-                // We're about to unset the buffer's uneditable eol setting and
-                // call set_text(), which will trigger two events:
-                // UneditableEndOfLine and OnBytes (in that order).
+                // We're about to:
                 //
-                // Since they're both triggered by the same replacement,
-                // the edit event handlers should only be called once,
-                // so we skip the next UneditableEndOfLine event if OnBytes
-                // is triggered.
+                // 1) unset the buffer's uneditable eol setting, which will
+                //    trigger a set event on UneditableEndOfLine;
+                // 2) call set_text(), which will trigger an OnBytes event;
+                //
+                // Since both events are triggered by the same replacement, the
+                // edit event handlers should only be called once, so we skip
+                // the next UneditableEndOfLine event if OnBytes is triggered.
                 let is_on_bytes_triggered =
                     !delete_range.is_empty() || !insert_text.is_empty();
 
                 if is_on_bytes_triggered {
                     self.state.skip_next_uneditable_eol.set(true);
 
-                    if !delete_range.is_empty() {
-                        // Extend the end of the deleted range by one byte
-                        // to account for having deleted the trailing newline.
-                        self.state
-                            .on_bytes_replacement_extend_deletion_end_by_one
-                            .set(true);
-                    } else if insert_after_uneditable_eol {
+                    // Extend the end of the deleted range by one byte
+                    // to account for having deleted the trailing newline.
+                    self.state
+                        .on_bytes_replacement_extend_deletion_end_by_one
+                        .set(true);
+
+                    if insert_after_uneditable_eol {
                         // Make the inserted text start at the next line to
                         // ignore the newline that we're about to re-add.
                         self.state
@@ -481,21 +491,25 @@ impl<'a> NeovimBuffer<'a> {
 
         debug_assert_eq!(buf, self.inner());
 
-        let deletion_start = start_offset.into();
-
         let should_extend_end =
             self.state.on_bytes_replacement_extend_deletion_end_by_one.take();
+
+        let should_start_at_next_line = self
+            .state
+            .on_bytes_replacement_insertion_starts_at_next_line
+            .take();
+
+        let should_extend_start =
+            should_extend_end && should_start_at_next_line;
+
+        let deletion_start =
+            (start_offset + should_extend_start as usize).into();
 
         let deletion_end =
             (start_offset + old_end_len + should_extend_end as usize).into();
 
         let mut insertion_start =
             Point { line_idx: start_row, byte_offset: start_col.into() };
-
-        let should_start_at_next_line = self
-            .state
-            .on_bytes_replacement_insertion_starts_at_next_line
-            .take();
 
         if should_start_at_next_line {
             insertion_start.line_idx += 1;
@@ -792,6 +806,10 @@ impl Buffer for NeovimBuffer<'_> {
         R: IntoIterator<Item = Replacement>,
     {
         for replacement in replacements {
+            if replacement.is_no_op() {
+                continue;
+            }
+
             self.events.with_mut(|events| {
                 if events.contains(&events::OnBytes(self.id())) {
                     events.agent_ids.edited_buffer.insert(self.id(), agent_id);
@@ -860,12 +878,12 @@ impl Buffer for NeovimBuffer<'_> {
             self.events.clone(),
             UneditableEndOfLine,
             move |(buf, was_set, is_set, set_by)| {
-                if buf.id() != buffer_id {
-                    return;
-                }
-
-                // Check if we should skip this event.
-                if buf.state.skip_next_uneditable_eol.take() {
+                // Ignore event if setting didn't change, if it changed for a
+                // different buffer or if we were told to skip this event.
+                if was_set == is_set
+                    || buf.id() != buffer_id
+                    || buf.state.skip_next_uneditable_eol.take()
+                {
                     return;
                 }
 
@@ -880,7 +898,7 @@ impl Buffer for NeovimBuffer<'_> {
                     (false, true) => {
                         Replacement::insertion(byte_len - 1, "\n")
                     },
-                    _ => return,
+                    _ => unreachable!("already checked"),
                 };
 
                 let edit = Edit {

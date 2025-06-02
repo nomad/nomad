@@ -113,6 +113,13 @@ impl Replacement {
         Self::new(offset..offset, text)
     }
 
+    /// Returns whether this replacement is a no-op, i.e. whether it removes no
+    /// text and inserts no text.
+    #[inline]
+    pub fn is_no_op(&self) -> bool {
+        self.removed_range.is_empty() && self.inserted_text.is_empty()
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn new(
