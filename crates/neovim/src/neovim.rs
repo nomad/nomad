@@ -77,10 +77,8 @@ impl Neovim {
 
     #[inline]
     fn new_inner(augroup_name: &str, reinstate_panic_hook: bool) -> Self {
-        let buffers_state = BuffersState {
-            decoration_provider: DecorationProvider::new(augroup_name),
-            skip_next_uneditable_eol: Default::default(),
-        };
+        let decoration_provider = DecorationProvider::new(augroup_name);
+        let buffers_state = BuffersState::new(decoration_provider);
         Self {
             buffers_state: buffers_state.clone(),
             events: Shared::new(Events::new(augroup_name, buffers_state)),

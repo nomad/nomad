@@ -251,15 +251,6 @@ pub(crate) struct SetUneditableEolAgentIds {
 
 impl SetUneditableEolAgentIds {
     #[inline]
-    pub(crate) fn is_set(&self) -> bool {
-        debug_assert!(
-            self.set_eol == self.set_fix_eol
-                || self.set_eol.is_unknown() && self.set_fix_eol.is_unknown()
-        );
-        !self.set_eol.is_unknown()
-    }
-
-    #[inline]
     pub(crate) fn set(&mut self, agent_id: AgentId) {
         debug_assert!(!agent_id.is_unknown());
         self.set_eol = agent_id;
