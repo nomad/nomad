@@ -13,39 +13,7 @@ use neovim::tests::ContextExt;
 use crate::ed::buffer::EditExt;
 
 #[neovim::test]
-async fn deleting_trailing_newline_is_like_unsetting_eol_empty_buf(
-    ctx: &mut Context<Neovim>,
-) {
-    let agent_id = ctx.new_agent_id();
-
-    let buffer_id = BufferId::of_focused();
-
-    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
-
-    ctx.with_borrowed(|ctx| {
-        let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "\n");
-        buf.edit(
-            [Replacement::removal(0usize.into()..1usize.into())],
-            agent_id,
-        );
-    });
-
-    let edit = edit_stream.next().await.unwrap();
-
-    assert_eq!(edit.made_by, agent_id);
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::removal(0usize.into()..1usize.into())]
-    );
-
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
-    assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
-    assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
-}
-
-#[neovim::test]
-async fn deleting_trailing_newline_is_like_unsetting_eol_non_empty_buf(
+async fn deleting_trailing_newline_is_like_unsetting_eol(
     ctx: &mut Context<Neovim>,
 ) {
     let agent_id = ctx.new_agent_id();
@@ -115,14 +83,16 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
 ) {
     let agent_id = ctx.new_agent_id();
 
+    ctx.feedkeys("iHello");
+
     let buffer_id = BufferId::of_focused();
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "\n");
-        buf.edit([Replacement::insertion(1usize, "")], agent_id);
+        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
+        buf.edit([Replacement::insertion(6usize, "")], agent_id);
     });
 
     let sleep = async_io::Timer::after(Duration::from_millis(500));
@@ -178,6 +148,9 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
 ) {
     let buffer_id = BufferId::of_focused();
 
+    // Eol is only relevant in non-empty buffers.
+    ctx.feedkeys("iHello");
+
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
     let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
@@ -189,7 +162,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
     assert!(edit.made_by.is_unknown());
     assert_eq!(
         &*edit.replacements,
-        &[Replacement::removal(0usize.into()..1usize.into())]
+        &[Replacement::removal(5usize.into()..6usize.into())]
     );
 }
 
@@ -198,6 +171,9 @@ async fn setting_eol_is_like_inserting_trailing_newline(
     ctx: &mut Context<Neovim>,
 ) {
     let buffer_id = BufferId::of_focused();
+
+    // Eol is only relevant in non-empty buffers.
+    ctx.feedkeys("iHello");
 
     let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
     api::set_option_value("eol", false, &opts).unwrap();
@@ -210,7 +186,67 @@ async fn setting_eol_is_like_inserting_trailing_newline(
     let edit = edit_stream.next().await.unwrap();
 
     assert!(edit.made_by.is_unknown());
-    assert_eq!(&*edit.replacements, &[Replacement::insertion(0usize, "\n")]);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(5usize, "\n")]);
+}
+
+#[neovim::test]
+async fn inserting_in_empty_buf_with_eol_causes_newline_insertion(
+    ctx: &mut Context<Neovim>,
+) {
+    let agent_id = ctx.new_agent_id();
+
+    let buffer_id = BufferId::of_focused();
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.with_borrowed(|ctx| {
+        let mut buf = ctx.buffer(buffer_id).unwrap();
+        buf.edit([Replacement::insertion(0usize, "foo")], agent_id);
+    });
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, agent_id);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(0usize, "foo")]);
+
+    let edit = edit_stream.next().await.unwrap();
+    assert!(edit.made_by.is_unknown());
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(3usize, "\n")]);
+}
+
+#[neovim::test]
+async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
+    ctx: &mut Context<Neovim>,
+) {
+    let agent_id = ctx.new_agent_id();
+
+    ctx.feedkeys("iHello");
+
+    let buffer_id = BufferId::of_focused();
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.with_borrowed(|ctx| {
+        let mut buf = ctx.buffer(buffer_id).unwrap();
+        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
+        buf.edit(
+            [Replacement::removal(0usize.into()..5usize.into())],
+            agent_id,
+        );
+    });
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, agent_id);
+    assert_eq!(
+        &*edit.replacements,
+        &[Replacement::removal(0usize.into()..5usize.into())]
+    );
+
+    let edit = edit_stream.next().await.unwrap();
+    assert!(edit.made_by.is_unknown());
+    assert_eq!(
+        &*edit.replacements,
+        &[Replacement::removal(0usize.into()..1usize.into())]
+    );
 }
 
 mod ed_buffer {

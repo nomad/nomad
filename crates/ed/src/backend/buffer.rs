@@ -96,6 +96,27 @@ pub struct Replacement {
     inserted_text: SmolStr,
 }
 
+impl Edit {
+    /// Returns the net change in bytes from all [`Replacement`]s in this edit.
+    ///
+    /// Positive values indicate bytes were added, negative values indicate
+    /// bytes were removed.
+    #[inline]
+    pub fn byte_delta(&self) -> isize {
+        self.replacements
+            .iter()
+            .map(|replacement| {
+                let num_inserted = replacement.inserted_text.len() as isize;
+                let num_deleted = usize::from(
+                    replacement.removed_range.end
+                        - replacement.removed_range.start,
+                ) as isize;
+                num_inserted - num_deleted
+            })
+            .sum()
+    }
+}
+
 impl Replacement {
     /// TODO: docs.
     #[inline]

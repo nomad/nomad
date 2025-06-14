@@ -341,8 +341,8 @@ impl<'a> NeovimBuffer<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the replacement is a no-op, i.e. if the both the range to
-    /// delete and the text to insert are empty.
+    /// Panics if the replacement is a no-op, i.e. if both the range to delete
+    /// and the text to insert are empty.
     #[track_caller]
     #[inline]
     pub(crate) fn replace_text_in_point_range(
@@ -797,7 +797,13 @@ impl Buffer for NeovimBuffer<'_> {
     fn byte_len(&self) -> ByteOffset {
         let buf = self.inner();
         let line_count = buf.line_count().expect("buffer is valid");
-        buf.get_offset(line_count).expect("buffer is valid").into()
+        let offset = buf.get_offset(line_count).expect("buffer is valid");
+        // Workaround for https://github.com/neovim/neovim/issues/34272.
+        if offset == 1 && self.has_uneditable_eol() {
+            ByteOffset::new(0)
+        } else {
+            offset.into()
+        }
     }
 
     #[inline]
@@ -866,7 +872,43 @@ impl Buffer for NeovimBuffer<'_> {
         let on_bytes_handle =
             Events::insert(self.events.clone(), events::OnBytes(self.id()), {
                 let fun = fun.clone();
-                move |(this, edit)| fun.with_mut(|fun| fun(this, edit))
+                move |(this, edit)| {
+                    fun.with_mut(|fun| fun(this, edit));
+
+                    if this.has_uneditable_eol() {
+                        // If the buffer has an uneditable eol, then:
+                        //
+                        // - if the buffer was empty and text is inserted the
+                        // eol "activates", and we should notify the user that
+                        // a \n was inserted;
+                        //
+                        // - if all the text is deleted and the buffer is now
+                        // empty the eol "deactivates", and we should notify
+                        // the user that a \n was deleted;
+
+                        let buf_len = this.byte_len();
+                        let edit_len_delta = edit.byte_delta();
+                        let edit_len_delta_abs = edit_len_delta.unsigned_abs();
+
+                        let replacement = if edit_len_delta.is_positive()
+                            && edit_len_delta_abs + 1 == buf_len
+                        {
+                            Replacement::insertion(edit_len_delta_abs, "\n")
+                        } else if edit_len_delta.is_negative() && buf_len == 0
+                        {
+                            Replacement::removal(0usize.into()..1usize.into())
+                        } else {
+                            return;
+                        };
+
+                        let edit = Edit {
+                            made_by: AgentId::UNKNOWN,
+                            replacements: smallvec_inline![replacement],
+                        };
+
+                        fun.with_mut(|fun| fun(this, &edit));
+                    }
+                }
             });
 
         // Setting/unsetting the uneditable eol behaves as if
@@ -888,6 +930,11 @@ impl Buffer for NeovimBuffer<'_> {
                 }
 
                 let byte_len = buf.byte_len();
+
+                // Eol-settings don't apply on empty buffers.
+                if byte_len == 0 {
+                    return;
+                }
 
                 let replacement = match (was_set, is_set) {
                     // The trailing newline was deleted.
