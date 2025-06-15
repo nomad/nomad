@@ -1,7 +1,7 @@
 use core::fmt;
 
-use collab_server::SessionId;
 use collab_server::message::Peer;
+use collab_server::SessionId;
 use eerie::fs::{AbsPath, AbsPathBuf};
 use eerie::{
     CursorCreation,
@@ -371,7 +371,7 @@ impl File<'_> {
         if let Some(cursor_id) = proj.local_cursor_id {
             let cursor = proj.replica.cursor(cursor_id).expect("ID is valid");
             let file_path = cursor.file().path();
-            let offset = ByteOffset::new(cursor.byte_offset() as usize);
+            let offset = cursor.byte_offset();
             panic!(
                 "tried to create cursor in {:?} at {byte_offset:?}, but \
                  another one already exists in {file_path:?} at {offset:?}",

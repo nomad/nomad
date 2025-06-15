@@ -4,16 +4,7 @@ use crate::notify::{self, Error, MaybeResult, Name, Namespace};
 use crate::plugin::{self, Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
-use crate::{
-    Api,
-    ApiValue,
-    Editor,
-    Borrowed,
-    Context,
-    Key,
-    MapAccess,
-    Value,
-};
+use crate::{Api, ApiValue, Borrowed, Context, Editor, Key, MapAccess, Value};
 
 /// TODO: docs.
 pub(crate) fn build_api<P, Ed>(plugin: P, mut state: StateMut<Ed>) -> Ed::Api

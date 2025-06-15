@@ -18,7 +18,7 @@ use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
-use crate::{AgentId, Editor, Buffer, Shared};
+use crate::{AgentId, Buffer, Editor, Shared};
 
 /// TODO: docs.
 pub trait BorrowState {

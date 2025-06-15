@@ -434,7 +434,7 @@ impl Metadata for OsMetadata {
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
-        self.inner.len().into()
+        self.inner.len() as ByteOffset
     }
 
     #[inline]

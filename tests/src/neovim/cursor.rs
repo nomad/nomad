@@ -36,7 +36,7 @@ async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
     // insert mode with "a" should move the offset to its right side.
     ctx.feedkeys("a<Esc>");
 
-    assert_eq!(offsets.next().await.unwrap(), 5usize);
+    assert_eq!(offsets.next().await.unwrap(), 5);
 }
 
 #[neovim::test]
@@ -52,7 +52,7 @@ async fn insert_to_normal(ctx: &mut Context<Neovim>) {
     // of the second "l", which is at offset 3.
     ctx.feedkeys("<Esc>");
 
-    assert_eq!(offsets.next().await.unwrap(), 3usize);
+    assert_eq!(offsets.next().await.unwrap(), 3);
 }
 
 trait ByteOffsetExt {

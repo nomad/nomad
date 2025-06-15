@@ -27,6 +27,6 @@ pub use buffer::{Buffer, Chunks, Edit, Replacement};
 pub use byte_offset::ByteOffset;
 pub use context::{BorrowState, Borrowed, Context, NotBorrowed};
 pub use cursor::Cursor;
-pub use editor::{Editor, BaseEditor};
+pub use editor::{BaseEditor, Editor};
 pub use selection::Selection;
 pub use shared::Shared;

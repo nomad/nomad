@@ -25,20 +25,14 @@ async fn deleting_trailing_newline_is_like_unsetting_eol(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
-        buf.edit(
-            [Replacement::removal(0usize.into()..6usize.into())],
-            agent_id,
-        );
+        assert_eq!(buf.get_text(0..buf.byte_len()), "Hello\n");
+        buf.edit([Replacement::removal(0..6)], agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
 
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::removal(0usize.into()..6usize.into())]
-    );
+    assert_eq!(&*edit.replacements, &[Replacement::removal(0..6)]);
 
     let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
@@ -59,17 +53,14 @@ async fn inserting_after_trailing_newline_unsets_eol(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
-        buf.edit([Replacement::insertion(6usize, "World")], agent_id);
+        assert_eq!(buf.get_text(0..buf.byte_len()), "Hello\n");
+        buf.edit([Replacement::insertion(6, "World")], agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
 
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::insertion(6usize, "World")]
-    );
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(6, "World")]);
 
     let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
@@ -90,8 +81,8 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
-        buf.edit([Replacement::insertion(6usize, "")], agent_id);
+        assert_eq!(buf.get_text(0..buf.byte_len()), "Hello\n");
+        buf.edit([Replacement::insertion(6, "")], agent_id);
     });
 
     let sleep = async_io::Timer::after(Duration::from_millis(500));
@@ -121,20 +112,14 @@ async fn replacement_including_trailing_newline_unsets_eol(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
-        buf.edit(
-            [Replacement::new(2usize.into()..6usize.into(), "y")],
-            agent_id,
-        );
+        assert_eq!(buf.get_text(0..buf.byte_len()), "Hello\n");
+        buf.edit([Replacement::new(2..6, "y")], agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
 
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::new(2usize.into()..6usize.into(), "y")]
-    );
+    assert_eq!(&*edit.replacements, &[Replacement::new(2..6, "y")]);
 
     let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
@@ -159,10 +144,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
     let edit = edit_stream.next().await.unwrap();
 
     assert!(edit.made_by.is_unknown());
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::removal(5usize.into()..6usize.into())]
-    );
+    assert_eq!(&*edit.replacements, &[Replacement::removal(5..6)]);
 }
 
 #[neovim::test]
@@ -185,7 +167,7 @@ async fn setting_eol_is_like_inserting_trailing_newline(
     let edit = edit_stream.next().await.unwrap();
 
     assert!(edit.made_by.is_unknown());
-    assert_eq!(&*edit.replacements, &[Replacement::insertion(5usize, "\n")]);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(5, "\n")]);
 }
 
 #[neovim::test]
@@ -200,16 +182,16 @@ async fn inserting_in_empty_buf_with_eol_causes_newline_insertion(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        buf.edit([Replacement::insertion(0usize, "foo")], agent_id);
+        buf.edit([Replacement::insertion(0, "foo")], agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(&*edit.replacements, &[Replacement::insertion(0usize, "foo")]);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "foo")]);
 
     let edit = edit_stream.next().await.unwrap();
     assert!(edit.made_by.is_unknown());
-    assert_eq!(&*edit.replacements, &[Replacement::insertion(3usize, "\n")]);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(3, "\n")]);
 }
 
 #[neovim::test]
@@ -226,26 +208,17 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.get_text(0usize.into()..buf.byte_len()), "Hello\n");
-        buf.edit(
-            [Replacement::removal(0usize.into()..5usize.into())],
-            agent_id,
-        );
+        assert_eq!(buf.get_text(0..buf.byte_len()), "Hello\n");
+        buf.edit([Replacement::removal(0..5)], agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::removal(0usize.into()..5usize.into())]
-    );
+    assert_eq!(&*edit.replacements, &[Replacement::removal(0..5)]);
 
     let edit = edit_stream.next().await.unwrap();
     assert!(edit.made_by.is_unknown());
-    assert_eq!(
-        &*edit.replacements,
-        &[Replacement::removal(0usize.into()..1usize.into())]
-    );
+    assert_eq!(&*edit.replacements, &[Replacement::removal(0..1)]);
 }
 
 mod ed_buffer {

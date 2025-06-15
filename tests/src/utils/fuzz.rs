@@ -44,7 +44,7 @@ fn seed() -> u64 {
 
 fn set_panic_hook(seed: u64) {
     thread_local! {
-        static FUZZ_SEED: Cell<Option<u64>> = Cell::new(None);
+        static FUZZ_SEED: Cell<Option<u64>> = const { Cell::new(None) };
     }
 
     FUZZ_SEED.with(|s| s.replace(Some(seed)));

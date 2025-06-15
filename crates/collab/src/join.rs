@@ -26,9 +26,9 @@ use ed::shared::{MultiThreaded, Shared};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
 use fxhash::FxHashMap;
 
-use crate::editors::{CollabEditor, SessionId, Welcome};
 use crate::collab::Collab;
 use crate::config::Config;
+use crate::editors::{CollabEditor, SessionId, Welcome};
 use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
 use crate::project::{

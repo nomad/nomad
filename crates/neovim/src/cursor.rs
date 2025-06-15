@@ -31,7 +31,7 @@ impl<'a> NeovimCursor<'a> {
     pub(crate) fn point(&self) -> Point {
         let (row, col) =
             api::Window::current().get_cursor().expect("couldn't get cursor");
-        Point { line_idx: row - 1, byte_offset: col.into() }
+        Point { line_idx: row - 1, byte_offset: col }
     }
 }
 
@@ -72,7 +72,7 @@ impl Cursor for NeovimCursor<'_> {
         let point = self.buffer().point_of_byte(offset);
 
         api::Window::current()
-            .set_cursor(point.line_idx + 1, point.byte_offset.into())
+            .set_cursor(point.line_idx + 1, point.byte_offset)
             .expect("couldn't set cursor");
     }
 

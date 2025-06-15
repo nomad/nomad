@@ -18,7 +18,7 @@ mod read_neovim {
     use ed::executor::Executor;
     use ed::fs::os::{OsDirectory, OsFs};
     use ed::fs::{Directory, Fs};
-    use ed::{Editor, Context};
+    use ed::{Context, Editor};
     use futures_lite::future;
     use mock::fs::MockFs;
     use mock::{ContextExt, Mock};

@@ -1,11 +1,11 @@
 use core::{fmt, iter, mem};
 
-use ed::{Editor, Buffer, Context, Edit, Replacement};
+use ed::{Buffer, Context, Edit, Editor, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use rand::Rng;
 
 use crate::ed::{ContextExt, TestEditor};
-use crate::utils::{CodeDistribution, Convert, fuzz};
+use crate::utils::{CodeDistribution, fuzz};
 
 pub(crate) async fn fuzz_edits(
     num_epochs: u32,
@@ -20,7 +20,7 @@ pub(crate) async fn fuzz_edits(
     // A string to which we'll apply the same edits we apply to the buffer.
     let mut expected_contents = ctx.with_borrowed(|ctx| {
         let buf = ctx.buffer(buf_id.clone()).unwrap();
-        buf.get_text(0usize.into()..buf.byte_len()).to_string()
+        buf.get_text(0..buf.byte_len()).to_string()
     });
 
     fuzz::run_async(async |rng| {
@@ -29,7 +29,7 @@ pub(crate) async fn fuzz_edits(
 
             // Apply the replacement to the string.
             expected_contents.replace_range(
-                replacement.removed_range().convert(),
+                replacement.removed_range(),
                 replacement.inserted_text(),
             );
 
@@ -50,7 +50,7 @@ pub(crate) async fn fuzz_edits(
             // Make sure the buffer's contents are the same as the string.
             ctx.with_borrowed(|ctx| {
                 let buf = ctx.buffer(buf_id.clone()).unwrap();
-                let buf_contents = buf.get_text(0usize.into()..buf.byte_len());
+                let buf_contents = buf.get_text(0..buf.byte_len());
 
                 if buf_contents != &*expected_contents {
                     panic!(
@@ -117,7 +117,7 @@ fn random_replacement(s: &str, rng: &mut impl Rng) -> Replacement {
         .take(insert_num)
         .collect::<String>();
 
-    Replacement::new(delete_from.into()..delete_to.into(), insert_str)
+    Replacement::new(delete_from..delete_to, insert_str)
 }
 
 pub(crate) trait EditExt {

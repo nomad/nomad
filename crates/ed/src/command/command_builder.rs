@@ -261,7 +261,7 @@ impl CommandCompletionsBuilder {
         if offset <= arg.end() {
             let prefix = offset
                 .checked_sub(arg.start())
-                .map(|off| &arg.as_str()[..off.into()])
+                .map(|off| &arg.as_str()[..off])
                 .unwrap_or("");
 
             return self

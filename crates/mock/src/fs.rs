@@ -166,7 +166,7 @@ impl MockDirectory {
         target_path: Option<&str>,
     ) -> Result<MockMetadata, CreateNodeError> {
         let metadata = MockMetadata {
-            byte_len: target_path.map(|p| p.len().into()).unwrap_or_default(),
+            byte_len: target_path.map(|p| p.len()).unwrap_or_default(),
             created_at: self.fs.now(),
             last_modified_at: self.fs.now(),
             name: node_name.to_owned(),
@@ -396,7 +396,7 @@ impl DirectoryInner {
             children: Default::default(),
             event_tx: None,
             metadata: MockMetadata {
-                byte_len: 0usize.into(),
+                byte_len: 0,
                 created_at: MockTimestamp(0),
                 last_modified_at: MockTimestamp(0),
                 node_kind: NodeKind::Directory,
@@ -491,7 +491,7 @@ impl FileInner {
             contents: contents.to_owned(),
             event_tx: None,
             metadata: MockMetadata {
-                byte_len: contents.len().into(),
+                byte_len: contents.len(),
                 created_at: MockTimestamp(0),
                 last_modified_at: MockTimestamp(0),
                 node_kind: NodeKind::File,
@@ -533,7 +533,7 @@ impl SymlinkInner {
         Self {
             target_path: target_path.to_owned(),
             metadata: MockMetadata {
-                byte_len: target_path.len().into(),
+                byte_len: target_path.len(),
                 created_at: MockTimestamp(0),
                 last_modified_at: MockTimestamp(0),
                 node_kind: NodeKind::Symlink,

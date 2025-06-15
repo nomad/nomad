@@ -85,7 +85,7 @@ impl<'a> SubCommandArgs<'a> {
 
     /// TODO: docs.
     pub fn iter(&self) -> SubCommandArgsIter<'a> {
-        SubCommandArgsIter { args: self.args, last_idx_end: 0usize.into() }
+        SubCommandArgsIter { args: self.args, last_idx_end: 0 }
     }
 
     /// TODO: docs.

@@ -3,7 +3,7 @@ use serde::ser::Serialize;
 
 use crate::action::Action;
 use crate::notify::{MaybeResult, Name};
-use crate::{Editor, Borrowed, Context};
+use crate::{Borrowed, Context, Editor};
 
 /// TODO: docs.
 pub trait Function<Ed: Editor>: 'static {

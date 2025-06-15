@@ -293,7 +293,8 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
         &mut self,
         event: fs::DirectoryEvent<Ed::Fs>,
         ctx: &mut Context<Ed>,
-    ) -> Result<Option<fs::DirectoryEvent<Ed::Fs>>, EventError<Ed::Fs, F>> {
+    ) -> Result<Option<fs::DirectoryEvent<Ed::Fs>>, EventError<Ed::Fs, F>>
+    {
         Ok(match event {
             fs::DirectoryEvent::Creation(ref creation) => {
                 let Some(node) = ctx
@@ -430,7 +431,11 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
             .map_err(EventError::Filter)
     }
 
-    fn watch_node(&mut self, node: &fs::FsNode<Ed::Fs>, ctx: &mut Context<Ed>) {
+    fn watch_node(
+        &mut self,
+        node: &fs::FsNode<Ed::Fs>,
+        ctx: &mut Context<Ed>,
+    ) {
         match node {
             fs::FsNode::Directory(dir) => self.dir_streams.insert(dir),
             fs::FsNode::File(file) => {
@@ -501,9 +506,9 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
     }
 }
 
-impl<Edd: CollabEditor> BufferStreamsEdEd> {
+impl<Ed: CollabEditor> BufferStreams<Ed> {
     /// Starts receiving [`event::BufferEvent`]s on the given buffer.
-    fn insert(&mut self, buffer: &Edd::Buffer<'_>, agent_id: AgentId) {
+    fn insert(&mut self, buffer: &Ed::Buffer<'_>, agent_id: AgentId) {
         let edits_handle = buffer.on_edited({
             let event_tx = self.event_tx.clone();
             move |buf, edit| {
@@ -542,16 +547,16 @@ impl<Edd: CollabEditor> BufferStreamsEdEd> {
 
     /// Returns whether the buffer with the given ID is currently being
     /// watched.
-    fn is_watched(&self, buffer_id: &Edd::BufferId) -> bool {
+    fn is_watched(&self, buffer_id: &Ed::BufferId) -> bool {
         self.handles.contains_key(buffer_id)
     }
 
     /// Returns whether the buffer with the given ID has just been saved.
-    fn has_buffer_been_saved(&self, buffer_id: &Edd::BufferId) -> bool {
+    fn has_buffer_been_saved(&self, buffer_id: &Ed::BufferId) -> bool {
         self.saved_buffers.with_mut(|buffer_ids| buffer_ids.remove(buffer_id))
     }
 
-    fn new(ctx: &mut Context<Edd>) -> Self {
+    fn new(ctx: &mut Context<Ed>) -> Self {
         let (event_tx, event_rx) = flume::unbounded();
 
         let new_buffers_handle = {
@@ -574,13 +579,13 @@ impl<Edd: CollabEditor> BufferStreamsEdEd> {
     }
 
     /// Removes the event handle corresponding to the buffer with the given ID.
-    fn remove(&mut self, buffer_id: &Edd::BufferId) {
+    fn remove(&mut self, buffer_id: &Ed::BufferId) {
         self.handles.remove(buffer_id);
     }
 
     fn select_next_some(
         &mut self,
-    ) -> impl FusedFuture<Output = event::BufferEvent<Edd>> {
+    ) -> impl FusedFuture<Output = event::BufferEvent<Ed>> {
         StreamExt::select_next_some(&mut self.event_rx)
     }
 }

@@ -5,8 +5,8 @@ use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
 
-use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::collab::Collab;
+use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::{NoActiveSessionError, Projects};
 
 /// An `Action` that pastes the [`SessionId`] of any active session to the

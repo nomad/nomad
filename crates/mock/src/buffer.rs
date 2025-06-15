@@ -211,7 +211,7 @@ impl ed::Buffer for Buffer<'_> {
     type Editor = mock::Mock;
 
     fn byte_len(&self) -> ByteOffset {
-        self.contents.len().into()
+        self.contents.len()
     }
 
     fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
@@ -224,9 +224,8 @@ impl ed::Buffer for Buffer<'_> {
         };
 
         for replacement in &edit.replacements {
-            let range = replacement.removed_range();
             self.contents.replace_range(
-                usize::from(range.start)..usize::from(range.end),
+                replacement.removed_range(),
                 replacement.inserted_text(),
             );
             for cursor in self.cursors.values_mut() {
@@ -249,8 +248,7 @@ impl ed::Buffer for Buffer<'_> {
     }
 
     fn get_text(&self, byte_range: Range<ByteOffset>) -> impl Chunks {
-        let range = byte_range.start.into()..byte_range.end.into();
-        &self.contents[range]
+        &self.contents[byte_range]
     }
 
     fn id(&self) -> BufferId {
@@ -261,7 +259,7 @@ impl ed::Buffer for Buffer<'_> {
         *self.current_buffer = Some(self.id);
 
         if self.cursors.is_empty() {
-            self.create_cursor(0usize.into(), agent_id);
+            self.create_cursor(0, agent_id);
         }
     }
 

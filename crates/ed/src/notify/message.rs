@@ -73,7 +73,7 @@ impl Message {
     /// TODO: docs.
     #[inline]
     pub fn byte_len(&self) -> ByteOffset {
-        self.inner.len().into()
+        self.inner.len()
     }
 
     /// TODO: docs.
@@ -139,9 +139,9 @@ impl Message {
         if s.is_empty() {
             return self;
         }
-        let start = self.inner.len().into();
+        let start = self.inner.len();
         self.inner.push_str(s);
-        let end = self.inner.len().into();
+        let end = self.inner.len();
         self.spans.push(SpanInner { byte_range: start..end, kind: span_kind });
         self
     }
@@ -220,9 +220,7 @@ impl<'a> Span<'a> {
     /// TODO: docs.
     #[inline]
     pub fn as_str(&self) -> &'a str {
-        let br = &self.byte_range;
-        let range: Range<usize> = br.start.into()..br.end.into();
-        &self.message.as_str()[range]
+        &self.message.as_str()[self.byte_range.clone()]
     }
 
     /// TODO: docs.
@@ -298,17 +296,14 @@ impl SpansState {
             None if !message.is_empty() => {
                 return Self::InGap {
                     gap_offset: 0,
-                    byte_range: ByteOffset::range(0..message.as_str().len()),
+                    byte_range: 0..message.as_str().len(),
                 };
             },
             None => return Self::Done,
         };
-        let start = usize::from(first_span.byte_range.start);
+        let start = first_span.byte_range.start;
         if start > 0 {
-            Self::InGap {
-                gap_offset: 0,
-                byte_range: ByteOffset::range(0..start),
-            }
+            Self::InGap { gap_offset: 0, byte_range: 0..start }
         } else {
             Self::InSpan { idx: 0 }
         }

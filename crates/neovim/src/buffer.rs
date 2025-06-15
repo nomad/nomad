@@ -87,7 +87,7 @@ impl<'a> NeovimBuffer<'a> {
     /// TODO: docs.
     #[inline]
     pub fn grapheme_offsets(&self) -> GraphemeOffsets<'_> {
-        self.grapheme_offsets_from(0usize.into())
+        self.grapheme_offsets_from(0)
     }
 
     /// TODO: docs.
@@ -133,11 +133,10 @@ impl<'a> NeovimBuffer<'a> {
     #[track_caller]
     #[inline]
     pub(crate) fn byte_of_point(&self, point: Point) -> ByteOffset {
-        let line_offset: ByteOffset = self
+        let line_offset = self
             .inner()
             .get_offset(point.line_idx)
-            .expect("couldn't get line offset")
-            .into();
+            .expect("couldn't get line offset");
         line_offset + point.byte_offset
     }
 
@@ -194,7 +193,7 @@ impl<'a> NeovimBuffer<'a> {
 
         if should_clamp_end {
             point_range.end.line_idx -= 1;
-            point_range.end.byte_offset = (oxi::Integer::MAX as usize).into();
+            point_range.end.byte_offset = oxi::Integer::MAX as usize;
 
             // The original start was <= than the end, so if it's now greater
             // it means they were both equal to the point of eof, i.e. the
@@ -208,8 +207,8 @@ impl<'a> NeovimBuffer<'a> {
             .inner()
             .get_text(
                 point_range.start.line_idx..point_range.end.line_idx,
-                point_range.start.byte_offset.into(),
-                point_range.end.byte_offset.into(),
+                point_range.start.byte_offset,
+                point_range.end.byte_offset,
                 &Default::default(),
             )
             .expect("couldn't get text");
@@ -291,7 +290,7 @@ impl<'a> NeovimBuffer<'a> {
         let line_idx = self.call(move |this| {
             let line_idx = api::call_function::<_, usize>(
                     "byte2line",
-                    (byte_offset.into_u64() as u32 + 1,),
+                    (byte_offset as u32 + 1,),
                 ).expect("offset is within bounds")
                 // byte2line() returns 1-based line numbers.
                 - 1;
@@ -313,7 +312,7 @@ impl<'a> NeovimBuffer<'a> {
             .get_offset(line_idx)
             .expect("line index is within bounds");
 
-        Point::new(line_idx, usize::from(byte_offset) - line_byte_offset)
+        Point::new(line_idx, byte_offset - line_byte_offset)
     }
 
     /// Returns the [`Point`] at the end of the buffer.
@@ -334,7 +333,7 @@ impl<'a> NeovimBuffer<'a> {
         let last_line_len = if has_uneditable_eol {
             0
         } else {
-            self.line_len(num_lines - 1).into()
+            self.line_len(num_lines - 1)
         };
 
         Point::new(num_lines, last_line_len)
@@ -462,8 +461,8 @@ impl<'a> NeovimBuffer<'a> {
         self.inner()
             .set_text(
                 delete_range.start.line_idx..delete_range.end.line_idx,
-                delete_range.start.byte_offset.into(),
-                delete_range.end.byte_offset.into(),
+                delete_range.start.byte_offset,
+                delete_range.end.byte_offset,
                 lines,
             )
             .expect("replacing text failed");
@@ -506,24 +505,23 @@ impl<'a> NeovimBuffer<'a> {
             should_extend_end && should_start_at_next_line;
 
         let deletion_start =
-            (start_offset + should_extend_start as usize).into();
+            start_offset + should_extend_start as usize;
 
         let deletion_end =
-            (start_offset + old_end_len + should_extend_end as usize).into();
+            start_offset + old_end_len + should_extend_end as usize;
 
         let mut insertion_start =
-            Point { line_idx: start_row, byte_offset: start_col.into() };
+            Point { line_idx: start_row, byte_offset: start_col };
 
         if should_start_at_next_line {
             insertion_start.line_idx += 1;
-            insertion_start.byte_offset = 0usize.into();
+            insertion_start.byte_offset = 0;
         }
 
         let insertion_end = Point {
             line_idx: start_row + new_end_row,
-            byte_offset: (start_col * (new_end_row == 0) as usize
-                + new_end_col)
-                .into(),
+            byte_offset: start_col * (new_end_row == 0) as usize
+                + new_end_col
         };
 
         Replacement::new(
@@ -567,7 +565,6 @@ impl<'a> NeovimBuffer<'a> {
         self.inner()
             .get_offset(line_offset)
             .expect("line index out of bounds")
-            .into()
     }
 
     /// Returns the contents of the line at the given index, *without* any
@@ -625,7 +622,7 @@ impl<'a> NeovimBuffer<'a> {
             })
             .expect("could not call col()");
 
-        (col - 1).into()
+        col - 1
     }
 
     /// Returns the selected byte range in the buffer, assuming:
@@ -652,15 +649,10 @@ impl<'a> NeovimBuffer<'a> {
             api::call_function::<_, (u32, usize, usize)>("getpos", ('.',))
                 .expect("couldn't call getpos");
 
-        let anchor = Point {
-            line_idx: anchor_row - 1,
-            byte_offset: ByteOffset::new(anchor_col - 1),
-        };
+        let anchor =
+            Point { line_idx: anchor_row - 1, byte_offset: anchor_col - 1 };
 
-        let head = Point {
-            line_idx: head_row - 1,
-            byte_offset: ByteOffset::new(head_col - 1),
-        };
+        let head = Point { line_idx: head_row - 1, byte_offset: head_col - 1 };
 
         let (start, end) =
             if anchor <= head { (anchor, head) } else { (head, anchor) };
@@ -799,7 +791,7 @@ impl BuffersState {
 impl Point {
     #[inline]
     pub(crate) fn new(line_idx: usize, byte_offset: usize) -> Self {
-        Self { line_idx, byte_offset: byte_offset.into() }
+        Self { line_idx, byte_offset }
     }
 
     #[inline]
@@ -817,11 +809,7 @@ impl Buffer for NeovimBuffer<'_> {
         let line_count = buf.line_count().expect("buffer is valid");
         let offset = buf.get_offset(line_count).expect("buffer is valid");
         // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if offset == 1 && self.has_uneditable_eol() {
-            ByteOffset::new(0)
-        } else {
-            offset.into()
-        }
+        if offset == 1 && self.has_uneditable_eol() { 0 } else { offset }
     }
 
     #[inline]
@@ -914,7 +902,7 @@ impl Buffer for NeovimBuffer<'_> {
                             Replacement::insertion(edit_len_delta_abs, "\n")
                         } else if edit_len_delta.is_negative() && buf_len == 0
                         {
-                            Replacement::removal(0usize.into()..1usize.into())
+                            Replacement::removal(0..1)
                         } else {
                             return;
                         };
@@ -1045,14 +1033,14 @@ impl Iterator for GraphemeOffsets<'_> {
         let line_from_offset = &self
             .current_line
             .get_or_insert_with(|| self.buffer.get_line(self.point.line_idx))
-            .as_bytes()[usize::from(self.point.byte_offset)..];
+            .as_bytes()[self.point.byte_offset..];
 
         if line_from_offset.is_empty() {
             // We're at the end of the current line, so the next grapheme
             // must be a newline character.
             self.byte_offset += 1;
             self.point.line_idx += 1;
-            self.point.byte_offset = 0usize.into();
+            self.point.byte_offset = 0;
             self.current_line = None;
             Some(self.byte_offset)
         } else {
@@ -1096,7 +1084,7 @@ impl fmt::Debug for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Point")
             .field(&self.line_idx)
-            .field(&usize::from(self.byte_offset))
+            .field(&self.byte_offset)
             .finish()
     }
 }

@@ -6,7 +6,7 @@ use abs_path::AbsPath;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
-use crate::{AgentId, Editor, ByteOffset};
+use crate::{AgentId, ByteOffset, Editor};
 
 /// TODO: docs.
 pub trait Buffer {
@@ -65,10 +65,7 @@ pub trait Buffer {
         Fun: FnMut(<Self::Editor as Editor>::BufferId, AgentId) + 'static;
 
     /// TODO: docs.
-    fn on_saved<Fun>(
-        &self,
-        fun: Fun,
-    ) -> <Self::Editor as Editor>::EventHandle
+    fn on_saved<Fun>(&self, fun: Fun) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(&<Self::Editor as Editor>::Buffer<'_>, AgentId) + 'static;
 
@@ -112,10 +109,7 @@ impl Edit {
             .iter()
             .map(|replacement| {
                 let num_inserted = replacement.inserted_text.len() as isize;
-                let num_deleted = usize::from(
-                    replacement.removed_range.end
-                        - replacement.removed_range.start,
-                ) as isize;
+                let num_deleted = replacement.removed_range.len() as isize;
                 num_inserted - num_deleted
             })
             .sum()
@@ -132,11 +126,10 @@ impl Replacement {
     /// TODO: docs.
     #[inline]
     pub fn insertion(
-        at_offset: impl Into<ByteOffset>,
+        at_offset: ByteOffset,
         text: impl Into<SmolStr>,
     ) -> Self {
-        let offset = at_offset.into();
-        Self::new(offset..offset, text)
+        Self::new(at_offset..at_offset, text)
     }
 
     /// Returns whether this replacement is a no-op, i.e. whether it removes no

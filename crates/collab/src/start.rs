@@ -19,15 +19,15 @@ use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
-use ed::{Editor, Buffer, Context};
+use ed::{Buffer, Context, Editor};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use smol_str::ToSmolStr;
 use walkdir::FsExt;
 
-use crate::editors::CollabEditor;
 use crate::collab::Collab;
 use crate::config::Config;
+use crate::editors::CollabEditor;
 use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
 use crate::project::{
@@ -687,7 +687,7 @@ pub mod benches {
     where
         Ed: CollabEditor,
     {
-        super::read_project(&*project_root.path(), PeerId::new(1), ctx)
+        super::read_project(project_root.path(), PeerId::new(1), ctx)
             .await
             .map(|_| ())
     }

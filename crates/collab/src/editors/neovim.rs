@@ -16,8 +16,8 @@ use neovim::buffer::BufferId;
 use neovim::{Neovim, mlua, oxi};
 use smol_str::ToSmolStr;
 
-use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::config;
+use crate::editors::{ActionForSelectedSession, CollabEditor};
 
 pub struct ServerConfig;
 

@@ -176,7 +176,7 @@ impl HighlightRanges {
             let mut opts = api::opts::SetExtmarkOpts::builder();
 
             opts.end_row(range.point_range.end.line_idx)
-                .end_col(range.point_range.end.byte_offset.into())
+                .end_col(range.point_range.end.byte_offset)
                 .ephemeral(true)
                 .hl_group(&*range.highlight_group_name);
 
@@ -188,7 +188,7 @@ impl HighlightRanges {
                 .set_extmark(
                     namespace_id,
                     range.point_range.start.line_idx,
-                    range.point_range.start.byte_offset.into(),
+                    range.point_range.start.byte_offset,
                     &opts.build(),
                 )
                 .expect("couldn't set extmark");

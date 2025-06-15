@@ -1,10 +1,8 @@
 use core::mem;
 use core::ops::Range;
 
-use ed::{Editor, Buffer, Context, Selection};
+use ed::{Buffer, Context, Editor, Selection};
 use futures_util::stream::FusedStream;
-
-use crate::utils::Convert;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum SelectionEvent {
@@ -32,13 +30,13 @@ impl SelectionEvent {
                     return;
                 }
 
-                let byte_range = selection.byte_range().convert();
+                let byte_range = selection.byte_range();
                 let _ = tx.send(Self::Created(byte_range));
 
                 mem::forget(selection.on_moved({
                     let tx = tx.clone();
                     move |selection, _moved_by| {
-                        let byte_range = selection.byte_range().convert();
+                        let byte_range = selection.byte_range();
                         let _ = tx.send(Self::Moved(byte_range));
                     }
                 }));

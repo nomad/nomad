@@ -91,6 +91,6 @@ impl Deref for ModeStr<'_> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0
     }
 }

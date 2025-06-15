@@ -3,15 +3,7 @@ use ed::fs::os::OsFs;
 use ed::fs::{self, AbsPath, Fs};
 use ed::notify::Namespace;
 use ed::plugin::Plugin;
-use ed::{
-    AgentId,
-    Editor,
-    BaseEditor,
-    BorrowState,
-    Buffer,
-    Context,
-    Shared,
-};
+use ed::{AgentId, BaseEditor, BorrowState, Buffer, Context, Editor, Shared};
 
 use crate::buffer::{
     BufferId,
@@ -306,15 +298,16 @@ impl BaseEditor for Neovim {
 
             // 'eol' is turned on by default, so avoid inserting the file's
             // trailing newline or we'll get an extra line.
-            let contents = contents
-                .ends_with('\n')
-                .then(|| &contents[..contents.len() - 1])
-                .unwrap_or(&contents);
+            let contents = if contents.ends_with('\n') {
+                &contents[..contents.len() - 1]
+            } else {
+                &contents
+            };
 
             if !contents.is_empty() {
                 buffer.replace_text_in_point_range(
                     Point::zero()..Point::zero(),
-                    &contents,
+                    contents,
                     agent_id,
                 );
             }

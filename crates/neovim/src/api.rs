@@ -74,13 +74,10 @@ impl Api for NeovimApi {
                 let args = &command_str[subcommand_starts_from..];
                 cursor_offset -= subcommand_starts_from;
 
-                completion_fun(
-                    CommandArgs::new(args),
-                    ByteOffset::new(cursor_offset),
-                )
-                .into_iter()
-                .map(|comp| comp.as_str().to_owned())
-                .collect::<Vec<_>>()
+                completion_fun(CommandArgs::new(args), cursor_offset)
+                    .into_iter()
+                    .map(|comp| comp.as_str().to_owned())
+                    .collect::<Vec<_>>()
             },
         );
 

@@ -1,7 +1,7 @@
 use core::mem;
 use core::time::Duration;
 
-use ed::{AgentId, Editor, Buffer, ByteOffset, Context, Cursor, Replacement};
+use ed::{AgentId, Buffer, ByteOffset, Context, Cursor, Editor, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 
@@ -55,7 +55,7 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
-        buf.edit([Replacement::insertion(0usize, "Hello world")], agent_id);
+        buf.edit([Replacement::insertion(0, "Hello world")], agent_id);
     });
 
     // Drain the event stream.
@@ -68,13 +68,13 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
         buf.for_each_cursor(|mut cursor| {
-            cursor.r#move(5usize.into(), agent_id);
+            cursor.r#move(5, agent_id);
         });
     });
 
     match events.next().await.unwrap() {
         CursorEvent::Moved(movement) => {
-            assert_eq!(movement.byte_offset, 5usize);
+            assert_eq!(movement.byte_offset, 5);
             assert_eq!(movement.buffer_id, buf_id);
             assert_eq!(movement.moved_by, agent_id);
         },

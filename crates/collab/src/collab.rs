@@ -3,8 +3,8 @@ use ed::module::{ApiCtx, Module};
 use ed::notify::Name;
 use ed::{Borrowed, Context, Shared};
 
-use crate::editors::{CollabEditor, SessionId};
 use crate::config::Config;
+use crate::editors::{CollabEditor, SessionId};
 use crate::join::Join;
 use crate::leave::{Leave, StopChannels};
 use crate::project::{ProjectHandle, Projects};

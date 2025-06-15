@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use crate::module::ApiCtx;
 use crate::notify::Name;
 use crate::plugin::PluginId;
-use crate::{Editor, Borrowed, Context};
+use crate::{Borrowed, Context, Editor};
 
 /// TODO: docs.
 pub trait Module<Ed: Editor>: 'static + Sized {

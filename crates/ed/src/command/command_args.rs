@@ -106,7 +106,7 @@ impl<'a> CommandArgs<'a> {
     pub fn arg(&self, idx: CommandArgIdx) -> Option<CommandArg<'a>> {
         (self.inner.len() <= idx.end).then_some(CommandArg {
             idx,
-            inner: &self.inner[idx.start.into()..idx.end.into()],
+            inner: &self.inner[idx.start..idx.end],
         })
     }
 
@@ -119,7 +119,7 @@ impl<'a> CommandArgs<'a> {
     /// TODO: docs.
     #[inline]
     pub fn byte_len(&self) -> ByteOffset {
-        self.as_str().len().into()
+        self.as_str().len()
     }
 
     /// TODO: docs.
@@ -131,7 +131,7 @@ impl<'a> CommandArgs<'a> {
     /// TODO: docs.
     #[inline]
     pub fn iter(&self) -> CommandArgsIter<'a> {
-        CommandArgsIter { inner: self.as_str(), last_idx_end: 0usize.into() }
+        CommandArgsIter { inner: self.as_str(), last_idx_end: 0 }
     }
 
     /// TODO: docs.

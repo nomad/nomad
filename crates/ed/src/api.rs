@@ -5,7 +5,7 @@ use core::fmt;
 
 use crate::command::{CommandArgs, CommandCompletion};
 use crate::notify::{self, Name};
-use crate::{Editor, ByteOffset};
+use crate::{ByteOffset, Editor};
 
 /// TODO: docs.
 pub type ApiValue<B> = <<B as Editor>::Api as Api>::Value;

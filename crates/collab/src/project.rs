@@ -10,7 +10,7 @@ use collab_project::fs::{DirectoryId, FileId, FileMut, FsOp, Node, NodeMut};
 use collab_project::{PeerId, text};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::fs::{self, File as _, Symlink as _};
-use ed::{AgentId, Borrowed, Context, Editor, Shared, notify};
+use ed::{AgentId, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -212,7 +212,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         };
 
         let peer_tooltip =
-            Ed::create_peer_tooltip(peer, offset.into(), buf_id, ctx).await;
+            Ed::create_peer_tooltip(peer, offset, buf_id, ctx).await;
 
         self.with_project(|proj| {
             proj.peer_tooltips.insert(cur_id, peer_tooltip);
@@ -243,7 +243,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         let Some(move_tooltip) = self.with_project(|proj| {
             let cursor = proj.project.integrate_cursor_movement(movement)?;
             let tooltip = proj.peer_tooltips.get_mut(&cursor.id())?;
-            Some(Ed::move_peer_tooltip(tooltip, cursor.offset().into(), ctx))
+            Some(Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx))
         }) else {
             return;
         };
@@ -278,7 +278,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
 
             let peer = match proj.remote_peers.remove(&peer_id) {
                 Some(peer) => peer,
-                None => panic!("peer ID {:?} doesn't exist", peer_id),
+                None => panic!("peer ID {peer_id:?} doesn't exist"),
             };
 
             (tooltips, peer)
@@ -558,7 +558,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             CursorEventKind::Created(buffer_id, byte_offset) => {
                 let (cursor_id, creation) = self
                     .text_file_of_buffer(&buffer_id)
-                    .create_cursor(byte_offset.into());
+                    .create_cursor(byte_offset);
 
                 self.id_maps.cursor2cursor.insert(event.cursor_id, cursor_id);
 
@@ -567,7 +567,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             CursorEventKind::Moved(byte_offset) => {
                 let movement = self
                     .cursor_of_cursor_id(&event.cursor_id)
-                    .r#move(byte_offset.into());
+                    .r#move(byte_offset);
 
                 Message::MovedCursor(movement)
             },
@@ -750,7 +750,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             SelectionEventKind::Created(buffer_id, byte_range) => {
                 let (selection_id, creation) = self
                     .text_file_of_buffer(&buffer_id)
-                    .create_selection(byte_range.convert());
+                    .create_selection(byte_range);
 
                 self.id_maps
                     .selection2selection
@@ -761,7 +761,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             SelectionEventKind::Moved(byte_range) => {
                 let movement = self
                     .selection_of_selection_id(&event.selection_id)
-                    .r#move(byte_range.convert());
+                    .r#move(byte_range);
 
                 Message::MovedSelection(movement)
             },
@@ -876,9 +876,11 @@ impl<Ed: CollabEditor> Projects<Ed> {
         let session = match &*active_sessions {
             [] => return Err(NoActiveSessionError::new()),
             [single] => single,
-            sessions => match Ed::select_session(sessions, action, ctx).await {
-                Some(session) => session,
-                None => return Ok(None),
+            sessions => {
+                match Ed::select_session(sessions, action, ctx).await {
+                    Some(session) => session,
+                    None => return Ok(None),
+                }
             },
         };
 
@@ -901,7 +903,10 @@ impl<Ed: CollabEditor> Projects<Ed> {
 }
 
 impl<Ed: CollabEditor> ProjectGuard<Ed> {
-    pub(crate) fn activate(self, args: NewProjectArgs<Ed>) -> ProjectHandle<Ed> {
+    pub(crate) fn activate(
+        self,
+        args: NewProjectArgs<Ed>,
+    ) -> ProjectHandle<Ed> {
         self.projects.starting.with_mut(|set| {
             assert!(set.remove(&self.root));
         });

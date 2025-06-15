@@ -9,8 +9,8 @@ use ed::{Context, Shared};
 use flume::{Receiver, Sender};
 use fxhash::FxHashMap;
 
-use crate::editors::{ActionForSelectedSession, CollabEditor, SessionId};
 use crate::collab::Collab;
+use crate::editors::{ActionForSelectedSession, CollabEditor, SessionId};
 use crate::project::{NoActiveSessionError, Projects};
 
 /// TODO: docs.

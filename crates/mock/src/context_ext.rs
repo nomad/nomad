@@ -1,5 +1,5 @@
 use ed::executor::Executor;
-use ed::{Editor, BorrowState, Context};
+use ed::{BorrowState, Context, Editor};
 
 /// TODO: docs.
 pub trait ContextExt {

@@ -13,7 +13,7 @@ use crate::context::BorrowedInner;
 use crate::module::{Module, ModuleId};
 use crate::notify::{Name, Namespace};
 use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
-use crate::{AgentId, Editor, Borrowed, Context, Shared};
+use crate::{AgentId, Borrowed, Context, Editor, Shared};
 
 /// TODO: docs.
 #[doc(hidden)]

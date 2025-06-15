@@ -5,11 +5,11 @@ use ed::shared::Shared;
 use ed::{
     AgentId,
     ApiValue,
-    Editor,
     BaseEditor,
     BorrowState,
     Context,
     Edit,
+    Editor,
     fs,
 };
 use fxhash::FxHashMap;

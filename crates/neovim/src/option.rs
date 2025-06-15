@@ -229,7 +229,7 @@ impl<T: WatchedOption> Event for OptionSet<T> {
             };
 
             for callback in callbacks {
-                callback((buffer, &old_value, &new_value));
+                callback((buffer, old_value, new_value));
             }
 
             false

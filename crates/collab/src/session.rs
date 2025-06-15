@@ -81,7 +81,9 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> Session<Ed, F> {
     }
 }
 
-impl<Ed: CollabEditor, F: Filter<Ed::Fs>> notify::Error for SessionError<Ed, F> {
+impl<Ed: CollabEditor, F: Filter<Ed::Fs>> notify::Error
+    for SessionError<Ed, F>
+{
     fn to_message(&self) -> (notify::Level, notify::Message) {
         todo!();
     }
