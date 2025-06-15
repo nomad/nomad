@@ -579,11 +579,15 @@ impl<'a> NeovimBuffer<'a> {
     /// use [`line_len()`](Self::line_len) instead.
     #[inline]
     fn get_line(&self, line_idx: usize) -> NvimString {
-        api::call_function(
-            "getbufoneline",
-            (self.id(), (line_idx + 1) as oxi::Integer),
-        )
-        .expect("could not call getbufoneline()")
+        let buffer_id = self.id();
+        self.inner()
+            .call(move |()| {
+                api::call_function(
+                    "getbufoneline",
+                    (buffer_id, (line_idx + 1) as oxi::Integer),
+                )
+            })
+            .expect("could not call getbufoneline()")
     }
 
     /// TODO: docs.
@@ -603,14 +607,18 @@ impl<'a> NeovimBuffer<'a> {
 
         let row = (line_idx + 1) as oxi::Integer;
 
-        let col = api::call_function::<_, usize>(
-            "col",
-            (oxi::Array::from_iter([
-                oxi::Object::from(row),
-                oxi::Object::from("$"),
-            ]),),
-        )
-        .expect("could not call col()");
+        let col: usize = self
+            .inner()
+            .call(move |()| {
+                api::call_function(
+                    "col",
+                    (oxi::Array::from_iter([
+                        oxi::Object::from(row),
+                        oxi::Object::from("$"),
+                    ]),),
+                )
+            })
+            .expect("could not call col()");
 
         (col - 1).into()
     }
