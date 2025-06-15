@@ -1,7 +1,6 @@
 use core::time::Duration;
 
-use ed::Context;
-use ed::backend::{Buffer, Edit, Replacement};
+use ed::{Buffer, Context, Edit, Replacement};
 use futures_util::future::FutureExt;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;

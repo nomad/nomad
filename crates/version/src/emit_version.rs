@@ -1,8 +1,7 @@
 use ed::action::Action;
-use ed::backend::Backend;
 use ed::command::ToCompletionFn;
 use ed::notify::{Message, Name};
-use ed::{Borrowed, Context};
+use ed::{Backend, Borrowed, Context};
 
 use crate::VERSION;
 

@@ -8,9 +8,7 @@ pub(crate) trait Convert<T> {
     fn convert(self) -> T;
 }
 
-impl Convert<collab_project::text::TextReplacement>
-    for ed::backend::Replacement
-{
+impl Convert<collab_project::text::TextReplacement> for ed::Replacement {
     fn convert(self) -> collab_project::text::TextReplacement {
         collab_project::text::TextReplacement {
             deleted_range: self.removed_range().convert(),

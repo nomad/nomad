@@ -61,7 +61,7 @@ trait ByteOffsetExt {
     fn new_stream(
         ctx: &mut Context<Neovim>,
     ) -> impl FusedStream<Item = ByteOffset> + Unpin + use<Self> {
-        use ed::backend::{Buffer, Cursor};
+        use ed::{Buffer, Cursor};
 
         let (tx, rx) = flume::unbounded();
 

@@ -14,13 +14,12 @@ use collab_project::fs::{
 use collab_project::{Project, ProjectBuilder};
 use collab_server::message::{Peer, PeerId};
 use collab_server::{SessionIntent, client};
-use ed::Context;
 use ed::action::AsyncAction;
-use ed::backend::{Backend, Buffer};
 use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
+use ed::{Backend, Buffer, Context};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use smol_str::ToSmolStr;

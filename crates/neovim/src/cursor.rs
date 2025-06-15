@@ -1,7 +1,6 @@
 //! TODO: docs.
 
-use ed::backend::{AgentId, Buffer, Cursor};
-use ed::{ByteOffset, Shared};
+use ed::{AgentId, Buffer, ByteOffset, Cursor, Shared};
 
 use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer, Point};

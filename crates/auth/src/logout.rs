@@ -1,10 +1,9 @@
 //! TODO: docs.
 
 use ed::action::AsyncAction;
-use ed::backend::Backend;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
-use ed::{Context, Shared};
+use ed::{Backend, Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
 use crate::{Auth, AuthInfos};

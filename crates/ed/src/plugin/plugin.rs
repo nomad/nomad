@@ -2,12 +2,11 @@ use core::any;
 
 use smol_str::ToSmolStr;
 
-use crate::backend::Backend;
 use crate::module::{self, Module};
 use crate::notify::{self, Name};
 use crate::plugin::PanicInfo;
 use crate::state::StateHandle;
-use crate::{Borrowed, Context};
+use crate::{Backend, Borrowed, Context};
 
 pub(crate) const NO_COMMAND_NAME: &str = "�";
 

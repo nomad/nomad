@@ -1,9 +1,8 @@
 //! TODO: docs.
 
-use ed::ByteOffset;
-use ed::backend::Api;
 use ed::command::{CommandArgs, CommandCompletion};
 use ed::notify::Name;
+use ed::{Api, ByteOffset};
 
 use crate::oxi::{Dictionary, Function, Object, api};
 use crate::value::NeovimValue;

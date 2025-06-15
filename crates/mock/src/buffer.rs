@@ -2,8 +2,7 @@ use core::ops::{Deref, DerefMut, Range};
 use std::borrow::Cow;
 
 use abs_path::AbsPath;
-use ed::ByteOffset;
-use ed::backend::{self, AgentId, Buffer as _, Chunks, Edit, Replacement};
+use ed::{self, AgentId, Buffer as _, ByteOffset, Chunks, Edit, Replacement};
 use slotmap::SlotMap;
 
 use crate::mock::{self, CallbackKind, Callbacks};
@@ -208,7 +207,7 @@ impl SelectionInner {
     }
 }
 
-impl backend::Buffer for Buffer<'_> {
+impl ed::Buffer for Buffer<'_> {
     type Backend = mock::Mock;
 
     fn byte_len(&self) -> ByteOffset {
@@ -326,7 +325,7 @@ impl DerefMut for Buffer<'_> {
     }
 }
 
-impl backend::Cursor for Cursor<'_> {
+impl ed::Cursor for Cursor<'_> {
     type Backend = mock::Mock;
 
     fn buffer_id(&self) -> BufferId {
@@ -392,7 +391,7 @@ impl DerefMut for Cursor<'_> {
     }
 }
 
-impl backend::Selection for Selection<'_> {
+impl ed::Selection for Selection<'_> {
     type Backend = mock::Mock;
 
     fn buffer_id(&self) -> BufferId {

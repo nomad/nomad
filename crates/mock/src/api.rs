@@ -1,6 +1,6 @@
+use ed::ByteOffset;
 use ed::command::{CommandArgs, CommandCompletion};
 use ed::notify::Name;
-use ed::{ByteOffset, backend};
 
 use crate::value::{Map, Value};
 
@@ -10,7 +10,7 @@ pub struct Api {
     map: Map,
 }
 
-impl backend::Api for Api {
+impl ed::Api for Api {
     type Value = Value;
 
     #[track_caller]

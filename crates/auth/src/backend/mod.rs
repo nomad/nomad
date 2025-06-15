@@ -5,8 +5,7 @@ mod neovim;
 
 use core::fmt::Debug;
 
-use ed::backend::Backend;
-use ed::{Borrowed, Context, notify};
+use ed::{Backend, Borrowed, Context, notify};
 
 use crate::AuthInfos;
 

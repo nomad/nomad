@@ -1,4 +1,4 @@
-use ed::backend::Backend;
+use ed::Backend;
 use mock::fs::MockFs;
 use mock::{ContextExt, Mock};
 

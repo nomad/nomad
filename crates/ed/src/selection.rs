@@ -1,7 +1,6 @@
 use core::ops::Range;
 
-use crate::ByteOffset;
-use crate::backend::{AgentId, Backend};
+use crate::{AgentId, Backend, ByteOffset};
 
 /// TODO: docs.
 pub trait Selection {

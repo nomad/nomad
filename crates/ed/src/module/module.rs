@@ -2,11 +2,10 @@ use core::any;
 
 use serde::de::DeserializeOwned;
 
-use crate::backend::Backend;
 use crate::module::ApiCtx;
 use crate::notify::Name;
 use crate::plugin::PluginId;
-use crate::{Borrowed, Context};
+use crate::{Backend, Borrowed, Context};
 
 /// TODO: docs.
 pub trait Module<B: Backend>: 'static + Sized {

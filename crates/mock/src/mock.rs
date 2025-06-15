@@ -1,9 +1,17 @@
 use abs_path::AbsPath;
-use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, Edit};
 use ed::executor::BackgroundSpawner;
 use ed::notify::{self, MaybeResult};
 use ed::shared::Shared;
-use ed::{BorrowState, Context, fs};
+use ed::{
+    AgentId,
+    ApiValue,
+    Backend,
+    BaseBackend,
+    BorrowState,
+    Context,
+    Edit,
+    fs,
+};
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use slotmap::{DefaultKey, SlotMap};

@@ -1,9 +1,8 @@
 use core::ops::Range;
 
 use abs_path::AbsPathBuf;
-use ed::ByteOffset;
-use ed::backend::{Backend, Replacement};
 use ed::fs::{DirectoryEvent, FileEvent};
+use ed::{Backend, ByteOffset, Replacement};
 use smallvec::SmallVec;
 
 /// TODO: docs.

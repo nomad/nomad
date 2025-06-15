@@ -7,10 +7,9 @@ use core::fmt::Debug;
 
 use collab_server::Authenticator;
 use collab_server::message::Peer;
-use ed::backend::Backend;
 use ed::command::CommandArgs;
 use ed::fs::{self, AbsPath, AbsPathBuf};
-use ed::{ByteOffset, Context, notify};
+use ed::{Backend, ByteOffset, Context, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::config;

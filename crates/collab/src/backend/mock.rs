@@ -10,10 +10,17 @@ use collab_server::Config;
 use collab_server::message::{Peer, PeerId};
 use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
 use duplex_stream::{DuplexStream, duplex};
-use ed::backend::{AgentId, ApiValue, Backend, BaseBackend};
 use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::notify::{self, MaybeResult};
-use ed::{BorrowState, ByteOffset, Context};
+use ed::{
+    AgentId,
+    ApiValue,
+    Backend,
+    BaseBackend,
+    BorrowState,
+    ByteOffset,
+    Context,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{ActionForSelectedSession, CollabBackend};

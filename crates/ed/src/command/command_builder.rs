@@ -1,6 +1,5 @@
 use smallvec::SmallVec;
 
-use crate::backend::Backend;
 use crate::command::{
     Command,
     CommandArg,
@@ -13,7 +12,7 @@ use crate::notify::{self, MaybeResult, Name, Namespace};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
-use crate::{Borrowed, ByteOffset, Context};
+use crate::{Backend, Borrowed, ByteOffset, Context};
 
 type CommandHandler<B> =
     Box<dyn FnMut(CommandArgs, &mut Context<B, Borrowed<'_>>)>;

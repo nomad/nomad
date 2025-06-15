@@ -1,10 +1,17 @@
 use ::serde::{Deserialize, Serialize};
-use ed::backend::{AgentId, Backend, BaseBackend, Buffer};
 use ed::fs::os::OsFs;
 use ed::fs::{self, AbsPath, Fs};
 use ed::notify::Namespace;
 use ed::plugin::Plugin;
-use ed::{BorrowState, Context, Shared};
+use ed::{
+    AgentId,
+    Backend,
+    BaseBackend,
+    BorrowState,
+    Buffer,
+    Context,
+    Shared,
+};
 
 use crate::buffer::{
     BufferId,

@@ -5,21 +5,23 @@ use abs_path::AbsPath;
 use serde::Serialize;
 use serde::de::Deserialize;
 
-use crate::backend::{
+use crate::executor::Executor;
+use crate::notify::{self, Emitter, MaybeResult};
+use crate::plugin::Plugin;
+use crate::{
     AgentId,
     Api,
     ApiValue,
+    BorrowState,
     Buffer,
+    Context,
     Cursor,
     Key,
     MapAccess,
     Selection,
     Value,
+    fs,
 };
-use crate::executor::Executor;
-use crate::notify::{self, Emitter, MaybeResult};
-use crate::plugin::Plugin;
-use crate::{BorrowState, Context, fs};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {

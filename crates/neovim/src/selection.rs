@@ -2,8 +2,7 @@
 
 use core::ops::Range;
 
-use ed::backend::{AgentId, Buffer, Selection};
-use ed::{ByteOffset, Shared};
+use ed::{AgentId, Buffer, ByteOffset, Selection, Shared};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{EventHandle, Events};

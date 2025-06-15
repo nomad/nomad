@@ -1,8 +1,7 @@
 use core::mem;
 use core::ops::Range;
 
-use ed::backend::{Buffer, Selection};
-use ed::{Backend, Context};
+use ed::{Backend, Buffer, Context, Selection};
 use futures_util::stream::FusedStream;
 
 use crate::utils::Convert;

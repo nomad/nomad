@@ -1,9 +1,16 @@
 #![allow(missing_docs)]
 
-use ed::backend::{AgentId, ApiValue, Backend, BaseBackend};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
-use ed::{BorrowState, Borrowed, Context};
+use ed::{
+    AgentId,
+    ApiValue,
+    Backend,
+    BaseBackend,
+    BorrowState,
+    Borrowed,
+    Context,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{AuthBackend, AuthInfos};

@@ -2,8 +2,7 @@
 
 use core::fmt;
 
-use ed::backend::{Key, MapAccess, Value};
-use ed::notify;
+use ed::{Key, MapAccess, Value, notify};
 
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
 

@@ -1,7 +1,6 @@
 use abs_path::AbsPath;
 
-use crate::backend::{AgentId, Backend};
-use crate::{BorrowState, Context};
+use crate::{AgentId, Backend, BorrowState, Context};
 
 /// TODO: docs.
 pub trait BaseBackend: Backend {

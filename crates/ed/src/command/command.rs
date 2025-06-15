@@ -1,10 +1,9 @@
 use smol_str::SmolStr;
 
 use crate::action::Action;
-use crate::backend::Backend;
 use crate::command::CommandArgs;
 use crate::notify::{self, MaybeResult, Name};
-use crate::{Borrowed, ByteOffset, Context};
+use crate::{Backend, Borrowed, ByteOffset, Context};
 
 /// TODO: docs.
 pub trait Command<B: Backend>: 'static {

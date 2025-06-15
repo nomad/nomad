@@ -1,5 +1,4 @@
-use ed::backend::{AgentId, Buffer};
-use ed::{Backend, BorrowState, Context};
+use ed::{AgentId, Backend, BorrowState, Buffer, Context};
 
 pub(crate) trait TestEditor: Backend {
     fn create_scratch_buffer(

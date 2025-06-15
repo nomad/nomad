@@ -1,11 +1,19 @@
-use crate::backend::{Api, ApiValue, Backend, Key, MapAccess, Value};
 use crate::command::{Command, CommandBuilder, CommandCompletionsBuilder};
 use crate::module::{Constant, Function, Module};
 use crate::notify::{self, Error, MaybeResult, Name, Namespace};
 use crate::plugin::{self, Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
-use crate::{Borrowed, Context};
+use crate::{
+    Api,
+    ApiValue,
+    Backend,
+    Borrowed,
+    Context,
+    Key,
+    MapAccess,
+    Value,
+};
 
 /// TODO: docs.
 pub(crate) fn build_api<P, B>(plugin: P, mut state: StateMut<B>) -> B::Api

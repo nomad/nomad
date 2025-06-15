@@ -1,6 +1,5 @@
-use crate::backend::Backend;
 use crate::notify::{MaybeResult, Name};
-use crate::{Borrowed, Context};
+use crate::{Backend, Borrowed, Context};
 
 /// TODO: docs.
 pub trait Action<B: Backend>: 'static {

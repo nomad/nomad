@@ -1,7 +1,6 @@
 use core::{fmt, iter, mem};
 
-use ed::backend::{Buffer, Edit, Replacement};
-use ed::{Backend, Context};
+use ed::{Backend, Buffer, Context, Edit, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use rand::Rng;
 
@@ -128,7 +127,7 @@ pub(crate) trait EditExt {
         buf_id: Ed::BufferId,
         ctx: &mut Context<Ed>,
     ) -> impl FusedStream<Item = Edit> + Unpin + use<Self, Ed> {
-        use ed::backend::Buffer;
+        use ed::Buffer;
 
         let (tx, rx) = flume::unbounded();
 

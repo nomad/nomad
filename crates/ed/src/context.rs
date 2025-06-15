@@ -1,9 +1,3 @@
-// State{Handle,Mut} is used in:
-//
-// - api_ctx;
-// - command_builder;
-// - plugin;
-
 use core::any::Any;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
@@ -12,8 +6,6 @@ use core::panic;
 use abs_path::AbsPath;
 use futures_lite::future::{self, FutureExt};
 
-use crate::Shared;
-use crate::backend::{AgentId, Backend, Buffer};
 use crate::executor::{
     BackgroundSpawner,
     BackgroundTask,
@@ -26,6 +18,7 @@ use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
+use crate::{AgentId, Backend, Buffer, Shared};
 
 /// TODO: docs.
 pub trait BorrowState {

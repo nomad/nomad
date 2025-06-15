@@ -1,4 +1,4 @@
-use ed::{backend, notify};
+use ed::notify;
 use indexmap::IndexMap;
 use serde_json::Number;
 
@@ -55,7 +55,7 @@ impl Map {
     }
 }
 
-impl backend::Value for Value {
+impl ed::Value for Value {
     type MapAccess<'a> = MapAccess<'a>;
     type MapAccessError<'a> = MapAccessError;
 
@@ -75,7 +75,7 @@ impl Default for Value {
     }
 }
 
-impl backend::MapAccess for MapAccess<'_> {
+impl ed::MapAccess for MapAccess<'_> {
     type Key<'a>
         = &'a str
     where

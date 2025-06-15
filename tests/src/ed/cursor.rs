@@ -1,8 +1,7 @@
 use core::mem;
 use core::time::Duration;
 
-use ed::backend::{AgentId, Backend, Buffer, Cursor, Replacement};
-use ed::{ByteOffset, Context};
+use ed::{AgentId, Backend, Buffer, ByteOffset, Context, Cursor, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 

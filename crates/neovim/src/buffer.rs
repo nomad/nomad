@@ -9,9 +9,8 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 
 use compact_str::CompactString;
-use ed::backend::{AgentId, Buffer, Chunks, Edit, Replacement};
 use ed::fs::AbsPath;
-use ed::{ByteOffset, Shared};
+use ed::{AgentId, Buffer, ByteOffset, Chunks, Edit, Replacement, Shared};
 use smallvec::smallvec_inline;
 
 use crate::Neovim;
@@ -326,16 +325,16 @@ impl<'a> NeovimBuffer<'a> {
             return Point::zero();
         }
 
-        let num_rows = self.inner().line_count().expect("buffer is valid");
+        let num_lines = self.inner().line_count().expect("buffer is valid");
 
         let has_uneditable_eol = self.has_uneditable_eol();
 
-        let num_lines = num_rows - 1 + has_uneditable_eol as usize;
+        let num_lines = num_lines - 1 + has_uneditable_eol as usize;
 
         let last_line_len = if has_uneditable_eol {
             0
         } else {
-            self.line_len(num_rows - 1).into()
+            self.line_len(num_lines - 1).into()
         };
 
         Point::new(num_lines, last_line_len)
