@@ -350,7 +350,6 @@ impl<'a> NeovimBuffer<'a> {
     }
 
     /// Returns the [`Point`] at the end of the buffer.
-    #[track_caller]
     #[inline]
     pub(crate) fn point_of_eof(&self) -> Point {
         // Workaround for https://github.com/neovim/neovim/issues/34272.
@@ -358,14 +357,14 @@ impl<'a> NeovimBuffer<'a> {
             return Point::zero();
         }
 
-        let num_lines = self.inner().line_count().expect("buffer is valid");
+        let num_rows = self.inner().line_count().expect("buffer is valid");
 
         let has_uneditable_eol = self.has_uneditable_eol();
 
-        let num_lines = num_lines - 1 + has_uneditable_eol as usize;
+        let num_lines = num_rows - 1 + has_uneditable_eol as usize;
 
         let last_line_len =
-            if has_uneditable_eol { 0 } else { self.line_len(num_lines - 1) };
+            if has_uneditable_eol { 0 } else { self.line_len(num_rows - 1) };
 
         Point::new(num_lines, last_line_len)
     }
