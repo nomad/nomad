@@ -129,7 +129,7 @@ impl DecorationProvider {
 
         let opts = api::opts::DecorationProviderOpts::builder()
             .on_start(this.on_start())
-            .on_buf(this.on_buf())
+            .on_win(this.on_win())
             .build();
 
         api::set_decoration_provider(namespace_id, &opts)
@@ -155,17 +155,23 @@ impl DecorationProvider {
     }
 
     #[inline]
-    fn on_buf(&self) -> impl Fn(api::opts::OnBufArgs) + 'static {
+    fn on_win(
+        &self,
+    ) -> impl Fn(api::opts::OnWinArgs) -> api::opts::DontSkipOnLines + 'static
+    {
         let inner = self.inner.clone();
 
-        move |(_, buf, _)| {
+        move |(_, _win, buf, _toprow, _botrow)| {
             let buf_id = BufferId::from(buf);
+
             inner.with_mut(|inner| {
                 // Draw the highlight ranges for the given buffer.
                 if let Some(ranges) = inner.highlight_ranges.get_mut(&buf_id) {
                     ranges.redraw(inner.namespace_id);
                 }
             });
+
+            false
         }
     }
 }
