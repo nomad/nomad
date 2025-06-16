@@ -72,22 +72,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set PAT to access private repos
-        env:
-          PAT: ${{ secrets.NOIB3_PAT }}
-        run: |
-          git config --global --replace-all "url.https://noib3:$PAT@github.com.insteadOf" ssh://git@github.com
-          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" git@github.com
-          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" https://github.com
-      - name: Install Neovim nightly
-        uses: rhysd/action-setup-vim@v1
+      - name: Setup the deploy key used to access private repos
+        uses: webfactory/ssh-agent@v0.9.1
         with:
-            neovim: true
-            version: nightly
-      - uses: dtolnay/rust-toolchain@nightly
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+      - name: Install Rust nightly with Clippy
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
-      - run: cargo clippy --features=neovim-nightly --all-targets -- -D warnings
+      - run: cargo clippy --all-features --all-targets --tests --workspace -- -D warnings
 
   docs:
     name: docs
