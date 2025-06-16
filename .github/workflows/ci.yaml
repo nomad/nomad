@@ -83,6 +83,8 @@ jobs:
         with:
           components: clippy
       - run: cargo clippy --all-features --all-targets --tests --workspace -- -D warnings
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
 
   docs:
     name: docs
