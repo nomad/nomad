@@ -74,6 +74,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Add the private repos' deploy keys
         uses: ./.github/actions/add-deploy-keys
+        with:
+          secrets: ${{ secrets }}
       - name: Install Rust nightly with Clippy
         uses: dtolnay/rust-toolchain@nightly
         with:

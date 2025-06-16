@@ -1,5 +1,9 @@
 name: "Add the private repos' deploy keys"
 
+inputs:
+  secrets:
+    required: true
+
 runs:
   using: "composite"
   steps:
@@ -7,5 +11,5 @@ runs:
       uses: webfactory/ssh-agent@v0.9.1
       with:
         ssh-private-key: |
-          ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-          ${{ secrets.CAUCHY_DEPLOY_KEY }}
+          inputs.secrets.ABS_PATH_DEPLOY_KEY
+          inputs.secrets.CAUCHY_DEPLOY_KEY
