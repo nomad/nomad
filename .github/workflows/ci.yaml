@@ -72,10 +72,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Add the private repos' deploy keys
-        uses: ./.github/actions/add-deploy-keys
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
         with:
-          secrets: ${{ secrets }}
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
       - name: Install Rust nightly with Clippy
         uses: dtolnay/rust-toolchain@nightly
         with:
