@@ -135,15 +135,18 @@ impl<'a> NeovimBuffer<'a> {
     pub fn highlight_ranges(
         &self,
     ) -> impl Iterator<Item = (Range<ByteOffset>, SmallVec<[String; 1]>)> {
-        let start = Point::zero();
-        let end = self.point_of_eof();
         let opts = api::opts::GetExtmarksOpts::builder()
             .details(true)
             .ty("highlight")
             .build();
 
         self.inner()
-            .get_extmarks(0, start.into(), end.into(), &opts)
+            .get_extmarks(
+                api::types::GetExtmarksNamespaceId::All,
+                Point::zero().into(),
+                self.point_of_eof().into(),
+                &opts,
+            )
             .expect("couldn't get extmarks")
             .map(|(_ns_id, start_row, start_col, maybe_infos)| {
                 let infos = maybe_infos.expect("requested details");

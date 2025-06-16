@@ -338,6 +338,112 @@ fn grapheme_offsets_start_from_middle_of_grapheme(ctx: &mut Context<Neovim>) {
     assert_eq!(offsets.next(), None);
 }
 
+#[neovim::test]
+fn highlight_ranges_empty(ctx: &mut Context<Neovim>) {
+    let mut ranges = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_ranges()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(ranges.next(), None);
+}
+
+#[neovim::test]
+fn highlight_range_simple(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("iHello");
+
+    let _hl_range_handle = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_range(0..5, "Normal")
+    });
+
+    ctx.redraw();
+
+    let mut ranges = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_ranges()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    let (byte_range, hl_groups) = ranges.next().unwrap();
+    assert_eq!(byte_range, 0..5);
+    assert_eq!(&*hl_groups, &["Normal"]);
+
+    assert_eq!(ranges.next(), None);
+}
+
+#[neovim::test]
+fn highlight_range_including_eol(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("iHello");
+
+    let _hl_range_handle = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_range(0..6, "Normal")
+    });
+
+    ctx.redraw();
+
+    let mut ranges = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_ranges()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    let (byte_range, hl_groups) = ranges.next().unwrap();
+    assert_eq!(byte_range, 0..6);
+    assert_eq!(&*hl_groups, &["Normal"]);
+
+    assert_eq!(ranges.next(), None);
+}
+
+#[neovim::test]
+fn highlight_range_is_removed_when_handle_is_dropped(
+    ctx: &mut Context<Neovim>,
+) {
+    ctx.feedkeys("iHello");
+
+    let hl_range_handle = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_range(0..5, "Normal")
+    });
+
+    ctx.redraw();
+
+    ctx.with_borrowed(|ctx| {
+        let num_ranges = ctx
+            .buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_ranges()
+            .count();
+
+        assert_eq!(num_ranges, 1);
+    });
+
+    drop(hl_range_handle);
+
+    ctx.redraw();
+
+    ctx.with_borrowed(|ctx| {
+        let num_ranges = ctx
+            .buffer(BufferId::of_focused())
+            .unwrap()
+            .highlight_ranges()
+            .count();
+
+        assert_eq!(num_ranges, 0);
+    });
+}
+
 mod ed_buffer {
     //! Contains the editor-agnostic buffer tests.
 

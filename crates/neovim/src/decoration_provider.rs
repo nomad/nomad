@@ -165,7 +165,7 @@ impl DecorationProvider {
                 if let Some(ranges) = inner.highlight_ranges.get_mut(&buf_id) {
                     ranges.redraw(inner.namespace_id);
                 }
-            })
+            });
         }
     }
 }

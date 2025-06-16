@@ -35,6 +35,11 @@ pub trait ContextExt {
         let keys = api::replace_termcodes(keys, true, false, true);
         api::feedkeys(&keys, c"x", false);
     }
+
+    /// Shortand for `ctx.cmd("redraw")`.
+    fn redraw(&self) {
+        self.cmd("redraw");
+    }
 }
 
 impl<Bs: BorrowState> ContextExt for ed::Context<Neovim, Bs> {}
