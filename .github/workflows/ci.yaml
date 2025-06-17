@@ -10,12 +10,17 @@ on:
   schedule:
     - cron: '0 0 1 * *'
 
+# TODO: remove after publishing private crates.
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
 jobs:
   test-crates:
     name: test crates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
       - name: Add the deploy keys of all private repos we depend on
         uses: webfactory/ssh-agent@v0.9.1
         with:
@@ -58,6 +63,7 @@ jobs:
             features: "neovim-nightly"
     steps:
       - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
       - name: Add the deploy keys of all private repos we depend on
         uses: webfactory/ssh-agent@v0.9.1
         with:
@@ -84,6 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
       - name: Add the deploy keys of all private repos we depend on
         uses: webfactory/ssh-agent@v0.9.1
         with:
@@ -118,6 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
       - name: Add the deploy keys of all private repos we depend on
         uses: webfactory/ssh-agent@v0.9.1
         with:
@@ -136,13 +144,13 @@ jobs:
         run: cargo clippy --all-features --all-targets --tests --workspace
         env:
           RUSTFLAGS: "-D warnings"
-          CARGO_NET_GIT_FETCH_WITH_CLI: true
 
   docs:
     name: docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
       - name: Add the deploy keys of all private repos we depend on
         uses: webfactory/ssh-agent@v0.9.1
         with:
