@@ -80,27 +80,33 @@ jobs:
         run: cargo test --features=${{ matrix.features }} --no-fail-fast
 
   coverage:
+    name: coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set PAT to access private repos
-        env:
-          PAT: ${{ secrets.NOIB3_PAT }}
-        run: |
-          git config --global --replace-all "url.https://noib3:$PAT@github.com.insteadOf" ssh://git@github.com
-          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" git@github.com
-          git config --global --add "url.https://noib3:$PAT@github.com.insteadOf" https://github.com
-      - name: Install Neovim nightly
-        uses: rhysd/action-setup-vim@v1
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
         with:
-            neovim: true
-            version: nightly
-      - uses: dtolnay/rust-toolchain@nightly
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Generate code coverage
-        run: CI=true cargo llvm-cov --workspace --codecov --output-path codecov.json
-      - name: Upload coverage to Codecov
+      - name: Run unit tests
+        working-directory: ./crates
+        run: cargo llvm-cov --no-report
+      - name: Run integration tests
+        working-directory: ./tests
+        run: cargo llvm-cov --no-report --features=auth,collab,walkdir
+      - name: Generate coverage report
+        run: cargo llvm-cov report --codecov --output-path codecov.json
+      - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -127,7 +133,9 @@ jobs:
         with:
           components: clippy
       - name: Run `cargo clippy`
-        run: cargo clippy --all-features --all-targets --tests --workspace -- -D warnings
+        run: cargo clippy --all-features --all-targets --tests --workspace
+        env:
+          RUSTFLAGS: "-D warnings"
 
   docs:
     name: docs
