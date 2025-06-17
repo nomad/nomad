@@ -12,7 +12,7 @@ on:
 
 jobs:
   test-crates:
-    name: test crates/*
+    name: test crates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
         run: cargo test --features=walkdir --no-fail-fast
 
   test-neovim:
-    name: test the Neovim backend
+    name: test Neovim
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -132,7 +132,7 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
-      - name: Run `cargo clippy`
+      - name: Run 'cargo clippy'
         run: cargo clippy --all-features --all-targets --tests --workspace
         env:
           RUSTFLAGS: "-D warnings"
@@ -154,7 +154,7 @@ jobs:
             ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
-      - name: Run `cargo doc`
+      - name: Run 'cargo doc'
         run: cargo doc --all-features --workspace
         env:
           RUSTFLAGS: "-D warnings"
@@ -169,5 +169,5 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
-      - name: Run `cargo fmt`
+      - name: Run 'cargo fmt'
         run: cargo fmt --check
