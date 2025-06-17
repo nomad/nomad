@@ -1,0 +1,191 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 1 * *'
+
+# TODO: remove after publishing private crates.
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+jobs:
+  test-crates:
+    name: test crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Compile unit tests for all crates
+        working-directory: ./crates
+        run: cargo test --no-run
+      - name: Run unit tests for all crates
+        working-directory: ./crates
+        run: cargo test --no-fail-fast
+      - name: Compile integration tests
+        working-directory: ./tests
+        run: cargo test --features=auth,collab,mock,walkdir --no-run
+      - name: Run crates/auth tests
+        working-directory: ./tests
+        run: cargo test --features=auth --no-fail-fast
+      - name: Run crates/collab tests
+        working-directory: ./tests
+        run: cargo test --features=collab --no-fail-fast
+      - name: Run crates/mock tests
+        working-directory: ./tests
+        run: cargo test --features=mock --no-fail-fast
+      - name: Run crates/walkdir tests
+        working-directory: ./tests
+        run: cargo test --features=walkdir --no-fail-fast
+
+  test-neovim:
+    name: test Neovim backend
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        neovim: [v0.11.2, nightly]
+        include:
+          - neovim: v0.11.2
+            features: "neovim"
+          - neovim: nightly
+            features: "neovim-nightly"
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Neovim ${{ matrix.neovim }}
+        uses: rhysd/action-setup-vim@v1
+        with:
+            neovim: true
+            version: ${{ matrix.neovim }}
+      - name: Compile Neovim tests
+        working-directory: ./tests
+        run: cargo test --features=${{ matrix.features }} --no-run
+      - name: Run Neovim tests
+        working-directory: ./tests
+        run: cargo test --features=${{ matrix.features }} --no-fail-fast
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Run unit tests
+        working-directory: ./crates
+        run: cargo llvm-cov --no-report
+      - name: Run integration tests
+        working-directory: ./tests
+        run: cargo llvm-cov --no-report --features=auth,collab,walkdir
+      - name: Generate coverage report
+        run: cargo llvm-cov report --codecov --output-path codecov.json
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: codecov.json
+          fail_ci_if_error: true
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Rust nightly with Clippy
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - name: Run 'cargo clippy'
+        run: cargo clippy --all-features --all-targets --tests --workspace
+        env:
+          RUSTFLAGS: "-D warnings"
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Run 'cargo doc'
+        run: cargo doc --all-features --workspace
+        env:
+          RUSTFLAGS: "-D warnings"
+          RUSTDOCFLAGS: "--cfg docsrs"
+
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust nightly with rustfmt
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Run 'cargo fmt'
+        run: cargo fmt --check
