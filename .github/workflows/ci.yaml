@@ -78,6 +78,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.ABS_PATH_DEPLOY_KEY }}
             ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
       - name: Install Rust nightly with Clippy
         uses: dtolnay/rust-toolchain@nightly
         with:
