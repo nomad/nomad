@@ -56,7 +56,7 @@ jobs:
         run: cargo test --features=walkdir --no-fail-fast
 
   test-neovim:
-    name: test Neovim
+    name: test Neovim backend
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
