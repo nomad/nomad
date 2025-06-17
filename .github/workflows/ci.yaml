@@ -79,6 +79,7 @@ jobs:
             ${{ secrets.ABS_PATH_DEPLOY_KEY }}
             ${{ secrets.CAUCHY_DEPLOY_KEY }}
             ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Install Rust nightly with Clippy
