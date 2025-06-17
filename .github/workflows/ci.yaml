@@ -33,9 +33,15 @@ jobs:
             ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
+      - name: Compile unit tests for all crates
+        working-directory: ./crates
+        run: cargo test --no-run
       - name: Run unit tests for all crates
         working-directory: ./crates
         run: cargo test --no-fail-fast
+      - name: Compile integration tests
+        working-directory: ./tests
+        run: cargo test --features=auth,collab,mock,walkdir --no-run
       - name: Run crates/auth tests
         working-directory: ./tests
         run: cargo test --features=auth --no-fail-fast
@@ -81,6 +87,9 @@ jobs:
         with:
             neovim: true
             version: ${{ matrix.neovim }}
+      - name: Compile Neovim tests
+        working-directory: ./tests
+        run: cargo test --features=${{ matrix.features }} --no-run
       - name: Run Neovim tests
         working-directory: ./tests
         run: cargo test --features=${{ matrix.features }} --no-fail-fast
