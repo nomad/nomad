@@ -136,6 +136,7 @@ jobs:
         run: cargo clippy --all-features --all-targets --tests --workspace
         env:
           RUSTFLAGS: "-D warnings"
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
 
   docs:
     name: docs
