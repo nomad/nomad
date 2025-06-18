@@ -53,7 +53,10 @@
                   ];
                 nativeBuildInputs = [
                   (rust.toolchain.withComponents [
+                    "cargo"
                     "clippy"
+                    "rust-src"
+                    "rustc"
                     "rustfmt"
                   ])
                 ];
