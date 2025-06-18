@@ -56,6 +56,7 @@
                     "cargo"
                     "clippy"
                     "rust-src"
+                    "rust-std"
                     "rustc"
                     "rustfmt"
                   ])
