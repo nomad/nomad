@@ -2,60 +2,88 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    flake-utils = {
-      url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     neovim-nightly-overlay = {
       url = "github:nix-community/neovim-nightly-overlay/master";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
     };
   };
 
   outputs =
     inputs:
-    with inputs;
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        inherit (nixpkgs.lib) lists;
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "x86_64-linux"
+      ];
 
-        mkPkgs =
-          isNightly:
-          (import nixpkgs {
-            inherit system;
-            overlays = lists.optionals isNightly [
-              neovim-nightly-overlay.overlay
-            ];
-          });
-
-        mkShell =
-          { nightly }:
-          (
+      perSystem =
+        {
+          inputs',
+          pkgs,
+          lib,
+          ...
+        }:
+        {
+          packages =
             let
-              pkgs = mkPkgs nightly;
-              inherit (pkgs) lib stdenv;
+              nightly-toolchain = inputs'.fenix.packages.fromToolchainFile {
+                file = ./rust-toolchain.toml;
+                sha256 = "sha256-SISBvV1h7Ajhs8g0pNezC1/KGA0hnXnApQ/5//STUbs=";
+              };
             in
-            pkgs.mkShell {
-              buildInputs =
-                with pkgs;
-                lib.optional stdenv.isDarwin [
-                  # Not sure who needs these
-                  darwin.apple_sdk.frameworks.AppKit
-                  libiconv
-                ];
-
-              packages = with pkgs; [
-                neovim
-              ];
-            }
-          );
-      in
-      {
-        devShells = {
-          default = mkShell { nightly = false; };
-          nightly = mkShell { nightly = true; };
+            {
+              neovim =
+                (pkgs.makeRustPlatform {
+                  cargo = nightly-toolchain;
+                  rustc = nightly-toolchain;
+                }).buildRustPackage
+                  {
+                    pname = "mad-neovim";
+                    version = "0.1.0";
+                    src = ./.;
+                    cargoLock = {
+                      lockFile = ./Cargo.lock;
+                      # TODO: remove after publishing private crates.
+                      outputHashes = {
+                        "abs-path-0.1.0" = lib.fakeHash;
+                        "cauchy-0.1.0" = lib.fakeHash;
+                        "codecs-0.0.9" = lib.fakeHash;
+                        "lazy-await-0.1.0" = lib.fakeHash;
+                        "nvim-oxi-0.6.0" = lib.fakeHash;
+                        "pando-0.1.0" = lib.fakeHash;
+                        "puff-0.1.0" = lib.fakeHash;
+                      };
+                    };
+                    buildPhase = ''
+                      runHook preBuild
+                      cargo xtask build --release
+                      runHook postBuild
+                    '';
+                    installPhase = ''
+                      runHook preInstall
+                      mkdir -p $out
+                      cp -r lua $out/
+                      runHook postInstall
+                    '';
+                  };
+              neovim-nightly = { };
+            };
+          devShells = {
+            default = pkgs.mkShell { };
+            neovim = pkgs.mkShell { };
+            neovim-nightly = pkgs.mkShell { };
+          };
+          formatter = pkgs.nixfmt-rfc-style;
         };
-      }
-    );
+    };
 }
