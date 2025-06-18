@@ -44,12 +44,15 @@
               default = pkgs.mkShell {
                 buildInputs =
                   with pkgs;
-                  lib.lists.optionals stdenv.isLinux [
+                  [
                     pkg-config
-                    # Needed by keyring to access the Secret Service.
+                    # Needed by /benches to let git2 clone the Neovim repo.
+                    openssl
+                  ]
+                  ++ lib.lists.optionals stdenv.isLinux [
+                    # Needed by /crates/auth to let "keyring" access the Secret
+                    # Service.
                     dbus
-                    # Needed by Clippy.
-                    zlib
                   ];
                 nativeBuildInputs = [
                   (rust.toolchain.withComponents [
