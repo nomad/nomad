@@ -153,9 +153,13 @@ jobs:
       - name: Enter the 'nix develop' environment
         run: nix run .#nix-develop-gha --accept-flake-config
       - name: Run 'cargo clippy'
-        run: cargo clippy --all-features --all-targets --tests --workspace
-        env:
-          RUSTFLAGS: "-D warnings"
+        run: >
+          cargo clippy
+            --all-features
+            --all-targets
+            --tests
+            --workspace
+            -- --deny warnings
 
   docs:
     name: docs
