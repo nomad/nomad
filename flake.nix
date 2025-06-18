@@ -34,11 +34,22 @@
           ...
         }:
         let
-          common = {
+          common = rec {
             devShells = {
-              default = pkgs.mkShell { };
+              default = pkgs.mkShell {
+                buildInputs =
+                  with pkgs;
+                  lib.lists.optionals stdenv.isLinux [
+                    pkg-config
+                    # Needed by keyring to access the Secret Service.
+                    dbus
+                  ];
+                nativeBuildInputs = [
+                  rust.toolchain
+                ];
+              };
             };
-            rust = {
+            rust = rec {
               cargoLock = {
                 lockFile = ./Cargo.lock;
                 # TODO: remove after publishing private crates.
@@ -52,17 +63,14 @@
                   "puff-0.1.0" = lib.fakeHash;
                 };
               };
-              platform =
-                let
-                  nightly-toolchain = inputs'.fenix.packages.fromToolchainFile {
-                    file = ./rust-toolchain.toml;
-                    sha256 = "sha256-SISBvV1h7Ajhs8g0pNezC1/KGA0hnXnApQ/5//STUbs=";
-                  };
-                in
-                pkgs.makeRustPlatform {
-                  cargo = nightly-toolchain;
-                  rustc = nightly-toolchain;
-                };
+              platform = pkgs.makeRustPlatform {
+                cargo = toolchain;
+                rustc = toolchain;
+              };
+              toolchain = inputs'.fenix.packages.fromToolchainFile {
+                file = ./rust-toolchain.toml;
+                sha256 = "sha256-SISBvV1h7Ajhs8g0pNezC1/KGA0hnXnApQ/5//STUbs=";
+              };
             };
           };
 
@@ -105,8 +113,16 @@
                 nightly = buildPlugin { isNightly = true; };
               };
               devShells = {
-                zero-dot-eleven = pkgs.mkShell { };
-                nightly = pkgs.mkShell { };
+                zero-dot-eleven = common.devShells.default.overrideAttrs (old: {
+                  nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+                    pkgs.neovim
+                  ];
+                });
+                nightly = common.devShells.default.overrideAttrs (old: {
+                  nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+                    inputs'.neovim-nightly-overlay.packages.default
+                  ];
+                });
               };
             };
         in
