@@ -44,14 +44,23 @@
               default = pkgs.mkShell {
                 buildInputs =
                   with pkgs;
-                  lib.lists.optionals stdenv.isLinux [
+                  [
                     pkg-config
-                    # Needed by keyring to access the Secret Service.
+                    # Needed by /benches to let git2 clone the Neovim repo.
+                    openssl
+                  ]
+                  ++ lib.lists.optionals stdenv.isLinux [
+                    # Needed by /crates/auth to let "keyring" access the Secret
+                    # Service.
                     dbus
                   ];
                 nativeBuildInputs = [
                   (rust.toolchain.withComponents [
+                    "cargo"
                     "clippy"
+                    "rust-src"
+                    "rust-std"
+                    "rustc"
                     "rustfmt"
                   ])
                 ];
@@ -136,7 +145,10 @@
         in
         {
           apps = {
-            nix-develop-gha = inputs'.nix-develop-gha.packages.default;
+            nix-develop-gha = {
+              type = "app";
+              program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
+            };
           };
           packages = {
             neovim = neovim.packages.zero-dot-eleven;
