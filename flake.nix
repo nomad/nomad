@@ -14,6 +14,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
     };
+
+    nix-develop-gha = {
+      url = "github:nicknovitski/nix-develop";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -45,7 +50,10 @@
                     dbus
                   ];
                 nativeBuildInputs = [
-                  rust.toolchain
+                  (rust.toolchain.withComponents [
+                    "clippy"
+                    "rustfmt"
+                  ])
                 ];
               };
             };
@@ -67,8 +75,8 @@
                 cargo = toolchain;
                 rustc = toolchain;
               };
-              toolchain = inputs'.fenix.packages.fromToolchainFile {
-                file = ./rust-toolchain.toml;
+              toolchain = inputs'.fenix.packages.fromToolchainName {
+                name = (lib.importTOML ./rust-toolchain.toml).toolchain.channel;
                 sha256 = "sha256-SISBvV1h7Ajhs8g0pNezC1/KGA0hnXnApQ/5//STUbs=";
               };
             };
@@ -127,6 +135,9 @@
             };
         in
         {
+          apps = {
+            nix-develop-gha = inputs'.nix-develop-gha.packages.default;
+          };
           packages = {
             neovim = neovim.packages.zero-dot-eleven;
             neovim-nightly = neovim.packages.nightly;
