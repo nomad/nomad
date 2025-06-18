@@ -136,7 +136,10 @@
         in
         {
           apps = {
-            nix-develop-gha = inputs'.nix-develop-gha.packages.default;
+            nix-develop-gha = {
+              type = "app";
+              program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
+            };
           };
           packages = {
             neovim = neovim.packages.zero-dot-eleven;
