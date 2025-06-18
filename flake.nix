@@ -49,11 +49,14 @@
                     # Needed by keyring to access the Secret Service.
                     dbus
                   ];
-                nativeBuildInputs = [
+                nativeBuildInputs = with pkgs; [
                   (rust.toolchain.withComponents [
                     "clippy"
                     "rustfmt"
                   ])
+                  pkg-config
+                  # Needed by Clippy.
+                  zlib
                 ];
               };
             };
