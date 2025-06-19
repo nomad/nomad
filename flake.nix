@@ -6,8 +6,8 @@
 
     crane.url = "github:ipetkov/crane";
 
-    fenix = {
-      url = "github:nix-community/fenix";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -71,6 +71,10 @@
               };
             };
             crane = rec {
+              lib = (inputs.crane.mkLib pkgs).overrideToolchain (
+                pkgs: (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile ./rust-toolchain.toml
+              );
+              src = lib.cleanCargoSource (lib.path ./.);
               commonArgs =
                 let
                   args = {
@@ -83,32 +87,6 @@
                   };
                 in
                 args // { cargoArtifacts = lib.buildDepsOnly args; };
-              # lib = (inputs.crane.mkLib pkgs).overrideToolchain (_pkgs: rust.toolchain);
-              lib = inputs.crane.mkLib pkgs;
-              src = lib.cleanCargoSource (lib.path ./.);
-            };
-            rust = rec {
-              cargoLock = {
-                lockFile = ./Cargo.lock;
-                # TODO: remove after publishing private crates.
-                outputHashes = {
-                  "abs-path-0.1.0" = lib.fakeHash;
-                  "cauchy-0.1.0" = lib.fakeHash;
-                  "codecs-0.0.9" = lib.fakeHash;
-                  "lazy-await-0.1.0" = lib.fakeHash;
-                  "nvim-oxi-0.6.0" = lib.fakeHash;
-                  "pando-0.1.0" = lib.fakeHash;
-                  "puff-0.1.0" = lib.fakeHash;
-                };
-              };
-              platform = pkgs.makeRustPlatform {
-                cargo = toolchain;
-                rustc = toolchain;
-              };
-              toolchain = inputs'.fenix.packages.fromToolchainName {
-                name = (lib.importTOML ./rust-toolchain.toml).toolchain.channel;
-                sha256 = "sha256-SISBvV1h7Ajhs8g0pNezC1/KGA0hnXnApQ/5//STUbs=";
-              };
             };
           };
 
