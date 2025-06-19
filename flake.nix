@@ -36,40 +36,12 @@
       perSystem =
         {
           inputs',
+          config,
           pkgs,
           lib,
           ...
         }:
         let
-          common = {
-            devShells = {
-              default = pkgs.mkShell {
-                buildInputs =
-                  with pkgs;
-                  [
-                    pkg-config
-                    openssl
-                  ]
-                  ++ lib.lists.optionals stdenv.isLinux [
-                    # Needed by /crates/auth to let "keyring" access the Secret
-                    # Service.
-                    dbus
-                  ];
-                nativeBuildInputs = with pkgs; [
-                  pkg-config
-                  openssl
-                  (rust.toolchain.withComponents [
-                    "cargo"
-                    "clippy"
-                    "rust-src"
-                    "rust-std"
-                    "rustc"
-                    "rustfmt"
-                  ])
-                ];
-              };
-            };
-          };
           crane = rec {
             lib =
               let
@@ -95,6 +67,13 @@
               in
               args // { cargoArtifacts = lib.buildDepsOnly args; };
           };
+
+          common = {
+            devShell = crane.lib.devShell {
+              inherit (config) checks;
+            };
+          };
+
           neovim =
             let
               buildPlugin =
@@ -156,12 +135,12 @@
                 nightly = buildPlugin { isNightly = true; };
               };
               devShells = {
-                zero-dot-eleven = common.devShells.default.overrideAttrs (old: {
+                zero-dot-eleven = common.devShell.overrideAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
                     pkgs.neovim
                   ];
                 });
-                nightly = common.devShells.default.overrideAttrs (old: {
+                nightly = common.devShell.overrideAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
                     inputs'.neovim-nightly-overlay.packages.default
                   ];
@@ -176,12 +155,26 @@
               program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
             };
           };
+          checks = {
+            clippy = crane.lib.cargoClippy (
+              crane.commonArgs
+              // {
+                cargoClippyExtraArgs = lib.concatStringsSep " " [
+                  "--all-features"
+                  "--all-targets"
+                  "--tests"
+                  "--workspace"
+                  "-- --deny warnings"
+                ];
+              }
+            );
+          };
           packages = {
             neovim = neovim.packages.zero-dot-eleven;
             neovim-nightly = neovim.packages.nightly;
           };
           devShells = {
-            default = common.devShells.default;
+            default = common.devShell;
             neovim = neovim.devShells.zero-dot-eleven;
             neovim-nightly = neovim.devShells.nightly;
           };
