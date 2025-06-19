@@ -149,12 +149,22 @@
             };
         in
         {
-          apps = {
-            nix-develop-gha = {
-              type = "app";
-              program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
-            };
-          };
+          apps =
+            {
+              nix-develop-gha = {
+                type = "app";
+                program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
+              };
+            }
+            # Workaround for https://github.com/NixOS/nix/issues/8881 so that
+            # we can run individual checks with `nix run .#check-<foo>`.
+            // lib.mapAttrs' (name: check: {
+              name = "check-${name}";
+              value = {
+                type = "app";
+                program = "${check}";
+              };
+            }) config.checks;
           checks = {
             clippy = crane.lib.cargoClippy (
               crane.commonArgs
