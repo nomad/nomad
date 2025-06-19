@@ -41,14 +41,13 @@
           ...
         }:
         let
-          common = rec {
+          common = {
             devShells = {
               default = pkgs.mkShell {
                 buildInputs =
                   with pkgs;
                   [
                     pkg-config
-                    # Needed by /benches to let git2 clone the Neovim repo.
                     openssl
                   ]
                   ++ lib.lists.optionals stdenv.isLinux [
@@ -70,53 +69,84 @@
                 ];
               };
             };
-            crane = rec {
-              lib = (inputs.crane.mkLib pkgs).overrideToolchain (
-                pkgs: (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile ./rust-toolchain.toml
-              );
-              src = lib.cleanCargoSource (lib.path ./.);
-              commonArgs =
-                let
-                  args = {
-                    inherit src;
-                    strictDeps = true;
-                    buildInputs = with pkgs; [
-                      pkg-config
-                      openssl.dev
-                    ];
-                  };
-                in
-                args // { cargoArtifacts = lib.buildDepsOnly args; };
-            };
           };
-
+          crane = rec {
+            lib =
+              let
+                mkToolchain =
+                  pkgs: (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile ./rust-toolchain.toml;
+              in
+              (inputs.crane.mkLib pkgs).overrideToolchain mkToolchain;
+            commonArgs =
+              let
+                args = {
+                  src = lib.cleanCargoSource (lib.path ./.);
+                  strictDeps = true;
+                  buildInputs = with pkgs; [
+                    pkg-config
+                    # Needed by /benches to let git2 clone the Neovim repo.
+                    openssl.dev
+                  ];
+                  # Crane will emit a warning if there's no
+                  # `workspace.package.name` set in the workspace's Cargo.lock,
+                  # so add a `pname` here to silence that.
+                  pname = "mad";
+                };
+              in
+              args // { cargoArtifacts = lib.buildDepsOnly args; };
+          };
           neovim =
             let
               buildPlugin =
-                let
-                  pname = "mad-neovim";
-                  version = "0.1.0";
-                in
                 {
                   isNightly,
                   isRelease ? true,
                 }:
-                common.crane.lib.buildPackage (
-                  common.crane.commonArgs
-                  // {
-                    inherit pname version;
-                    buildPhaseCargoCommand =
-                      let
-                        nightlyFlag = lib.optionalString isNightly "--nightly";
-                        releaseFlag = lib.optionalString isRelease "--release";
-                      in
-                      "cargo xtask build ${nightlyFlag} ${releaseFlag}";
-                    installPhaseCommand = ''
-                      mkdir -p $out
-                      cp -r lua $out/
-                    '';
-                    doCheck = false;
-                  }
+                crane.lib.buildPackage (
+                  crane.commonArgs
+                  // (
+                    let
+                      # Get the crate's name and version.
+                      crateInfos = builtins.fromJSON (
+                        builtins.readFile (
+                          pkgs.runCommand "cargo-metadata"
+                            {
+                              nativeBuildInputs = [
+                                crane.lib.toolchain
+                                pkgs.jq
+                              ];
+                            }
+                            ''
+                              cargo metadata \
+                                --format-version 1 \
+                                --no-deps \
+                                --offline \
+                                --manifest-path ${./crates/mad-neovim/Cargo.toml} | \
+                              jq '
+                                .workspace_default_members[0] as $default_id |
+                                .packages[] |
+                                select(.id == $default_id) |
+                                {pname: .name, version: .version}
+                              ' > $out
+                            ''
+                        )
+                      );
+                    in
+                    {
+                      inherit (crateInfos) pname version;
+                      buildPhaseCargoCommand =
+                        let
+                          nightlyFlag = lib.optionalString isNightly "--nightly";
+                          releaseFlag = lib.optionalString isRelease "--release";
+                        in
+                        "cargo xtask build ${nightlyFlag} ${releaseFlag}";
+                      installPhaseCommand = ''
+                        mkdir -p $out
+                        cp -r lua $out/
+                      '';
+                      doCheck = false;
+                    }
+                  )
                 );
             in
             {
