@@ -55,10 +55,17 @@
                   src = lib.cleanCargoSource (lib.path ./.);
                   strictDeps = true;
                   nativeBuildInputs = with pkgs; [ pkg-config ];
-                  buildInputs = with pkgs; [
-                    # Needed by /benches to let git2 clone the Neovim repo.
-                    openssl
-                  ];
+                  buildInputs =
+                    with pkgs;
+                    [
+                      # Needed by /benches to let git2 clone the Neovim repo.
+                      openssl
+                    ]
+                    ++ lib.lists.optionals stdenv.isLinux [
+                      # Needed by /crates/auth to let "keyring" access the
+                      # Secret Service.
+                      dbus
+                    ];
                   # Crane will emit a warning if there's no
                   # `workspace.package.name` set in the workspace's Cargo.lock,
                   # so add a `pname` here to silence that.
