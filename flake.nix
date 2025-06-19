@@ -4,6 +4,8 @@
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
+    crane.url = "github:ipetkov/crane";
+
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -68,6 +70,23 @@
                 ];
               };
             };
+            crane = rec {
+              commonArgs =
+                let
+                  args = {
+                    inherit src;
+                    strictDeps = true;
+                    buildInputs = with pkgs; [
+                      pkg-config
+                      openssl.dev
+                    ];
+                  };
+                in
+                args // { cargoArtifacts = lib.buildDepsOnly args; };
+              # lib = (inputs.crane.mkLib pkgs).overrideToolchain (_pkgs: rust.toolchain);
+              lib = inputs.crane.mkLib pkgs;
+              src = lib.cleanCargoSource (lib.path ./.);
+            };
             rust = rec {
               cargoLock = {
                 lockFile = ./Cargo.lock;
@@ -104,27 +123,23 @@
                   isNightly,
                   isRelease ? true,
                 }:
-                common.rust.platform.buildRustPackage {
-                  inherit pname version;
-                  inherit (common.rust) cargoLock;
-                  src = ./.;
-                  buildPhase =
-                    let
-                      nightlyFlag = lib.optionalString isNightly "--nightly";
-                      releaseFlag = lib.optionalString isRelease "--release";
-                    in
-                    ''
-                      runHook preBuild
-                      cargo xtask build ${nightlyFlag} ${releaseFlag}
-                      runHook postBuild
+                common.crane.lib.buildPackage (
+                  common.crane.commonArgs
+                  // {
+                    inherit pname version;
+                    buildPhaseCargoCommand =
+                      let
+                        nightlyFlag = lib.optionalString isNightly "--nightly";
+                        releaseFlag = lib.optionalString isRelease "--release";
+                      in
+                      "cargo xtask build ${nightlyFlag} ${releaseFlag}";
+                    installPhaseCommand = ''
+                      mkdir -p $out
+                      cp -r lua $out/
                     '';
-                  installPhase = ''
-                    runHook preInstall
-                    mkdir -p $out
-                    cp -r lua $out/
-                    runHook postInstall
-                  '';
-                };
+                    doCheck = false;
+                  }
+                );
             in
             {
               packages = {
