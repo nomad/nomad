@@ -54,7 +54,9 @@
                     # Service.
                     dbus
                   ];
-                nativeBuildInputs = [
+                nativeBuildInputs = with pkgs; [
+                  pkg-config
+                  openssl
                   (rust.toolchain.withComponents [
                     "cargo"
                     "clippy"
