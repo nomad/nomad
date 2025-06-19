@@ -4,8 +4,10 @@
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
-    fenix = {
-      url = "github:nix-community/fenix";
+    crane.url = "github:ipetkov/crane";
+
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -34,95 +36,106 @@
       perSystem =
         {
           inputs',
+          config,
           pkgs,
           lib,
           ...
         }:
         let
-          common = rec {
-            devShells = {
-              default = pkgs.mkShell {
-                buildInputs =
-                  with pkgs;
-                  [
-                    pkg-config
-                    # Needed by /benches to let git2 clone the Neovim repo.
-                    openssl
-                  ]
-                  ++ lib.lists.optionals stdenv.isLinux [
-                    # Needed by /crates/auth to let "keyring" access the Secret
-                    # Service.
-                    dbus
-                  ];
-                nativeBuildInputs = [
-                  (rust.toolchain.withComponents [
-                    "cargo"
-                    "clippy"
-                    "rust-src"
-                    "rust-std"
-                    "rustc"
-                    "rustfmt"
-                  ])
-                ];
-              };
+          crane =
+            let
+              mkToolchain =
+                pkgs: (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile ./rust-toolchain.toml;
+              craneLib = (inputs.crane.mkLib pkgs).overrideToolchain mkToolchain;
+            in
+            {
+              lib = craneLib;
+              commonArgs =
+                let
+                  args = {
+                    src = craneLib.cleanCargoSource (craneLib.path ./.);
+                    strictDeps = true;
+                    nativeBuildInputs = with pkgs; [ pkg-config ];
+                    buildInputs =
+                      with pkgs;
+                      [
+                        # Needed by /benches to let git2 clone the Neovim repo.
+                        openssl
+                      ]
+                      ++ lib.lists.optionals stdenv.isLinux [
+                        # Needed by /crates/auth to let "keyring" access the
+                        # Secret Service.
+                        dbus
+                      ];
+                    # Crane will emit a warning if there's no
+                    # `workspace.package.name` set in the workspace's
+                    # Cargo.lock, so add a `pname` here to silence that.
+                    pname = "mad";
+                  };
+                in
+                args // { cargoArtifacts = craneLib.buildDepsOnly args; };
             };
-            rust = rec {
-              cargoLock = {
-                lockFile = ./Cargo.lock;
-                # TODO: remove after publishing private crates.
-                outputHashes = {
-                  "abs-path-0.1.0" = lib.fakeHash;
-                  "cauchy-0.1.0" = lib.fakeHash;
-                  "codecs-0.0.9" = lib.fakeHash;
-                  "lazy-await-0.1.0" = lib.fakeHash;
-                  "nvim-oxi-0.6.0" = lib.fakeHash;
-                  "pando-0.1.0" = lib.fakeHash;
-                  "puff-0.1.0" = lib.fakeHash;
-                };
-              };
-              platform = pkgs.makeRustPlatform {
-                cargo = toolchain;
-                rustc = toolchain;
-              };
-              toolchain = inputs'.fenix.packages.fromToolchainName {
-                name = (lib.importTOML ./rust-toolchain.toml).toolchain.channel;
-                sha256 = "sha256-SISBvV1h7Ajhs8g0pNezC1/KGA0hnXnApQ/5//STUbs=";
-              };
+
+          common = {
+            devShell = crane.lib.devShell {
+              inherit (config) checks;
             };
           };
 
           neovim =
             let
               buildPlugin =
-                let
-                  pname = "mad-neovim";
-                  version = "0.1.0";
-                in
                 {
                   isNightly,
                   isRelease ? true,
                 }:
-                common.rust.platform.buildRustPackage {
-                  inherit pname version;
-                  inherit (common.rust) cargoLock;
-                  src = ./.;
-                  buildPhase =
+                crane.lib.buildPackage (
+                  crane.commonArgs
+                  // (
                     let
-                      nightlyFlag = lib.optionalString isNightly "--nightly";
-                      releaseFlag = lib.optionalString isRelease "--release";
+                      # Get the crate's name and version.
+                      crateInfos = builtins.fromJSON (
+                        builtins.readFile (
+                          pkgs.runCommand "cargo-metadata"
+                            {
+                              nativeBuildInputs = [
+                                crane.lib.cargo
+                                pkgs.jq
+                              ];
+                            }
+                            ''
+                              cd ${crane.commonArgs.src}
+                              cargo metadata \
+                                --format-version 1 \
+                                --no-deps \
+                                --offline \
+                                --manifest-path crates/mad-neovim/Cargo.toml | \
+                              jq '
+                                .workspace_default_members[0] as $default_id |
+                                .packages[] |
+                                select(.id == $default_id) |
+                                {pname: .name, version: .version}
+                              ' > $out
+                            ''
+                        )
+                      );
                     in
-                    ''
-                      runHook preBuild
-                      cargo xtask build ${nightlyFlag} ${releaseFlag}
-                      runHook postBuild
-                    '';
-                  installPhase = ''
-                    runHook preInstall
-                    mkdir -p $out
-                    cp -r lua $out/
-                    runHook postInstall
-                  '';
-                };
+                    {
+                      inherit (crateInfos) pname version;
+                      buildPhaseCargoCommand =
+                        let
+                          nightlyFlag = lib.optionalString isNightly "--nightly";
+                          releaseFlag = lib.optionalString isRelease "--release";
+                        in
+                        "cargo xtask build ${nightlyFlag} ${releaseFlag}";
+                      installPhaseCommand = ''
+                        mkdir -p $out
+                        cp -r lua $out/
+                      '';
+                      doCheck = false;
+                    }
+                  )
+                );
             in
             {
               packages = {
@@ -130,12 +143,12 @@
                 nightly = buildPlugin { isNightly = true; };
               };
               devShells = {
-                zero-dot-eleven = common.devShells.default.overrideAttrs (old: {
+                zero-dot-eleven = common.devShell.overrideAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
                     pkgs.neovim
                   ];
                 });
-                nightly = common.devShells.default.overrideAttrs (old: {
+                nightly = common.devShell.overrideAttrs (old: {
                   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
                     inputs'.neovim-nightly-overlay.packages.default
                   ];
@@ -144,18 +157,42 @@
             };
         in
         {
-          apps = {
-            nix-develop-gha = {
-              type = "app";
-              program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
-            };
+          apps =
+            {
+              nix-develop-gha = {
+                type = "app";
+                program = "${inputs'.nix-develop-gha.packages.default}/bin/nix-develop-gha";
+              };
+            }
+            # Workaround for https://github.com/NixOS/nix/issues/8881 so that
+            # we can run individual checks with `nix run .#check-<foo>`.
+            // lib.mapAttrs' (name: check: {
+              name = "check-${name}";
+              value = {
+                type = "app";
+                program = "${check}";
+              };
+            }) config.checks;
+          checks = {
+            clippy = crane.lib.cargoClippy (
+              crane.commonArgs
+              // {
+                cargoClippyExtraArgs = lib.concatStringsSep " " [
+                  "--all-features"
+                  "--all-targets"
+                  "--workspace"
+                  "--"
+                  "--deny warnings"
+                ];
+              }
+            );
           };
           packages = {
             neovim = neovim.packages.zero-dot-eleven;
             neovim-nightly = neovim.packages.nightly;
           };
           devShells = {
-            default = common.devShells.default;
+            default = common.devShell;
             neovim = neovim.devShells.zero-dot-eleven;
             neovim-nightly = neovim.devShells.nightly;
           };

@@ -150,16 +150,8 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Check the nixpkgs flake input
         uses: DeterminateSystems/flake-checker-action@main
-      - name: Enter the 'nix develop' environment
-        run: nix run .#nix-develop-gha --accept-flake-config
-      - name: Run 'cargo clippy'
-        run: >
-          cargo clippy
-            --all-features
-            --all-targets
-            --tests
-            --workspace
-            -- --deny warnings
+      - name: Run Clippy
+        run: nix run .#check-clippy --accept-flake-config
 
   docs:
     name: docs
