@@ -172,9 +172,9 @@
                 cargoClippyExtraArgs = lib.concatStringsSep " " [
                   "--all-features"
                   "--all-targets"
-                  "--tests"
                   "--workspace"
-                  "-- --deny warnings"
+                  "--"
+                  "--deny warnings"
                 ];
               }
             );
