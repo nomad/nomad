@@ -112,16 +112,17 @@
                           pkgs.runCommand "cargo-metadata"
                             {
                               nativeBuildInputs = [
-                                crane.lib.toolchain
+                                crane.lib.cargo
                                 pkgs.jq
                               ];
                             }
                             ''
+                              cd ${crane.commonArgs.src}
                               cargo metadata \
                                 --format-version 1 \
                                 --no-deps \
                                 --offline \
-                                --manifest-path ${./crates/mad-neovim/Cargo.toml} | \
+                                --manifest-path crates/mad-neovim/Cargo.toml | \
                               jq '
                                 .workspace_default_members[0] as $default_id |
                                 .packages[] |
