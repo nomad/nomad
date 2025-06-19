@@ -54,10 +54,10 @@
                 args = {
                   src = lib.cleanCargoSource (lib.path ./.);
                   strictDeps = true;
+                  nativeBuildInputs = with pkgs; [ pkg-config ];
                   buildInputs = with pkgs; [
-                    pkg-config
                     # Needed by /benches to let git2 clone the Neovim repo.
-                    openssl.dev
+                    openssl
                   ];
                   # Crane will emit a warning if there's no
                   # `workspace.package.name` set in the workspace's Cargo.lock,
