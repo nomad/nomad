@@ -77,7 +77,17 @@
               commonArgs =
                 let
                   args = {
-                    src = craneLib.cleanCargoSource (craneLib.path ./.);
+                    src = lib.cleanSourceWith {
+                      src = craneLib.path ./.;
+                      filter =
+                        path: type:
+                        (craneLib.filterCargoSources path type)
+                        # Include the Git directory in the source or the build
+                        # script of /crates/version will fail.
+                        || (lib.hasInfix "/.git" path);
+                      # Be reproducible, regardless of the directory name.
+                      name = "source";
+                    };
                     strictDeps = true;
                     nativeBuildInputs = with pkgs; [ pkg-config ];
                     buildInputs =
