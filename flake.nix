@@ -58,7 +58,18 @@
           crane =
             let
               mkToolchain =
-                pkgs: (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile ./rust-toolchain.toml;
+                pkgs:
+                let
+                  toolchain =
+                    (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile
+                      ./rust-toolchain.toml;
+                in
+                toolchain.override {
+                  extensions = (toolchain.extensions or [ ]) ++ [
+                    # Needed by cargo-llvm-cov to generate coverage.
+                    "llvm-tools-preview"
+                  ];
+                };
               craneLib = (inputs.crane.mkLib pkgs).overrideToolchain mkToolchain;
             in
             {
