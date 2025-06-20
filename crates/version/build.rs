@@ -1,12 +1,14 @@
 #![allow(missing_docs)]
 #![allow(clippy::unwrap_used)]
 
+use core::ops::Deref;
 use std::env;
 use std::fmt::Write;
 use std::fs::File;
 use std::path::Path;
+use std::sync::OnceLock;
 
-use chrono::{Datelike, FixedOffset, TimeZone};
+use chrono::Datelike;
 use git2::Repository;
 
 fn main() {
@@ -17,36 +19,35 @@ fn main() {
 }
 
 fn add_commit_infos(file: &mut GeneratedFile) {
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let repo = LazyRepo::default();
 
-    let repo = Repository::discover(manifest_dir).expect("couldn't find repo");
+    let commit_hash = env::var("COMMIT_HASH")
+        .unwrap_or_else(|_| repo.head_commit().id().to_string());
 
-    let head_commit = repo
-        .head()
-        .expect("couldn't get HEAD")
-        .peel_to_commit()
-        .expect("couldn't get HEAD commit");
+    let commit_unix_timestamp = env::var("COMMIT_UNIX_TIMESTAMP")
+        .map(|env_var| env_var.parse::<i64>().unwrap())
+        .unwrap_or_else(|_| repo.head_commit().time().seconds());
 
-    let commit_time = head_commit.time();
+    let commit_date =
+        chrono::DateTime::from_timestamp(commit_unix_timestamp, 0)
+            .expect("invalid timestamp");
 
-    let date = FixedOffset::east_opt(commit_time.offset_minutes())
-        .expect("minutes out of bounds")
-        .timestamp_opt(commit_time.seconds(), 0)
-        .unwrap();
+    file.add_const("COMMIT_SHORT_HASH", &commit_hash[..7])
+        .add_const("COMMIT_YEAR", commit_date.year() as u16)
+        .add_const("COMMIT_MONTH", commit_date.month() as u8)
+        .add_const("COMMIT_DAY", commit_date.day() as u8);
 
-    file.add_const("COMMIT_SHORT_HASH", &head_commit.id().to_string()[..7])
-        .add_const("COMMIT_YEAR", date.year() as u16)
-        .add_const("COMMIT_MONTH", date.month() as u8)
-        .add_const("COMMIT_DAY", date.day() as u8);
+    if let Some(repo) = repo.inner() {
+        // Trigger a rebuild when new commits are made.
+        let head_path = repo.path().join("HEAD");
+        println!("cargo:rerun-if-changed={}", head_path.display());
 
-    // Trigger a rebuild when new commits are made.
-    let head_path = repo.path().join("HEAD");
-    println!("cargo:rerun-if-changed={}", head_path.display());
-
-    let head_contents = std::fs::read_to_string(&head_path).unwrap();
-    if let Some((_, relative_ref_path)) = head_contents.split_once("ref: ") {
-        let ref_path = repo.path().join(relative_ref_path.trim());
-        println!("cargo:rerun-if-changed={}", ref_path.display());
+        let head_contents = std::fs::read_to_string(&head_path).unwrap();
+        if let Some((_, relative_ref_path)) = head_contents.split_once("ref: ")
+        {
+            let ref_path = repo.path().join(relative_ref_path.trim());
+            println!("cargo:rerun-if-changed={}", ref_path.display());
+        }
     }
 }
 
@@ -85,6 +86,35 @@ impl GeneratedFile {
     fn create(self) {
         use std::io::Write;
         out_file(Self::NAME).write_all(self.contents.as_bytes()).unwrap();
+    }
+}
+
+#[derive(Default)]
+struct LazyRepo {
+    inner: OnceLock<Repository>,
+}
+
+impl LazyRepo {
+    fn head_commit(&self) -> git2::Commit<'_> {
+        self.head()
+            .expect("couldn't get HEAD")
+            .peel_to_commit()
+            .expect("couldn't get HEAD commit")
+    }
+
+    fn inner(&self) -> Option<&Repository> {
+        self.inner.get()
+    }
+}
+
+impl Deref for LazyRepo {
+    type Target = Repository;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner.get_or_init(|| {
+            let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+            Repository::discover(manifest_dir).expect("couldn't find repo")
+        })
     }
 }
 

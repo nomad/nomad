@@ -77,17 +77,7 @@
               commonArgs =
                 let
                   args = {
-                    src = lib.cleanSourceWith {
-                      src = craneLib.path ./.;
-                      filter =
-                        path: type:
-                        (craneLib.filterCargoSources path type)
-                        # Include the Git directory in the source or the build
-                        # script of /crates/version will fail.
-                        || (lib.hasInfix "/.git" path);
-                      # Be reproducible, regardless of the directory name.
-                      name = "source";
-                    };
+                    src = craneLib.cleanCargoSource (craneLib.path ./.);
                     strictDeps = true;
                     nativeBuildInputs = with pkgs; [ pkg-config ];
                     buildInputs =
@@ -105,6 +95,8 @@
                     # `workspace.package.name` set in the workspace's
                     # Cargo.lock, so add a `pname` here to silence that.
                     pname = "mad";
+                    COMMIT_HASH = inputs.self.rev;
+                    COMMIT_UNIX_TIMESTAMP = toString inputs.self.lastModified;
                   };
                 in
                 args // { cargoArtifacts = craneLib.buildDepsOnly args; };
