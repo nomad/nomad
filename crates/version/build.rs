@@ -17,7 +17,9 @@ fn main() {
 }
 
 fn add_commit_infos(file: &mut GeneratedFile) {
-    let repo = Repository::discover(".").expect("couldn't find repo");
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+
+    let repo = Repository::discover(manifest_dir).expect("couldn't find repo");
 
     let head_commit = repo
         .head()
