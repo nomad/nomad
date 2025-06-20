@@ -110,23 +110,16 @@ jobs:
             ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Run unit tests
-        working-directory: ./crates
-        run: cargo llvm-cov --no-report
-      - name: Run integration tests
-        working-directory: ./tests
-        run: cargo llvm-cov --no-report --features=auth,collab,walkdir
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Generate coverage report
-        run: cargo llvm-cov report --codecov --output-path codecov.json
+        run: nix build .#coverage --accept-flake-config
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: codecov.json
+          files: ./result/codecov.json
           fail_ci_if_error: true
 
   clippy:
