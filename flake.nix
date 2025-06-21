@@ -160,9 +160,11 @@
                         "cargo xtask build ${nightlyFlag} ${releaseFlag}";
                       installPhaseCommand = ''
                         mkdir -p $out
-                        cp -r lua $out/
+                        mv lua/* $out/
                       '';
                       doCheck = false;
+                      # We'll handle the installation ourselves.
+                      doNotPostBuildInstallCargoBinaries = true;
                     }
                   )
                 );
