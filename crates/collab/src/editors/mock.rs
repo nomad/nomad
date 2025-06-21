@@ -497,11 +497,16 @@ impl FromStr for SessionId {
     }
 }
 
-impl TryFrom<ed::command::CommandArgs<'_>> for SessionId {
-    type Error = Infallible;
+impl<'a> TryFrom<ed::command::CommandArgs<'a>> for SessionId {
+    type Error = <ed::command::Parse<Self> as TryFrom<
+        ed::command::CommandArgs<'a>,
+    >>::Error;
 
-    fn try_from(_: ed::command::CommandArgs<'_>) -> Result<Self, Self::Error> {
-        unreachable!()
+    fn try_from(
+        args: ed::command::CommandArgs<'a>,
+    ) -> Result<Self, Self::Error> {
+        ed::command::Parse::<Self>::try_from(args)
+            .map(|ed::command::Parse(this)| this)
     }
 }
 
