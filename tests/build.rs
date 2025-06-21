@@ -12,8 +12,8 @@ fn main() {
     }
 }
 
-/// Enables the `git-in-PATH` feature iff git is in $PATH and its version is
-/// at least 2.32.
+/// Enables `cfg(git_in_PATH)` if git is in $PATH and its version is at least
+/// 2.32.
 ///
 /// We require 2.32 because that was the first release which supported the
 /// `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` environment variables that we
@@ -23,6 +23,8 @@ fn main() {
 ///
 /// [1]: https://github.com/git/git/blob/master/Documentation/RelNotes/2.32.0.adoc#updates-since-v231
 fn setup_git() {
+    println!("cargo::rustc-check-cfg=cfg(git_in_PATH)");
+
     let maybe_git_version = Command::new("git")
         .arg("--version")
         .output()
@@ -34,7 +36,7 @@ fn setup_git() {
     if let Some(git_version) = maybe_git_version
         && git_version >= GitVersion(2, 32, 0)
     {
-        println!("cargo:rustc-cfg=feature=\"git-in-PATH\"");
+        println!("cargo:rustc-cfg=git_in_PATH");
     }
 }
 

@@ -8,7 +8,7 @@ use tempdir::TempDir;
 use walkdir::GitIgnore;
 
 #[test]
-#[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn gitignore_1() {
     let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",
@@ -25,7 +25,7 @@ fn gitignore_1() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn gitignore_is_ignored_if_not_in_git_repo() {
     let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",
@@ -37,7 +37,7 @@ fn gitignore_is_ignored_if_not_in_git_repo() {
 }
 
 #[test]
-#[cfg_attr(feature = "git-in-PATH", ignore = "git is in $PATH")]
+#[cfg_attr(git_in_PATH, ignore = "git is in $PATH")]
 fn gitignore_is_ignored_if_git_is_not_in_path() {
     let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",
@@ -49,7 +49,7 @@ fn gitignore_is_ignored_if_git_is_not_in_path() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn gitignore_cache_is_refreshed_after_expiration() {
     let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",

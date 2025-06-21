@@ -1,16 +1,16 @@
 use criterion::BenchmarkGroup;
 use criterion::measurement::WallTime;
 
-#[cfg_attr(not(any(feature = "neovim-repo")), allow(unused_variables))]
+#[cfg_attr(not(neovim_repo), allow(unused_variables))]
 pub(crate) fn run(group: &mut BenchmarkGroup<'_, WallTime>) {
-    #[cfg(feature = "neovim-repo")]
+    #[cfg(neovim_repo)]
     read_neovim::from_mock_fs(group);
 
-    #[cfg(feature = "neovim-repo")]
+    #[cfg(neovim_repo)]
     read_neovim::from_real_fs(group);
 }
 
-#[cfg(feature = "neovim-repo")]
+#[cfg(neovim_repo)]
 mod read_neovim {
     use collab::CollabEditor;
     use collab::mock::CollabMock;

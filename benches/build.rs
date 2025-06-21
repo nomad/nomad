@@ -25,12 +25,14 @@ fn main() {
 
 /// Sets up the environment needed to run collab-related benchmarks.
 fn setup_collab(out_dir: &AbsPath, generated_file: &mut String) {
+    println!("cargo::rustc-check-cfg=cfg(neovim_repo)");
+
     generated_file.push_str("pub(crate) mod collab {");
 
     match checkout_neovim_commit(out_dir) {
         Ok(repo_path_declaration) => {
             generated_file.push_str(&repo_path_declaration);
-            println!("cargo:rustc-cfg=feature=\"neovim-repo\"")
+            println!("cargo::rustc-cfg=neovim_repo")
         },
         Err(err) => {
             println!(
@@ -61,7 +63,7 @@ fn checkout_neovim_commit(_out_dir: &AbsPath) -> anyhow::Result<String> {
     //
     //     Ok(format!(
     //         r#"
-    // #[cfg(feature = "neovim-repo")]
+    // #[cfg(neovim_repo)]
     // pub(crate) const NEOVIM_REPO_PATH: &::abs_path::AbsPath =
     //     unsafe {{ ::abs_path::AbsPath::from_str_unchecked("{repo_path}") }};
     // "#

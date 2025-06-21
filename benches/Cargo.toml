@@ -9,9 +9,6 @@ publish.workspace = true
 [features]
 collab = ["dep:collab", "dep:walkdir"]
 
-# Features that should only be enabled by the build script.
-neovim-repo = []
-
 [dependencies]
 abs-path = { workspace = true }
 criterion = "0.6"
