@@ -18,6 +18,6 @@ pub mod start;
 pub mod yank;
 
 pub use collab::Collab;
-pub use editors::{CollabEditor, SessionId};
 #[cfg(feature = "mock")]
 pub use editors::mock;
+pub use editors::{CollabEditor, SessionId};

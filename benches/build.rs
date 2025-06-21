@@ -1,11 +1,8 @@
 #![allow(missing_docs)]
 
-use std::path::Path;
 use std::{env, fs};
 
 use abs_path::{AbsPath, AbsPathBuf, node};
-use git2::Repository;
-use git2::build::CheckoutBuilder;
 
 /// https://github.com/neovim/neovim/tree/8707ec264462b66ff9243f40365d6d24ed2f7f6d
 const NEOVIM_COMMIT: &str = "8707ec264462b66ff9243f40365d6d24ed2f7f6d";
@@ -48,24 +45,25 @@ fn setup_collab(out_dir: &AbsPath, generated_file: &mut String) {
 
 /// Clones the Neovim repository into the `OUT_DIR` and checks out a specific
 /// commit, or does nothing if it already exists.
-fn checkout_neovim_commit(out_dir: &AbsPath) -> anyhow::Result<String> {
-    let repo_path = out_dir.join(node!("neovim"));
-
-    let repo = if Path::new(repo_path.as_str()).exists() {
-        Repository::open(&repo_path)?
-    } else {
-        Repository::clone("https://github.com/neovim/neovim.git", &repo_path)?
-    };
-
-    let commit_obj = repo.revparse_single(NEOVIM_COMMIT)?;
-    repo.checkout_tree(&commit_obj, Some(CheckoutBuilder::new().force()))?;
-    repo.set_head_detached(commit_obj.id())?;
-
-    Ok(format!(
-        r#"
-#[cfg(feature = "neovim-repo")]
-pub(crate) const NEOVIM_REPO_PATH: &::abs_path::AbsPath =
-    unsafe {{ ::abs_path::AbsPath::from_str_unchecked("{repo_path}") }};
-"#
-    ))
+fn checkout_neovim_commit(_out_dir: &AbsPath) -> anyhow::Result<String> {
+    anyhow::bail!("cloning Neovim {NEOVIM_COMMIT} takes too much time..")
+    //     let repo_path = out_dir.join(node!("neovim"));
+    //
+    //     let repo = if Path::new(repo_path.as_str()).exists() {
+    //         Repository::open(&repo_path)?
+    //     } else {
+    //         Repository::clone("https://github.com/neovim/neovim.git", &repo_path)?
+    //     };
+    //
+    //     let commit_obj = repo.revparse_single(NEOVIM_COMMIT)?;
+    //     repo.checkout_tree(&commit_obj, Some(CheckoutBuilder::new().force()))?;
+    //     repo.set_head_detached(commit_obj.id())?;
+    //
+    //     Ok(format!(
+    //         r#"
+    // #[cfg(feature = "neovim-repo")]
+    // pub(crate) const NEOVIM_REPO_PATH: &::abs_path::AbsPath =
+    //     unsafe {{ ::abs_path::AbsPath::from_str_unchecked("{repo_path}") }};
+    // "#
+    //     ))
 }

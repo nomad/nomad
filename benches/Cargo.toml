@@ -27,7 +27,6 @@ walkdir = { workspace = true, optional = true, features = ["gitignore"] }
 [build-dependencies]
 abs-path = { workspace = true, features = ["macros"] }
 anyhow = "1.0"
-git2 = { workspace = true, features = ["https"] }
 
 [lints]
 workspace = true
