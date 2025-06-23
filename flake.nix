@@ -245,7 +245,7 @@
                   (cd crates && cargo llvm-cov test --no-report)
 
                   # Run integration tests.
-                  (cd tests && cargo llvm-cov test --no-report --features=auth,collab,walkdir)
+                  (cd tests && cargo llvm-cov test --no-report --features=auth,collab,mock,walkdir)
 
                   # Generate coverage report.
                   cargo llvm-cov report --codecov --output-path codecov.json

@@ -69,7 +69,7 @@ pub trait Buffer {
     where
         Fun: FnMut(&<Self::Editor as Editor>::Buffer<'_>, AgentId) + 'static;
 
-    /// TODO: docs.
+    /// Returns the absolute path of the file associated with this buffer.
     fn path(&self) -> Cow<'_, AbsPath>;
 }
 

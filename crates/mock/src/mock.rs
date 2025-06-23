@@ -137,7 +137,7 @@ where
     }
 
     fn buffer_at(&self, path: &AbsPath) -> Option<&BufferInner> {
-        self.buffers.values().find(|buf| path.as_str() == buf.name)
+        self.buffers.values().find(|buf| path == &buf.file_path)
     }
 
     #[track_caller]
@@ -324,7 +324,7 @@ where
 
             this.buffers.insert(
                 buffer_id,
-                BufferInner::new(buffer_id, file_path.to_string(), contents),
+                BufferInner::new(buffer_id, file_path.to_owned(), contents),
             );
 
             let buffer = this.buffer_mut(buffer_id);

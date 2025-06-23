@@ -1,7 +1,7 @@
 use core::ops::{Deref, DerefMut, Range};
 use std::borrow::Cow;
 
-use abs_path::AbsPath;
+use abs_path::{AbsPath, AbsPathBuf};
 use ed::{
     self,
     AgentId,
@@ -53,8 +53,8 @@ pub struct SelectionId {
 pub struct BufferInner {
     pub(crate) cursors: SlotMap<AnnotationId, CursorInner>,
     pub(crate) contents: String,
+    pub(crate) file_path: AbsPathBuf,
     pub(crate) id: BufferId,
-    pub(crate) name: String,
     pub(crate) selections: SlotMap<AnnotationId, SelectionInner>,
 }
 
@@ -149,12 +149,16 @@ impl SelectionId {
 }
 
 impl BufferInner {
-    pub(crate) fn new(id: BufferId, name: String, contents: String) -> Self {
+    pub(crate) fn new(
+        id: BufferId,
+        file_path: AbsPathBuf,
+        contents: String,
+    ) -> Self {
         Self {
             cursors: Default::default(),
             contents,
             id,
-            name,
+            file_path,
             selections: Default::default(),
         }
     }
@@ -330,8 +334,7 @@ impl ed::Buffer for Buffer<'_> {
     }
 
     fn path(&self) -> Cow<'_, AbsPath> {
-        todo!();
-        // Cow::Borrowed(&self.name)
+        Cow::Borrowed(&self.file_path)
     }
 }
 
