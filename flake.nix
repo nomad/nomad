@@ -46,134 +46,17 @@
         inputs.treefmt-nix.flakeModule
         ./nix/crane.nix
         ./nix/formatter.nix
+        ./nix/neovim.nix
       ];
 
       perSystem =
         {
           config,
-          pkgs,
           lib,
           inputs',
           crane,
           ...
         }:
-        let
-          common = {
-            devShell = crane.lib.devShell {
-              inherit (config) checks;
-            };
-          };
-
-          neovim =
-            let
-              neovimPkg =
-                isNightly: if isNightly then inputs'.neovim-nightly-overlay.packages.default else pkgs.neovim;
-
-              mkOverride =
-                {
-                  isNightly,
-                }:
-                (drv: {
-                  nativeBuildInputs = (drv.nativeBuildInputs or [ ]) ++ [
-                    (neovimPkg isNightly)
-                  ];
-                });
-
-              mkDevShell =
-                {
-                  isNightly,
-                }:
-                common.devShell.overrideAttrs (mkOverride {
-                  inherit isNightly;
-                });
-
-              mkPlugin =
-                {
-                  isNightly,
-                  isRelease ? true,
-                }:
-                crane.lib.buildPackage (
-                  crane.commonArgs
-                  // (
-                    let
-                      # Get the crate's name and version.
-                      crateInfos = builtins.fromJSON (
-                        builtins.readFile (
-                          pkgs.runCommand "cargo-metadata"
-                            {
-                              nativeBuildInputs = [
-                                crane.lib.cargo
-                                pkgs.jq
-                              ];
-                            }
-                            ''
-                              cd ${crane.commonArgs.src}
-                              cargo metadata \
-                                --format-version 1 \
-                                --no-deps \
-                                --offline \
-                                --manifest-path crates/mad-neovim/Cargo.toml | \
-                              jq '
-                                .workspace_default_members[0] as $default_id |
-                                .packages[] |
-                                select(.id == $default_id) |
-                                {pname: .name, version: .version}
-                              ' > $out
-                            ''
-                        )
-                      );
-                    in
-                    {
-                      inherit (crateInfos) pname version;
-                      doCheck = false;
-                      # We'll handle the installation ourselves.
-                      doNotPostBuildInstallCargoBinaries = true;
-                      buildPhaseCargoCommand =
-                        let
-                          nightlyFlag = lib.optionalString isNightly "--nightly";
-                          releaseFlag = lib.optionalString isRelease "--release";
-                        in
-                        "cargo xtask build ${nightlyFlag} ${releaseFlag}";
-                      installPhaseCommand = ''
-                        mkdir -p $out
-                        mv lua/* $out/
-                      '';
-                    }
-                  )
-                );
-              mkTests =
-                {
-                  isNightly,
-                }:
-                crane.lib.cargoTest (
-                  crane.commonArgs
-                  // {
-                    cargoTestExtraArgs = lib.concatStringsSep " " [
-                      "--package=tests"
-                      "--features=neovim${lib.optionalString isNightly "-nightly"}"
-                      "--no-fail-fast"
-                    ];
-                    nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ [
-                      (neovimPkg isNightly)
-                    ];
-                  }
-                );
-            in
-            {
-              checks = {
-                test = mkTests { isNightly = false; };
-                test-nightly = mkTests { isNightly = true; };
-              };
-              devShells = {
-                zero-dot-eleven = mkDevShell { isNightly = false; };
-                nightly = mkDevShell { isNightly = true; };
-              };
-              packages = {
-                zero-dot-eleven = mkPlugin { isNightly = false; };
-                nightly = mkPlugin { isNightly = true; };
-              };
-            };
-        in
         {
           apps =
             {
@@ -219,8 +102,6 @@
               }
             );
             fmt = config.treefmt.build.check inputs.self;
-            test-neovim = neovim.checks.test;
-            test-neovim-nightly = neovim.checks.test-nightly;
           };
           packages = {
             coverage = crane.lib.cargoLlvmCov (
@@ -247,13 +128,11 @@
                 };
               }
             );
-            neovim = neovim.packages.zero-dot-eleven;
-            neovim-nightly = neovim.packages.nightly;
           };
           devShells = {
-            default = common.devShell;
-            neovim = neovim.devShells.zero-dot-eleven;
-            neovim-nightly = neovim.devShells.nightly;
+            default = crane.lib.devShell {
+              inherit (config) checks;
+            };
           };
         };
     };
