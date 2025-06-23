@@ -17,7 +17,11 @@ env:
 jobs:
   tests:
     name: tests
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       # TODO: remove after publishing private crates.
@@ -39,16 +43,17 @@ jobs:
 
   tests-neovim:
     name: Neovim tests
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         neovim: [v0.11.2, nightly]
         include:
           - neovim: v0.11.2
             check: "check-tests-neovim"
           - neovim: nightly
             check: "check-tests-neovim-nightly"
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       # TODO: remove after publishing private crates.
@@ -67,6 +72,32 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run Neovim tests
         run: nix run .#${{ matrix.check }} --accept-flake-config
+
+  clippy:
+    name: clippy
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: remove after publishing private crates.
+      - name: Add the deploy keys of all private repos we depend on
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run Clippy
+        run: nix run .#check-clippy --accept-flake-config
 
   coverage:
     name: coverage
@@ -95,28 +126,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./result/codecov.json
           fail_ci_if_error: true
-
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # TODO: remove after publishing private crates.
-      - name: Add the deploy keys of all private repos we depend on
-        uses: webfactory/ssh-agent@v0.9.1
-        with:
-          ssh-private-key: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - name: Run Clippy
-        run: nix run .#check-clippy --accept-flake-config
 
   docs:
     name: docs
