@@ -14,10 +14,10 @@
         // {
           buildPhaseCargoCommand = ''
             # Run unit tests.
-            (cd crates && cargo llvm-cov test --no-report)
+            cargo llvm-cov --no-report --workspace
 
             # Run integration tests.
-            (cd tests && cargo llvm-cov test --no-report --features=auth,collab,mock,walkdir)
+            cargo llvm-cov --no-report --package=tests --features=auth,collab,mock,walkdir
 
             # Generate coverage report.
             cargo llvm-cov report --codecov --output-path codecov.json

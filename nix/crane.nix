@@ -38,7 +38,7 @@
                 buildInputs =
                   with pkgs;
                   lib.lists.optionals stdenv.isLinux [
-                    # Needed by /crates/auth to let "keyring" access the Secret
+                    # Needed by crates/auth to let "keyring" access the Secret
                     # Service.
                     dbus
                   ];

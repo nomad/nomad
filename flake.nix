@@ -51,6 +51,7 @@
         ./nix/formatter.nix
         ./nix/github-actions.nix
         ./nix/neovim.nix
+        ./nix/tests.nix
       ];
 
       perSystem =

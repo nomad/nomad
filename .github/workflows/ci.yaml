@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -15,8 +15,8 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
-  test-crates:
-    name: test crates
+  tests:
+    name: tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,32 +31,14 @@ jobs:
             ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: Compile unit tests for all crates
-        working-directory: ./crates
-        run: cargo test --no-run
-      - name: Run unit tests for all crates
-        working-directory: ./crates
-        run: cargo test --no-fail-fast
-      - name: Compile integration tests
-        working-directory: ./tests
-        run: cargo test --features=auth,collab,mock,walkdir --no-run
-      - name: Run crates/auth tests
-        working-directory: ./tests
-        run: cargo test --features=auth --no-fail-fast
-      - name: Run crates/collab tests
-        working-directory: ./tests
-        run: cargo test --features=collab --no-fail-fast
-      - name: Run crates/mock tests
-        working-directory: ./tests
-        run: cargo test --features=mock --no-fail-fast
-      - name: Run crates/walkdir tests
-        working-directory: ./tests
-        run: cargo test --features=walkdir --no-fail-fast
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Run tests
+        run: nix run .#check-tests --accept-flake-config
 
-  test-neovim:
-    name: test Neovim backend
+  tests-neovim:
+    name: Neovim tests
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -64,9 +46,9 @@ jobs:
         neovim: [v0.11.2, nightly]
         include:
           - neovim: v0.11.2
-            check: "check-test-neovim"
+            check: "check-tests-neovim"
           - neovim: nightly
-            check: "check-test-neovim-nightly"
+            check: "check-tests-neovim-nightly"
     steps:
       - uses: actions/checkout@v4
       # TODO: remove after publishing private crates.

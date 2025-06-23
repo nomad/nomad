@@ -98,8 +98,8 @@
     in
     {
       checks = {
-        test-neovim = mkTests { isNightly = false; };
-        test-neovim-nightly = mkTests { isNightly = true; };
+        tests-neovim = mkTests { isNightly = false; };
+        tests-neovim-nightly = mkTests { isNightly = true; };
       };
       devShells = {
         neovim = mkDevShell { isNightly = false; };
