@@ -18,15 +18,26 @@
             cargo
             rustc
           ];
+          env = {
+            # Setting this will disable some tests that fail in headless
+            # environments like CI.
+            HEADLESS = "true";
+          };
         };
       };
 
       mkDevShell =
         devShell:
-        pkgs.mkShell {
-          buildInputs = (crane.commonArgs.buildInputs or [ ]) ++ (devShell.buildInputs or [ ]);
-          nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ (devShell.packages or [ ]);
-        };
+        let
+          cleanedDevShell = builtins.removeAttrs devShell [ "packages" ];
+        in
+        pkgs.mkShell (
+          cleanedDevShell
+          // {
+            buildInputs = (crane.commonArgs.buildInputs or [ ]) ++ (devShell.buildInputs or [ ]);
+            nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ (devShell.packages or [ ]);
+          }
+        );
     in
     {
       apps.nix-develop-gha = {
