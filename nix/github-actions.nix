@@ -14,7 +14,7 @@
     let
       devShells = {
         tests = {
-          packages = with crane; [
+          packages = with crane.lib; [
             cargo
             rustc
           ];
