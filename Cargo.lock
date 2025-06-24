@@ -613,13 +613,14 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
+source = "git+ssh://git@github.com/nomad/collab.git#a5b07c40cefb3433fe425d4b4a9858abf19c6e0a"
 dependencies = [
  "bincode",
  "bytes",
  "cauchy",
  "derive_more",
  "futures-util",
+ "leb128",
  "nohash",
  "pin-project-lite",
  "serde",
@@ -671,7 +672,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
+source = "git+ssh://git@github.com/nomad/collab.git#a5b07c40cefb3433fe425d4b4a9858abf19c6e0a"
 dependencies = [
  "cauchy",
  "codecs",
@@ -685,7 +686,7 @@ dependencies = [
 [[package]]
 name = "collab-project"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
+source = "git+ssh://git@github.com/nomad/collab.git#a5b07c40cefb3433fe425d4b4a9858abf19c6e0a"
 dependencies = [
  "cauchy",
  "cola",
@@ -701,7 +702,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
+source = "git+ssh://git@github.com/nomad/collab.git#a5b07c40cefb3433fe425d4b4a9858abf19c6e0a"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -969,7 +970,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
+source = "git+ssh://git@github.com/nomad/collab.git#a5b07c40cefb3433fe425d4b4a9858abf19c6e0a"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1210,7 +1211,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#f973bcf8d68a412ad38aa4dfe8311b74fb05d4d8"
+source = "git+ssh://git@github.com/nomad/collab.git#a5b07c40cefb3433fe425d4b4a9858abf19c6e0a"
 dependencies = [
  "flume",
  "futures-util",
@@ -1568,6 +1569,12 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "leb128"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libc"
