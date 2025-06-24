@@ -51,6 +51,6 @@ runs:
 
     - name: Enter Nix devshell
       if: ${{ inputs.devshell != '' }}
-      run: nix run .#nix-develop-gha --accept-flake-config -- ${{ inputs.devshell }}
+      run: nix run .#nix-develop-gha --accept-flake-config -- ${{ inputs.devshell }} --accept-flake-config
       shell: bash
 
