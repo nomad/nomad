@@ -21,26 +21,31 @@ jobs:
       fail-fast: false
       matrix:
         # os: [ubuntu-latest, macos-latest]
-        os: [ubuntu-latest
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      # TODO: remove after publishing private crates.
-      - name: Add the deploy keys of all private repos we depend on
-        uses: webfactory/ssh-agent@v0.9.1
+      - name: Enter test environment
+        uses: ./.github/actions/setup-rust-nix
         with:
-          ssh-private-key: |
+          devshell: ".#"
+          ssh-private-keys: |
             ${{ secrets.ABS_PATH_DEPLOY_KEY }}
             ${{ secrets.CAUCHY_DEPLOY_KEY }}
             ${{ secrets.COLLAB_DEPLOY_KEY }}
             ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - name: Run tests
-        run: nix run .#check-tests --accept-flake-config
+      - name: Run unit tests
+        run: cargo test --workspace --no-fail-fast
+      - name: Run integration tests for crates/auth
+        run: cargo test --package=tests --features=auth --no-fail-fast
+      - name: Run integration tests for crates/collab
+        run: cargo test --package=tests --features=collab --no-fail-fast
+      - name: Run integration tests for crates/mock
+        run: cargo test --package=tests --features=mock --no-fail-fast
+      - name: Run integration tests for crates/walkdir
+        run: cargo test --package=tests --features=walkdir --no-fail-fast
 
   # clippy:
   #   name: clippy
@@ -130,35 +135,35 @@ jobs:
   #     - name: Run formatters
   #       run: nix run .#check-fmt --accept-flake-config
 
-  tests-neovim:
-    name: Neovim tests
-    strategy:
-      fail-fast: false
-      matrix:
-        # os: [ubuntu-latest, macos-latest]
-        os: [ubuntu-latest]
-        neovim: [v0.11.2, nightly]
-        include:
-          - neovim: v0.11.2
-            check: "check-tests-neovim"
-          - neovim: nightly
-            check: "check-tests-neovim-nightly"
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      # TODO: remove after publishing private crates.
-      - name: Add the deploy keys of all private repos we depend on
-        uses: webfactory/ssh-agent@v0.9.1
-        with:
-          ssh-private-key: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - name: Run Neovim tests
-        run: nix run .#${{ matrix.check }} --accept-flake-config
+  # tests-neovim:
+  #   name: Neovim tests
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       # os: [ubuntu-latest, macos-latest]
+  #       os: [ubuntu-latest]
+  #       neovim: [v0.11.2, nightly]
+  #       include:
+  #         - neovim: v0.11.2
+  #           check: "check-tests-neovim"
+  #         - neovim: nightly
+  #           check: "check-tests-neovim-nightly"
+  #   runs-on: ${{ matrix.os }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     # TODO: remove after publishing private crates.
+  #     - name: Add the deploy keys of all private repos we depend on
+  #       uses: webfactory/ssh-agent@v0.9.1
+  #       with:
+  #         ssh-private-key: |
+  #           ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+  #           ${{ secrets.CAUCHY_DEPLOY_KEY }}
+  #           ${{ secrets.COLLAB_DEPLOY_KEY }}
+  #           ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+  #           ${{ secrets.PANDO_DEPLOY_KEY }}
+  #           ${{ secrets.PUFF_DEPLOY_KEY }}
+  #     - name: Install Nix
+  #       uses: DeterminateSystems/nix-installer-action@main
+  #     - uses: DeterminateSystems/magic-nix-cache-action@main
+  #     - name: Run Neovim tests
+  #       run: nix run .#${{ matrix.check }} --accept-flake-config

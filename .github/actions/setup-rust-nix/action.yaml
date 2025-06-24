@@ -1,0 +1,54 @@
+name: "Setup Rust with Nix"
+
+description: "Sets up Rust and Nix caches and enters the environment specified by the given devshell"
+
+inputs:
+  ssh-private-keys:
+    description: "SSH deploy keys for private repositories"
+    required: true
+  devshell:
+    description: "Nix devshell to enter"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        # Hits on every run with the same Cargo.lock.
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry
+
+    - name: Cache build artifacts
+      uses: actions/cache@v4
+      with:
+        path: target/
+        # Hits if the neither branch nor the source code have changed.
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-target-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock', '**/*.rs', '**/Cargo.toml') }}
+        restore-keys: |
+          # Last commit on same branch (most likely to be relevant).
+          ${{ runner.os }}-${{ runner.arch }}-cargo-target-${{ github.ref_name }}
+          # Last commit on main branch.
+          ${{ runner.os }}-${{ runner.arch }}-cargo-target-main
+          # Last commit on any branch.
+          ${{ runner.os }}-${{ runner.arch }}-cargo-target
+
+    - name: Add deploy keys for private repos
+      uses: webfactory/ssh-agent@v0.9.1
+      with:
+        ssh-private-key: ${{ inputs.ssh-private-keys }}
+
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@main
+    - uses: DeterminateSystems/magic-nix-cache-action@main
+
+    - name: Enter Nix devshell
+      if: ${{ inputs.devshell != '' }}
+      run: nix run .#nix-develop-gha --accept-flake-config -- ${{ inputs.devshell }}
