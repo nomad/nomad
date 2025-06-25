@@ -38,6 +38,7 @@ runs:
     - name: Install Nix
       uses: cachix/install-nix-action@v31
       with:
+        extra_nix_config: ${{ inputs.accept-flake-config == 'true' && 'accept-flake-config = true' || '' }}
         github_access_token: ${{ github.token }}
 
     - name: Setup Cachix
@@ -45,7 +46,6 @@ runs:
       with:
         name: "nomad"
         authToken: ${{ inputs.cachix-auth-token }}
-        extra_nix_config: ${{ inputs.accept-flake-config == 'true' && 'accept-flake-config = true' || '' }}
 
     - name: End timer for installing Nix
       shell: bash
