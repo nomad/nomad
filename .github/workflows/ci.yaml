@@ -28,6 +28,7 @@ jobs:
       - name: Enter test environment
         uses: ./.github/actions/setup-rust-nix
         with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ".#gha-tests"
           ssh-private-keys: |
             ${{ secrets.ABS_PATH_DEPLOY_KEY }}

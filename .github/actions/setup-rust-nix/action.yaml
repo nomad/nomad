@@ -3,13 +3,16 @@ name: "Setup Rust with Nix"
 description: "Sets up Rust and Nix caches and enters the environment specified by the given devshell"
 
 inputs:
-  ssh-private-keys:
-    description: "SSH deploy keys for private repositories"
+  cachix-auth-token:
+    description: "Auth token for pushing Nix artifacts to Cachix"
     required: true
   devshell:
     description: "Nix devshell to enter"
     required: false
     default: ""
+  ssh-private-keys:
+    description: "SSH deploy keys for private repositories"
+    required: true
 
 runs:
   using: "composite"
@@ -115,15 +118,22 @@ runs:
       run: echo "nix_start_time=$(date +%s)" >> $GITHUB_OUTPUT
 
     - name: Install Nix
-      uses: DeterminateSystems/nix-installer-action@main
-    - uses: DeterminateSystems/magic-nix-cache-action@main
+      uses: cachix/install-nix-action@v31
+      with:
+        github_access_token: ${{ github.token }}
+
+    - name: Setup Cachix
+      uses: cachix/cachix-action@v15
+      with:
+        name: "nomad"
+        authToken: ${{ inputs.cachix-auth-token }}
 
     - name: End timer for installing Nix
       shell: bash
       run: |
         nix_end_time=$(date +%s)
         nix_duration=$((nix_end_time - ${{ steps.nix-timer-start.outputs.nix_start_time }}))
-        echo "⏱️ Installing Nix and setting up its binary cache took ${nix_duration}s"
+        echo "⏱️ Installing Nix and setting up Cachix took ${nix_duration}s"
 
     - name: Start timer for entering Nix devshell '${{ inputs.devshell }}'
       if: ${{ inputs.devshell != '' }}
