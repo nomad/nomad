@@ -102,7 +102,7 @@ runs:
       run: |
         cache_end_time=$(date +%s)
         cache_duration=$((cache_end_time - ${{ steps.cache-timer-start.outputs.cache_start_time }}))
-        echo "Setting up Rust's caches took ${cache_duration}s"
+        echo "⏱️ Setting up Rust's caches took ${cache_duration}s"
 
     - name: Add deploy keys for private repos
       uses: webfactory/ssh-agent@v0.9.1
@@ -123,7 +123,7 @@ runs:
       run: |
         nix_end_time=$(date +%s)
         nix_duration=$((nix_end_time - ${{ steps.nix-timer-start.outputs.nix_start_time }}))
-        echo "Installing Nix and setting up its binary cache took ${nix_duration}s"
+        echo "⏱️ Installing Nix and setting up its binary cache took ${nix_duration}s"
 
     - name: Start timer for entering Nix devshell '${{ inputs.devshell }}'
       if: ${{ inputs.devshell != '' }}
@@ -142,4 +142,4 @@ runs:
       run: |
         devshell_end_time=$(date +%s)
         devshell_duration=$((devshell_end_time - ${{ steps.devshell-timer-start.outputs.devshell_start_time }}))
-        echo "Entering Nix devshell '${{ inputs.devshell }}' took ${devshell_duration}s"
+        echo "⏱️ Entering Nix devshell '${{ inputs.devshell }}' took ${devshell_duration}s"
