@@ -21,8 +21,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Rust cache
+        uses: ./.github/actions/setup-rust-cache
       - name: Enter test environment
-        uses: ./.github/actions/setup-rust-nix
+        uses: ./.github/actions/setup-nix
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ".#gha-tests"

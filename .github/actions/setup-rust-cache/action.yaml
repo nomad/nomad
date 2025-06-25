@@ -1,26 +1,14 @@
-name: "Setup Rust with Nix"
+name: "Rust caches"
 
-description: "Sets up Rust and Nix caches and enters the environment specified by the given devshell"
-
-inputs:
-  cachix-auth-token:
-    description: "Auth token for pushing Nix artifacts to Cachix"
-    required: true
-  devshell:
-    description: "Nix devshell to enter"
-    required: false
-    default: ""
-  ssh-private-keys:
-    description: "SSH deploy keys for private repositories"
-    required: true
+description: "Pulls in the caches for the Cargo registry and the build artifacts for the current job"
 
 runs:
   using: "composite"
   steps:
-    - name: Start timer for setting up Rust's caches
-      id: cache-timer-start
+    - name: Start timer for computing cache keys
+      id: keys-timer-start
       shell: bash
-      run: echo "cache_start_time=$(date +%s)" >> $GITHUB_OUTPUT
+      run: echo "keys_start_time=$(date +%s)" >> $GITHUB_OUTPUT
 
     - name: Compute key for the Cargo registry cache
       id: cache-key-cargo-registry
@@ -70,6 +58,18 @@ runs:
         echo "Build artifacts cache key: $cache_key"
         echo "cache_key=$cache_key" >> $GITHUB_OUTPUT
 
+    - name: End timer for computing cache keys
+      shell: bash
+      run: |
+        keys_end_time=$(date +%s)
+        keys_duration=$((keys_end_time - ${{ steps.keys-timer-start.outputs.keys_start_time }}))
+        echo "⏱️ Computing the cache keys took ${keys_duration}s"
+
+    - name: Start timer for pulling in Rust's caches
+      id: cache-timer-start
+      shell: bash
+      run: echo "cache_start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
     - name: Cache Cargo registry
       uses: actions/cache@v4
       env:
@@ -100,56 +100,9 @@ runs:
           ${{ env.CACHE_KEY_PREFIX }}-main
           ${{ env.CACHE_KEY_PREFIX }}
 
-    - name: End timer for setting up Rust's caches
+    - name: End timer for pulling in Rust's caches
       shell: bash
       run: |
         cache_end_time=$(date +%s)
         cache_duration=$((cache_end_time - ${{ steps.cache-timer-start.outputs.cache_start_time }}))
-        echo "⏱️ Setting up Rust's caches took ${cache_duration}s"
-
-    - name: Add deploy keys for private repos
-      uses: webfactory/ssh-agent@v0.9.1
-      with:
-        ssh-private-key: ${{ inputs.ssh-private-keys }}
-
-    - name: Start timer for installing Nix
-      id: nix-timer-start
-      shell: bash
-      run: echo "nix_start_time=$(date +%s)" >> $GITHUB_OUTPUT
-
-    - name: Install Nix
-      uses: cachix/install-nix-action@v31
-      with:
-        github_access_token: ${{ github.token }}
-
-    - name: Setup Cachix
-      uses: cachix/cachix-action@v15
-      with:
-        name: "nomad"
-        authToken: ${{ inputs.cachix-auth-token }}
-
-    - name: End timer for installing Nix
-      shell: bash
-      run: |
-        nix_end_time=$(date +%s)
-        nix_duration=$((nix_end_time - ${{ steps.nix-timer-start.outputs.nix_start_time }}))
-        echo "⏱️ Installing Nix and setting up Cachix took ${nix_duration}s"
-
-    - name: Start timer for entering Nix devshell '${{ inputs.devshell }}'
-      if: ${{ inputs.devshell != '' }}
-      id: devshell-timer-start
-      shell: bash
-      run: echo "devshell_start_time=$(date +%s)" >> $GITHUB_OUTPUT
-
-    - name: Enter Nix devshell '${{ inputs.devshell }}'
-      if: ${{ inputs.devshell != '' }}
-      shell: bash
-      run: nix run .#nix-develop-gha --accept-flake-config -- ${{ inputs.devshell }} --accept-flake-config
-
-    - name: End timer for entering Nix devshell '${{ inputs.devshell }}'
-      if: ${{ inputs.devshell != '' }}
-      shell: bash
-      run: |
-        devshell_end_time=$(date +%s)
-        devshell_duration=$((devshell_end_time - ${{ steps.devshell-timer-start.outputs.devshell_start_time }}))
-        echo "⏱️ Entering Nix devshell '${{ inputs.devshell }}' took ${devshell_duration}s"
+        echo "⏱️ Pulling in Rust's caches took ${cache_duration}s"
