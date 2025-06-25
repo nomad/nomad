@@ -132,8 +132,8 @@ jobs:
         uses: ./.github/actions/setup-nix
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Run formatters
-        run: nix run .#check-fmt
+      - name: Check formatting
+        run: nix run .#check-format
 
   # tests-neovim:
   #   name: Neovim tests

@@ -13,13 +13,15 @@
       ...
     }:
     {
-      checks.fmt = config.treefmt.build.check inputs.self;
+      checks.format = config.treefmt.build.check inputs.self;
 
       treefmt =
         let
           cargoSortPriority = 1;
         in
         {
+          # We've already added a 'format' check.
+          flakeCheck = false;
           inherit (config.flake-root) projectRootFile;
           programs.nixfmt.enable = true;
           programs.rustfmt = {
