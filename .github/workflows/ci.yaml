@@ -10,10 +10,6 @@ on:
   schedule:
     - cron: '0 0 1 * *'
 
-# TODO: remove after publishing private crates.
-env:
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
-
 jobs:
   tests:
     name: tests
