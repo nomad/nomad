@@ -21,11 +21,6 @@
             cargo
             rustc
           ];
-          env = {
-            # Setting this will disable some tests that fail in headless
-            # environments like CI.
-            HEADLESS = "true";
-          };
         };
       };
     };

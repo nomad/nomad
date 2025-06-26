@@ -5,6 +5,7 @@
 {
   perSystem =
     {
+      pkgs,
       crane,
       ...
     }:
@@ -26,12 +27,14 @@
             mkdir -p $out
             mv codecov.json $out/
           '';
-          env = (crane.commonArgs.env or { }) // {
-            # Setting this will disable some tests that fail in headless
-            # environments like CI.
-            HEADLESS = "true";
-          };
         }
       );
+      ciDevShells.coverage = {
+        packages = [
+          crane.lib.cargo
+          crane.lib.rustc
+          pkgs.cargo-llvm-cov
+        ];
+      };
     };
 }
