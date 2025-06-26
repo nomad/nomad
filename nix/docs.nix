@@ -23,5 +23,15 @@
           };
         }
       );
+
+      ciDevShells.docs = {
+        packages = with crane.lib; [
+          cargo
+          rustc
+        ];
+        env = {
+          RUSTFLAGS = "--deny warnings";
+        };
+      };
     };
 }

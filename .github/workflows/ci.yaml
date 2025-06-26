@@ -11,6 +11,98 @@ on:
     - cron: '0 0 1 * *'
 
 jobs:
+  clippy:
+    name: clippy
+    strategy:
+      fail-fast: false
+      matrix:
+        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust cache
+        uses: ./.github/actions/setup-rust-cache
+      - name: Enter Clippy environment
+        uses: ./.github/actions/setup-nix
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          devshell: ".#ci-clippy"
+          ssh-private-keys: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Run Clippy
+        run: cargo clippy --all-features --all-targets --no-deps --workspace
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust cache
+        uses: ./.github/actions/setup-rust-cache
+      - name: Enter coverage environment
+        uses: ./.github/actions/setup-nix
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          devshell: ".#ci-coverage"
+          ssh-private-keys: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov --no-report --workspace
+          cargo llvm-cov --no-report --package=tests --features=auth,collab,mock,walkdir
+          cargo llvm-cov report --codecov --output-path codecov.json
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./codecov.json
+          fail_ci_if_error: true
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust cache
+        uses: ./.github/actions/setup-rust-cache
+      - name: Enter docs environment
+        uses: ./.github/actions/setup-nix
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          devshell: ".#ci-docs"
+          ssh-private-keys: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
+      - name: Run Rustdoc
+        run: cargo doc --all-features --no-deps --workspace
+
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        uses: ./.github/actions/setup-nix
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Check formatting
+        run: nix run .#check-format
+
   tests:
     name: tests
     strategy:
@@ -45,98 +137,6 @@ jobs:
         run: cargo test --package=tests --features=mock --no-fail-fast
       - name: Run integration tests for crates/walkdir
         run: cargo test --package=tests --features=walkdir --no-fail-fast
-
-  # clippy:
-  #   name: clippy
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       # os: [ubuntu-latest, macos-latest]
-  #       os: [ubuntu-latest]
-  #   runs-on: ${{ matrix.os }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     # TODO: remove after publishing private crates.
-  #     - name: Add the deploy keys of all private repos we depend on
-  #       uses: webfactory/ssh-agent@v0.9.1
-  #       with:
-  #         ssh-private-key: |
-  #           ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-  #           ${{ secrets.CAUCHY_DEPLOY_KEY }}
-  #           ${{ secrets.COLLAB_DEPLOY_KEY }}
-  #           ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-  #           ${{ secrets.PANDO_DEPLOY_KEY }}
-  #           ${{ secrets.PUFF_DEPLOY_KEY }}
-  #     - name: Install Nix
-  #       uses: DeterminateSystems/nix-installer-action@main
-  #     - uses: DeterminateSystems/magic-nix-cache-action@main
-  #     - name: Run Clippy
-  #       run: nix run .#check-clippy --accept-flake-config
-
-  coverage:
-    name: coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Rust cache
-        uses: ./.github/actions/setup-rust-cache
-      - name: Enter coverage environment
-        uses: ./.github/actions/setup-nix
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          devshell: ".#ci-coverage"
-          ssh-private-keys: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Generate coverage report
-        run: |
-          cargo llvm-cov --no-report --workspace
-          cargo llvm-cov --no-report --package=tests --features=auth,collab,mock,walkdir
-          cargo llvm-cov report --codecov --output-path codecov.json
-      - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./codecov.json
-          fail_ci_if_error: true
-
-  # docs:
-  #   name: docs
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     # TODO: remove after publishing private crates.
-  #     - name: Add the deploy keys of all private repos we depend on
-  #       uses: webfactory/ssh-agent@v0.9.1
-  #       with:
-  #         ssh-private-key: |
-  #           ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-  #           ${{ secrets.CAUCHY_DEPLOY_KEY }}
-  #           ${{ secrets.COLLAB_DEPLOY_KEY }}
-  #           ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-  #           ${{ secrets.PANDO_DEPLOY_KEY }}
-  #           ${{ secrets.PUFF_DEPLOY_KEY }}
-  #     - name: Install Nix
-  #       uses: DeterminateSystems/nix-installer-action@main
-  #     - uses: DeterminateSystems/magic-nix-cache-action@main
-  #     - name: Run 'cargo doc'
-  #       run: nix run .#check-docs --accept-flake-config
-
-  format:
-    name: format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Nix
-        uses: ./.github/actions/setup-nix
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Check formatting
-        run: nix run .#check-format
 
   tests-neovim:
     name: Neovim tests

@@ -18,10 +18,22 @@
             "--all-targets"
             "--no-deps"
             "--workspace"
-            "--"
-            "--deny warnings"
           ];
+          env = (crane.commonArgs.env or { }) // {
+            RUSTFLAGS = "--deny warnings";
+          };
         }
       );
+
+      ciDevShells.clippy = {
+        packages = with crane.lib; [
+          cargo
+          clippy
+          rustc
+        ];
+        env = {
+          RUSTFLAGS = "--deny warnings";
+        };
+      };
     };
 }

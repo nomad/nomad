@@ -21,5 +21,12 @@
           '';
         }
       );
+
+      ciDevShells.tests = {
+        packages = with crane.lib; [
+          cargo
+          rustc
+        ];
+      };
     };
 }
