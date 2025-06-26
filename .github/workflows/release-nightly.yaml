@@ -1,0 +1,66 @@
+name: Release Nightly
+
+on:
+ schedule:
+   # Every night at 2AM UTC+0.
+   - cron: '0 2 * * *'
+
+env:
+  NIGHTLY_TAG: nightly
+
+jobs:
+  release-nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old nightly release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete $NIGHTLY_TAG --yes \
+            || echo "No existing release to delete"
+
+      - name: Delete old nightly tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/git/refs/tags/$NIGHTLY_TAG \
+            --method DELETE \
+            || echo "No remote tag to delete"
+
+      - name: Create new nightly tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/git/refs \
+            --method POST \
+            --field ref="refs/tags/$NIGHTLY_TAG" \
+            --field sha="${{ github.sha }}"
+
+      - name: Generate release date
+        id: release-date
+        run: |
+          day=$(date '+%-d')
+          month=$(date '+%B')
+          year=$(date '+%Y')
+
+          # Get ordinal suffix (st, nd, rd, th).
+          case $day in
+            1|21|31) ordinal_suffix="st" ;;
+            2|22) ordinal_suffix="nd" ;;
+            3|23) ordinal_suffix="rd" ;;
+            *) ordinal_suffix="th" ;;
+          esac
+
+          # Format: "January 2nd, 2006".
+          formatted_date="${month} ${day}${ordinal_suffix}, ${year}"
+          echo "formatted_date=$formatted_date" >> $GITHUB_OUTPUT
+
+      - name: Create new nightly release
+        uses: ./.github/workflows/reusable/build-and-release.yml
+        with:
+          cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          checkout_ref: main
+          is_stable: false
+          release_name: "Mad Nightly (${{ steps.release-date.outputs.formatted_date }})"
+          release_body: ""
+          tag: ${{ env.NIGHTLY_TAG }}

@@ -7,6 +7,10 @@ on:
         description: "Auth token for pushing Nix artifacts to Cachix"
         required: true
         type: string
+      checkout_ref:
+        description: "Branch, tag, or commit to checkout and build from"
+        required: true
+        type: string
       is_stable:
         description: "Whether we're building for a stable release or nightly"
         required: true
@@ -16,7 +20,11 @@ on:
         required: true
         type: string
       release_body:
-        description: "A markdown-formatter string describing changes in this release"
+        description: "A markdown-formatted string describing changes in this release"
+        required: true
+        type: string
+      tag:
+        description: "The tag to attach the release to"
         required: true
         type: string
 
@@ -33,6 +41,10 @@ jobs:
           targets: "aarch64-apple-darwin,x86_64-apple-darwin"
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
+
       - name: Setup Rust cache
         uses: ./.github/actions/setup-rust-cache
 
@@ -79,6 +91,7 @@ jobs:
           body: ${{ inputs.release_body }}
           make_latest: ${{ toString(inputs.is_stable) }}
           prerelease: ${{ !inputs.is_stable }}
+          tag_name: ${{ inputs.tag }}
 
       - name: Delete all artifacts after creating the release
         uses: geekyeggo/delete-artifact@v5
