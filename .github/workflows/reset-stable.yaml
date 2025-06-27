@@ -1,0 +1,83 @@
+name: Reset 'stable' on 'main'
+
+on:
+  push:
+    tags:
+      # On every push of a semver-formatted tag (with no pre-release label).
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  STABLE_BRANCH: stable
+
+jobs:
+  release-stable:
+    runs-on: ubuntu-latest
+    steps:
+      # By default, this will checkout the commit that the tag that triggered
+      # this workflow points to.
+      - uses: actions/checkout@v4
+
+      - name: Get the name of the default branch
+        id: default-branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          branch=$(gh api repos/${{ github.repository }} --jq '.default_branch')
+          echo "Default branch: $branch"
+          echo "branch=$branch" >> $GITHUB_OUTPUT
+
+      - name: Verify that the tagged commit is at (or behind) the default branch's tip
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          default_branch="${{ steps.default-branch.outputs.branch }}"
+
+          tag_commit=$(gh api repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }} --jq '.object.sha')
+
+          if gh api repos/${{ github.repository }}/compare/$tag_commit...$default_branch --jq '.status' | grep -q "ahead\|identical"; then
+            echo "✅ Tag commit is at or behind $default_branch's tip"
+          else
+            echo "❌ Tag commit is ahead of $default_branch's tip"
+            exit 1
+          fi
+
+      - name: Verify that the tag's version matches the workspace's version
+        uses: ./.github/actions/verify-tag-version-matches-workspace
+
+      - name: Hard reset '${{ env.STABLE_BRANCH }}' to the tagged commit
+        run: |
+          # Fetch the latest stable branch (and don't fail if stable doesn't
+          # exist yet).
+          git fetch origin $STABLE_BRANCH:$STABLE_BRANCH || true
+
+          # Hard reset (or create) stable to the checked out ref.
+          git checkout -B $STABLE_BRANCH
+
+          git push origin $STABLE_BRANCH --force-with-lease
+
+      - name: Create a commit on ${{ steps.default-branch.outputs.branch }} that increases the workspace's version
+        run: |
+          default_branch="${{ steps.default-branch.outputs.branch }}"
+
+          # Fetch from the default branch.
+          git fetch origin $default_branch:$default_branch || true
+
+          current_version=${GITHUB_REF_NAME#v}
+
+          # Calculate next dev version.
+          IFS='.' read -r major minor patch <<< "$current_version"
+          next_version="$major.$((minor + 1)).0-dev"
+
+          # Switch to the default branch and update the version in the
+          # Cargo.toml.
+          git checkout $default_branch
+          tomlq --toml-output ".workspace.package.version = \"$next_version\"" Cargo.toml > Cargo.toml.tmp
+          mv Cargo.toml.tmp Cargo.toml
+
+          # Configure git and commit.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Cargo.toml
+          git commit -m "chore: bump version from $current_version to $next_version"
+          git push origin $default_branch

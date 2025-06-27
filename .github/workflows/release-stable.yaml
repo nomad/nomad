@@ -12,20 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install yq (also installs tomlq)
-        uses: mikefarah/yq@master
-
-      - name: Make sure the tag's version matches the workspace's version
-        run: |
-          tag_version=${GITHUB_REF_NAME#v}
-          workspace_version=$(tomlq ".workspace.package.version" ./Cargo.toml)
-
-          if [ "$tag_version" != "$workspace_version" ]; then
-            echo "❌ Version mismatch!"
-            echo "Tag version: $tag_version"
-            echo "Workspace version: $workspace_version"
-            exit 1
-          fi
+      - name: Verify that the tag's version matches the workspace's version
+        uses: ./.github/actions/verify-tag-version-matches-workspace
 
       - name: Create new stable release
         uses: ./.github/workflows/reusable/build-and-release.yml
