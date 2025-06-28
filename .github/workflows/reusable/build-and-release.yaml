@@ -34,45 +34,24 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-      include:
-        - os: ubuntu-latest
-          targets: "aarch64-unknown-linux-gnu,x86_64-unknown-linux-gnu"
-        - os: macos-latest
-          targets: "aarch64-apple-darwin,x86_64-apple-darwin"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout_ref }}
 
-      - name: Setup Rust cache
-        uses: ./.github/actions/setup-rust-cache
-
-      - name: Enter Neovim build environment
+      - name: Install Nix
         uses: ./.github/actions/setup-nix
         with:
           cachix-auth-token: ${{ inputs.cachix_auth_token }}
-          devshell: ".#ci-neovim-build"
 
-      - name: Build the Neovim plugins for all Neovim versions and targets
-        run: |
-          mkdir -p build
-
-          IFS=',' read -ra TARGETS <<< "${{ matrix.targets }}"
-
-          for neovim in "0.11" "nightly"; do
-            for target in "${TARGETS[@]}"; do
-              nightly_flag=$([ "$neovim" = "nightly" ] && echo "--nightly" || echo "")
-              cargo xtask build $nightly_flag -- --release --target $target
-              tar -czf "build/mad-neovim-$neovim-$target.tar.gz" lua
-            done
-          done
+      - name: Build the Neovim release artifacts
+        run: nix build .#neovim-release-artifacts
 
       - name: Upload all artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mad-neovim-${{ matrix.os }}
-          path: build/
+          path: result/*
 
   release:
     needs: [build-neovim]
