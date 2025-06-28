@@ -44,12 +44,14 @@
           isRelease ? true,
         }:
         let
+          xtask = "${crane.xtask}/bin/xtask";
+
           # Get the crate's name and version.
           crateInfos = builtins.fromJSON (
             builtins.readFile (
-              pkgs.runCommand "crate-infos" {
-                nativeBuildInputs = [ crane.xtask ];
-              } "xtask neovim print-crate-infos > $out"
+              pkgs.runCommand "crate-infos" { } ''
+                ${xtask} neovim print-crate-infos > $out"
+              ''
             )
           );
         in
@@ -60,15 +62,12 @@
             doCheck = false;
             # We'll handle the installation ourselves.
             doNotPostBuildInstallCargoBinaries = true;
-            nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ [
-              crane.xargs
-            ];
             buildPhaseCargoCommand =
               let
                 nightlyFlag = lib.optionalString isNightly "--nightly";
                 releaseFlag = lib.optionalString isRelease "--release";
               in
-              "xtask neovim build ${nightlyFlag} ${releaseFlag}";
+              "${xtask} neovim build ${nightlyFlag} ${releaseFlag}";
             installPhaseCommand = ''
               mkdir -p $out
               mv lua $out/
