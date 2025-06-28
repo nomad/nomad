@@ -7,7 +7,7 @@ use anyhow::{Context, anyhow};
 use cargo_metadata::TargetKind;
 use xshell::cmd;
 
-use crate::WORKSPACE_ROOT;
+use crate::neovim::CARGO_TOML_META;
 
 #[derive(Debug, Copy, Clone, clap::Args)]
 pub(crate) struct BuildArgs {
@@ -21,163 +21,100 @@ pub(crate) struct BuildArgs {
 }
 
 pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
-    Build::new(xshell::Shell::new()?)
-        .parse_package()?
-        .build_plugin(args)?
-        .fix_library_name()
+    let sh = xshell::Shell::new()?;
+    build_plugin(args, &sh)?;
+    fix_library_name()?;
+    Ok(())
 }
 
-struct Build<State> {
-    sh: xshell::Shell,
-    state: State,
-}
+fn build_plugin(args: BuildArgs, sh: &xshell::Shell) -> anyhow::Result<()> {
+    struct Arg<'a>(Cow<'a, str>);
 
-struct ParsePackage;
-
-struct BuildPlugin {
-    package: cargo_metadata::Package,
-}
-
-struct FixLibraryName {
-    package: cargo_metadata::Package,
-}
-
-impl Build<ParsePackage> {
-    fn parse_package(self) -> anyhow::Result<Build<BuildPlugin>> {
-        let package = self.state.call()?;
-        Ok(Build { sh: self.sh, state: BuildPlugin { package } })
-    }
-
-    fn new(sh: xshell::Shell) -> Self {
-        Self { sh, state: ParsePackage }
-    }
-}
-
-impl Build<BuildPlugin> {
-    fn build_plugin(
-        self,
-        args: BuildArgs,
-    ) -> anyhow::Result<Build<FixLibraryName>> {
-        self.state.call(args, &self.sh)?;
-        Ok(Build {
-            sh: self.sh,
-            state: FixLibraryName { package: self.state.package },
-        })
-    }
-}
-
-impl Build<FixLibraryName> {
-    fn fix_library_name(self) -> anyhow::Result<()> {
-        self.state.call()
-    }
-}
-
-impl ParsePackage {
-    fn call(&self) -> anyhow::Result<cargo_metadata::Package> {
-        let cargo_dot_toml = WORKSPACE_ROOT
-            .join(node!("crates"))
-            .join(node!("nomad-neovim"))
-            .join(node!("Cargo.toml"));
-
-        let metadata = cargo_metadata::MetadataCommand::new()
-            .manifest_path(cargo_dot_toml.clone())
-            .exec()?;
-
-        metadata.root_package().cloned().ok_or_else(|| {
-            anyhow!(
-                "Could not find the root package for manifest at \
-                 {cargo_dot_toml:?}"
-            )
-        })
-    }
-}
-
-impl BuildPlugin {
-    fn call(&self, args: BuildArgs, sh: &xshell::Shell) -> anyhow::Result<()> {
-        struct Arg<'a>(Cow<'a, str>);
-
-        impl AsRef<std::ffi::OsStr> for Arg<'_> {
-            fn as_ref(&self) -> &std::ffi::OsStr {
-                self.0.as_ref().as_ref()
-            }
+    impl AsRef<std::ffi::OsStr> for Arg<'_> {
+        fn as_ref(&self) -> &std::ffi::OsStr {
+            self.0.as_ref().as_ref()
         }
-
-        // Setting the artifact directory is still unstable.
-        let artifact_dir_args = ["-Zunstable-options", "--artifact-dir"]
-            .into_iter()
-            .map(Cow::Borrowed)
-            .chain(iter::once(Cow::Owned(artifact_dir().to_string())));
-
-        // Specify which package to build.
-        let package_args =
-            ["--package", &self.package.name].into_iter().map(Cow::Borrowed);
-
-        let is_nightly = args.nightly
-            || NeovimVersion::detect(sh)
-                .map(|v| v.is_nightly())
-                .unwrap_or(false);
-
-        let feature_args = is_nightly
-            .then_some("--features=neovim-nightly")
-            .into_iter()
-            .map(Cow::Borrowed);
-
-        let profile_args =
-            args.release.then_some("--release").into_iter().map(Cow::Borrowed);
-
-        let args = artifact_dir_args
-            .chain(package_args)
-            .chain(feature_args)
-            .chain(profile_args)
-            .map(Arg);
-
-        cmd!(sh, "cargo build {args...}").run()?;
-
-        Ok(())
     }
+
+    let package_meta = &CARGO_TOML_META;
+
+    // Setting the artifact directory is still unstable.
+    let artifact_dir_args = ["-Zunstable-options", "--artifact-dir"]
+        .into_iter()
+        .map(Cow::Borrowed)
+        .chain(iter::once(Cow::Owned(artifact_dir().to_string())));
+
+    // Specify which package to build.
+    let package_args =
+        ["--package", &package_meta.name].into_iter().map(Cow::Borrowed);
+
+    let is_nightly = args.nightly
+        || NeovimVersion::detect(sh).map(|v| v.is_nightly()).unwrap_or(false);
+
+    let feature_args = is_nightly
+        .then_some("--features=neovim-nightly")
+        .into_iter()
+        .map(Cow::Borrowed);
+
+    let profile_args =
+        args.release.then_some("--release").into_iter().map(Cow::Borrowed);
+
+    let args = artifact_dir_args
+        .chain(package_args)
+        .chain(feature_args)
+        .chain(profile_args)
+        .map(Arg);
+
+    cmd!(sh, "cargo build {args...}").run()?;
+
+    Ok(())
 }
 
-impl FixLibraryName {
-    #[allow(clippy::unwrap_used)]
-    fn call(&self) -> anyhow::Result<()> {
-        let mut cdylib_targets =
-            self.package.targets.iter().filter(|target| {
-                target.kind.iter().any(|kind| kind == &TargetKind::CDyLib)
-            });
-        let cdylib_target = cdylib_targets.next().ok_or_else(|| {
-            anyhow!(
-                "Could not find a cdylib target in manifest of package {:?}",
-                self.package.name
-            )
-        })?;
-        if cdylib_targets.next().is_some() {
-            return Err(anyhow!(
-                "Found multiple cdylib targets in manifest of package {:?}",
-                self.package.name
-            ));
-        }
-        let source = format!(
-            "{prefix}{lib_name}{suffix}",
-            prefix = env::consts::DLL_PREFIX,
-            lib_name = &cdylib_target.name,
-            suffix = env::consts::DLL_SUFFIX
+#[allow(clippy::unwrap_used)]
+fn fix_library_name() -> anyhow::Result<()> {
+    let package_meta = &CARGO_TOML_META;
+
+    let mut cdylib_targets = package_meta.targets.iter().filter(|target| {
+        target.kind.iter().any(|kind| kind == &TargetKind::CDyLib)
+    });
+
+    let cdylib_target = cdylib_targets.next().ok_or_else(|| {
+        anyhow!(
+            "Could not find a cdylib target in manifest of package {:?}",
+            package_meta.name
         )
-        .parse::<NodeNameBuf>()
-        .unwrap();
-        let dest = format!(
-            "{lib_name}{suffix}",
-            lib_name = &cdylib_target.name,
-            suffix = if cfg!(target_os = "windows") { ".dll" } else { ".so" }
-        )
-        .parse::<NodeNameBuf>()
-        .unwrap();
-        force_rename(artifact_dir().push(source), artifact_dir().push(dest))
-            .context("Failed to rename the library")
+    })?;
+
+    if cdylib_targets.next().is_some() {
+        return Err(anyhow!(
+            "Found multiple cdylib targets in manifest of package {:?}",
+            package_meta.name
+        ));
     }
+
+    let source = format!(
+        "{prefix}{lib_name}{suffix}",
+        prefix = env::consts::DLL_PREFIX,
+        lib_name = &cdylib_target.name,
+        suffix = env::consts::DLL_SUFFIX
+    )
+    .parse::<NodeNameBuf>()
+    .unwrap();
+
+    let dest = format!(
+        "{lib_name}{suffix}",
+        lib_name = &cdylib_target.name,
+        suffix = if cfg!(target_os = "windows") { ".dll" } else { ".so" }
+    )
+    .parse::<NodeNameBuf>()
+    .unwrap();
+
+    force_rename(artifact_dir().push(source), artifact_dir().push(dest))
+        .context("Failed to rename the library")
 }
 
 fn artifact_dir() -> AbsPathBuf {
-    WORKSPACE_ROOT.join(node!("lua"))
+    crate::WORKSPACE_ROOT.join(node!("lua"))
 }
 
 fn force_rename(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {

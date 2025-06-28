@@ -25,6 +25,8 @@
               ];
             }
           );
+
+          src = craneLib.cleanCargoSource (craneLib.path ../.);
         in
         {
           lib = craneLib;
@@ -32,7 +34,7 @@
           commonArgs =
             let
               args = {
-                src = craneLib.cleanCargoSource (craneLib.path ../.);
+                inherit src;
                 strictDeps = true;
                 nativeBuildInputs = with pkgs; [ pkg-config ];
                 buildInputs =
@@ -63,6 +65,31 @@
 
           devShell = craneLib.devShell {
             inherit (config) checks;
+          };
+
+          xtask = craneLib.buildPackage rec {
+            inherit src;
+            pname = "xtask";
+            cargoExtraArgs = "--bin xtask";
+            doCheck = false;
+            env = {
+              WORKSPACE_ROOT = src.outPath;
+            };
+            nativeBuildInputs = [
+              # Needed to call `wrapProgram`.
+              pkgs.makeWrapper
+            ];
+            # Needed to shell out to `cargo metadata`.
+            #
+            # TODO: how the fuck do you get the correct path to the `cargo`
+            # binary used by `crane`?
+            #
+            # `${craneLib.cargo}/bin/cargo` evals to something like
+            # /nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-rust-default-1.89.0-nightly-2025-06-22/bin/cargo"
+            postInstall = ''
+              wrapProgram $out/bin/${pname} \
+                --set CARGO ${lib.getExe' craneLib.cargo "cargo"}
+            '';
           };
         };
     };

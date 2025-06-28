@@ -47,26 +47,9 @@
           # Get the crate's name and version.
           crateInfos = builtins.fromJSON (
             builtins.readFile (
-              pkgs.runCommand "cargo-metadata"
-                {
-                  nativeBuildInputs = [
-                    crane.lib.cargo
-                    pkgs.jq
-                  ];
-                }
-                ''
-                  cargo metadata \
-                    --format-version 1 \
-                    --no-deps \
-                    --offline \
-                    --manifest-path ${crane.commonArgs.src}/crates/nomad-neovim/Cargo.toml | \
-                  jq '
-                    .workspace_default_members[0] as $default_id |
-                    .packages[] |
-                    select(.id == $default_id) |
-                    {pname: .name, version: .version}
-                  ' > $out
-                ''
+              pkgs.runCommand "crate-infos" {
+                nativeBuildInputs = [ crane.xtask ];
+              } "xtask neovim print-crate-infos > $out"
             )
           );
         in
@@ -77,12 +60,15 @@
             doCheck = false;
             # We'll handle the installation ourselves.
             doNotPostBuildInstallCargoBinaries = true;
+            nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ [
+              crane.xargs
+            ];
             buildPhaseCargoCommand =
               let
                 nightlyFlag = lib.optionalString isNightly "--nightly";
                 releaseFlag = lib.optionalString isRelease "--release";
               in
-              "cargo xtask neovim build ${nightlyFlag} ${releaseFlag}";
+              "xtask neovim build ${nightlyFlag} ${releaseFlag}";
             installPhaseCommand = ''
               mkdir -p $out
               mv lua $out/
