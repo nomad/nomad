@@ -50,7 +50,7 @@
           crateInfos = builtins.fromJSON (
             builtins.readFile (
               pkgs.runCommand "crate-infos" { } ''
-                ${xtask} neovim print-crate-infos > $out"
+                ${xtask} neovim print-crate-infos > $out
               ''
             )
           );
@@ -61,14 +61,15 @@
             pname = crateInfos.name;
             version = crateInfos.version;
             doCheck = false;
-            # Already included in the build command.
-            doInstall = false;
             buildPhaseCargoCommand =
               let
                 nightlyFlag = lib.optionalString isNightly "--nightly";
                 releaseFlag = lib.optionalString isRelease "--release";
               in
               "${xtask} neovim build ${nightlyFlag} ${releaseFlag} --out-dir=$out";
+            # Installation was already handled by the build command.
+            doNotPostBuildInstallCargoBinaries = true;
+            installPhaseCommand = "";
           }
         );
 

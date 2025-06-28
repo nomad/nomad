@@ -22,6 +22,7 @@ static CARGO_TOML_META: LazyLock<cargo_metadata::Package> =
 
         let meta = match cargo_metadata::MetadataCommand::new()
             .manifest_path((**manifest_path).clone())
+            .no_deps()
             .exec()
         {
             Ok(meta) => meta,
@@ -33,7 +34,9 @@ static CARGO_TOML_META: LazyLock<cargo_metadata::Package> =
             },
         };
 
-        let Some(package) = meta.root_package() else {
+        let Some(package) = meta.packages.iter().find(|package| {
+            package.manifest_path.as_str() == manifest_path.as_str()
+        }) else {
             panic!(
                 "couldn't find the root package for manifest at \
                  {manifest_path:?}"

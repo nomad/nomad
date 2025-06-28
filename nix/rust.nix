@@ -32,6 +32,8 @@
             cargoExtraArgs = "--bin xtask";
             doCheck = false;
             env = {
+              # Crane will compile xtask in release mode if this is not unset.
+              CARGO_PROFILE = "";
               WORKSPACE_ROOT = crane.commonArgs.src.outPath;
             };
             nativeBuildInputs = [
@@ -41,7 +43,8 @@
             # Needed to shell out to `cargo metadata`.
             postInstall = ''
               wrapProgram $out/bin/${pname} \
-                --set CARGO ${lib.getExe' toolchain "cargo"}
+                --set CARGO ${lib.getExe' toolchain "cargo"} \
+                --set RUSTC ${lib.getExe' toolchain "rustc"}
             '';
           }
         );
