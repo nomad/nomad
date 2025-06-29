@@ -10,13 +10,17 @@ use crate::neovim::CARGO_TOML_META;
 
 #[derive(Debug, Clone, clap::Args)]
 pub(crate) struct BuildArgs {
+    /// Build the plugin for the latest nightly version of Neovim.
+    #[clap(long)]
+    nightly: bool,
+
     /// Build the plugin in release mode.
-    #[clap(long, short, default_value_t = false)]
+    #[clap(long, short)]
     release: bool,
 
-    /// Build the plugin for the latest nightly version of Neovim.
-    #[clap(long, default_value_t = false)]
-    nightly: bool,
+    /// The target triple to build the plugin for.
+    #[clap(long)]
+    target: Option<String>,
 
     /// The absolute path to the directory under which to place the build
     /// artifacts.
@@ -34,32 +38,20 @@ pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
         .into_iter()
         .chain(iter::once(artifact_dir.as_str()));
 
-    let package_meta = &CARGO_TOML_META;
+    let target_args =
+        args.target.as_deref().map(|target| ["--target", target]);
 
-    // Specify which package to build.
-    let package_args = ["--package", &package_meta.name].into_iter();
-
-    let feature_args =
-        args.nightly.then_some("--features=neovim-nightly").into_iter();
-
-    let profile_args = args.release.then_some("--release").into_iter();
-
-    let output = process::Command::new("cargo")
+    let exit_status = process::Command::new("cargo")
         .arg("build")
         .args(artifact_dir_args)
-        .args(package_args)
-        .args(feature_args)
-        .args(profile_args)
-        .stdout(process::Stdio::inherit())
-        .stderr(process::Stdio::inherit())
-        .output()?;
+        .args(["--package", &CARGO_TOML_META.name])
+        .args(args.nightly.then_some("--features=neovim-nightly"))
+        .args(args.release.then_some("--release"))
+        .args(target_args.as_ref().map(|args| &args[..]).unwrap_or_default())
+        .status()?;
 
-    if !output.status.success() {
-        return Err(anyhow!(
-            "cargo build failed with exit code {:?}: {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr)
-        ));
+    if !exit_status.success() {
+        process::exit(exit_status.code().unwrap_or(1));
     }
 
     fix_library_name(&artifact_dir)?;

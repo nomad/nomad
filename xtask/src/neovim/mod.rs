@@ -18,10 +18,10 @@ static CARGO_TOML_PATH: LazyLock<AbsPathBuf> = LazyLock::new(|| {
 /// entrypoint to the Neovim plugin.
 static CARGO_TOML_META: LazyLock<cargo_metadata::Package> =
     LazyLock::new(|| {
-        let manifest_path = &CARGO_TOML_PATH;
+        let manifest_path = &**CARGO_TOML_PATH;
 
         let meta = match cargo_metadata::MetadataCommand::new()
-            .manifest_path((**manifest_path).clone())
+            .manifest_path(manifest_path.to_owned())
             .no_deps()
             .exec()
         {
