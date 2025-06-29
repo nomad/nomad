@@ -71,7 +71,7 @@
               ${xtask} neovim build \
                 ${lib.optionalString isNightly "--nightly"} \
                 ${lib.optionalString isRelease "--release"} \
-                ${lib.optionalString isCross "--target=${hostPlatform.config}"} \
+                ${lib.optionalString isCross "--target=${hostPlatform.rust.rustcTarget}"} \
                 --out-dir=$out
             '';
             # Installation was already handled by the build command.
@@ -97,24 +97,10 @@
             ];
           }
         );
-    in
-    {
-      checks = {
-        tests-neovim = mkTests { isNightly = false; };
-        tests-neovim-nightly = mkTests { isNightly = true; };
-      };
-      ciDevShells = {
-        tests-neovim = mkCIShell { isNightly = false; };
-        tests-neovim-nightly = mkCIShell { isNightly = true; };
-      };
-      devShells = {
-        neovim = mkDevShell { isNightly = false; };
-        neovim-nightly = mkDevShell { isNightly = true; };
-      };
-      packages = {
-        neovim = mkPlugin { isNightly = false; };
-        neovim-nightly = mkPlugin { isNightly = true; };
-        neovim-release-artifacts = pkgs.stdenv.mkDerivation {
+
+      mkReleaseArtifacts =
+        targetPackageSets:
+        pkgs.stdenv.mkDerivation {
           inherit (crateInfos) version;
           pname = "${crateInfos.name}-release-artifacts";
           src = null;
@@ -135,7 +121,7 @@
                 }
                 {
                   name = "targetPkgs";
-                  values = [ pkgs ];
+                  values = targetPackageSets;
                 }
               ];
 
@@ -169,6 +155,33 @@
               runHook postInstall
             '';
         };
+    in
+    {
+      checks = {
+        tests-neovim = mkTests { isNightly = false; };
+        tests-neovim-nightly = mkTests { isNightly = true; };
+      };
+      ciDevShells = {
+        tests-neovim = mkCIShell { isNightly = false; };
+        tests-neovim-nightly = mkCIShell { isNightly = true; };
+      };
+      devShells = {
+        neovim = mkDevShell { isNightly = false; };
+        neovim-nightly = mkDevShell { isNightly = true; };
+      };
+      packages = {
+        neovim = mkPlugin { isNightly = false; };
+        neovim-nightly = mkPlugin { isNightly = true; };
+        neovim-release-artifacts-linux = mkReleaseArtifacts [
+          pkgs.pkgsCross.aarch64-linux
+          pkgs.pkgsCross.x86_64-linux
+        ];
+        # Cross-compiling for macOS requires proprietary Apple tooling which is
+        # only available when building on a macOS host.
+        neovim-release-artifacts-macos = lib.mkIf pkgs.stdenv.isDarwin (mkReleaseArtifacts [
+          pkgs.pkgsCross.aarch64-darwin
+          pkgs.pkgsCross.x86_64-darwin
+        ]);
       };
     };
 }

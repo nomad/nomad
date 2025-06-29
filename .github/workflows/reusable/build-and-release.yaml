@@ -34,6 +34,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            release-artifacts-package: ".#neovim-release-artifacts-linux"
+          - os: macos-latest
+            release-artifacts-package: ".#neovim-release-artifacts-macos"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +51,7 @@ jobs:
           cachix-auth-token: ${{ inputs.cachix_auth_token }}
 
       - name: Build the Neovim release artifacts
-        run: nix build .#neovim-release-artifacts
+        run: nix build ${{ matrix.release-artifacts-package }}
 
       - name: Upload all artifacts
         uses: actions/upload-artifact@v4

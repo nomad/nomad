@@ -76,7 +76,12 @@
                 newToolchain =
                   if buildPlatform != hostPlatform then
                     toolchain.override {
-                      targets = lib.unique ((toolchain.targets or [ ]) ++ [ hostPlatform.config ]);
+                      targets = lib.unique (
+                        (toolchain.targets or [ ])
+                        ++ [
+                          hostPlatform.rust.rustcTarget
+                        ]
+                      );
                     }
                   else
                     toolchain;
