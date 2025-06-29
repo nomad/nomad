@@ -13,18 +13,7 @@
       _module.args.crane =
         let
           mkCraneLib =
-            targetPkgs: toolchain:
-            ((inputs.crane.mkLib targetPkgs).overrideToolchain (_targetPkgs: toolchain)).overrideScope (
-              # Override Crane's 'filterCargoSources' to also keep all Lua
-              # files and all symlinks under `lua/nomad`.
-              final: prev: {
-                filterCargoSources =
-                  path: type:
-                  (prev.filterCargoSources path type)
-                  || (lib.hasSuffix ".lua" (builtins.baseNameOf path))
-                  || (type == "symlink" && lib.hasInfix "lua/nomad" path);
-              }
-            );
+            targetPkgs: toolchain: (inputs.crane.mkLib targetPkgs).overrideToolchain (_targetPkgs: toolchain);
 
           mkCommonArgs =
             targetPkgs: toolchain:

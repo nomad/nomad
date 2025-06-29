@@ -25,6 +25,17 @@
         )
       );
 
+      cleanCargoSourceButKeepLua =
+        craneLib:
+        craneLib.cleanCargoSource.override {
+          filterCargoSources =
+            path: type:
+            (craneLib.filterCargoSources path type)
+            # Keep all Lua files and all symlinks under `lua/nomad`.
+            || (lib.hasSuffix ".lua" (builtins.baseNameOf path))
+            || (type == "symlink" && lib.hasInfix "lua/nomad" path);
+        };
+
       mkPackage =
         isNightly: if isNightly then inputs'.neovim-nightly-overlay.packages.default else pkgs.neovim;
 
@@ -60,12 +71,14 @@
           isCross = buildPlatform != hostPlatform;
           # Use native crane unless cross-compiling.
           targetCrane = if isCross then crane.overridePkgs targetPkgs else crane;
+          craneLib = targetCrane.lib;
         in
-        targetCrane.lib.buildPackage (
+        craneLib.buildPackage (
           targetCrane.commonArgs
           // {
             pname = crateInfos.name;
             version = crateInfos.version;
+            src = (cleanCargoSourceButKeepLua craneLib) (craneLib.path ../.);
             doCheck = false;
             buildPhaseCargoCommand = ''
               ${xtask} neovim build \
