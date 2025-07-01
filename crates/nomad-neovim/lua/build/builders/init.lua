@@ -1,11 +1,21 @@
 ---@class (exact) nomad.neovim.build.Builder
+---
+---Something.
 ---@field command string something
----@field fallback function(builder: nomad.neovim.build.Builder) nomad.neovim.build.Builder
+---
+---Something.
+---@field fallback fun(builder: nomad.neovim.build.Builder): nomad.neovim.build.Builder
 
 ---@class (exact) nomad.neovim.build.Builders
----@field cargo function(opts: nomad.neovim.build.CargoOpts?): nomad.neovim.build.Builder
----@field download_prebuilt function(opts: nomad.neovim.build.DownloadPrebuiltOpts?): nomad.neovim.build.Builder
----@field nix function(opts: nomad.neovim.build.NixOpts?): nomad.neovim.build.Builder
+---
+---Something.
+---@field cargo fun(opts: nomad.neovim.build.CargoOpts?): nomad.neovim.build.Builder
+---
+---Something.
+---@field download_prebuilt fun(opts: nomad.neovim.build.DownloadPrebuiltOpts?): nomad.neovim.build.Builder
+---
+---Something.
+---@field nix fun(opts: nomad.neovim.build.NixOpts?): nomad.neovim.build.Builder
 
 ---@type nomad.neovim.build.Builders
 return {
