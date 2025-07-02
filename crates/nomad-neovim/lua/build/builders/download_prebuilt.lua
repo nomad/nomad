@@ -6,8 +6,15 @@ local Command = require("nomad.neovim.command")
 ---@type nomad.Result
 local Result = require("nomad.result")
 
----@param nomad_version string
----@return nomad.Result<string, string>
+--- NOTE: this has to be kept in sync with the 'mkArchiveName' function in
+--- neovim.nix which is responsible for naming the Neovim artifacts published
+--- in the releases.
+---
+--- TODO: either eliminate one of the two sources of truth (not sure how), or
+--- add a test in CI that fails if they diverge.
+---
+--- @param nomad_version string
+--- @return nomad.Result<string, string>
 local get_artifact_name = function(nomad_version)
   local arch = ({
     ["x64"] = "x86_64",
