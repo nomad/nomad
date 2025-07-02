@@ -1,7 +1,7 @@
 local Context = require("nomad.neovim.build.context")
 
 ---@type nomad.neovim.build.Driver
-return function(builder)
+return function(build_fn)
   ---@type nomad.result.Result<nil, string>?
   local done_res = nil
 
@@ -13,7 +13,7 @@ return function(builder)
     on_done = function(res) done_res = res end,
   })
 
-  builder:build(ctx)
+  build_fn(ctx)
 
   -- Keep yielding until the builder is done. Lazy takes care of scheduling the
   -- next resume() to be called in the next tick of the event loop.

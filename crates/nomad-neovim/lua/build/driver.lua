@@ -1,1 +1,1 @@
----@alias nomad.neovim.build.Driver fun(builder: nomad.neovim.build.Builder)
+---@alias nomad.neovim.build.Driver fun(build_fn: fun(ctx: nomad.neovim.build.Context))

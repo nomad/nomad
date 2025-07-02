@@ -16,15 +16,15 @@ local Builder = require("nomad.neovim.build.builder")
 ---@type nomad.neovim.build.builders
 return {
   cargo = function(opts)
-    local build = require("nomad.neovim.build.builders.cargo")
-    return Builder.new(function(ctx) return build(opts, ctx) end)
+    local build_fn = require("nomad.neovim.build.builders.cargo")
+    return Builder.new(function(ctx) return build_fn(opts, ctx) end)
   end,
   download_prebuilt = function(opts)
-    local build = require("nomad.neovim.build.builders.download_prebuilt")
-    return Builder.new(function(ctx) return build(opts, ctx) end)
+    local build_fn = require("nomad.neovim.build.builders.download_prebuilt")
+    return Builder.new(function(ctx) return build_fn(opts, ctx) end)
   end,
   nix = function(opts)
-    local build = require("nomad.neovim.build.builders.nix")
-    return Builder.new(function(ctx) return build(opts, ctx) end)
+    local build_fn = require("nomad.neovim.build.builders.nix")
+    return Builder.new(function(ctx) return build_fn(opts, ctx) end)
   end
 }

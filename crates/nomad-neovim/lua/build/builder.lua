@@ -9,11 +9,11 @@
 local Builder = {}
 Builder.__index = Builder
 
----@param build fun(ctx: nomad.neovim.build.Context)
+---@param build_fn fun(ctx: nomad.neovim.build.Context)
 ---@return nomad.neovim.build.Builder
-Builder.new = function(build)
+Builder.new = function(build_fn)
   local self = {
-    _build = build,
+    build_fn = build_fn,
   }
   return setmetatable(self, Builder)
 end
@@ -21,7 +21,7 @@ end
 ---@param self nomad.neovim.build.Builder
 ---@param driver nomad.neovim.build.Driver
 function Builder:build(driver)
-  driver(self)
+  driver(self.build_fn)
 end
 
 ---@param self nomad.neovim.build.Builder
@@ -29,11 +29,11 @@ end
 ---@return nomad.neovim.build.Builder
 function Builder:fallback(fallback_builder)
   return Builder.new(function(ctx)
-    self._build(ctx:override({
+    self.build_fn(ctx:override({
       on_done = function(res)
         if res:is_err() then
           ctx.emit(res:unwrap_err())
-          fallback_builder._build(ctx)
+          fallback_builder.build_fn(ctx)
         end
       end
     }))
