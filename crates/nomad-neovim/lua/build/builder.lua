@@ -9,7 +9,7 @@
 local Builder = {}
 Builder.__index = Builder
 
----@param build_fn fun(ctx: nomad.neovim.build.Context)
+---@param build_fn fun(ctx: nomad.neovim.build.Context): nomad.future.Future<nomad.Result<nil, string>>
 ---@return nomad.neovim.build.Builder
 Builder.new = function(build_fn)
   local self = {
@@ -21,13 +21,8 @@ end
 ---@param self nomad.neovim.build.Builder
 ---@param driver nomad.neovim.build.Driver
 function Builder:build(driver)
-  driver(self.build_fn)
-end
-
----@param self nomad.neovim.build.Builder
----@param ctx nomad.neovim.build.Context
-function Builder:build2(ctx)
-  local build_res = ctx.executor.block_on(self.run(ctx.emit))
+  local build_fut = self.build_fn(driver.ctx)
+  local build_res = driver.executor.block_on(build_fut)
   if build_res:is_err() then error(build_res:unwrap_err()) end
 end
 
@@ -36,14 +31,13 @@ end
 ---@return nomad.neovim.build.Builder
 function Builder:fallback(fallback_builder)
   return Builder.new(function(ctx)
-    self.build_fn(ctx:override({
-      on_done = function(res)
-        if res:is_err() then
-          ctx.emit(res:unwrap_err())
-          fallback_builder.build_fn(ctx)
-        end
-      end
-    }))
+    return self.build_fn(ctx)
+        :and_then(function(res)
+          if res:is_err() then
+            ctx.emit(res:unwrap_err())
+            return fallback_builder.build_fn(ctx)
+          end
+        end)
   end)
 end
 

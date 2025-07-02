@@ -1,1 +1,4 @@
----@alias nomad.neovim.build.Driver fun(build_fn: fun(ctx: nomad.neovim.build.Context))
+---@class (exact) nomad.neovim.build.Driver
+---
+---@field context nomad.neovim.build.Context
+---@field executor nomad.future.Executor

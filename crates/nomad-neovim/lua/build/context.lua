@@ -1,11 +1,9 @@
 ---@class (exact) nomad.neovim.build.Context: nomad.neovim.build.ContextOpts
----
----@field override fun(self: nomad.neovim.build.Context, overrides: table<string, any>): nomad.neovim.build.Context
+
 
 ---@class (exact) nomad.neovim.build.ContextOpts
 ---
 ---@field emit fun(msg: string)
----@field on_done fun(res: nomad.Result<nil, string>)
 
 ---@type nomad.path
 local path = require("nomad.path")
@@ -30,11 +28,6 @@ Context.__index = Context
 ---@return nomad.neovim.build.Context
 Context.new = function(opts)
   return setmetatable(opts, Context)
-end
-
----@return nomad.neovim.build.Context
-function Context:override(overrides)
-  return setmetatable(vim.tbl_extend("force", self, overrides), Context)
 end
 
 ---@return nomad.path.Path
