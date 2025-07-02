@@ -55,7 +55,7 @@ return function(opts, ctx)
 
   process.command.new("git")
       :args({ "describe", "--tags", "--exact-match" })
-      :current_dir(ctx.repo_dir())
+      :current_dir(ctx:repo_dir())
       :on_stdout(function(line) tag = line end)
       :on_done(function(res)
         -- We're not on a tag, so we can't download a pre-built artifact.
@@ -65,11 +65,11 @@ return function(opts, ctx)
         -- We don't offer pre-built artifacts for this machine.
         local nomad_version = tag:gsub("^v", "")
         local res = get_artifact_name(nomad_version)
-        if res:is_err() then return ctx.on_done(res) end
+        if res:is_err() then return ctx.on_done(res:map(function() end)) end
 
         artifact_name = res:unwrap()
         local url = get_artifact_url(tag, artifact_name)
-        out_dir = ctx.repo_dir():join("result")
+        out_dir = ctx:repo_dir():join("result")
 
         -- Download the artifact from the releases page.
         return process.command.new("curl")
@@ -92,7 +92,7 @@ return function(opts, ctx)
 
         return process.command.new("cp")
             :args({ out_dir:join("/lua/*"), "lua/" })
-            :current_dir(ctx.repo_dir())
+            :current_dir(ctx:repo_dir())
       end)
       :on_done(function(res)
         ctx.on_done(res:map_err(tostring))
