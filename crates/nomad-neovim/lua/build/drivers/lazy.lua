@@ -2,7 +2,7 @@ local Context = require("nomad.neovim.build.context")
 
 ---@type nomad.neovim.build.Driver
 return function(build_fn)
-  ---@type nomad.result.Result<nil, string>?
+  ---@type nomad.Result<nil, string>?
   local done_res = nil
 
   ---@type [string]

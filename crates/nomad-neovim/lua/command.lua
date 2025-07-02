@@ -8,7 +8,7 @@
 ---@field current_dir fun(self: nomad.neovim.process.Command, dir: nomad.path.Path): nomad.neovim.process.Command
 ---@field on_stdout fun(self: nomad.neovim.process.Command, handler: fun(stdout_line: string)): nomad.neovim.process.Command
 ---@field on_stderr fun(self: nomad.neovim.process.Command, handler: fun(stdout_line: string)): nomad.neovim.process.Command
----@field on_done fun(self: nomad.neovim.process.Command, handler: fun(res: nomad.result.Result<nil, integer>): nomad.neovim.process.Command?): nomad.neovim.process.Command?
+---@field on_done fun(self: nomad.neovim.process.Command, handler: fun(res: nomad.Result<nil, integer>): nomad.neovim.process.Command?): nomad.neovim.process.Command?
 
 ---@type nomad.result
 local result = require("nomad.result")

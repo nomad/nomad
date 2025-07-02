@@ -5,7 +5,7 @@
 ---@class (exact) nomad.neovim.build.ContextOpts
 ---
 ---@field emit fun(msg: string)
----@field on_done fun(res: nomad.result.Result<nil, string>)
+---@field on_done fun(res: nomad.Result<nil, string>)
 
 ---@type nomad.path
 local path = require("nomad.path")
@@ -14,7 +14,7 @@ local path = require("nomad.path")
 --- @param list [T]
 --- @param start_idx integer
 --- @param end_idx integer
---- @return T[]
+--- @return [T]
 local slice = function(list, start_idx, end_idx)
   local sliced = {}
   for idx = start_idx, end_idx do

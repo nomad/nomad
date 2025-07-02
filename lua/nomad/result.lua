@@ -1,30 +1,47 @@
----@class nomad.result
----@field ok fun(value: T): nomad.result.Result<T, any>
----@field err fun(err: E): nomad.result.Result<any, E>
+---@class nomad.Result<T, E>: { value: T?, error: E? }
 
----@class nomad.result.Result<T, E>: { value: T?, error: E? }
+local Result = {}
+Result.__index = Result
 
-local result = {}
-result.__index = result
-
----@return nomad.result.Result
-result.new = function(value, error)
+---@generic T
+---@param value T
+---@return nomad.Result<T, any>
+Result.ok = function(value)
   local self = {
     value = value,
-    error = error,
+    error = nil,
   }
-  return setmetatable(self, result)
+  return setmetatable(self, Result)
 end
 
-function result:is_ok()
+---@generic E
+---@param error E
+---@return nomad.Result<any, E>
+Result.err = function(error)
+  local self = {
+    value = nil,
+    error = error,
+  }
+  return setmetatable(self, Result)
+end
+
+function Result:is_ok()
   return self.value ~= nil
 end
 
-function result:is_err()
+function Result:is_err()
   return self.error ~= nil
 end
 
-function result:unwrap()
+function Result:map(fun)
+  return self:is_err() and self or Result.ok(fun(self:unwrap()))
+end
+
+function Result:map_err(fun)
+  return self:is_ok() and self or Result.err(fun(self:unwrap_err()))
+end
+
+function Result:unwrap()
   if self:is_ok() then
     return self.value
   else
@@ -32,7 +49,7 @@ function result:unwrap()
   end
 end
 
-function result:unwrap_err()
+function Result:unwrap_err()
   if self:is_err() then
     return self.error
   else
@@ -40,8 +57,4 @@ function result:unwrap_err()
   end
 end
 
----@type nomad.result
-return {
-  ok = function(value) return result.new(value, nil) end,
-  err = function(err) return result.new(nil, err) end,
-}
+return Result
