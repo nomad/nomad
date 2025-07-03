@@ -8,11 +8,11 @@
 ---@type nomad.path
 local path = require("nomad.path")
 
---- @generic T
---- @param list [T]
---- @param start_idx integer
---- @param end_idx integer
---- @return [T]
+---@generic T
+---@param list [T]
+---@param start_idx integer
+---@param end_idx integer
+---@return [T]
 local slice = function(list, start_idx, end_idx)
   local sliced = {}
   for idx = start_idx, end_idx do

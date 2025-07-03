@@ -6,31 +6,31 @@
 ---
 --- * if the future has completed, polling it will return the output of the
 ---   computation.
---- @class (exact) nomad.future.Future<T>: { poll: fun(ctx: nomad.future.Context): nomad.Option<T> }
+---@class (exact) nomad.future.Future<T>: { poll: fun(ctx: nomad.future.Context): nomad.Option<T> }
 
 --- TODO: docs.
 ---
---- @class (exact) nomad.future.Context
---- @field wake fun()
+---@class (exact) nomad.future.Context
+---@field wake fun()
 
 local Option = require("nomad.option")
 
 local Future = {}
 Future.__index = Future
 
---- @generic T
---- @param poll fun(ctx: nomad.future.Context): nomad.Option<T>
---- @return nomad.future.Future<T>
+---@generic T
+---@param poll fun(ctx: nomad.future.Context): nomad.Option<T>
+---@return nomad.future.Future<T>
 Future.new = function(poll)
   local self = setmetatable({}, Future)
   self.poll = poll
   return self
 end
 
---- @generic T
---- @param self nomad.future.Future<T>
---- @param ctx nomad.future.Context
---- @return T
+---@generic T
+---@param self nomad.future.Future<T>
+---@param ctx nomad.future.Context
+---@return T
 function Future:await(ctx)
   while true do
     local maybe_out = self.poll(ctx)

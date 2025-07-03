@@ -1,11 +1,5 @@
+--- Same as Rust's `std::process::Command`, but async.
 ---@class nomad.neovim.Command
----@field new fun(command: string): nomad.neovim.Command
----@field arg fun(self: nomad.neovim.Command, arg: string): nomad.neovim.Command
----@field args fun(self: nomad.neovim.Command, args: [string]): nomad.neovim.Command
----@field current_dir fun(self: nomad.neovim.Command, dir: nomad.path.Path): nomad.neovim.Command
----@field on_stdout fun(self: nomad.neovim.Command, handler: fun(stdout_line: string)): nomad.neovim.Command
----@field on_stderr fun(self: nomad.neovim.Command, handler: fun(stdout_line: string)): nomad.neovim.Command
----@field on_done fun(self: nomad.neovim.Command, handler: fun(res: nomad.Result<nil, integer>): nomad.neovim.Command?): nomad.neovim.Command?
 
 local future = require("nomad.future")
 local Option = require("nomad.option")
@@ -23,6 +17,7 @@ Command.new = function(cmd)
   return self
 end
 
+---@param self nomad.neovim.Command
 ---@param arg string?
 ---@return nomad.neovim.Command
 function Command:arg(arg)
@@ -42,21 +37,21 @@ end
 ---@param dir neovim.path.Path
 ---@return nomad.neovim.Command
 function Command:current_dir(dir)
-  self.cwd = dir
+  self._cwd = dir
   return self
 end
 
 ---@param handler fun(stdout_line: string)
 ---@return nomad.neovim.Command
 function Command:on_stdout(handler)
-  self.on_stdout_line = handler
+  self._on_stdout_line = handler
   return self
 end
 
 ---@param handler fun(stderr_line: string)
 ---@return nomad.neovim.Command
 function Command:on_stderr(handler)
-  self.on_stderr_line = handler
+  self._on_stderr_line = handler
   return self
 end
 
@@ -71,19 +66,19 @@ function Command:into_future()
 
   local start = function()
     vim.system(self._cmd_args, {
-      cwd = tostring(self.cwd),
+      cwd = self._cwd and tostring(self._cwd) or nil,
       stdout = function(_, data)
         if not data then return end
-        if not self.on_stdout_line then return end
+        if not self._on_stdout_line then return end
         for line in data:gmatch("([^\n]+)") do
-          self.on_stdout_line(line)
+          self._on_stdout_line(line)
         end
       end,
       stderr = function(_, data)
         if not data then return end
-        if not self.on_stderr_line then return end
+        if not self._on_stderr_line then return end
         for line in data:gmatch("([^\n]+)") do
-          self.on_stderr_line(line)
+          self._on_stderr_line(line)
         end
       end,
       text = true,

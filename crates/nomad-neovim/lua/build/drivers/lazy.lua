@@ -1,7 +1,7 @@
---- @type [string]
+---@type [string]
 local message_queue = {}
 
---- @type nomad.neovim.build.Driver
+---@type nomad.neovim.build.Driver
 return {
   block_on_build = function(build_fut)
     --- Lazy already takes care of scheduling a coroutine.resume() to run in
@@ -20,8 +20,8 @@ return {
     while true do
       local maybe_res = build_fut.poll(noop_ctx)
 
-      if maybe_res then
-        build_res = maybe_res
+      if maybe_res:is_some() then
+        build_res = maybe_res:unwrap()
         break
       end
 

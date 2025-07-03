@@ -15,8 +15,8 @@ local Command = require("nomad.neovim.command")
 --- TODO: either eliminate one of the two sources of truth (not sure how), or
 --- add a test in CI that fails if they diverge.
 ---
---- @param nomad_version string
---- @return nomad.Result<string, string>
+---@param nomad_version string
+---@return nomad.Result<string, string>
 local get_artifact_name = function(nomad_version)
   local arch = ({
     ["x64"] = "x86_64",
