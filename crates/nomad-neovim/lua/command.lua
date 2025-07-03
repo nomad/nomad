@@ -18,14 +18,14 @@ Command.__index = Command
 ---@return nomad.neovim.Command
 Command.new = function(cmd)
   local self = setmetatable({}, Command)
-  self._cmd = cmd
+  self._cmd_args = { cmd }
   return self
 end
 
 ---@param arg string?
 ---@return nomad.neovim.Command
 function Command:arg(arg)
-  if arg then table.insert(self._cmd, arg) end
+  if arg then table.insert(self._cmd_args, arg) end
   return self
 end
 
@@ -33,7 +33,7 @@ end
 ---@return nomad.neovim.Command
 function Command:args(args)
   for _, arg in ipairs(args) do
-    table.insert(self._cmd, arg)
+    table.insert(self._cmd_args, arg)
   end
   return self
 end
@@ -65,8 +65,11 @@ function Command:into_future()
   ---@type integer?
   local exit_code = nil
 
-  local start = function(wake)
-    vim.system(self._cmd, {
+  ---@type fun()
+  local wake
+
+  local start = function()
+    vim.system(self._cmd_args, {
       cwd = tostring(self.cwd),
       stdout = function(_, data)
         if not data then return end
@@ -92,12 +95,14 @@ function Command:into_future()
   local has_completed = false
   local has_started = false
 
-  return future.Future.new(function(wake)
+  return future.Future.new(function(ctx)
     if has_completed then
       error("called poll() on a Command that has already completed")
     end
 
-    if not has_started then start(wake) end
+    -- Update the waker.
+    wake = ctx.wake
+    if not has_started then start() end
     has_started = true
     if not exit_code then return end
     has_completed = true

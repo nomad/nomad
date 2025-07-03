@@ -17,7 +17,7 @@ local Future = {}
 Future.__index = Future
 
 --- @generic T
---- @param poll fun(wake: fun()): T?
+--- @param poll fun(ctx: nomad.future.Context): T?
 --- @return nomad.future.Future<T>
 Future.new = function(poll)
   local self = setmetatable({}, Future)
