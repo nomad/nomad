@@ -1,6 +1,7 @@
 /.direnv
 /.envrc
-/lua/nomad.so
+/lua/*
+!/lua/nomad/
 /result
 /target
 TODO.md
