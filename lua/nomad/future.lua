@@ -39,7 +39,7 @@ function Future:await(ctx)
     end
     local success, next_ctx = pcall(coroutine.yield)
     if not success or not type(next_ctx) == "table" then
-      error("await() can only be called from within an async block", 0)
+      error("await() can only be called from within an async block", 2)
     end
     ctx = next_ctx
   end
@@ -61,7 +61,7 @@ local async = function(fun)
 
   return Future.new(function(ctx)
     if is_done then
-      error("called poll() on a Future that has already completed", 0)
+      error("called poll() on a Future that has already completed", 2)
     end
 
     if is_first_poll then

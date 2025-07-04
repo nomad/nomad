@@ -44,7 +44,7 @@ function Option:unwrap()
   if self._is_some then
     return self._value
   else
-    error("called unwrap() on an none value")
+    error("called Option:unwrap() on an none value", 2)
   end
 end
 

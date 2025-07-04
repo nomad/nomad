@@ -1,4 +1,4 @@
----@class nomad.Result<T, E>: { value: T?, error: E? }
+---@class nomad.Result<T, E>: { _is_ok: boolean, _value: T?, _error: E? }
 
 local Result = {}
 Result.__index = Result
@@ -7,30 +7,28 @@ Result.__index = Result
 ---@param value T
 ---@return nomad.Result<T, any>
 Result.ok = function(value)
-  local self = {
-    value = value,
-    error = nil,
-  }
-  return setmetatable(self, Result)
+  local self = setmetatable({}, Result)
+  self._is_ok = true
+  self._value = value
+  return self
 end
 
 ---@generic E
 ---@param error E
 ---@return nomad.Result<any, E>
 Result.err = function(error)
-  local self = {
-    value = nil,
-    error = error,
-  }
-  return setmetatable(self, Result)
+  local self = setmetatable({}, Result)
+  self._is_ok = false
+  self._error = error
+  return self
 end
 
 function Result:is_ok()
-  return self.value ~= nil
+  return self._is_ok
 end
 
 function Result:is_err()
-  return self.error ~= nil
+  return not self:is_ok()
 end
 
 function Result:map(fun)
@@ -43,17 +41,17 @@ end
 
 function Result:unwrap()
   if self:is_ok() then
-    return self.value
+    return self._value
   else
-    error("called `unwrap()` on an error value")
+    error("called Result:unwrap() on an error value", 2)
   end
 end
 
 function Result:unwrap_err()
   if self:is_err() then
-    return self.error
+    return self._error
   else
-    error("called `unwrap_err()` on an ok value")
+    error("called Result:unwrap_err() on an ok value", 2)
   end
 end
 

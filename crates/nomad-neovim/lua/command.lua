@@ -88,11 +88,12 @@ function Command:into_future()
     end)
   end
 
+  local is_done = false
   local is_first_poll = true
 
   return future.Future.new(function(ctx)
-    if exit_code then
-      error("called poll() on a Command that has already completed")
+    if is_done then
+      error("called poll() on a Command that has already completed", 2)
     end
 
     -- Update the waker.
@@ -104,6 +105,7 @@ function Command:into_future()
     end
 
     if exit_code then
+      is_done = true
       local res = exit_code == 0 and Result.ok(nil) or Result.err(exit_code)
       return Option.some(res)
     else

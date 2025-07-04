@@ -17,6 +17,6 @@ return function(opts, build_ctx)
         :on_stdout(build_ctx.notify)
         :on_stderr(build_ctx.notify)
         :await(ctx)
-        :map_res(tostring)
+        :map_err(tostring)
   end)
 end
