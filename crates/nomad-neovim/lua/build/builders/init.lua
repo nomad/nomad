@@ -30,16 +30,26 @@ local Builder = require("nomad.neovim.build.builder")
 ---@return nomad.future.Future<nomad.Result<nil, string>>
 local check_commands_in_path = function(commands)
   return future.async(function(ctx)
-    local missing_commands = {}
-
-    for _, command in ipairs(commands) do
-      local is_missing = not Command.is_in_path(command):await(ctx)
-      if is_missing then missing_commands[#missing_commands + 1] = command end
+    ---@param command string
+    ---@return nomad.future.Future<string?>
+    local is_missing = function(command)
+      return Command.is_in_path(command):map(function(is_in_path)
+        if not is_in_path then return command end
+      end)
     end
+
+    local futures = vim.tbl_map(is_missing, commands)
+    local outputs = future.join_all_unordered(futures):await(ctx)
+    local filter_nil = function(x) return x ~= nil end
+    local missing_commands = vim.tbl_filter(filter_nil, outputs)
 
     if #missing_commands == 0 then
       return Result.ok(nil)
     else
+      -- Sort the missing commands alphabetically to make the error message
+      -- stable across runs.
+      table.sort(missing_commands)
+
       return Result.err(("command%s not in $PATH: %s")
         :format(
           #missing_commands == 1 and "" or "s",

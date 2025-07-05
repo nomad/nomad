@@ -95,7 +95,42 @@ local async = function(fun)
   end)
 end
 
+---@generic T
+---@param futures [nomad.future.Future<T>]
+---@return nomad.future.Future<[T]>
+local join_all_unordered = function(futures)
+  local outputs = {}
+  local is_done = false
+
+  return Future.new(function(ctx)
+    if is_done then
+      error("called poll() on a Future that has already completed", 2)
+    end
+
+    local idx = 1
+
+    while idx <= #futures do
+      local future = futures[idx]
+      local maybe_out = future.poll(ctx)
+      if maybe_out:is_some() then
+        outputs[#outputs + 1] = maybe_out:unwrap()
+        table.remove(futures, idx)
+      else
+        idx = idx + 1
+      end
+    end
+
+    if #futures == 0 then
+      is_done = true
+      return Option.some(outputs)
+    else
+      return Option.none
+    end
+  end)
+end
+
 return {
   async = async,
+  join_all_unordered = join_all_unordered,
   Future = Future,
 }
