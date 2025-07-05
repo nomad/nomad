@@ -8,6 +8,17 @@ local Result = require("nomad.result")
 ---@type nomad.neovim.Command
 local Command = require("nomad.neovim.command")
 
+--- All the commands that this builder needs to be in the user's $PATH.
+---
+---@type table<string, string>
+local commands = {
+  cp = "cp",
+  curl = "curl",
+  git = "git",
+  mkdir = "mkdir",
+  tar = "tar",
+}
+
 ---@param exit_code integer
 ---@return string
 local err = function(exit_code)
@@ -60,12 +71,12 @@ end
 ---@param opts nomad.neovim.build.DownloadPrebuiltOpts
 ---@param build_ctx nomad.neovim.build.Context
 ---@return nomad.future.Future<nomad.Result<nil, string>>
-return function(opts, build_ctx)
+local build_fn = function(opts, build_ctx)
   return future.async(function(ctx)
     ---@type string
     local tag
 
-    local tag_res = Command.new("git")
+    local tag_res = Command.new(commands.git)
         :args({ "describe", "--tags", "--exact-match" })
         :current_dir(build_ctx:repo_dir())
         :on_stdout(function(line) tag = line end)
@@ -87,14 +98,14 @@ return function(opts, build_ctx)
     -- downloaded artifact under.
     local out_dir = build_ctx:repo_dir():join("result")
 
-    local mkdir_res = Command.new("mkdir")
+    local mkdir_res = Command.new(commands.mkdir)
         :args({ "-p", out_dir })
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
     if mkdir_res:is_err() then return mkdir_res:map_err(err) end
 
-    local curl_res = Command.new("curl")
+    local curl_res = Command.new(commands.curl)
         -- Follow redirects.
         :arg("--location")
         :arg("--output")
@@ -106,7 +117,7 @@ return function(opts, build_ctx)
 
     if curl_res:is_err() then return curl_res:map_err(err) end
 
-    local tar_res = Command.new("tar")
+    local tar_res = Command.new(commands.tar)
         :args({ "-xzf", out_dir:join(artifact_name) })
         :args({ "-C", out_dir })
         :on_stderr(build_ctx.notify)
@@ -114,7 +125,7 @@ return function(opts, build_ctx)
 
     if tar_res:is_err() then return tar_res:map_err(err) end
 
-    return Command.new("cp")
+    return Command.new(commands.cp)
         :args({ out_dir:join("/lua/*"), "lua/" })
         :current_dir(build_ctx:repo_dir())
         :await(ctx)
@@ -122,3 +133,9 @@ return function(opts, build_ctx)
         :map_err(err)
   end)
 end
+
+---@type nomad.neovim.build.BuilderSpec
+return {
+  build_fn = build_fn,
+  commands = vim.tbl_values(commands),
+}

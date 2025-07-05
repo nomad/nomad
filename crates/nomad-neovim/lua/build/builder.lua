@@ -6,14 +6,16 @@
 ---Fallback.
 ---@field fallback fun(self: nomad.neovim.build.Builder, fallback_builder: nomad.neovim.build.Builder): nomad.neovim.build.Builder
 
-local future = require("nomad.future")
-local Result = require("nomad.result")
+---@alias nomad.neovim.build.BuildFn fun(ctx: nomad.neovim.build.Context): nomad.future.Future<nomad.Result<nil, string>>
+
 local Context = require("nomad.neovim.build.context")
+local Result = require("nomad.result")
+local future = require("nomad.future")
 
 local Builder = {}
 Builder.__index = Builder
 
----@param build_fn fun(ctx: nomad.neovim.build.Context): nomad.future.Future<nomad.Result<nil, string>>
+---@param build_fn nomad.neovim.build.BuildFn
 ---@return nomad.neovim.build.Builder
 Builder.new = function(build_fn)
   local self = setmetatable({}, Builder)

@@ -3,7 +3,7 @@
 
 ---@class (exact) nomad.neovim.build.ContextOpts
 ---
----@field emit fun(msg: string)
+---@field notify fun(msg: string)
 
 local path = require("nomad.path")
 
