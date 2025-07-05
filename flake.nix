@@ -54,6 +54,7 @@
         ./nix/github-actions.nix
         ./nix/neovim.nix
         ./nix/rust.nix
+        ./nix/src.nix
         ./nix/tests.nix
       ];
 

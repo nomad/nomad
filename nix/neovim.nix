@@ -12,6 +12,7 @@
       common,
       crane,
       rust,
+      src,
       ...
     }:
     let
@@ -24,17 +25,6 @@
           ''
         )
       );
-
-      cleanCargoSourceButKeepLua =
-        craneLib:
-        craneLib.cleanCargoSource.override {
-          filterCargoSources =
-            path: type:
-            (craneLib.filterCargoSources path type)
-            # Keep all Lua files and all symlinks under `lua/nomad`.
-            || (lib.hasSuffix ".lua" (builtins.baseNameOf path))
-            || (type == "symlink" && lib.hasInfix "lua/nomad" path);
-        };
 
       mkPackage =
         isNightly: if isNightly then inputs'.neovim-nightly-overlay.packages.default else pkgs.neovim;
@@ -72,13 +62,14 @@
           # Use native crane unless cross-compiling.
           targetCrane = if isCross then crane.overridePkgs targetPkgs else crane;
           craneLib = targetCrane.lib;
+          pluginSrc = src.any [ src.filters.rust src.filters.lua ] craneLib;
         in
         craneLib.buildPackage (
           targetCrane.commonArgs
-          // rec {
+          // {
             pname = crateInfos.name;
             version = crateInfos.version;
-            src = (cleanCargoSourceButKeepLua craneLib) (craneLib.path ../.);
+            src = pluginSrc;
             doCheck = false;
             buildPhaseCargoCommand = ''
               ${xtask} neovim build \
@@ -86,7 +77,7 @@
                 ${lib.optionalString isRelease "--release"} \
                 ${lib.optionalString isCross "--target=${hostPlatform.rust.rustcTarget}"} \
                 --out-dir=$out \
-                --includes='${src}/lua/nomad'
+                --includes='${pluginSrc}/lua/nomad'
             '';
             # Installation was already handled by the build command.
             doNotPostBuildInstallCargoBinaries = true;
@@ -125,7 +116,7 @@
           ];
           installPhase =
             let
-              args = common.lib.cartesianProduct [
+              args = common.cartesianProduct [
                 {
                   name = "isNightly";
                   values = [

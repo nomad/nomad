@@ -7,6 +7,7 @@
       lib,
       common,
       rust,
+      src,
       ...
     }:
     {
@@ -24,7 +25,7 @@
                 inherit (common) nativeBuildInputs;
                 buildInputs = common.buildInputsFor targetPkgs;
                 pname = common.workspaceName;
-                src = craneLib.cleanCargoSource (craneLib.path ../.);
+                src = src.rust craneLib;
                 strictDeps = true;
               };
             in

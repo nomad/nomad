@@ -7,6 +7,7 @@
       lib,
       crane,
       rust,
+      src,
       ...
     }:
     {
@@ -22,11 +23,20 @@
             dbus
           ];
 
-        # The list of executables that have to be in $PATH needed to compile
-        # all the crates in the workspace with only their default features
-        # enabled (excluding packages from the Rust toolchain like cargo and
-        # rustc).
-        nativeBuildInputs = with pkgs; [ pkg-config ];
+        cartesianProduct =
+          specs:
+          let
+            # Fold over the specs, extending each partial combination with
+            # every value for the current key.
+            step = (
+              acc: spec:
+              lib.flatten (
+                builtins.map (combo: builtins.map (val: combo // { "${spec.name}" = val; }) spec.values) acc
+              )
+            );
+          in
+          # Start with a list containing a single empty attrset.
+          builtins.foldl' step [ { } ] specs;
 
         # Returns the human-readable architecture string for the given package
         # set ("x86_64" or "aarch64") to be used in the release artifacts' file
@@ -58,49 +68,45 @@
           else
             throw "unsupported target OS: ${hostPlatform.system}";
 
+        # The list of executables that have to be in $PATH needed to compile
+        # all the crates in the workspace with only their default features
+        # enabled (excluding packages from the Rust toolchain like cargo and
+        # rustc).
+        nativeBuildInputs = with pkgs; [ pkg-config ];
+
+        # A compiled version of the xtask executable defined in this workspace.
+        xtask = crane.lib.buildPackage (
+          let
+            pname = "xtask";
+            xtaskSrc = src.rust crane.lib;
+          in
+          {
+            inherit (crane.commonArgs) cargoArtifacts strictDeps;
+            inherit pname;
+            src = xtaskSrc;
+            cargoExtraArgs = "--bin xtask";
+            doCheck = false;
+            env = {
+              # Crane will compile xtask in release mode if this is not unset.
+              CARGO_PROFILE = "";
+              WORKSPACE_ROOT = xtaskSrc.outPath;
+            };
+            nativeBuildInputs = [
+              # Needed to call `wrapProgram`.
+              pkgs.makeWrapper
+            ];
+            # Needed to shell out to `cargo metadata`.
+            postInstall = ''
+              wrapProgram $out/bin/${pname} \
+                --set CARGO ${lib.getExe' rust.toolchain "cargo"} \
+                --set RUSTC ${lib.getExe' rust.toolchain "rustc"}
+            '';
+          }
+        );
+
         # Our workspace doesn't have a default package, so set one here to be
         # used in the release artifacts' file names.
         workspaceName = "nomad";
-
-        # A compiled version of the xtask executable defined in this workspace.
-        xtask = crane.lib.buildPackage rec {
-          inherit (crane.commonArgs) cargoArtifacts src strictDeps;
-          pname = "xtask";
-          cargoExtraArgs = "--bin xtask";
-          doCheck = false;
-          env = {
-            # Crane will compile xtask in release mode if this is not unset.
-            CARGO_PROFILE = "";
-            WORKSPACE_ROOT = crane.commonArgs.src.outPath;
-          };
-          nativeBuildInputs = [
-            # Needed to call `wrapProgram`.
-            pkgs.makeWrapper
-          ];
-          # Needed to shell out to `cargo metadata`.
-          postInstall = ''
-            wrapProgram $out/bin/${pname} \
-              --set CARGO ${lib.getExe' rust.toolchain "cargo"} \
-              --set RUSTC ${lib.getExe' rust.toolchain "rustc"}
-          '';
-        };
-
-        lib = {
-          cartesianProduct =
-            specs:
-            let
-              # Fold over the specs, extending each partial combination with
-              # every value for the current key.
-              step = (
-                acc: spec:
-                lib.flatten (
-                  builtins.map (combo: builtins.map (val: combo // { "${spec.name}" = val; }) spec.values) acc
-                )
-              );
-            in
-            # Start with a list containing a single empty attrset.
-            builtins.foldl' step [ { } ] specs;
-        };
       };
     };
 }

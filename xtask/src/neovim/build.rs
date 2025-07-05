@@ -143,8 +143,6 @@ fn copy_dir(src_dir: &AbsPath, dst_dir: &AbsPath) -> anyhow::Result<()> {
 
     fs::create_dir_all(dst_dir)?;
 
-    let mut entry_names = Vec::new();
-
     for entry in fs::read_dir(src_dir)? {
         let entry = entry?;
 
@@ -154,8 +152,6 @@ fn copy_dir(src_dir: &AbsPath, dst_dir: &AbsPath) -> anyhow::Result<()> {
             .to_str()
             .map(<&NodeName>::try_from)
             .context("Invalid file name")??;
-
-        entry_names.push(entry_name.to_owned());
 
         let src = src_dir.join(entry_name);
         let dst = dst_dir.join(entry_name);
