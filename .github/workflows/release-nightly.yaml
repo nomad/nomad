@@ -59,6 +59,8 @@ jobs:
           formatted_date="${month} ${day}${ordinal_suffix}, ${year}"
           echo "formatted_date=$formatted_date" >> $GITHUB_OUTPUT
 
+      - uses: actions/checkout@v4
+
       - name: Create new nightly release
         uses: ./.github/workflows/reusable/build-and-release.yaml
         with:
