@@ -60,7 +60,7 @@ jobs:
           echo "formatted_date=$formatted_date" >> $GITHUB_OUTPUT
 
       - name: Create new nightly release
-        uses: ./.github/workflows/reusable/build-and-release.yml
+        uses: ./.github/workflows/reusable/build-and-release.yaml
         with:
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           checkout_ref: main

@@ -16,7 +16,7 @@ jobs:
         uses: ./.github/actions/verify-tag-version-matches-workspace
 
       - name: Create new stable release
-        uses: ./.github/workflows/reusable/build-and-release.yml
+        uses: ./.github/workflows/reusable/build-and-release.yaml
         with:
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           checkout_ref: ${{ github.ref_name }}
