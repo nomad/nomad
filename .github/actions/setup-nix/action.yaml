@@ -16,8 +16,8 @@ inputs:
     default: ""
   # TODO: remove after publishing private crates.
   ssh-private-keys:
-    description: "SSH deploy keys for private repositories, if any"
-    required: false
+    description: "SSH deploy keys for private repositories"
+    required: true
     default: ""
 
 runs:

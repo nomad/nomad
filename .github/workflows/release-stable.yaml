@@ -19,10 +19,17 @@ jobs:
     needs: setup
     uses: ./.github/workflows/build-and-release.yaml
     with:
-      checkout_ref: ${{ github.ref_name }}
-      is_stable: true
-      release_name: "Mad ${{ github.ref_name }}"
-      release_body: ""
-      release_tag: ${{ github.ref_name }}
+      checkout-ref: ${{ github.ref_name }}
+      is-stable: true
+      release-name: "Mad ${{ github.ref_name }}"
+      release-body: ""
+      release-tag: ${{ github.ref_name }}
     secrets:
-      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      ssh-private-keys: |
+        ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+        ${{ secrets.CAUCHY_DEPLOY_KEY }}
+        ${{ secrets.COLLAB_DEPLOY_KEY }}
+        ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+        ${{ secrets.PANDO_DEPLOY_KEY }}
+        ${{ secrets.PUFF_DEPLOY_KEY }}

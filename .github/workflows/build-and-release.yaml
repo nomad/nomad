@@ -3,19 +3,19 @@ name: "Build and Release"
 on:
   workflow_call:
     inputs:
-      checkout_ref:
+      checkout-ref:
         description: "Branch, tag, or commit to checkout and build from"
         required: true
         type: string
-      is_stable:
+      is-stable:
         description: "Whether we're building for a stable release or nightly"
         required: true
         type: boolean
-      release_name:
+      release-name:
         description: "Name of the release"
         required: true
         type: string
-      release_body:
+      release-body:
         description: "A markdown-formatted string describing changes in this release"
         required: true
         type: string
@@ -24,8 +24,12 @@ on:
         required: true
         type: string
     secrets:
-      cachix_auth_token:
+      cachix-auth-token:
         description: "Auth token for pushing Nix artifacts to Cachix"
+        required: true
+      # TODO: remove after publishing private crates.
+      ssh-private-keys:
+        description: "SSH deploy keys for private repositories"
         required: true
 
 jobs:
@@ -43,12 +47,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.checkout_ref }}
+          ref: ${{ inputs.checkout-ref }}
 
       - name: Install Nix
         uses: ./.github/actions/setup-nix
         with:
-          cachix-auth-token: ${{ secrets.cachix_auth_token }}
+          cachix-auth-token: ${{ secrets.cachix-auth-token }}
+          ssh-private-keys: ${{ secrets.ssh-private-keys }}
 
       - name: Build the Neovim release artifacts
         run: nix build ${{ matrix.release-artifacts-package }}
@@ -71,10 +76,10 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: artifacts/**/*
-          name: ${{ inputs.release_name }}
-          body: ${{ inputs.release_body }}
-          make_latest: ${{ inputs.is_stable && 'true' || 'false' }}
-          prerelease: ${{ !inputs.is_stable }}
+          name: ${{ inputs.release-name }}
+          body: ${{ inputs.release-body }}
+          make_latest: ${{ inputs.is-stable && 'true' || 'false' }}
+          prerelease: ${{ !inputs.is-stable }}
           tag_name: ${{ inputs.release_tag }}
 
       - name: Delete all artifacts after creating the release

@@ -73,10 +73,17 @@ jobs:
     needs: setup
     uses: ./.github/workflows/build-and-release.yaml
     with:
-      checkout_ref: main
-      is_stable: false
-      release_name: "Mad Nightly (${{ needs.setup.outputs.formatted_date }})"
-      release_body: ""
-      release_tag: ${{ needs.setup.outputs.nightly_tag }}
+      checkout-ref: main
+      is-stable: false
+      release-name: "Mad Nightly (${{ needs.setup.outputs.formatted_date }})"
+      release-body: ""
+      release-tag: ${{ needs.setup.outputs.nightly_tag }}
     secrets:
-      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      ssh-private-keys: |
+        ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+        ${{ secrets.CAUCHY_DEPLOY_KEY }}
+        ${{ secrets.COLLAB_DEPLOY_KEY }}
+        ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+        ${{ secrets.PANDO_DEPLOY_KEY }}
+        ${{ secrets.PUFF_DEPLOY_KEY }}
