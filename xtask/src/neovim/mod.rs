@@ -1,49 +1,17 @@
 use std::sync::LazyLock;
 
-use abs_path::{AbsPathBuf, node};
-
 mod build;
 mod print_crate_infos;
 
-/// The path to the `Cargo.toml` of the package containing the entrypoint to
-/// the Neovim plugin.
-static CARGO_TOML_PATH: LazyLock<AbsPathBuf> = LazyLock::new(|| {
-    crate::WORKSPACE_ROOT
-        .join(node!("crates"))
-        .join(node!("nomad-neovim"))
-        .join(node!("Cargo.toml"))
-});
-
 /// Metadata contained in the `Cargo.toml` of the package containing the
 /// entrypoint to the Neovim plugin.
-static CARGO_TOML_META: LazyLock<cargo_metadata::Package> =
+static ENTRYPOINT_METADATA: LazyLock<cargo_metadata::Package> =
     LazyLock::new(|| {
-        let manifest_path = &**CARGO_TOML_PATH;
-
-        let meta = match cargo_metadata::MetadataCommand::new()
-            .manifest_path(manifest_path.to_owned())
-            .no_deps()
-            .exec()
-        {
-            Ok(meta) => meta,
-            Err(err) => {
-                panic!(
-                    "couldn't run 'cargo metadata' for manifest at \
-                     {manifest_path:?}: {err}",
-                )
-            },
-        };
-
-        let Some(package) = meta.packages.iter().find(|package| {
-            package.manifest_path.as_str() == manifest_path.as_str()
-        }) else {
-            panic!(
-                "couldn't find the root package for manifest at \
-                 {manifest_path:?}"
-            )
-        };
-
-        package.clone()
+        let json = include_str!(concat!(
+            env!("OUT_DIR"),
+            "/neovim_package_metadata.json"
+        ));
+        serde_json::from_str(json).expect("failed to parse package metadata")
     });
 
 #[derive(clap::Subcommand)]

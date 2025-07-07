@@ -6,7 +6,6 @@
       pkgs,
       lib,
       crane,
-      rust,
       src,
       ...
     }:
@@ -91,16 +90,6 @@
               CARGO_PROFILE = "";
               WORKSPACE_ROOT = xtaskSrc.outPath;
             };
-            nativeBuildInputs = [
-              # Needed to call `wrapProgram`.
-              pkgs.makeWrapper
-            ];
-            # Needed to shell out to `cargo metadata`.
-            postInstall = ''
-              wrapProgram $out/bin/${pname} \
-                --set CARGO ${lib.getExe' rust.toolchain "cargo"} \
-                --set RUSTC ${lib.getExe' rust.toolchain "rustc"}
-            '';
           }
         );
 

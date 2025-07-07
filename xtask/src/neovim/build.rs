@@ -6,7 +6,7 @@ use anyhow::{Context, anyhow};
 use cargo_metadata::TargetKind;
 
 use crate::WORKSPACE_ROOT;
-use crate::neovim::CARGO_TOML_META;
+use crate::neovim::ENTRYPOINT_METADATA;
 
 #[derive(Debug, clap::Args)]
 pub(crate) struct BuildArgs {
@@ -54,7 +54,7 @@ pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
     let exit_status = process::Command::new("cargo")
         .arg("build")
         .args(artifact_dir_args)
-        .args(["--package", &CARGO_TOML_META.name])
+        .args(["--package", &ENTRYPOINT_METADATA.name])
         .args(args.nightly.then_some("--features=neovim-nightly"))
         .args(args.release.then_some("--release"))
         .args(target_args.as_ref().map(|args| &args[..]).unwrap_or_default())
@@ -97,7 +97,7 @@ pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
 
 #[allow(clippy::unwrap_used)]
 fn fix_library_name(artifact_dir: &AbsPath) -> anyhow::Result<()> {
-    let package_meta = &CARGO_TOML_META;
+    let package_meta = &ENTRYPOINT_METADATA;
 
     let mut cdylib_targets = package_meta.targets.iter().filter(|target| {
         target.kind.iter().any(|kind| kind == &TargetKind::CDyLib)

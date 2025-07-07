@@ -1,9 +1,9 @@
 use cargo_metadata::semver;
 
-use crate::neovim::CARGO_TOML_META;
+use crate::neovim::ENTRYPOINT_METADATA;
 
 pub(super) fn run() {
-    let meta = &CARGO_TOML_META;
+    let meta = &ENTRYPOINT_METADATA;
     let infos = CrateInfos::from(&**meta);
     let json = serde_json::to_string(&infos).expect("never fails");
     println!("{json}");
