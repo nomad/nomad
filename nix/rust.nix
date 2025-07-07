@@ -12,7 +12,7 @@
         let
           mkToolchain =
             pkgs:
-            (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile (
+            (inputs.rust-overlay.lib.mkRustBin { } pkgs.buildPackages).fromRustupToolchainFile (
               crane.lib.path ../rust-toolchain.toml
             );
         in
