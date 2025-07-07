@@ -21,7 +21,7 @@ jobs:
     with:
       checkout-ref: ${{ github.ref_name }}
       is-stable: true
-      release-name: "Mad ${{ github.ref_name }}"
+      release-name: "Nomad ${{ github.ref_name }}"
       release-body: ""
       release-tag: ${{ github.ref_name }}
     secrets:

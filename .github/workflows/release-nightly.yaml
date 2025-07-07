@@ -75,7 +75,7 @@ jobs:
     with:
       checkout-ref: main
       is-stable: false
-      release-name: "Mad Nightly (${{ needs.setup.outputs.formatted_date }})"
+      release-name: "Nomad Nightly – ${{ needs.setup.outputs.formatted_date }}"
       release-body: ""
       release-tag: ${{ needs.setup.outputs.nightly_tag }}
     secrets:
