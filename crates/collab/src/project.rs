@@ -10,7 +10,7 @@ use collab_project::fs::{DirectoryId, FileId, FileMut, FsOp, Node, NodeMut};
 use collab_project::{PeerId, text};
 use collab_server::message::{Message, Peer, Peers};
 use ed::fs::{self, File as _, Symlink as _};
-use ed::{AgentId, Context, Editor, Shared, notify};
+use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -50,13 +50,13 @@ pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 /// TODO: docs.
 pub(crate) struct Project<Ed: CollabEditor> {
-    _agent_id: AgentId,
+    agent_id: AgentId,
     host_id: PeerId,
     id_maps: IdMaps<Ed>,
+    inner: collab_project::Project,
     _local_peer: Peer,
     peer_selections: FxHashMap<text::SelectionId, Ed::PeerSelection>,
     peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltip>,
-    project: collab_project::Project,
     remote_peers: FxHashMap<PeerId, Peer>,
     root_path: AbsPathBuf,
     session_id: SessionId<Ed>,
@@ -154,7 +154,9 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                     .await;
             },
             Message::EditedBinary(_binary_edit) => todo!(),
-            Message::EditedText(_text_edit) => todo!(),
+            Message::EditedText(text_edit) => {
+                self.integrate_text_edit(text_edit, ctx).await
+            },
             Message::MovedCursor(cursor_movement) => {
                 self.integrate_cursor_movement(cursor_movement, ctx).await
             },
@@ -207,7 +209,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         ctx: &mut Context<Ed>,
     ) {
         let Some((peer, offset, buf_id, cur_id)) = self.with_project(|proj| {
-            let cursor = proj.project.integrate_cursor_creation(creation)?;
+            let cursor = proj.inner.integrate_cursor_creation(creation)?;
             let cursor_file = cursor.file()?;
             let cursor_owner = proj.remote_peers.get(&cursor.owner())?;
             let buf_id = proj.id_maps.file2buffer.get(&cursor_file.id())?;
@@ -235,7 +237,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         ctx: &mut Context<Ed>,
     ) {
         let Some(tooltip) = self.with_project(|proj| {
-            proj.project
+            proj.inner
                 .integrate_cursor_deletion(deletion)
                 .and_then(|cursor_id| proj.peer_tooltips.remove(&cursor_id))
         }) else {
@@ -251,7 +253,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         ctx: &mut Context<Ed>,
     ) {
         let Some(move_tooltip) = self.with_project(|proj| {
-            let cursor = proj.project.integrate_cursor_movement(movement)?;
+            let cursor = proj.inner.integrate_cursor_movement(movement)?;
             let tooltip = proj.peer_tooltips.get_mut(&cursor.id())?;
             Some(Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx))
         }) else {
@@ -283,7 +285,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     ) {
         let (tooltips, _peer) = self.with_project(|proj| {
             let (cursor_ids, _selection_ids) =
-                proj.project.integrate_peer_disconnection(peer_id);
+                proj.inner.integrate_peer_disconnection(peer_id);
 
             let tooltips = cursor_ids
                 .into_iter()
@@ -310,7 +312,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     ) {
         let Some((peer, range, buf_id, sel_id)) = self.with_project(|proj| {
             let selection =
-                proj.project.integrate_selection_creation(creation)?;
+                proj.inner.integrate_selection_creation(creation)?;
             let file_id = selection.file()?.id();
             let buf_id = proj.id_maps.file2buffer.get(&file_id)?;
             let selection_owner = proj.remote_peers.get(&selection.owner())?;
@@ -338,7 +340,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         ctx: &mut Context<Ed>,
     ) {
         let Some(selection) = self.with_project(|proj| {
-            proj.project.integrate_selection_deletion(deletion).and_then(
+            proj.inner.integrate_selection_deletion(deletion).and_then(
                 |selection_id| proj.peer_selections.remove(&selection_id),
             )
         }) else {
@@ -355,7 +357,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     ) {
         let Some(move_selection) = self.with_project(|proj| {
             let selection =
-                proj.project.integrate_selection_movement(movement)?;
+                proj.inner.integrate_selection_movement(movement)?;
             let peer_selection =
                 proj.peer_selections.get_mut(&selection.id())?;
             Some(Ed::move_peer_selection(
@@ -368,6 +370,52 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         };
 
         move_selection.await;
+    }
+
+    async fn integrate_text_edit(
+        &self,
+        edit: text::TextEdit,
+        ctx: &mut Context<Ed>,
+    ) {
+        let Some((buf_id_or_file_path, replacements, agent_id)) = self
+            .with_project(|proj| {
+                let (file, replacements) =
+                    proj.inner.integrate_text_edit(edit)?;
+                let file_id = file.as_file().id();
+                let buf_id_or_file_path = proj
+                    .id_maps
+                    .file2buffer
+                    .get(&file_id)
+                    .cloned()
+                    .ok_or_else(|| {
+                        let file = proj.inner.file(file_id).expect("is valid");
+                        proj.root_path.clone().concat(file.path())
+                    });
+                Some((buf_id_or_file_path, replacements, proj.agent_id))
+            })
+        else {
+            return;
+        };
+
+        // If there's already an open buffer for the edited file we can just
+        // apply the replacements to it. If not, we have to first create one.
+        let buffer_id = match buf_id_or_file_path {
+            Ok(buf_id) => buf_id,
+            // Not actually an error, we're abusing Result as an Either.
+            Err(file_path) => {
+                match ctx.create_buffer(&file_path, agent_id).await {
+                    Ok(buf_id) => buf_id,
+                    Err(err) => todo!("handle {err:?}"),
+                }
+            },
+        };
+
+        ctx.with_borrowed(|ctx| {
+            ctx.buffer(buffer_id).expect("buffer exists").edit(
+                replacements.into_iter().map(Convert::convert),
+                agent_id,
+            );
+        });
     }
 
     #[allow(clippy::too_many_lines)]
@@ -438,7 +486,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
 
         // Apply the diff.
         Ok(self.with_project(|proj| {
-            let file = proj.project.file_mut(file_id)?;
+            let file = proj.inner.file_mut(file_id)?;
 
             Some(match (file, file_diff) {
                 (FileMut::Binary(mut file), FileDiff::Binary(contents)) => {
@@ -514,8 +562,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             panic!("unknown cursor ID: {cursor_id:?}");
         };
 
-        let Ok(maybe_cursor) = self.project.cursor_mut(project_cursor_id)
-        else {
+        let Ok(maybe_cursor) = self.inner.cursor_mut(project_cursor_id) else {
             panic!("cursor ID {cursor_id:?} maps to a remote peer's cursor")
         };
 
@@ -528,7 +575,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     }
 
     fn is_host(&self) -> bool {
-        self.project.peer_id() == self.host_id
+        self.inner.peer_id() == self.host_id
     }
 
     /// Returns the [`NodeMut`] corresponding to the node with the given
@@ -539,12 +586,12 @@ impl<Ed: CollabEditor> Project<Ed> {
         node_id: &<Ed::Fs as fs::Fs>::NodeId,
     ) -> NodeMut<'_> {
         if let Some(&dir_id) = self.id_maps.node2dir.get(node_id) {
-            let Some(dir) = self.project.directory_mut(dir_id) else {
+            let Some(dir) = self.inner.directory_mut(dir_id) else {
                 panic!("node ID {node_id:?} maps to a deleted directory")
             };
             NodeMut::Directory(dir)
         } else if let Some(&file_id) = self.id_maps.node2file.get(node_id) {
-            let Some(file) = self.project.file_mut(file_id) else {
+            let Some(file) = self.inner.file_mut(file_id) else {
                 panic!("node ID {node_id:?} maps to a deleted file")
             };
             NodeMut::File(file)
@@ -567,7 +614,7 @@ impl<Ed: CollabEditor> Project<Ed> {
         };
 
         let Ok(maybe_selection) =
-            self.project.selection_mut(project_selection_id)
+            self.inner.selection_mut(project_selection_id)
         else {
             panic!(
                 "selection ID {selection_id:?} maps to a remote peer's \
@@ -596,7 +643,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                     .strip_prefix(&self.root_path)
                     .expect("the buffer is backed by a file in the project");
 
-                let file_id = match self.project.node_at_path(path_in_proj)? {
+                let file_id = match self.inner.node_at_path(path_in_proj)? {
                     Node::File(file) => file.id(),
                     Node::Directory(_) => return None,
                 };
@@ -718,8 +765,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             .strip_prefix(&self.root_path)
             .expect("the new parent has to be in the project");
 
-        let Some(parent) =
-            self.project.node_at_path_mut(parent_path_in_project)
+        let Some(parent) = self.inner.node_at_path_mut(parent_path_in_project)
         else {
             panic!(
                 "parent path {parent_path_in_project:?} doesn't exist in the \
@@ -794,8 +840,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             .strip_prefix(&self.root_path)
             .expect("the new parent has to be in the project");
 
-        let Some(parent) =
-            self.project.node_at_path_mut(parent_path_in_project)
+        let Some(parent) = self.inner.node_at_path_mut(parent_path_in_project)
         else {
             panic!(
                 "parent path {parent_path_in_project:?} doesn't exist in the \
@@ -865,7 +910,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             panic!("unknown buffer ID: {buffer_id:?}");
         };
 
-        let Some(file) = self.project.file_mut(file_id) else {
+        let Some(file) = self.inner.file_mut(file_id) else {
             panic!("buffer ID {buffer_id:?} maps to a deleted file")
         };
 
@@ -995,13 +1040,13 @@ impl<Ed: CollabEditor> ProjectGuard<Ed> {
             .collect();
 
         self.projects.insert(Project {
-            _agent_id: args.agent_id,
+            agent_id: args.agent_id,
             host_id: args.host_id,
             id_maps: args.id_maps,
+            inner: args.project,
             _local_peer: args.local_peer,
             peer_selections: FxHashMap::default(),
             peer_tooltips: FxHashMap::default(),
-            project: args.project,
             remote_peers,
             root_path: self.root.clone(),
             session_id: args.session_id,

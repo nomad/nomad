@@ -12,3 +12,9 @@ impl Convert<collab_project::text::TextReplacement> for ed::Replacement {
         }
     }
 }
+
+impl Convert<ed::Replacement> for collab_project::text::TextReplacement {
+    fn convert(self) -> ed::Replacement {
+        ed::Replacement::new(self.deleted_range, &*self.inserted_text)
+    }
+}
