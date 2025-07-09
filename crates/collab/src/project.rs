@@ -31,7 +31,6 @@ use crate::event::{
 #[derive(cauchy::Clone)]
 pub struct ProjectHandle<Ed: CollabEditor> {
     inner: Shared<Project<Ed>>,
-    is_dropping_last_instance: Shared<bool>,
     projects: Projects<Ed>,
 }
 
@@ -1013,7 +1012,6 @@ impl<Ed: CollabEditor> Projects<Ed> {
         let session_id = project.session_id;
         let handle = ProjectHandle {
             inner: Shared::new(project),
-            is_dropping_last_instance: Shared::new(false),
             projects: self.clone(),
         };
         self.active.with_mut(|map| {
@@ -1066,12 +1064,14 @@ impl<B> NoActiveSessionError<B> {
 
 impl<Ed: CollabEditor> Drop for ProjectHandle<Ed> {
     fn drop(&mut self) {
-        if self.inner.strong_count() == 2
-            && !self.is_dropping_last_instance.copied()
-        {
-            self.is_dropping_last_instance.set(true);
-
-            self.projects.active.with_mut(|map| {
+        // The Projects struct is also storing an instance of this
+        // ProjectHandle, so if the strong count is 2 it effectively means
+        // we're dropping the last used instance.
+        if self.inner.strong_count() == 2 {
+            // Removing the ProjectHandle from the Projects will cause this
+            // Drop impl to be called again, so use a non-panicking method
+            // to access the inner map.
+            let _ = self.projects.active.try_with_mut(|map| {
                 map.remove(&self.session_id());
             });
         }
