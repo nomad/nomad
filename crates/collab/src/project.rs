@@ -50,14 +50,25 @@ pub struct NoActiveSessionError<B>(PhantomData<B>);
 /// TODO: docs.
 pub(crate) struct Project<Ed: CollabEditor> {
     agent_id: AgentId,
+    /// The [`PeerId`] of the host of the session.
     host_id: PeerId,
+    /// Contains various mappings between editor IDs and project IDs.
     id_maps: IdMaps<Ed>,
+    /// The inner CRDT holding the entire state of the project.
     inner: collab_project::Project,
+    /// The local [`Peer`].
     _local_peer: Peer,
+    /// Map from a remote selections's ID to the corresponding selection
+    /// displayed in the editor.
     peer_selections: FxHashMap<text::SelectionId, Ed::PeerSelection>,
+    /// Map from a remote cursor's ID to the corresponding tooltip displayed in
+    /// the editor.
     peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltip>,
+    /// Map from a remote peer's ID to the corresponding [`Peer`].
     remote_peers: FxHashMap<PeerId, Peer>,
+    /// The path to the root of the project.
     root_path: AbsPathBuf,
+    /// The ID of the collaborative session this project is part of.
     session_id: SessionId<Ed>,
 }
 
