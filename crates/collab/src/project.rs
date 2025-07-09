@@ -167,10 +167,8 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         request: message::ProjectRequest,
     ) -> message::ProjectResponse {
         let (peers, project) = self.with_project(|proj| {
-            let peers = proj
-                .remote_peers
-                .values()
-                .chain(iter::once(&proj.local_peer))
+            let peers = iter::once(&proj.local_peer)
+                .chain(proj.remote_peers.values())
                 .cloned()
                 .collect::<Peers>();
             let project = Box::new(proj.inner.clone().into_state());
