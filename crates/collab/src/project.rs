@@ -1,7 +1,7 @@
 //! TODO: docs.
 
-use core::fmt;
 use core::marker::PhantomData;
+use core::{fmt, iter};
 use std::collections::hash_map;
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ use collab_project::fs::{
     NodeMut,
 };
 use collab_project::{PeerId, binary, text};
-use collab_server::message::{Message, Peer, Peers};
+use collab_server::message::{self, Message, Peer, Peers};
 use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
@@ -65,7 +65,7 @@ pub(crate) struct Project<Ed: CollabEditor> {
     /// The inner CRDT holding the entire state of the project.
     inner: collab_project::Project,
     /// The local [`Peer`].
-    _local_peer: Peer,
+    local_peer: Peer,
     /// Map from a remote selections's ID to the corresponding selection
     /// displayed in the editor.
     peer_selections: FxHashMap<text::SelectionId, Ed::PeerSelection>,
@@ -162,6 +162,28 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         self.with(|proj| proj.session_id)
     }
 
+    pub(crate) fn handle_request(
+        &self,
+        request: message::ProjectRequest,
+    ) -> message::ProjectResponse {
+        let (peers, project) = self.with_project(|proj| {
+            let peers = proj
+                .remote_peers
+                .values()
+                .chain(iter::once(&proj.local_peer))
+                .cloned()
+                .collect::<Peers>();
+            let project = Box::new(proj.inner.clone().into_state());
+            (peers, project)
+        });
+
+        message::ProjectResponse {
+            peers,
+            project,
+            respond_to: request.requested_by.id,
+        }
+    }
+
     /// TODO: docs.
     #[allow(clippy::too_many_lines)]
     pub(crate) async fn integrate(
@@ -218,7 +240,12 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
             Message::PeerLeft(peer_id) => {
                 self.integrate_peer_left(peer_id, ctx).await
             },
-            Message::ProjectRequest(_) => todo!(),
+            Message::ProjectRequest(_) => {
+                panic!(
+                    "ProjectRequest should've been handled by calling \
+                     handle_request() instead of integrate()"
+                );
+            },
             Message::ProjectResponse(_) => {
                 ctx.emit_error(notify::Message::from_display(
                     "received unexpected ProjectResponse message",
@@ -1157,7 +1184,7 @@ impl<Ed: CollabEditor> ProjectGuard<Ed> {
             host_id: args.host_id,
             id_maps: args.id_maps,
             inner: args.project,
-            _local_peer: args.local_peer,
+            local_peer: args.local_peer,
             peer_selections: FxHashMap::default(),
             peer_tooltips: FxHashMap::default(),
             remote_peers,

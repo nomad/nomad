@@ -1,6 +1,7 @@
 use std::io;
 
 use collab_server::client::ClientRxError;
+use collab_server::message::Message;
 use ed::{Context, notify};
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
@@ -69,6 +70,13 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> Session<Ed, F> {
                 maybe_message_res = message_rx.next() => {
                     let message = maybe_message_res
                         .ok_or(SessionError::MessageRxExhausted)??;
+
+                    if let Message::ProjectRequest(request) = message {
+                        let response = project_handle.handle_request(request);
+                        let message = Message::ProjectResponse(response);
+                        message_tx.send(message).await?;
+                        continue;
+                    }
 
                     project_handle.integrate(message, ctx).await;
                 },
