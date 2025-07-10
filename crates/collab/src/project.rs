@@ -5,15 +5,19 @@ use core::{fmt, iter};
 use std::collections::hash_map;
 use std::sync::Arc;
 
-use abs_path::{AbsPath, AbsPathBuf};
+use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
 use collab_project::fs::{
+    AttachedOrSync,
     DirectoryId,
+    File,
     FileId,
     FileMut,
     FsOp,
     GlobalFileId,
     Node,
     NodeMut,
+    NodeRename,
+    SyncAction,
 };
 use collab_project::{PeerId, binary, text};
 use collab_server::message::{self, Message, Peer, Peers};
@@ -121,12 +125,12 @@ pub(crate) enum SynchronizeError<Ed: CollabEditor> {
 /// The type of error that can occcur when integrating a
 /// [`binary::BinaryEdit`].
 #[derive(cauchy::Debug)]
-pub enum IntegrateBinaryEditError<Ed: CollabEditor> {
+pub enum IntegrateBinaryEditError<Fs: fs::Fs> {
     /// The node at the given path was a directory, not a file.
     DirectoryAtPath(AbsPathBuf),
 
     /// It wasn't possible to get the node at the given path.
-    NodeAtPath(<Ed::Fs as Fs>::NodeAtPathError),
+    NodeAtPath(Fs::NodeAtPathError),
 
     /// There wasn't any node at the given path.
     NoNodeAtPath(AbsPathBuf),
@@ -136,8 +140,13 @@ pub enum IntegrateBinaryEditError<Ed: CollabEditor> {
 
     /// It wasn't possible to write the new contents to the file at the given
     /// path.
-    WriteToFile(AbsPathBuf, <<Ed::Fs as Fs>::File as fs::File>::WriteError),
+    WriteToFile(AbsPathBuf, <Fs::File as fs::File>::WriteError),
 }
+
+/// The type of error that can occcur when integrating a
+/// [`binary::BinaryEdit`].
+#[derive(cauchy::Debug)]
+pub enum IntegrateFsOpError<Fs: fs::Fs> {}
 
 enum FsNodeContents {
     Directory,
@@ -276,7 +285,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         &self,
         edit: binary::BinaryEdit,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), IntegrateBinaryEditError<Ed>> {
+    ) -> Result<(), IntegrateBinaryEditError<Ed::Fs>> {
         let Some((file_path, new_contents)) = self.with_project(|proj| {
             let file_mut = proj.inner.integrate_binary_edit(edit)?;
             let file = file_mut.as_file();
@@ -402,8 +411,152 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         })
     }
 
-    async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
-        todo!();
+    async fn integrate_fs_op<T: FsOp>(&self, op: T, ctx: &mut Context<Ed>) {
+        enum ResolvedFsOp {
+            CreateDirectory(AbsPathBuf),
+            CreateFile(AbsPathBuf, FileContents),
+            DeleteNode(AbsPathBuf),
+            MoveNode(AbsPathBuf, AbsPathBuf),
+        }
+
+        fn push_node_creation(
+            node: Node<impl AttachedOrSync>,
+            ops: &mut SmallVec<[ResolvedFsOp; 1]>,
+        ) {
+            match node {
+                Node::Directory(dir) => {
+                    ops.push(ResolvedFsOp::CreateDirectory(dir.path()));
+                    for child in dir.children() {
+                        push_node_creation(child, ops);
+                    }
+                },
+                Node::File(file) => {
+                    let file_contents = match file {
+                        File::Binary(binary) => {
+                            FileContents::Binary(binary.contents().into())
+                        },
+                        File::Symlink(symlink) => {
+                            FileContents::Symlink(symlink.target_path().into())
+                        },
+                        File::Text(text) => {
+                            FileContents::Text(text.contents().clone())
+                        },
+                    };
+                    ops.push(ResolvedFsOp::CreateFile(
+                        file.path(),
+                        file_contents,
+                    ));
+                },
+            }
+        }
+
+        let ops: SmallVec<[ResolvedFsOp; 1]> = self.with_project(|proj| {
+            let mut ops = SmallVec::new();
+            let mut sync_actions = proj.inner.integrate_fs_op(op);
+            while let Some(action) = sync_actions.next() {
+                match action {
+                    SyncAction::Create(create) => {
+                        push_node_creation(create.node(), &mut ops);
+                    },
+                    SyncAction::CreateAndResolve(create_and_resolve) => {
+                        let ops_len = ops.len();
+                        let move_existing = ResolvedFsOp::MoveNode(
+                            AbsPathBuf::root(),
+                            AbsPathBuf::root(),
+                        );
+                        ops.push(move_existing);
+                        let create_node = create_and_resolve.create().node();
+                        push_node_creation(create_node, &mut ops);
+                        let _resolve = create_and_resolve.into_resolve();
+                        // TODO: resolve conflict, fix names.
+                    },
+                    SyncAction::Delete(delete) => {
+                        let node_path = delete.node().path();
+                        ops.push(ResolvedFsOp::DeleteNode(node_path));
+                    },
+                    SyncAction::Move(r#move) => {
+                        let from_path = r#move.old_path();
+                        let to_path = r#move.new_path();
+                        ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                    },
+                    SyncAction::MoveAndResolve(move_and_resolve) => {
+                        let r#move = move_and_resolve.r#move();
+                        let from_path = r#move.old_path();
+                        let _resolve = move_and_resolve.into_resolve();
+                        // TODO: resolve conflict, fix names.
+                    },
+                    SyncAction::Rename(rename) => {
+                        let from_path = rename.old_path();
+                        let to_path = rename.new_path();
+                        ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                    },
+                    SyncAction::RenameAndResolve(rename_and_resolve) => {
+                        let rename = rename_and_resolve.rename();
+                        let parent_path = rename.parent().path();
+                        let _resolve = rename_and_resolve.into_resolve();
+                        // TODO: resolve conflict, fix names.
+                    },
+                }
+            }
+            ops
+        });
+
+        let fs = ctx.fs();
+
+        ctx.spawn_background(async move {
+            for op in ops {
+                match op {
+                    ResolvedFsOp::CreateDirectory(path) => {
+                        let (parent_path, dir_name) =
+                            path.split_last().expect("not creating root");
+
+                        fs.dir_at_path(parent_path)
+                            .await?
+                            .create_directory(dir_name)
+                            .await?;
+                    },
+                    ResolvedFsOp::CreateFile(path, contents) => {
+                        let (parent_path, file_name) =
+                            path.split_last().expect("not creating root");
+
+                        let mut parent = fs.dir_at_path(parent_path).await?;
+
+                        match contents {
+                            FileContents::Binary(contents) => {
+                                parent
+                                    .create_file(file_name)
+                                    .await?
+                                    .write(contents)
+                                    .await?;
+                            },
+                            FileContents::Symlink(target_path) => {
+                                parent
+                                    .create_symlink(file_name, target_path)
+                                    .await?;
+                            },
+                            FileContents::Text(rope) => {
+                                parent
+                                    .create_file(file_name)
+                                    .await?
+                                    .write_chunks(rope.chunks())
+                                    .await?;
+                            },
+                        };
+                    },
+                    ResolvedFsOp::DeleteNode(path) => {
+                        fs.delete_node(&path)
+                            .await
+                            .map_err(IntegrateFsOpError::DeleteNode)?;
+                    },
+                    ResolvedFsOp::MoveNode(from_path, to_path) => {
+                        fs.move_node(from_path, to_path)
+                            .await
+                            .map_err(IntegrateFsOpError::MoveNode)?;
+                    },
+                }
+            }
+        })
+        .await
     }
 
     async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
@@ -1193,6 +1346,82 @@ impl<Ed: CollabEditor> ProjectGuard<Ed> {
 
     pub(crate) fn root(&self) -> &AbsPath {
         &self.root
+    }
+}
+
+enum NamingConflictSource {
+    Creation,
+    Movement,
+    Rename,
+}
+
+fn resolve_naming_conflict<Ed: CollabEditor>(
+    conflict: collab_project::fs::ResolveConflict,
+    conflict_source: NamingConflictSource,
+    _local_peer: &Peer,
+    _remote_peers: &Peers,
+) -> (NodeRename, NodeRename) {
+    let conflicting = conflict.conflicting_node();
+
+    let existing = conflict.existing_node();
+
+    match conflict_source {
+        NamingConflictSource::Creation => {
+            debug_assert!(
+                conflicting.created_by() != existing.created_by(),
+                "conflicting and existing nodes must have different creators"
+            );
+
+            todo!();
+        },
+
+        _ => {
+            let (seed_conflicting, seed_existing) =
+                if conflicting.created_by() == existing.created_by() {
+                    let seed = conflicting.created_by();
+                    let mut rng = fastrand::Rng::with_seed(seed);
+                    (rng.gen_u64(), rng.gen_u64())
+                } else {
+                    (creator_confl, creator_existing)
+                };
+
+            let mut rng_conflicting =
+                fastrand::Rng::with_seed(seed_conflicting);
+
+            let mut rng_existing = fastrand::Rng::with_seed(seed_existing);
+
+            let gen_name =
+                |current_name: &NodeName, rng: &mut fastrand::Rng| {
+                    format_compat!(
+                        "{current_name}-{}",
+                        rng.alphanumeric(6).to_smolstr()
+                    )
+                    .parse::<NodeNameBuf>()
+                    .expect("generated name is valid")
+                };
+
+            loop {
+                let name_conflicting =
+                    gen_name(conflicting.name(), &mut rng_conflicting);
+
+                let name_existing =
+                    gen_name(existing.name(), &mut rng_existing);
+
+                let Ok(rename_conflicting) =
+                    conflict.conflicting_node_mut().rename(name_conflicting)
+                else {
+                    continue;
+                };
+
+                let Ok(rename_existing) =
+                    conflict.existing_node_mut().rename(name_existing)
+                else {
+                    continue;
+                };
+
+                break (rename_conflicting, rename_existing);
+            }
+        },
     }
 }
 
