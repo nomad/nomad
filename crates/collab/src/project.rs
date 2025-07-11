@@ -1333,7 +1333,7 @@ mod impl_integrate_fs_op {
             SyncAction::MoveAndResolve(move_and_resolve) => {
                 let r#move = move_and_resolve.r#move();
                 let move_existing_from = r#move.new_path();
-                let from_path = r#move.old_path();
+                let move_conflicting_from = r#move.old_path();
 
                 let (rename_conflicting, rename_existing) =
                     resolve_naming_conflict(
@@ -1344,14 +1344,14 @@ mod impl_integrate_fs_op {
                     );
 
                 let move_existing_to = {
-                    let mut path = from_path.clone();
+                    let mut path = move_existing_from.clone();
                     path.pop();
                     path.push(rename_existing.name());
                     path
                 };
 
                 let move_conflicting_to = {
-                    let mut path = from_path.clone();
+                    let mut path = move_existing_from.clone();
                     path.pop();
                     path.push(rename_conflicting.name());
                     path
@@ -1363,7 +1363,7 @@ mod impl_integrate_fs_op {
                 ));
 
                 ops.push(ResolvedFsOp::MoveNode(
-                    from_path,
+                    move_conflicting_from,
                     move_conflicting_to,
                 ));
 
