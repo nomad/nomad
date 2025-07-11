@@ -18,7 +18,7 @@ use collab_project::fs::{
     NodeRename,
 };
 use collab_project::{PeerId, binary, text};
-use collab_server::message::{self, Message, Peer, Peers};
+use collab_server::message::{self, Message, Peer};
 use compact_str::format_compact;
 use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
@@ -100,7 +100,7 @@ pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
     pub(crate) host_id: PeerId,
     pub(crate) id_maps: IdMaps<Ed>,
     pub(crate) local_peer: Peer,
-    pub(crate) remote_peers: Peers,
+    pub(crate) remote_peers: message::Peers,
     pub(crate) project: collab_project::Project,
     pub(crate) session_id: SessionId<Ed>,
 }
@@ -176,7 +176,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         request: message::ProjectRequest,
     ) -> message::ProjectResponse {
         let (peers, project) = self.with_project(|proj| {
-            let peers = proj.peers.values().cloned().collect::<Peers>();
+            let peers = proj.peers.values().cloned().collect();
             let project = Box::new(proj.inner.clone().into_state());
             (peers, project)
         });
@@ -409,7 +409,6 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     }
 
     /// TODO: docs.
-    #[allow(clippy::too_many_lines)]
     async fn integrate_fs_op<T: FsOp>(
         &self,
         op: T,
@@ -417,16 +416,18 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     ) -> Result<SmallVec<[NodeRename; 2]>, IntegrateFsOpError<Ed::Fs>> {
         use impl_integrate_fs_op as r#impl;
 
-        let mut ops = SmallVec::<[r#impl::ResolvedFsOp; _]>::new();
-
-        let mut renames = SmallVec::<[NodeRename; _]>::new();
+        let mut actions = SmallVec::new();
+        let mut renames = SmallVec::new();
 
         self.with_project(|proj| {
             let mut sync_actions = proj.inner.integrate_fs_op(op);
-            while let Some(action) = sync_actions.next() {
-                if let Some(more_renames) =
-                    r#impl::push_sync_action(action, &proj.peers, &mut ops)
-                {
+
+            while let Some(sync_action) = sync_actions.next() {
+                if let Some(more_renames) = r#impl::push_resolved_actions(
+                    sync_action,
+                    &proj.peers,
+                    &mut actions,
+                ) {
                     renames.extend(more_renames);
                 }
             }
@@ -435,8 +436,8 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         let fs = ctx.fs();
 
         ctx.spawn_background(async move {
-            for op in ops {
-                op.apply(&fs).await?;
+            for action in actions {
+                action.apply(&fs).await?;
             }
             Ok(())
         })
@@ -1254,7 +1255,7 @@ mod impl_integrate_fs_op {
 
     /// The type of file system operation that should be performed as a
     /// result of
-    pub(super) enum ResolvedFsOp {
+    pub(super) enum ResolvedFsAction {
         /// Create a directory at the given path.
         CreateDirectory(AbsPathBuf),
         /// Create a file at the given path with the given contents.
@@ -1272,29 +1273,29 @@ mod impl_integrate_fs_op {
         Movement,
     }
 
-    pub(super) fn push_sync_action(
+    pub(super) fn push_resolved_actions(
         action: SyncAction<'_>,
         peers: &FxHashMap<PeerId, Peer>,
-        ops: &mut SmallVec<[ResolvedFsOp; 1]>,
+        actions: &mut SmallVec<[ResolvedFsAction; 1]>,
     ) -> Option<[NodeRename; 2]> {
         match action {
             SyncAction::Create(create) => {
-                push_node_creation(create.node(), &mut ops);
+                push_node_creation(create.node(), &mut actions);
                 None
             },
             SyncAction::Delete(delete) => {
-                ops.push(ResolvedFsOp::DeleteNode(delete.old_path()));
+                actions.push(ResolvedFsAction::DeleteNode(delete.old_path()));
                 None
             },
             SyncAction::Move(r#move) => {
-                ops.push(ResolvedFsOp::MoveNode(
+                actions.push(ResolvedFsAction::MoveNode(
                     r#move.old_path(),
                     r#move.new_path(),
                 ));
                 None
             },
             SyncAction::Rename(rename) => {
-                ops.push(ResolvedFsOp::MoveNode(
+                actions.push(ResolvedFsAction::MoveNode(
                     rename.old_path(),
                     rename.new_path(),
                 ));
@@ -1303,18 +1304,18 @@ mod impl_integrate_fs_op {
             SyncAction::CreateAndResolve(create_and_resolve) => {
                 let create_node = create_and_resolve.create().node();
                 let create_node_path = create_node.path();
-                let orig_len = ops.len();
+                let orig_len = actions.len();
 
-                // Push a move op for the existing node causing the conflict.
-                // We'll replace the destination path once we've resolved the
-                // conflict.
-                ops.push(ResolvedFsOp::MoveNode(
+                // Push a move action for the existing node causing the
+                // conflict. We'll replace the destination path once we've
+                // resolved the conflict.
+                actions.push(ResolvedFsAction::MoveNode(
                     create_node_path.clone(),
                     create_node_path,
                 ));
 
-                // Push the creation ops for the new node.
-                push_node_creation(create_node, &mut ops);
+                // Push the creation actions for the new node.
+                push_node_creation(create_node, &mut actions);
 
                 let (rename_conflicting, rename_existing) =
                     resolve_naming_conflict(
@@ -1323,21 +1324,21 @@ mod impl_integrate_fs_op {
                         peers,
                     );
 
-                match &mut ops[orig_len] {
-                    ResolvedFsOp::MoveNode(_, dest_path) => {
+                match &mut actions[orig_len] {
+                    ResolvedFsAction::MoveNode(_, dest_path) => {
                         dest_path.pop();
                         dest_path.push(rename_existing.name());
                     },
-                    _ => unreachable!("we pushed a MoveNode op above"),
+                    _ => unreachable!("we pushed a MoveNode action above"),
                 }
 
-                match &mut ops[orig_len + 1] {
-                    ResolvedFsOp::CreateDirectory(path)
-                    | ResolvedFsOp::CreateFile(path, _) => {
+                match &mut actions[orig_len + 1] {
+                    ResolvedFsAction::CreateDirectory(path)
+                    | ResolvedFsAction::CreateFile(path, _) => {
                         path.pop();
                         path.push(rename_conflicting.name());
                     },
-                    _ => unreachable!("we pushed a Create* op above"),
+                    _ => unreachable!("we pushed a Create* action above"),
                 }
 
                 Some([rename_conflicting, rename_existing])
@@ -1349,7 +1350,7 @@ mod impl_integrate_fs_op {
                     r#move.old_path(),
                     move_and_resolve.into_resolve(),
                     peers,
-                    ops,
+                    actions,
                 ))
             },
             SyncAction::RenameAndResolve(rename_and_resolve) => {
@@ -1359,26 +1360,26 @@ mod impl_integrate_fs_op {
                     rename.old_path(),
                     rename_and_resolve.into_resolve(),
                     peers,
-                    ops,
+                    actions,
                 ))
             },
         }
     }
 
-    /// Pushes the `ResolvedFsOp`s corresponding to the creation of
-    /// the given node into `ops`.
+    /// Pushes the actions corresponding to the creation of the given node into
+    /// the given buffer.
     ///
-    /// If the node is a directory, it recursively pushes the creation
-    /// of all its children.
+    /// If the node is a directory, it recursively pushes the creation actions
+    /// for all its children.
     fn push_node_creation(
         node: Node<impl AttachedOrSync>,
-        ops: &mut SmallVec<[ResolvedFsOp; 1]>,
+        actions: &mut SmallVec<[ResolvedFsAction; 1]>,
     ) {
         match node {
             Node::Directory(dir) => {
-                ops.push(ResolvedFsOp::CreateDirectory(dir.path()));
+                actions.push(ResolvedFsAction::CreateDirectory(dir.path()));
                 for child in dir.children() {
-                    push_node_creation(child, ops);
+                    push_node_creation(child, actions);
                 }
             },
             Node::File(file) => {
@@ -1393,7 +1394,10 @@ mod impl_integrate_fs_op {
                         FileContents::Text(text.contents().clone())
                     },
                 };
-                ops.push(ResolvedFsOp::CreateFile(file.path(), file_contents));
+                actions.push(ResolvedFsAction::CreateFile(
+                    file.path(),
+                    file_contents,
+                ));
             },
         }
     }
@@ -1404,7 +1408,7 @@ mod impl_integrate_fs_op {
         move_conflicting_from: AbsPathBuf,
         conflict: ResolveConflict<'_>,
         peers: &FxHashMap<PeerId, Peer>,
-        ops: &mut SmallVec<[ResolvedFsOp; 1]>,
+        actions: &mut SmallVec<[ResolvedFsAction; 1]>,
     ) -> [NodeRename; 2] {
         let (rename_conflicting, rename_existing) = resolve_naming_conflict(
             conflict,
@@ -1426,9 +1430,12 @@ mod impl_integrate_fs_op {
             path
         };
 
-        ops.push(ResolvedFsOp::MoveNode(move_existing_from, move_existing_to));
+        actions.push(ResolvedFsAction::MoveNode(
+            move_existing_from,
+            move_existing_to,
+        ));
 
-        ops.push(ResolvedFsOp::MoveNode(
+        actions.push(ResolvedFsAction::MoveNode(
             move_conflicting_from,
             move_conflicting_to,
         ));
@@ -1538,7 +1545,7 @@ mod impl_integrate_fs_op {
         }
     }
 
-    impl ResolvedFsOp {
+    impl ResolvedFsAction {
         pub(super) async fn apply<Fs: fs::Fs>(
             self,
             fs: &Fs,
