@@ -8,13 +8,12 @@ use std::io;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{AsyncWriteExt, select};
 
 use crate::ByteOffset;
 use crate::fs::{
-    AbsPath,
-    AbsPathBuf,
     Directory,
     DirectoryEvent,
     File,
@@ -25,7 +24,6 @@ use crate::fs::{
     Metadata,
     MetadataNameError,
     NodeKind,
-    NodeName,
     Symlink,
 };
 

@@ -11,8 +11,6 @@ mod node_kind;
 pub mod os;
 mod symlink;
 
-#[doc(inline)]
-pub use abs_path::*;
 pub use directory::{
     Directory,
     DirectoryEvent,

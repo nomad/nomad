@@ -11,6 +11,7 @@ mock = []
 neovim = ["keyring/apple-native", "keyring/secret-service", "dep:neovim"]
 
 [dependencies]
+abs-path = { workspace = true }
 collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = [
   "nomad",
 ] }

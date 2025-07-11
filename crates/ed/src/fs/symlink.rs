@@ -1,6 +1,8 @@
 use core::error::Error;
 
-use crate::fs::{self, AbsPath, Fs, FsNode, NodeName};
+use abs_path::{AbsPath, NodeName};
+
+use crate::fs::{self, Fs, FsNode};
 
 /// TODO: docs.
 pub trait Symlink: Send + Sync {

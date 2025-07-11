@@ -4,7 +4,7 @@ use core::fmt;
 use core::ops::Deref;
 use std::rc::Rc;
 
-use ed::fs::AbsPathBuf;
+use abs_path::AbsPathBuf;
 use serde::de::{Deserialize, Deserializer};
 
 /// TODO: docs.

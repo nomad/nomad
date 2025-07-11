@@ -474,7 +474,7 @@ pub enum SearchProjectRootError<Ed: CollabEditor> {
     BufNameNotAbsolutePath(String),
 
     /// TODO: docs.
-    CouldntFindRoot(fs::AbsPathBuf),
+    CouldntFindRoot(AbsPathBuf),
 
     /// TODO: docs.
     FindRoot(root_markers::FindRootError<Ed::Fs, Markers>),

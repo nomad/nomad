@@ -218,7 +218,7 @@ impl<Fs: fs::Fs> WalkDir<Self> for Fs {
 
     async fn list_metas(
         &self,
-        dir_path: &fs::AbsPath,
+        dir_path: &AbsPath,
     ) -> Result<
         impl FusedStream<
             Item = Result<<Self as fs::Fs>::Metadata, Self::ReadMetadataError>,

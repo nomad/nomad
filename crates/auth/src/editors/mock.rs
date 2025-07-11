@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use ed::fs::AbsPath;
+use abs_path::AbsPath;
 use ed::notify::MaybeResult;
 use ed::{
     AgentId,

@@ -135,7 +135,7 @@ impl MockFs {
         Self { inner: Shared::new(FsInner::new(root)) }
     }
 
-    fn delete_node(
+    fn delete_node_inner(
         &self,
         path: &AbsPath,
     ) -> Result<impl Future<Output = ()>, DeleteNodeError> {
@@ -734,7 +734,7 @@ impl fs::Directory for MockDirectory {
     }
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)?.await;
+        self.fs.delete_node_inner(&self.path)?.await;
         Ok(())
     }
 
@@ -789,7 +789,7 @@ impl fs::File for MockFile {
     type WriteError = GetNodeError;
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)?.await;
+        self.fs.delete_node_inner(&self.path)?.await;
         Ok(())
     }
 
@@ -844,7 +844,7 @@ impl fs::Symlink for MockSymlink {
     type ReadError = GetNodeError;
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)?.await;
+        self.fs.delete_node_inner(&self.path)?.await;
         Ok(())
     }
 
