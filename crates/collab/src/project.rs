@@ -5,7 +5,7 @@ use core::{fmt, iter};
 use std::collections::hash_map;
 use std::sync::Arc;
 
-use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
+use abs_path::{AbsPath, AbsPathBuf};
 use collab_project::fs::{
     DirectoryId,
     File,
@@ -128,16 +128,12 @@ pub(crate) enum SynchronizeError<Ed: CollabEditor> {
 pub enum IntegrateBinaryEditError<Fs: fs::Fs> {
     /// The node at the given path was a directory, not a file.
     DirectoryAtPath(AbsPathBuf),
-
     /// It wasn't possible to get the node at the given path.
     NodeAtPath(Fs::NodeAtPathError),
-
     /// There wasn't any node at the given path.
     NoNodeAtPath(AbsPathBuf),
-
     /// The node at the given path was a symlink, not a file.
     SymlinkAtPath(AbsPathBuf),
-
     /// It wasn't possible to write the new contents to the file at the given
     /// path.
     WriteToFile(AbsPathBuf, <Fs::File as fs::File>::WriteError),
@@ -146,7 +142,22 @@ pub enum IntegrateBinaryEditError<Fs: fs::Fs> {
 /// The type of error that can occcur when integrating a
 /// [`binary::BinaryEdit`].
 #[derive(cauchy::Debug)]
-pub enum IntegrateFsOpError<Fs: fs::Fs> {}
+pub enum IntegrateFsOpError<Fs: fs::Fs> {
+    /// It wasn't possible to create a directory.
+    CreateDirectory(<Fs::Directory as fs::Directory>::CreateDirectoryError),
+    /// It wasn't possible to create a file.
+    CreateFile(<Fs::Directory as fs::Directory>::CreateFileError),
+    /// It wasn't possible to create a symlink.
+    CreateSymlink(<Fs::Directory as fs::Directory>::CreateSymlinkError),
+    /// It wasn't possible to get the directory at a particular path.
+    DirAtPath(fs::DirAtPathError<Fs>),
+    /// It wasn't possible to delete a node.
+    DeleteNode(fs::DeleteNodeError<Fs>),
+    /// It wasn't possible to move a node to a new location.
+    MoveNode(fs::MoveNodeError<Fs>),
+    /// It wasn't possible to write to a file.
+    WriteFile(<Fs::File as fs::File>::WriteError),
+}
 
 enum FsNodeContents {
     Directory,
@@ -1243,6 +1254,7 @@ mod impl_integrate_fs_op {
     //! Contains the various types, free-standing functions and methods used in
     //! the implementation of [`ProjectHandle::integrate_fs_op`].
 
+    use abs_path::{NodeName, NodeNameBuf};
     use collab_project::fs::{AttachedOrSync, ResolveConflict, SyncAction};
 
     use super::*;
@@ -1555,49 +1567,53 @@ mod impl_integrate_fs_op {
                     let (parent_path, dir_name) =
                         path.split_last().expect("not creating root");
 
-                    fs.dir_at_path(parent_path)
-                        .await?
+                    fs.dir(parent_path)
+                        .await
+                        .map_err(IntegrateFsOpError::DirAtPath)?
                         .create_directory(dir_name)
-                        .await?;
+                        .map_err(IntegrateFsOpError::CreateDirectory)
+                        .await
                 },
                 Self::CreateFile(path, contents) => {
                     let (parent_path, file_name) =
                         path.split_last().expect("not creating root");
 
-                    let mut parent = fs.dir_at_path(parent_path).await?;
+                    let mut parent = fs
+                        .dir(parent_path)
+                        .await
+                        .map_err(IntegrateFsOpError::DirAtPath)?;
 
                     match contents {
-                        FileContents::Binary(contents) => {
-                            parent
-                                .create_file(file_name)
-                                .await?
-                                .write(contents)
-                                .await?;
-                        },
-                        FileContents::Symlink(target_path) => {
-                            parent
-                                .create_symlink(file_name, target_path)
-                                .await?;
-                        },
-                        FileContents::Text(rope) => {
-                            parent
-                                .create_file(file_name)
-                                .await?
-                                .write_chunks(rope.chunks())
-                                .await?;
-                        },
-                    };
+                        FileContents::Binary(contents) => parent
+                            .create_file(file_name)
+                            .await
+                            .map_err(IntegrateFsOpError::CreateFile)?
+                            .write(contents)
+                            .await
+                            .map_err(IntegrateFsOpError::WriteFile)?,
+
+                        FileContents::Symlink(target_path) => parent
+                            .create_symlink(file_name, target_path)
+                            .await
+                            .map_err(IntegrateFsOpError::CreateSymlink),
+
+                        FileContents::Text(rope) => parent
+                            .create_file(file_name)
+                            .await
+                            .map_err(IntegrateFsOpError::CreateFile)?
+                            .write_chunks(rope.chunks())
+                            .await
+                            .map_err(IntegrateFsOpError::WriteFile),
+                    }
                 },
-                Self::DeleteNode(path) => {
-                    fs.delete_node(&path)
-                        .await
-                        .map_err(IntegrateFsOpError::DeleteNode)?;
-                },
-                Self::MoveNode(from_path, to_path) => {
-                    fs.move_node(from_path, to_path)
-                        .await
-                        .map_err(IntegrateFsOpError::MoveNode)?;
-                },
+                Self::DeleteNode(path) => fs
+                    .delete_node(&path)
+                    .await
+                    .map_err(IntegrateFsOpError::DeleteNode),
+                Self::MoveNode(from_path, to_path) => fs
+                    .move_node(from_path, to_path)
+                    .await
+                    .map_err(IntegrateFsOpError::MoveNode),
             }
         }
     }
