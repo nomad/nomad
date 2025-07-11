@@ -67,16 +67,17 @@ pub(crate) struct Project<Ed: CollabEditor> {
     id_maps: IdMaps<Ed>,
     /// The inner CRDT holding the entire state of the project.
     inner: collab_project::Project,
-    /// The local [`Peer`].
-    local_peer: Peer,
+    /// The ID of the local [`Peer`].
+    local_peer_id: PeerId,
     /// Map from a remote selections's ID to the corresponding selection
     /// displayed in the editor.
     peer_selections: FxHashMap<text::SelectionId, Ed::PeerSelection>,
     /// Map from a remote cursor's ID to the corresponding tooltip displayed in
     /// the editor.
     peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltip>,
-    /// Map from a remote peer's ID to the corresponding [`Peer`].
-    remote_peers: FxHashMap<PeerId, Peer>,
+    /// Map from a peer's ID to the corresponding [`Peer`]. Contains both the
+    /// local peer and the remote peers.
+    peers: FxHashMap<PeerId, Peer>,
     /// The path to the root of the project.
     root_path: AbsPathBuf,
     /// The ID of the collaborative session this project is part of.
@@ -175,10 +176,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         request: message::ProjectRequest,
     ) -> message::ProjectResponse {
         let (peers, project) = self.with_project(|proj| {
-            let peers = iter::once(&proj.local_peer)
-                .chain(proj.remote_peers.values())
-                .cloned()
-                .collect::<Peers>();
+            let peers = proj.peers.values().cloned().collect::<Peers>();
             let project = Box::new(proj.inner.clone().into_state());
             (peers, project)
         });
@@ -335,7 +333,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         let Some((peer, offset, buf_id, cur_id)) = self.with_project(|proj| {
             let cursor = proj.inner.integrate_cursor_creation(creation)?;
             let cursor_file = cursor.file()?;
-            let cursor_owner = proj.remote_peers.get(&cursor.owner())?;
+            let cursor_owner = proj.peers.get(&cursor.owner())?;
             let buf_id = proj.id_maps.file2buffer.get(&cursor_file.id())?;
             Some((
                 cursor_owner.clone(),
@@ -426,7 +424,12 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         self.with_project(|proj| {
             let mut sync_actions = proj.inner.integrate_fs_op(op);
             while let Some(action) = sync_actions.next() {
-                r#impl::push_sync_action(action, &mut ops, &mut renames);
+                if let Some((rename_1, rename_2)) =
+                    r#impl::push_sync_action(action, &proj.peers, &mut ops)
+                {
+                    renames.push(rename_1);
+                    renames.push(rename_2);
+                }
             }
         });
 
@@ -444,7 +447,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     }
 
     async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
-        self.with_project(|proj| match proj.remote_peers.entry(peer.id) {
+        self.with_project(|proj| match proj.peers.entry(peer.id) {
             hash_map::Entry::Occupied(_) => {
                 panic!("peer ID {:?} already exists", peer.id);
             },
@@ -468,7 +471,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 .flat_map(|cursor_id| proj.peer_tooltips.remove(&cursor_id))
                 .collect::<SmallVec<[_; 1]>>();
 
-            let peer = match proj.remote_peers.remove(&peer_id) {
+            let peer = match proj.peers.remove(&peer_id) {
                 Some(peer) => peer,
                 None => panic!("peer ID {peer_id:?} doesn't exist"),
             };
@@ -491,7 +494,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 proj.inner.integrate_selection_creation(creation)?;
             let file_id = selection.file()?.id();
             let buf_id = proj.id_maps.file2buffer.get(&file_id)?;
-            let selection_owner = proj.remote_peers.get(&selection.owner())?;
+            let selection_owner = proj.peers.get(&selection.owner())?;
             Some((
                 selection_owner.clone(),
                 selection.offset_range(),
@@ -1208,10 +1211,13 @@ impl<Ed: CollabEditor> ProjectGuard<Ed> {
             assert!(set.remove(&self.root));
         });
 
-        let remote_peers = args
+        let local_peer_id = args.local_peer.id;
+
+        let peers = args
             .remote_peers
             .into_iter()
             .map(|peer| (peer.id, peer))
+            .chain(iter::once((local_peer_id, args.local_peer)))
             .collect();
 
         self.projects.insert(Project {
@@ -1219,10 +1225,10 @@ impl<Ed: CollabEditor> ProjectGuard<Ed> {
             host_id: args.host_id,
             id_maps: args.id_maps,
             inner: args.project,
-            local_peer: args.local_peer,
+            local_peer_id,
             peer_selections: FxHashMap::default(),
             peer_tooltips: FxHashMap::default(),
-            remote_peers,
+            peers,
             root_path: self.root.clone(),
             session_id: args.session_id,
         })
@@ -1269,27 +1275,31 @@ mod impl_integrate_fs_op {
 
     pub(super) fn push_sync_action(
         action: SyncAction<'_>,
+        peers: &FxHashMap<PeerId, Peer>,
         ops: &mut SmallVec<[ResolvedFsOp; 1]>,
-        renames: &mut SmallVec<[NodeRename; 2]>,
-    ) {
+    ) -> Option<(NodeRename, NodeRename)> {
         match action {
             SyncAction::Create(create) => {
                 push_node_creation(create.node(), &mut ops);
+                None
             },
             SyncAction::Delete(delete) => {
                 ops.push(ResolvedFsOp::DeleteNode(delete.old_path()));
+                None
             },
             SyncAction::Move(r#move) => {
                 ops.push(ResolvedFsOp::MoveNode(
                     r#move.old_path(),
                     r#move.new_path(),
                 ));
+                None
             },
             SyncAction::Rename(rename) => {
                 ops.push(ResolvedFsOp::MoveNode(
                     rename.old_path(),
                     rename.new_path(),
                 ));
+                None
             },
             SyncAction::CreateAndResolve(create_and_resolve) => {
                 let create_node = create_and_resolve.create().node();
@@ -1311,8 +1321,7 @@ mod impl_integrate_fs_op {
                     resolve_naming_conflict(
                         create_and_resolve.into_resolve(),
                         NamingConflictSource::Creation,
-                        todo!(),
-                        todo!(),
+                        peers,
                     );
 
                 match &mut ops[orig_len] {
@@ -1332,28 +1341,27 @@ mod impl_integrate_fs_op {
                     _ => unreachable!("we pushed a Create* op above"),
                 }
 
-                renames.push(rename_conflicting);
-                renames.push(rename_existing);
+                Some((rename_conflicting, rename_existing))
             },
             SyncAction::MoveAndResolve(move_and_resolve) => {
                 let r#move = move_and_resolve.r#move();
-                push_move_and_resolve(
+                Some(push_move_and_resolve(
                     r#move.new_path(),
                     r#move.old_path(),
                     move_and_resolve.into_resolve(),
+                    peers,
                     ops,
-                    renames,
-                );
+                ))
             },
             SyncAction::RenameAndResolve(rename_and_resolve) => {
                 let rename = rename_and_resolve.rename();
-                push_move_and_resolve(
+                Some(push_move_and_resolve(
                     rename.new_path(),
                     rename.old_path(),
                     rename_and_resolve.into_resolve(),
+                    peers,
                     ops,
-                    renames,
-                );
+                ))
             },
         }
     }
@@ -1396,14 +1404,13 @@ mod impl_integrate_fs_op {
         move_existing_from: AbsPathBuf,
         move_conflicting_from: AbsPathBuf,
         conflict: ResolveConflict<'_>,
+        peers: &FxHashMap<PeerId, Peer>,
         ops: &mut SmallVec<[ResolvedFsOp; 1]>,
-        renames: &mut SmallVec<[NodeRename; 2]>,
-    ) {
+    ) -> (NodeRename, NodeRename) {
         let (rename_conflicting, rename_existing) = resolve_naming_conflict(
             conflict,
             NamingConflictSource::Movement,
-            todo!(),
-            todo!(),
+            peers,
         );
 
         let move_existing_to = {
@@ -1427,15 +1434,13 @@ mod impl_integrate_fs_op {
             move_conflicting_to,
         ));
 
-        renames.push(rename_conflicting);
-        renames.push(rename_existing);
+        (rename_conflicting, rename_existing)
     }
 
     fn resolve_naming_conflict(
         mut conflict: ResolveConflict<'_>,
         conflict_source: NamingConflictSource,
-        _local_peer: &Peer,
-        _remote_peers: &Peers,
+        peers: &FxHashMap<PeerId, Peer>,
     ) -> (NodeRename, NodeRename) {
         let conflicting = conflict.conflicting_node();
         let existing = conflict.existing_node();
