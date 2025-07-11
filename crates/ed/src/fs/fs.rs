@@ -3,9 +3,9 @@ use core::fmt::Debug;
 use core::future::Future;
 use core::hash::Hash;
 
-use abs_path::AbsPathBuf;
+use abs_path::{AbsPath, AbsPathBuf};
 
-use crate::fs::{AbsPath, Directory, File, FsNode, Metadata, Symlink};
+use crate::fs::{self, Directory, File, FsNode, Metadata, Symlink};
 
 /// TODO: docs.
 pub trait Fs: Clone + Send + Sync + 'static {
@@ -81,6 +81,25 @@ pub trait Fs: Clone + Send + Sync + 'static {
             self.node_at_path(path).await.map(|maybe_node| {
                 maybe_node.map(|node| node.is_dir()).unwrap_or(false)
             })
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn delete_node<P: AsRef<AbsPath> + Send>(
+        &self,
+        path: P,
+    ) -> impl Future<Output = Result<(), DeleteNodeError<Self>>> + Send {
+        async move {
+            let path = path.as_ref();
+
+            self.node_at_path(path)
+                .await
+                .map_err(DeleteNodeError::GetNode)?
+                .ok_or_else(|| DeleteNodeError::NoNodeAtPath(path.to_owned()))?
+                .delete()
+                .await
+                .map_err(DeleteNodeError::DeleteNode)
         }
     }
 
@@ -173,8 +192,31 @@ pub trait Fs: Clone + Send + Sync + 'static {
     }
 }
 
-/// The type of error that can occur when trying to get the directory at a
-/// given path via [`Fs::dir`].
+/// The type of error that can occur when deleting the node at a
+/// given path via [`Fs::delete_node`].
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
+pub enum DeleteNodeError<Fs: self::Fs> {
+    /// Deleting the node failed.
+    #[display("{_0}")]
+    DeleteNode(fs::NodeDeleteError<Fs>),
+
+    /// Getting the node at the given path failed.
+    #[display("{_0}")]
+    GetNode(Fs::NodeAtPathError),
+
+    /// There wasn't any node at the given path.
+    #[display("no file or directory at {_0:?}")]
+    NoNodeAtPath(AbsPathBuf),
+}
+
+/// The type of error that can occur when getting the directory at a given path
+/// via [`Fs::dir`].
 #[derive(
     cauchy::Debug,
     derive_more::Display,
