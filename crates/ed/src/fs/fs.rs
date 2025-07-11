@@ -130,6 +130,26 @@ pub trait Fs: Clone + Send + Sync + 'static {
 
     /// TODO: docs.
     #[inline]
+    fn move_node(
+        &self,
+        node_path: &AbsPath,
+        new_path: &AbsPath,
+    ) -> impl Future<Output = Result<(), MoveNodeError<Self>>> + Send {
+        async move {
+            self.node_at_path(node_path)
+                .await
+                .map_err(MoveNodeError::GetNode)?
+                .ok_or_else(|| {
+                    MoveNodeError::NoNodeAtPath(node_path.to_owned())
+                })?
+                .r#move(new_path)
+                .await
+                .map_err(MoveNodeError::MoveNode)
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
     fn read_file<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
@@ -236,6 +256,29 @@ pub enum GetDirError<Fs: self::Fs> {
     /// The node at the given path was a symlink, but a directory was expected.
     #[display("expected a directory at {:?}, but got a symlink", _0.path())]
     GotSymlink(Fs::Symlink),
+
+    /// There wasn't any node at the given path.
+    #[display("no file or directory at {_0:?}")]
+    NoNodeAtPath(AbsPathBuf),
+}
+
+/// The type of error that can occur when moving the node at a
+/// given path via [`Fs::move_node`].
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
+pub enum MoveNodeError<Fs: self::Fs> {
+    /// Getting the node at the given path failed.
+    #[display("{_0}")]
+    GetNode(Fs::NodeAtPathError),
+
+    /// Moving the node failed.
+    #[display("{_0}")]
+    MoveNode(fs::NodeMoveError<Fs>),
 
     /// There wasn't any node at the given path.
     #[display("no file or directory at {_0:?}")]

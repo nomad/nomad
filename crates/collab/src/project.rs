@@ -1614,7 +1614,7 @@ mod impl_integrate_fs_op {
                     .await
                     .map_err(IntegrateFsOpError::DeleteNode),
                 Self::MoveNode(from_path, to_path) => fs
-                    .move_node(from_path, to_path)
+                    .move_node(&from_path, &to_path)
                     .await
                     .map_err(IntegrateFsOpError::MoveNode),
             }
