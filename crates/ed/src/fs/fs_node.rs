@@ -31,6 +31,22 @@ pub enum NodeDeleteError<Fs: fs::Fs> {
     Symlink(<Fs::Symlink as Symlink>::DeleteError),
 }
 
+/// TODO: docs.
+#[derive(
+    cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
+)]
+#[display("{_0}")]
+pub enum NodeMoveError<Fs: fs::Fs> {
+    /// TODO: docs.
+    File(<Fs::File as File>::MoveError),
+
+    /// TODO: docs.
+    Directory(<Fs::Directory as Directory>::MoveError),
+
+    /// TODO: docs.
+    Symlink(<Fs::Symlink as Symlink>::MoveError),
+}
+
 impl<Fs: fs::Fs> FsNode<Fs> {
     /// TODO: docs.
     #[inline]
@@ -87,6 +103,25 @@ impl<Fs: fs::Fs> FsNode<Fs> {
             Self::File(file) => file.meta(),
             Self::Directory(dir) => dir.meta(),
             Self::Symlink(symlink) => symlink.meta(),
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub async fn r#move(
+        &self,
+        new_path: &AbsPath,
+    ) -> Result<(), NodeMoveError<Fs>> {
+        match self {
+            Self::File(file) => {
+                file.r#move(new_path).await.map_err(NodeMoveError::File)
+            },
+            Self::Directory(dir) => {
+                dir.r#move(new_path).await.map_err(NodeMoveError::Directory)
+            },
+            Self::Symlink(symlink) => {
+                symlink.r#move(new_path).await.map_err(NodeMoveError::Symlink)
+            },
         }
     }
 

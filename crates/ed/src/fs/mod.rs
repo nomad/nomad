@@ -29,7 +29,7 @@ pub use fs::{
     ReadFileToStringError,
 };
 pub use fs_event::{FsEvent, FsEventKind};
-pub use fs_node::{FsNode, NodeDeleteError};
+pub use fs_node::{FsNode, NodeDeleteError, NodeMoveError};
 pub use metadata::{Metadata, MetadataNameError};
 pub use node_kind::NodeKind;
 pub use symlink::Symlink;
