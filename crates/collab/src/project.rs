@@ -412,14 +412,87 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         })
     }
 
-    async fn integrate_fs_op<T: FsOp>(&self, op: T, ctx: &mut Context<Ed>) {
+    /// TODO: docs.
+    #[allow(clippy::too_many_lines)]
+    async fn integrate_fs_op<T: FsOp>(
+        &self,
+        op: T,
+        ctx: &mut Context<Ed>,
+    ) -> Result<SmallVec<[NodeRename; 2]>, IntegrateFsOpError<Ed::Fs>> {
+        enum FileContents {
+            Binary(Arc<[u8]>),
+            Text(text::crop::Rope),
+            Symlink(compact_str::CompactString),
+        }
+
+        /// The type of file system operation that should be performed as a
+        /// result of
         enum ResolvedFsOp {
+            /// Create a directory at the given path.
             CreateDirectory(AbsPathBuf),
+            /// Create a file at the given path with the given contents.
             CreateFile(AbsPathBuf, FileContents),
+            /// Delete the node at the given path.
             DeleteNode(AbsPathBuf),
+            /// Move a node from the first path to the second path.
             MoveNode(AbsPathBuf, AbsPathBuf),
         }
 
+        fn push_sync_action(
+            action: SyncAction<'_>,
+            ops: &mut SmallVec<[ResolvedFsOp; 1]>,
+            renames: &mut SmallVec<[NodeRename; 2]>,
+        ) {
+            match action {
+                SyncAction::Create(create) => {
+                    push_node_creation(create.node(), &mut ops);
+                },
+                SyncAction::CreateAndResolve(create_and_resolve) => {
+                    let ops_len = ops.len();
+                    let move_existing = ResolvedFsOp::MoveNode(
+                        AbsPathBuf::root(),
+                        AbsPathBuf::root(),
+                    );
+                    ops.push(move_existing);
+                    let create_node = create_and_resolve.create().node();
+                    push_node_creation(create_node, &mut ops);
+                    let _resolve = create_and_resolve.into_resolve();
+                    // TODO: resolve conflict, fix names.
+                },
+                SyncAction::Delete(delete) => {
+                    let node_path = delete.node().path();
+                    ops.push(ResolvedFsOp::DeleteNode(node_path));
+                },
+                SyncAction::Move(r#move) => {
+                    let from_path = r#move.old_path();
+                    let to_path = r#move.new_path();
+                    ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                },
+                SyncAction::MoveAndResolve(move_and_resolve) => {
+                    let r#move = move_and_resolve.r#move();
+                    let from_path = r#move.old_path();
+                    let _resolve = move_and_resolve.into_resolve();
+                    // TODO: resolve conflict, fix names.
+                },
+                SyncAction::Rename(rename) => {
+                    let from_path = rename.old_path();
+                    let to_path = rename.new_path();
+                    ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                },
+                SyncAction::RenameAndResolve(rename_and_resolve) => {
+                    let rename = rename_and_resolve.rename();
+                    let parent_path = rename.parent().path();
+                    let _resolve = rename_and_resolve.into_resolve();
+                    // TODO: resolve conflict, fix names.
+                },
+            }
+        }
+
+        /// Pushes the `ResolvedFsOp`s corresponding to the creation of
+        /// the given node into `ops`.
+        ///
+        /// If the node is a directory, it recursively pushes the creation
+        /// of all its children.
         fn push_node_creation(
             node: Node<impl AttachedOrSync>,
             ops: &mut SmallVec<[ResolvedFsOp; 1]>,
@@ -451,63 +524,13 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
             }
         }
 
-        let ops: SmallVec<[ResolvedFsOp; 1]> = self.with_project(|proj| {
-            let mut ops = SmallVec::new();
-            let mut sync_actions = proj.inner.integrate_fs_op(op);
-            while let Some(action) = sync_actions.next() {
-                match action {
-                    SyncAction::Create(create) => {
-                        push_node_creation(create.node(), &mut ops);
-                    },
-                    SyncAction::CreateAndResolve(create_and_resolve) => {
-                        let ops_len = ops.len();
-                        let move_existing = ResolvedFsOp::MoveNode(
-                            AbsPathBuf::root(),
-                            AbsPathBuf::root(),
-                        );
-                        ops.push(move_existing);
-                        let create_node = create_and_resolve.create().node();
-                        push_node_creation(create_node, &mut ops);
-                        let _resolve = create_and_resolve.into_resolve();
-                        // TODO: resolve conflict, fix names.
-                    },
-                    SyncAction::Delete(delete) => {
-                        let node_path = delete.node().path();
-                        ops.push(ResolvedFsOp::DeleteNode(node_path));
-                    },
-                    SyncAction::Move(r#move) => {
-                        let from_path = r#move.old_path();
-                        let to_path = r#move.new_path();
-                        ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
-                    },
-                    SyncAction::MoveAndResolve(move_and_resolve) => {
-                        let r#move = move_and_resolve.r#move();
-                        let from_path = r#move.old_path();
-                        let _resolve = move_and_resolve.into_resolve();
-                        // TODO: resolve conflict, fix names.
-                    },
-                    SyncAction::Rename(rename) => {
-                        let from_path = rename.old_path();
-                        let to_path = rename.new_path();
-                        ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
-                    },
-                    SyncAction::RenameAndResolve(rename_and_resolve) => {
-                        let rename = rename_and_resolve.rename();
-                        let parent_path = rename.parent().path();
-                        let _resolve = rename_and_resolve.into_resolve();
-                        // TODO: resolve conflict, fix names.
-                    },
-                }
-            }
-            ops
-        });
-
-        let fs = ctx.fs();
-
-        ctx.spawn_background(async move {
-            for op in ops {
-                match op {
-                    ResolvedFsOp::CreateDirectory(path) => {
+        impl ResolvedFsOp {
+            async fn apply<Fs: fs::Fs>(
+                self,
+                fs: &Fs,
+            ) -> Result<(), IntegrateFsOpError<Fs>> {
+                match self {
+                    Self::CreateDirectory(path) => {
                         let (parent_path, dir_name) =
                             path.split_last().expect("not creating root");
 
@@ -516,7 +539,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                             .create_directory(dir_name)
                             .await?;
                     },
-                    ResolvedFsOp::CreateFile(path, contents) => {
+                    Self::CreateFile(path, contents) => {
                         let (parent_path, file_name) =
                             path.split_last().expect("not creating root");
 
@@ -544,20 +567,41 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                             },
                         };
                     },
-                    ResolvedFsOp::DeleteNode(path) => {
+                    Self::DeleteNode(path) => {
                         fs.delete_node(&path)
                             .await
                             .map_err(IntegrateFsOpError::DeleteNode)?;
                     },
-                    ResolvedFsOp::MoveNode(from_path, to_path) => {
+                    Self::MoveNode(from_path, to_path) => {
                         fs.move_node(from_path, to_path)
                             .await
                             .map_err(IntegrateFsOpError::MoveNode)?;
                     },
                 }
             }
+        }
+
+        let mut ops = SmallVec::<[ResolvedFsOp; _]>::new();
+        let mut renames = SmallVec::<[NodeRename; _]>::new();
+
+        self.with_project(|proj| {
+            let mut sync_actions = proj.inner.integrate_fs_op(op);
+            while let Some(action) = sync_actions.next() {
+                push_sync_action(action, &mut ops, &mut renames);
+            }
+        });
+
+        let fs = ctx.fs();
+
+        ctx.spawn_background(async move {
+            for op in ops {
+                op.apply(&fs).await?;
+            }
+            Ok(())
         })
-        .await
+        .await?;
+
+        Ok(renames)
     }
 
     async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
