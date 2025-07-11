@@ -1265,7 +1265,6 @@ mod impl_integrate_fs_op {
     enum NamingConflictSource {
         Creation,
         Movement,
-        Rename,
     }
 
     pub(super) fn push_sync_action(
@@ -1276,6 +1275,20 @@ mod impl_integrate_fs_op {
         match action {
             SyncAction::Create(create) => {
                 push_node_creation(create.node(), &mut ops);
+            },
+            SyncAction::Delete(delete) => {
+                let node_path = delete.node().path();
+                ops.push(ResolvedFsOp::DeleteNode(node_path));
+            },
+            SyncAction::Move(r#move) => {
+                let from_path = r#move.old_path();
+                let to_path = r#move.new_path();
+                ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+            },
+            SyncAction::Rename(rename) => {
+                let from_path = rename.old_path();
+                let to_path = rename.new_path();
+                ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
             },
             SyncAction::CreateAndResolve(create_and_resolve) => {
                 let create_node = create_and_resolve.create().node();
@@ -1321,65 +1334,25 @@ mod impl_integrate_fs_op {
                 renames.push(rename_conflicting);
                 renames.push(rename_existing);
             },
-            SyncAction::Delete(delete) => {
-                let node_path = delete.node().path();
-                ops.push(ResolvedFsOp::DeleteNode(node_path));
-            },
-            SyncAction::Move(r#move) => {
-                let from_path = r#move.old_path();
-                let to_path = r#move.new_path();
-                ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
-            },
             SyncAction::MoveAndResolve(move_and_resolve) => {
                 let r#move = move_and_resolve.r#move();
-                let move_existing_from = r#move.new_path();
-                let move_conflicting_from = r#move.old_path();
-
-                let (rename_conflicting, rename_existing) =
-                    resolve_naming_conflict(
-                        move_and_resolve.into_resolve(),
-                        NamingConflictSource::Movement,
-                        todo!(),
-                        todo!(),
-                    );
-
-                let move_existing_to = {
-                    let mut path = move_existing_from.clone();
-                    path.pop();
-                    path.push(rename_existing.name());
-                    path
-                };
-
-                let move_conflicting_to = {
-                    let mut path = move_existing_from.clone();
-                    path.pop();
-                    path.push(rename_conflicting.name());
-                    path
-                };
-
-                ops.push(ResolvedFsOp::MoveNode(
-                    move_existing_from,
-                    move_existing_to,
-                ));
-
-                ops.push(ResolvedFsOp::MoveNode(
-                    move_conflicting_from,
-                    move_conflicting_to,
-                ));
-
-                renames.push(rename_conflicting);
-                renames.push(rename_existing);
-            },
-            SyncAction::Rename(rename) => {
-                let from_path = rename.old_path();
-                let to_path = rename.new_path();
-                ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                push_move_and_resolve(
+                    r#move.new_path(),
+                    r#move.old_path(),
+                    move_and_resolve.into_resolve(),
+                    ops,
+                    renames,
+                );
             },
             SyncAction::RenameAndResolve(rename_and_resolve) => {
                 let rename = rename_and_resolve.rename();
-                let parent_path = rename.parent().path();
-                let _resolve = rename_and_resolve.into_resolve();
-                // TODO: resolve conflict, fix names.
+                push_move_and_resolve(
+                    rename.new_path(),
+                    rename.old_path(),
+                    rename_and_resolve.into_resolve(),
+                    ops,
+                    renames,
+                );
             },
         }
     }
@@ -1415,6 +1388,46 @@ mod impl_integrate_fs_op {
                 ops.push(ResolvedFsOp::CreateFile(file.path(), file_contents));
             },
         }
+    }
+
+    /// TODO: docs.
+    fn push_move_and_resolve(
+        move_existing_from: AbsPathBuf,
+        move_conflicting_from: AbsPathBuf,
+        conflict: collab_project::fs::ResolveConflict<'_>,
+        ops: &mut SmallVec<[ResolvedFsOp; 1]>,
+        renames: &mut SmallVec<[NodeRename; 2]>,
+    ) {
+        let (rename_conflicting, rename_existing) = resolve_naming_conflict(
+            conflict,
+            NamingConflictSource::Movement,
+            todo!(),
+            todo!(),
+        );
+
+        let move_existing_to = {
+            let mut path = move_existing_from.clone();
+            path.pop();
+            path.push(rename_existing.name());
+            path
+        };
+
+        let move_conflicting_to = {
+            let mut path = move_existing_from.clone();
+            path.pop();
+            path.push(rename_conflicting.name());
+            path
+        };
+
+        ops.push(ResolvedFsOp::MoveNode(move_existing_from, move_existing_to));
+
+        ops.push(ResolvedFsOp::MoveNode(
+            move_conflicting_from,
+            move_conflicting_to,
+        ));
+
+        renames.push(rename_conflicting);
+        renames.push(rename_existing);
     }
 
     fn resolve_naming_conflict(
