@@ -1317,6 +1317,9 @@ mod impl_integrate_fs_op {
                     },
                     _ => unreachable!("we pushed a Create* op above"),
                 }
+
+                renames.push(rename_conflicting);
+                renames.push(rename_existing);
             },
             SyncAction::Delete(delete) => {
                 let node_path = delete.node().path();
@@ -1329,9 +1332,43 @@ mod impl_integrate_fs_op {
             },
             SyncAction::MoveAndResolve(move_and_resolve) => {
                 let r#move = move_and_resolve.r#move();
+                let move_existing_from = r#move.new_path();
                 let from_path = r#move.old_path();
-                let _resolve = move_and_resolve.into_resolve();
-                // TODO: resolve conflict, fix names.
+
+                let (rename_conflicting, rename_existing) =
+                    resolve_naming_conflict(
+                        move_and_resolve.into_resolve(),
+                        NamingConflictSource::Movement,
+                        todo!(),
+                        todo!(),
+                    );
+
+                let move_existing_to = {
+                    let mut path = from_path.clone();
+                    path.pop();
+                    path.push(rename_existing.name());
+                    path
+                };
+
+                let move_conflicting_to = {
+                    let mut path = from_path.clone();
+                    path.pop();
+                    path.push(rename_conflicting.name());
+                    path
+                };
+
+                ops.push(ResolvedFsOp::MoveNode(
+                    move_existing_from,
+                    move_existing_to,
+                ));
+
+                ops.push(ResolvedFsOp::MoveNode(
+                    from_path,
+                    move_conflicting_to,
+                ));
+
+                renames.push(rename_conflicting);
+                renames.push(rename_existing);
             },
             SyncAction::Rename(rename) => {
                 let from_path = rename.old_path();
