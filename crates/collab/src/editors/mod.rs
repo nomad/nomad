@@ -6,11 +6,11 @@ mod neovim;
 use core::fmt::Debug;
 use core::ops::Range;
 
+use abs_path::{AbsPath, AbsPathBuf};
 use collab_server::Authenticator;
 use collab_server::message::Peer;
 use ed::command::CommandArgs;
-use ed::fs::{self, AbsPath, AbsPathBuf};
-use ed::{ByteOffset, Context, Editor, notify};
+use ed::{ByteOffset, Context, Editor, fs, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::config;

@@ -1,10 +1,10 @@
 use core::error::Error;
 
-use abs_path::AbsPathBuf;
+use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select_biased};
 
-use crate::fs::{self, AbsPath, File, Fs, Metadata, NodeName, Symlink};
+use crate::fs::{self, File, Fs, Metadata, Symlink};
 
 /// TODO: docs.
 pub trait Directory: Send + Sync + Sized {

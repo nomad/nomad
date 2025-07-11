@@ -11,6 +11,7 @@ nightly = ["nvim-oxi/neovim-nightly"]
 test = ["nvim-oxi/test", "nvim-oxi/test-terminator"]
 
 [dependencies]
+abs-path = { workspace = true }
 async-task = "4.7"
 cauchy = { workspace = true }
 compact_str = { workspace = true }

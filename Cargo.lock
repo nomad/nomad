@@ -233,6 +233,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auth"
 version = "0.1.0-dev"
 dependencies = [
+ "abs-path",
  "collab-server",
  "ed",
  "event-listener",
@@ -1777,6 +1778,7 @@ dependencies = [
 name = "neovim"
 version = "0.1.0-dev"
 dependencies = [
+ "abs-path",
  "async-task",
  "cauchy",
  "compact_str",

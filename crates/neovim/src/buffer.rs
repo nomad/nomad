@@ -7,8 +7,8 @@ use core::iter::FusedIterator;
 use core::ops::Range;
 use std::borrow::Cow;
 
+use abs_path::AbsPath;
 use compact_str::CompactString;
-use ed::fs::AbsPath;
 use ed::{AgentId, Buffer, ByteOffset, Chunks, Edit, Replacement, Shared};
 use smallvec::{SmallVec, smallvec_inline};
 

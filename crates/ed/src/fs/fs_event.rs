@@ -1,4 +1,4 @@
-use crate::fs::AbsPathBuf;
+use abs_path::AbsPathBuf;
 
 /// TODO: docs.
 #[derive(Debug, Clone)]

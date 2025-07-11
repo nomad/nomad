@@ -1,7 +1,8 @@
 use core::convert::Infallible;
 use core::error::Error;
 
-use ed::fs::{self, AbsPath, Metadata};
+use abs_path::AbsPath;
+use ed::fs::{self, Metadata};
 use futures_util::stream::{self, FusedStream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 

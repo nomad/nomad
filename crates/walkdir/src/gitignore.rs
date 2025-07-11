@@ -7,9 +7,9 @@ use std::process::{Command, ExitStatus};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use abs_path::{AbsPath, AbsPathBuf, NodeName};
+use abs_path::{AbsPath, AbsPathBuf, InvalidNodeNameError, NodeName};
 use compact_str::CompactString;
-use ed::fs::{self, Metadata, MetadataNameError, os};
+use ed::fs::{Metadata, MetadataNameError, os};
 
 use crate::{Either, Filter};
 
@@ -31,7 +31,7 @@ pub enum GitIgnoreError {
     GitCommand(io::Error),
 
     #[display("{node_name:?} is not a valid node name: {err:?}")]
-    NotNodeName { node_name: String, err: fs::InvalidNodeNameError },
+    NotNodeName { node_name: String, err: InvalidNodeNameError },
 
     #[display("{path:?} is not in {dir_path:?}")]
     NotInDir { path: AbsPathBuf, dir_path: AbsPathBuf },

@@ -1,7 +1,7 @@
 use core::error::Error;
 use core::fmt;
 
-use abs_path::AbsPathBuf;
+use abs_path::{AbsPath, AbsPathBuf};
 use ed::fs::{self, Directory, File, MetadataNameError, Symlink};
 use ed::notify;
 use futures_util::select;
@@ -14,13 +14,13 @@ pub struct FindRootArgs<'a, M> {
     /// The path to the first directory to search for markers in.
     ///
     /// If this points to a file, the search will start from its parent.
-    pub(super) start_from: &'a fs::AbsPath,
+    pub(super) start_from: &'a AbsPath,
 
     /// The path to the last directory to search for markers in, if any.
     ///
     /// If set and no root marker is found within it, the search is cut
     /// short instead of continuing with its parent.
-    pub(super) stop_at: Option<&'a fs::AbsPath>,
+    pub(super) stop_at: Option<&'a AbsPath>,
 }
 
 pub struct GitDirectory;
@@ -63,7 +63,7 @@ impl<M> FindRootArgs<'_, M> {
     pub(super) async fn find<Fs>(
         self,
         fs: &mut Fs,
-    ) -> Result<Option<fs::AbsPathBuf>, FindRootError<Fs, M>>
+    ) -> Result<Option<AbsPathBuf>, FindRootError<Fs, M>>
     where
         Fs: fs::Fs,
         M: RootMarker<Fs>,

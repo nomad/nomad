@@ -1,9 +1,10 @@
 use core::error::Error;
 
+use abs_path::{AbsPath, NodeName};
 use futures_util::Stream;
 
 use crate::ByteOffset;
-use crate::fs::{self, AbsPath, Fs, NodeName};
+use crate::fs::{self, Fs};
 
 /// TODO: docs.
 pub trait File: Send + Sync {

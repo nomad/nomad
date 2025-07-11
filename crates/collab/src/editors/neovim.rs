@@ -5,7 +5,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::{env, io};
 
-use abs_path::{AbsPath, AbsPathBuf, node};
+use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use collab_server::Config;
 use collab_server::message::{Peer, PeerId};
 use collab_server::nomad::{NomadConfig, NomadSessionId};
@@ -95,7 +95,7 @@ impl CollabEditor for Neovim {
     type LspRootError = NeovimLspRootError;
 
     async fn confirm_start(
-        project_root: &fs::AbsPath,
+        project_root: &AbsPath,
         ctx: &mut Context<Self>,
     ) -> bool {
         let prompt = format!(
@@ -205,10 +205,10 @@ impl CollabEditor for Neovim {
         match home::home_dir() {
             Some(home_dir) if !home_dir.as_os_str().is_empty() => {
                 home_dir.as_path().try_into().map_err(|err| match err {
-                    fs::AbsPathFromPathError::NotAbsolute => {
+                    AbsPathFromPathError::NotAbsolute => {
                         NeovimHomeDirError::HomeDirNotAbsolute(home_dir)
                     },
-                    fs::AbsPathFromPathError::NotUtf8 => {
+                    AbsPathFromPathError::NotUtf8 => {
                         NeovimHomeDirError::HomeDirNotUtf8(home_dir)
                     },
                 })
@@ -310,10 +310,10 @@ impl CollabEditor for Neovim {
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, SessionId)],
         action: ActionForSelectedSession,
         ctx: &mut Context<Self>,
-    ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
+    ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
         let select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
 
         let home_dir = Self::home_dir(ctx).await.ok();
