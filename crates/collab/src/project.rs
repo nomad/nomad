@@ -424,11 +424,10 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         self.with_project(|proj| {
             let mut sync_actions = proj.inner.integrate_fs_op(op);
             while let Some(action) = sync_actions.next() {
-                if let Some((rename_1, rename_2)) =
+                if let Some(more_renames) =
                     r#impl::push_sync_action(action, &proj.peers, &mut ops)
                 {
-                    renames.push(rename_1);
-                    renames.push(rename_2);
+                    renames.extend(more_renames);
                 }
             }
         });
@@ -1277,7 +1276,7 @@ mod impl_integrate_fs_op {
         action: SyncAction<'_>,
         peers: &FxHashMap<PeerId, Peer>,
         ops: &mut SmallVec<[ResolvedFsOp; 1]>,
-    ) -> Option<(NodeRename, NodeRename)> {
+    ) -> Option<[NodeRename; 2]> {
         match action {
             SyncAction::Create(create) => {
                 push_node_creation(create.node(), &mut ops);
@@ -1341,7 +1340,7 @@ mod impl_integrate_fs_op {
                     _ => unreachable!("we pushed a Create* op above"),
                 }
 
-                Some((rename_conflicting, rename_existing))
+                Some([rename_conflicting, rename_existing])
             },
             SyncAction::MoveAndResolve(move_and_resolve) => {
                 let r#move = move_and_resolve.r#move();
@@ -1406,7 +1405,7 @@ mod impl_integrate_fs_op {
         conflict: ResolveConflict<'_>,
         peers: &FxHashMap<PeerId, Peer>,
         ops: &mut SmallVec<[ResolvedFsOp; 1]>,
-    ) -> (NodeRename, NodeRename) {
+    ) -> [NodeRename; 2] {
         let (rename_conflicting, rename_existing) = resolve_naming_conflict(
             conflict,
             NamingConflictSource::Movement,
@@ -1434,7 +1433,7 @@ mod impl_integrate_fs_op {
             move_conflicting_to,
         ));
 
-        (rename_conflicting, rename_existing)
+        [rename_conflicting, rename_existing]
     }
 
     fn resolve_naming_conflict(
