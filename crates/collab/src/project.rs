@@ -1278,16 +1278,45 @@ mod impl_integrate_fs_op {
                 push_node_creation(create.node(), &mut ops);
             },
             SyncAction::CreateAndResolve(create_and_resolve) => {
-                let ops_len = ops.len();
-                let move_existing = ResolvedFsOp::MoveNode(
-                    AbsPathBuf::root(),
-                    AbsPathBuf::root(),
-                );
-                ops.push(move_existing);
                 let create_node = create_and_resolve.create().node();
+                let create_node_path = create_node.path();
+                let orig_len = ops.len();
+
+                // Push a move op for the existing node causing the conflict.
+                // We'll replace the destination path once we've resolved the
+                // conflict.
+                ops.push(ResolvedFsOp::MoveNode(
+                    create_node_path.clone(),
+                    create_node_path,
+                ));
+
+                // Push the creation ops for the new node.
                 push_node_creation(create_node, &mut ops);
-                let _resolve = create_and_resolve.into_resolve();
-                // TODO: resolve conflict, fix names.
+
+                let (rename_conflicting, rename_existing) =
+                    resolve_naming_conflict(
+                        create_and_resolve.into_resolve(),
+                        NamingConflictSource::Creation,
+                        todo!(),
+                        todo!(),
+                    );
+
+                match &mut ops[orig_len] {
+                    ResolvedFsOp::MoveNode(_, dest_path) => {
+                        dest_path.pop();
+                        dest_path.push(rename_existing.name());
+                    },
+                    _ => unreachable!("we pushed a MoveNode op above"),
+                }
+
+                match &mut ops[orig_len + 1] {
+                    ResolvedFsOp::CreateDirectory(path)
+                    | ResolvedFsOp::CreateFile(path, _) => {
+                        path.pop();
+                        path.push(rename_conflicting.name());
+                    },
+                    _ => unreachable!("we pushed a Create* op above"),
+                }
             },
             SyncAction::Delete(delete) => {
                 let node_path = delete.node().path();
