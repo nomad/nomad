@@ -86,7 +86,32 @@ pub trait Fs: Clone + Send + Sync + 'static {
 
     /// TODO: docs.
     #[inline]
-    fn read<P: AsRef<AbsPath> + Send>(
+    fn dir<P: AsRef<AbsPath> + Send>(
+        &self,
+        path: P,
+    ) -> impl Future<Output = Result<Self::Directory, GetDirError<Self>>> + Send
+    {
+        async move {
+            let path = path.as_ref();
+
+            match self
+                .node_at_path(path)
+                .await
+                .map_err(GetDirError::GetNode)?
+                .ok_or_else(|| GetDirError::NoNodeAtPath(path.to_owned()))?
+            {
+                FsNode::File(file) => Err(GetDirError::GotFile(file)),
+                FsNode::Directory(dir) => Ok(dir),
+                FsNode::Symlink(symlink) => {
+                    Err(GetDirError::GotSymlink(symlink))
+                },
+            }
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn read_file<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
     ) -> impl Future<Output = Result<Vec<u8>, ReadFileError<Self>>> + Send
@@ -128,7 +153,7 @@ pub trait Fs: Clone + Send + Sync + 'static {
 
     /// TODO: docs.
     #[inline]
-    fn read_to_string<P: AsRef<AbsPath> + Send>(
+    fn read_file_to_string<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
     ) -> impl Future<Output = Result<String, ReadFileToStringError<Self>>> + Send
@@ -136,7 +161,7 @@ pub trait Fs: Clone + Send + Sync + 'static {
         async move {
             let path = path.as_ref();
 
-            self.read(path)
+            self.read_file(path)
                 .await
                 .map_err(ReadFileToStringError::ReadFile)
                 .and_then(|contents| {
@@ -146,6 +171,33 @@ pub trait Fs: Clone + Send + Sync + 'static {
                 })
         }
     }
+}
+
+/// The type of error that can occur when trying to get the directory at a
+/// given path via [`Fs::dir`].
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
+pub enum GetDirError<Fs: self::Fs> {
+    /// Getting the node at the given path failed.
+    #[display("{_0}")]
+    GetNode(Fs::NodeAtPathError),
+
+    /// The node at the given path was a file, but a directory was expected.
+    #[display("expected a directory at {:?}, but got a file", _0.path())]
+    GotFile(Fs::File),
+
+    /// The node at the given path was a symlink, but a directory was expected.
+    #[display("expected a directory at {:?}, but got a symlink", _0.path())]
+    GotSymlink(Fs::Symlink),
+
+    /// There wasn't any node at the given path.
+    #[display("no file or directory at {_0:?}")]
+    NoNodeAtPath(AbsPathBuf),
 }
 
 /// TODO: docs.

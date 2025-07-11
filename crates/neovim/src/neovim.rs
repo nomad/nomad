@@ -278,7 +278,7 @@ impl BaseEditor for Neovim {
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = match ctx
             .with_editor(|ed| ed.as_mut().fs())
-            .read_to_string(file_path)
+            .read_file_to_string(file_path)
             .await
         {
             Ok(contents) => contents,

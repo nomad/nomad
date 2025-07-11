@@ -149,10 +149,10 @@ pub enum IntegrateFsOpError<Fs: fs::Fs> {
     CreateFile(<Fs::Directory as fs::Directory>::CreateFileError),
     /// It wasn't possible to create a symlink.
     CreateSymlink(<Fs::Directory as fs::Directory>::CreateSymlinkError),
-    /// It wasn't possible to get the directory at a particular path.
-    DirAtPath(fs::DirAtPathError<Fs>),
     /// It wasn't possible to delete a node.
     DeleteNode(fs::DeleteNodeError<Fs>),
+    /// It wasn't possible to get the directory at a particular path.
+    GetDir(fs::GetDirError<Fs>),
     /// It wasn't possible to move a node to a new location.
     MoveNode(fs::MoveNodeError<Fs>),
     /// It wasn't possible to write to a file.
@@ -1256,6 +1256,7 @@ mod impl_integrate_fs_op {
 
     use abs_path::{NodeName, NodeNameBuf};
     use collab_project::fs::{AttachedOrSync, ResolveConflict, SyncAction};
+    use ed::fs::Directory;
 
     use super::*;
 
@@ -1569,10 +1570,11 @@ mod impl_integrate_fs_op {
 
                     fs.dir(parent_path)
                         .await
-                        .map_err(IntegrateFsOpError::DirAtPath)?
+                        .map_err(IntegrateFsOpError::GetDir)?
                         .create_directory(dir_name)
-                        .map_err(IntegrateFsOpError::CreateDirectory)
                         .await
+                        .map(|_| ())
+                        .map_err(IntegrateFsOpError::CreateDirectory)
                 },
                 Self::CreateFile(path, contents) => {
                     let (parent_path, file_name) =
@@ -1581,7 +1583,7 @@ mod impl_integrate_fs_op {
                     let mut parent = fs
                         .dir(parent_path)
                         .await
-                        .map_err(IntegrateFsOpError::DirAtPath)?;
+                        .map_err(IntegrateFsOpError::GetDir)?;
 
                     match contents {
                         FileContents::Binary(contents) => parent
@@ -1590,11 +1592,12 @@ mod impl_integrate_fs_op {
                             .map_err(IntegrateFsOpError::CreateFile)?
                             .write(contents)
                             .await
-                            .map_err(IntegrateFsOpError::WriteFile)?,
+                            .map_err(IntegrateFsOpError::WriteFile),
 
                         FileContents::Symlink(target_path) => parent
-                            .create_symlink(file_name, target_path)
+                            .create_symlink(file_name, &target_path)
                             .await
+                            .map(|_| ())
                             .map_err(IntegrateFsOpError::CreateSymlink),
 
                         FileContents::Text(rope) => parent
