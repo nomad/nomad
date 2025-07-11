@@ -98,6 +98,24 @@ impl OsFile {
     }
 }
 
+/// Moves the node at the given source path to the target path.
+///
+/// Note that this will error if (among other things) there's already a node at
+/// the target path.
+async fn move_node(
+    source_path: &AbsPath,
+    target_path: &AbsPath,
+) -> Result<(), io::Error> {
+    // FIXME: this could lead to a TOC-TOU race condition.
+    if async_fs::symlink_metadata(target_path).await.is_ok() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "target path already exists",
+        ));
+    }
+    async_fs::rename(source_path, target_path).await
+}
+
 impl Fs for OsFs {
     type Directory = OsDirectory;
     type File = OsFile;
@@ -166,6 +184,7 @@ impl Directory for OsDirectory {
     type CreateSymlinkError = io::Error;
     type DeleteError = io::Error;
     type ListError = io::Error;
+    type MoveError = io::Error;
     type ParentError = io::Error;
     type ReadMetadataError = io::Error;
 
@@ -291,6 +310,11 @@ impl Directory for OsDirectory {
     }
 
     #[inline]
+    async fn r#move(&self, new_path: &AbsPath) -> Result<(), Self::MoveError> {
+        move_node(self.path(), new_path).await
+    }
+
+    #[inline]
     async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
         let Some(parent_path) = self.path().parent() else { return Ok(None) };
         let metadata = async_fs::metadata(parent_path).await?;
@@ -313,6 +337,7 @@ impl File for OsFile {
     type Fs = OsFs;
 
     type DeleteError = io::Error;
+    type MoveError = io::Error;
     type ParentError = io::Error;
     type ReadError = io::Error;
     type WriteError = io::Error;
@@ -329,6 +354,11 @@ impl File for OsFile {
             node_kind: NodeKind::File,
             node_name: self.name().as_str().into(),
         }
+    }
+
+    #[inline]
+    async fn r#move(&self, new_path: &AbsPath) -> Result<(), Self::MoveError> {
+        move_node(self.path(), new_path).await
     }
 
     #[inline]
@@ -372,6 +402,7 @@ impl Symlink for OsSymlink {
 
     type DeleteError = io::Error;
     type FollowError = io::Error;
+    type MoveError = io::Error;
     type ParentError = io::Error;
     type ReadError = io::Error;
 
@@ -405,6 +436,11 @@ impl Symlink for OsSymlink {
             node_kind: NodeKind::Symlink,
             node_name: self.name().as_str().into(),
         }
+    }
+
+    #[inline]
+    async fn r#move(&self, new_path: &AbsPath) -> Result<(), Self::MoveError> {
+        move_node(self.path(), new_path).await
     }
 
     #[inline]

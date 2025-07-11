@@ -21,7 +21,13 @@ pub use directory::{
     ReplicateError,
 };
 pub use file::{File, FileEvent, FileIdChange, FileModification};
-pub use fs::{Fs, GetDirError, ReadFileError, ReadFileToStringError};
+pub use fs::{
+    DeleteNodeError,
+    Fs,
+    GetDirError,
+    ReadFileError,
+    ReadFileToStringError,
+};
 pub use fs_event::{FsEvent, FsEventKind};
 pub use fs_node::{FsNode, NodeDeleteError};
 pub use metadata::{Metadata, MetadataNameError};

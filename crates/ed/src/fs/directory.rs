@@ -33,6 +33,9 @@ pub trait Directory: Send + Sync + Sized {
     type ListError: Error + Send;
 
     /// TODO: docs.
+    type MoveError: Error + Send;
+
+    /// TODO: docs.
     type ParentError: Error + Send;
 
     /// TODO: docs.
@@ -82,6 +85,12 @@ pub trait Directory: Send + Sync + Sized {
 
     /// TODO: docs.
     fn meta(&self) -> <Self::Fs as Fs>::Metadata;
+
+    /// TODO: docs.
+    fn r#move(
+        &self,
+        new_path: &AbsPath,
+    ) -> impl Future<Output = Result<(), Self::MoveError>> + Send;
 
     /// TODO: docs.
     #[inline]

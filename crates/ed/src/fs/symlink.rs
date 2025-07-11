@@ -16,6 +16,9 @@ pub trait Symlink: Send + Sync {
     type FollowError: Error + Send;
 
     /// TODO: docs.
+    type MoveError: Error + Send;
+
+    /// TODO: docs.
     type ParentError: Error + Send;
 
     /// TODO: docs.
@@ -48,6 +51,12 @@ pub trait Symlink: Send + Sync {
 
     /// TODO: docs.
     fn meta(&self) -> <Self::Fs as Fs>::Metadata;
+
+    /// TODO: docs.
+    fn r#move(
+        &self,
+        new_path: &AbsPath,
+    ) -> impl Future<Output = Result<(), Self::MoveError>> + Send;
 
     /// TODO: docs.
     fn name(&self) -> &NodeName {

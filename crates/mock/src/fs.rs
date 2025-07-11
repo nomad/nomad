@@ -682,6 +682,7 @@ impl fs::Directory for MockDirectory {
     type ClearError = GetNodeError;
     type DeleteError = DeleteNodeError;
     type ListError = ListDirError;
+    type MoveError = Infallible;
     type ParentError = GetNodeError;
     type ReadMetadataError = ReadMetadataError;
 
@@ -754,6 +755,13 @@ impl fs::Directory for MockDirectory {
         self.metadata.clone()
     }
 
+    async fn r#move(
+        &self,
+        _new_path: &AbsPath,
+    ) -> Result<(), Self::MoveError> {
+        todo!();
+    }
+
     async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
         let Some(parent_path) = self.path.parent() else { return Ok(None) };
         let Ok(maybe_node) = self.fs.node_at_path(parent_path).await;
@@ -784,6 +792,7 @@ impl fs::File for MockFile {
     type Fs = MockFs;
 
     type DeleteError = DeleteNodeError;
+    type MoveError = Infallible;
     type ParentError = GetNodeError;
     type ReadError = GetNodeError;
     type WriteError = GetNodeError;
@@ -795,6 +804,13 @@ impl fs::File for MockFile {
 
     fn meta(&self) -> MockMetadata {
         self.metadata.clone()
+    }
+
+    async fn r#move(
+        &self,
+        _new_path: &AbsPath,
+    ) -> Result<(), Self::MoveError> {
+        todo!();
     }
 
     async fn parent(&self) -> Result<MockDirectory, Self::ParentError> {
@@ -840,6 +856,7 @@ impl fs::Symlink for MockSymlink {
 
     type DeleteError = DeleteNodeError;
     type FollowError = FollowError;
+    type MoveError = Infallible;
     type ParentError = GetNodeError;
     type ReadError = GetNodeError;
 
@@ -907,6 +924,13 @@ impl fs::Symlink for MockSymlink {
 
     fn meta(&self) -> MockMetadata {
         self.metadata.clone()
+    }
+
+    async fn r#move(
+        &self,
+        _new_path: &AbsPath,
+    ) -> Result<(), Self::MoveError> {
+        todo!();
     }
 
     async fn parent(&self) -> Result<MockDirectory, Self::ParentError> {

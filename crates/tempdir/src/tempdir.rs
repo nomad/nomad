@@ -22,16 +22,18 @@ impl TempDir {
 impl Directory for TempDir {
     type EventStream = <os::OsDirectory as Directory>::EventStream;
     type Fs = <os::OsDirectory as Directory>::Fs;
+
+    type ClearError = <os::OsDirectory as Directory>::ClearError;
     type CreateDirectoryError =
         <os::OsDirectory as Directory>::CreateDirectoryError;
     type CreateFileError = <os::OsDirectory as Directory>::CreateFileError;
     type CreateSymlinkError =
         <os::OsDirectory as Directory>::CreateSymlinkError;
-    type ClearError = <os::OsDirectory as Directory>::ClearError;
     type DeleteError = <os::OsDirectory as Directory>::DeleteError;
+    type ListError = <os::OsDirectory as Directory>::ListError;
+    type MoveError = <os::OsDirectory as Directory>::MoveError;
     type ParentError = <os::OsDirectory as Directory>::ParentError;
     type ReadMetadataError = <os::OsDirectory as Directory>::ReadMetadataError;
-    type ListError = <os::OsDirectory as Directory>::ListError;
 
     async fn create_directory(
         &self,
@@ -75,6 +77,10 @@ impl Directory for TempDir {
 
     fn meta(&self) -> <Self::Fs as Fs>::Metadata {
         <os::OsDirectory as Directory>::meta(&self.os_dir)
+    }
+
+    async fn r#move(&self, new_path: &AbsPath) -> Result<(), Self::MoveError> {
+        <os::OsDirectory as Directory>::r#move(&self.os_dir, new_path).await
     }
 
     async fn parent(
