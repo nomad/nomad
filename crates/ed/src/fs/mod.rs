@@ -25,6 +25,7 @@ pub use fs::{
     DeleteNodeError,
     Fs,
     GetDirError,
+    MoveNodeError,
     ReadFileError,
     ReadFileToStringError,
 };

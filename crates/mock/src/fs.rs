@@ -503,12 +503,20 @@ impl FileInner {
         }
     }
 
-    fn write<C: AsRef<[u8]>>(
+    fn write_chunks<Chunks, Chunk>(
         &mut self,
-        contents: C,
+        chunks: Chunks,
         now: MockTimestamp,
-    ) -> impl Future<Output = ()> + use<C> {
-        self.contents = contents.as_ref().to_owned();
+    ) -> impl Future<Output = ()> + use<Chunks, Chunk>
+    where
+        Chunks: IntoIterator<Item = Chunk>,
+        Chunk: AsRef<[u8]>,
+    {
+        self.contents.clear();
+
+        for chunk in chunks {
+            self.contents.extend_from_slice(chunk.as_ref());
+        }
 
         let event = FileEvent::Modification(fs::FileModification {
             file_id: self.metadata.node_id,
@@ -841,12 +849,17 @@ impl fs::File for MockFile {
         .expect("file was deleted")
     }
 
-    async fn write<C: AsRef<[u8]>>(
+    async fn write_chunks<Chunks, Chunk>(
         &mut self,
-        new_contents: C,
-    ) -> Result<(), Self::WriteError> {
+        chunks: Chunks,
+    ) -> Result<(), Self::WriteError>
+    where
+        Chunks: IntoIterator<Item = Chunk> + Send,
+        Chunks::IntoIter: Send,
+        Chunk: AsRef<[u8]> + Send,
+    {
         let now = self.fs.now();
-        self.with_inner(|file| file.write(new_contents.as_ref(), now))?.await;
+        self.with_inner(|file| file.write_chunks(chunks, now))?.await;
         Ok(())
     }
 }

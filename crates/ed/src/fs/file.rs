@@ -80,10 +80,23 @@ pub trait File: Send + Sync {
     fn watch(&self) -> Self::EventStream;
 
     /// TODO: docs.
+    fn write_chunks<Chunks, Chunk>(
+        &mut self,
+        chunks: Chunks,
+    ) -> impl Future<Output = Result<(), Self::WriteError>> + Send
+    where
+        Chunks: IntoIterator<Item = Chunk> + Send,
+        Chunks::IntoIter: Send,
+        Chunk: AsRef<[u8]> + Send;
+
+    /// TODO: docs.
+    #[inline]
     fn write<C: AsRef<[u8]> + Send>(
         &mut self,
         new_contents: C,
-    ) -> impl Future<Output = Result<(), Self::WriteError>> + Send;
+    ) -> impl Future<Output = Result<(), Self::WriteError>> + Send {
+        self.write_chunks(core::iter::once(new_contents))
+    }
 }
 
 /// TODO: docs.

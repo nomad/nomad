@@ -384,12 +384,19 @@ impl File for OsFile {
     }
 
     #[inline]
-    async fn write<C: AsRef<[u8]> + Send>(
+    async fn write_chunks<Chunks, Chunk>(
         &mut self,
-        new_contents: C,
-    ) -> Result<(), Self::WriteError> {
+        chunks: Chunks,
+    ) -> Result<(), Self::WriteError>
+    where
+        Chunks: IntoIterator<Item = Chunk> + Send,
+        Chunks::IntoIter: Send,
+        Chunk: AsRef<[u8]> + Send,
+    {
         self.with_file_async(async move |file| {
-            file.write_all(new_contents.as_ref()).await?;
+            for chunk in chunks {
+                file.write_all(chunk.as_ref()).await?;
+            }
             file.sync_all().await?;
             Ok(())
         })
