@@ -21,6 +21,7 @@ use collab_project::fs::{
 };
 use collab_project::{PeerId, binary, text};
 use collab_server::message::{self, Message, Peer, Peers};
+use compact_str::format_compact;
 use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
@@ -1355,73 +1356,102 @@ enum NamingConflictSource {
     Rename,
 }
 
-fn resolve_naming_conflict<Ed: CollabEditor>(
-    conflict: collab_project::fs::ResolveConflict,
+fn resolve_naming_conflict(
+    mut conflict: collab_project::fs::ResolveConflict<'_>,
     conflict_source: NamingConflictSource,
     _local_peer: &Peer,
     _remote_peers: &Peers,
 ) -> (NodeRename, NodeRename) {
     let conflicting = conflict.conflicting_node();
-
     let existing = conflict.existing_node();
 
-    match conflict_source {
-        NamingConflictSource::Creation => {
-            debug_assert!(
-                conflicting.created_by() != existing.created_by(),
-                "conflicting and existing nodes must have different creators"
-            );
+    // If the naming conflict is due to concurrent creations, we'll first try
+    // to resolve it by appending the GitHub handles of the creators to the
+    // file names.
+    //
+    // For example, if Alice and Bob concurrently create a "lib.rs" file in the
+    // same directory, we'll rename them to "lib.rs-alice" and "lib.rs-bob",
+    // respectively.
+    //
+    // In the rare edge case where doing that doesn't break the conflict (for
+    // example if a file named "lib.rs-alice" already exists), we'll fallback
+    // to the logic below, which will append random suffixes to the new names.
+    if let NamingConflictSource::Creation = conflict_source {
+        debug_assert!(
+            conflicting.created_by() != existing.created_by(),
+            "conflicting and existing nodes must have different creators"
+        );
 
-            todo!();
-        },
-
-        _ => {
-            let (seed_conflicting, seed_existing) =
-                if conflicting.created_by() == existing.created_by() {
-                    let seed = conflicting.created_by();
-                    let mut rng = fastrand::Rng::with_seed(seed);
-                    (rng.gen_u64(), rng.gen_u64())
-                } else {
-                    (creator_confl, creator_existing)
-                };
-
-            let mut rng_conflicting =
-                fastrand::Rng::with_seed(seed_conflicting);
-
-            let mut rng_existing = fastrand::Rng::with_seed(seed_existing);
-
-            let gen_name =
-                |current_name: &NodeName, rng: &mut fastrand::Rng| {
-                    format_compat!(
-                        "{current_name}-{}",
-                        rng.alphanumeric(6).to_smolstr()
-                    )
+        if let (Some(creator_conflicting), Some(creator_existing)) = (
+            peers.get(conflicting.created_by()),
+            peers.get(existing.created_by()),
+        ) {
+            let gen_name = |current_name: &NodeName, node_creator: &Peer| {
+                let suffix = node_creator.github_handle.as_str();
+                format_compact!("{current_name}-{suffix}")
                     .parse::<NodeNameBuf>()
-                    .expect("generated name is valid")
-                };
+                    .expect("new name is valid")
+            };
 
-            loop {
-                let name_conflicting =
-                    gen_name(conflicting.name(), &mut rng_conflicting);
+            let mut conflicting = conflict.conflicting_node_mut();
+            let new_name = gen_name(conflicting.name(), creator_conflicting);
+            let rename_conflicting = conflicting.force_rename(new_name);
 
-                let name_existing =
-                    gen_name(existing.name(), &mut rng_existing);
+            let mut existing = conflict.existing_node_mut();
+            let new_name = gen_name(existing.name(), creator_existing);
+            let rename_existing = existing.force_rename(new_name);
 
-                let Ok(rename_conflicting) =
-                    conflict.conflicting_node_mut().rename(name_conflicting)
-                else {
-                    continue;
-                };
-
-                let Ok(rename_existing) =
-                    conflict.existing_node_mut().rename(name_existing)
-                else {
-                    continue;
-                };
-
-                break (rename_conflicting, rename_existing);
+            match conflict.assume_resolved() {
+                Ok(()) => return (rename_conflicting, rename_existing),
+                Err(still_conflict) => conflict = still_conflict,
             }
-        },
+        }
+    }
+
+    let conflicting = conflict.conflicting_node();
+    let existing = conflict.existing_node();
+
+    // Create 2 deterministically-seeded RNGs to produce name suffixes.
+    let (seed_conflicting, seed_existing) =
+        if conflicting.created_by() != existing.created_by() {
+            (conflicting.created_by(), existing.created_by())
+        } else {
+            let seed = existing.created_by();
+            let mut rng = fastrand::Rng::with_seed(seed);
+            (rng.u64(..), rng.u64(..))
+        };
+
+    debug_assert!(seed_conflicting != seed_existing);
+
+    let mut rng_conflicting = fastrand::Rng::with_seed(seed_conflicting);
+    let mut rng_existing = fastrand::Rng::with_seed(seed_existing);
+
+    let gen_name = |current_name: &NodeName, rng: &mut fastrand::Rng| {
+        let suffix = iter::repeat_with(|| rng.alphanumeric())
+            .take(6)
+            .map(|ch| ch.to_ascii_lowercase())
+            .collect::<compact_str::CompactString>();
+        format_compact!("{current_name}-{suffix}")
+            .parse::<NodeNameBuf>()
+            .expect("new name is valid")
+    };
+
+    let orig_name_conflicting = conflicting.name().to_owned();
+    let orig_name_existing = existing.name().to_owned();
+
+    loop {
+        let mut conflicting = conflict.conflicting_node_mut();
+        let new_name = gen_name(orig_name_conflicting, &mut rng_conflicting);
+        let rename_conflicting = conflicting.force_rename(new_name);
+
+        let mut existing = conflict.existing_node_mut();
+        let new_name = gen_name(orig_name_existing, &mut rng_existing);
+        let rename_existing = existing.force_rename(new_name);
+
+        match conflict.assume_resolved() {
+            Ok(()) => return (rename_conflicting, rename_existing),
+            Err(still_conflict) => conflict = still_conflict,
+        }
     }
 }
 

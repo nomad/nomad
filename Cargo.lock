@@ -652,7 +652,7 @@ dependencies = [
  "clipboard",
  "collab-project",
  "collab-server",
- "concurrent-queue",
+ "compact_str",
  "derive_more",
  "duplex-stream",
  "ed",
