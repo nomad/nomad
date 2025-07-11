@@ -12,12 +12,12 @@ neovim = ["keyring/apple-native", "keyring/secret-service", "dep:neovim"]
 
 [dependencies]
 abs-path = { workspace = true }
-collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = [
+collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
   "nomad",
 ] }
 ed = { workspace = true }
 event-listener = "5"
-keyring = { version = "4.0.0-rc.1", default-features = false }
+keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1"
 

@@ -22,8 +22,8 @@ neovim = [
 abs-path = { workspace = true, features = ["macros"] }
 auth = { workspace = true }
 cauchy = { workspace = true }
-collab-project = { git = "ssh://git@github.com/nomad/collab.git" }
-collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = [
+collab-project = { git = "ssh://git@github.com/nomad/collab-server.git" }
+collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
   "client",
 ] }
 compact_str = { workspace = true }

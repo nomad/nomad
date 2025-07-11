@@ -1580,7 +1580,7 @@ mod impl_integrate_fs_op {
                     let (parent_path, file_name) =
                         path.split_last().expect("not creating root");
 
-                    let mut parent = fs
+                    let parent = fs
                         .dir(parent_path)
                         .await
                         .map_err(IntegrateFsOpError::GetDir)?;
