@@ -1237,7 +1237,7 @@ mod impl_integrate_fs_op {
     //! Contains the various types, free-standing functions and methods used in
     //! the implementation of [`ProjectHandle::integrate_fs_op`].
 
-    use collab_project::fs::{AttachedOrSync, SyncAction};
+    use collab_project::fs::{AttachedOrSync, ResolveConflict, SyncAction};
 
     use super::*;
 
@@ -1277,18 +1277,19 @@ mod impl_integrate_fs_op {
                 push_node_creation(create.node(), &mut ops);
             },
             SyncAction::Delete(delete) => {
-                let node_path = delete.node().path();
-                ops.push(ResolvedFsOp::DeleteNode(node_path));
+                ops.push(ResolvedFsOp::DeleteNode(delete.old_path()));
             },
             SyncAction::Move(r#move) => {
-                let from_path = r#move.old_path();
-                let to_path = r#move.new_path();
-                ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                ops.push(ResolvedFsOp::MoveNode(
+                    r#move.old_path(),
+                    r#move.new_path(),
+                ));
             },
             SyncAction::Rename(rename) => {
-                let from_path = rename.old_path();
-                let to_path = rename.new_path();
-                ops.push(ResolvedFsOp::MoveNode(from_path, to_path));
+                ops.push(ResolvedFsOp::MoveNode(
+                    rename.old_path(),
+                    rename.new_path(),
+                ));
             },
             SyncAction::CreateAndResolve(create_and_resolve) => {
                 let create_node = create_and_resolve.create().node();
@@ -1394,7 +1395,7 @@ mod impl_integrate_fs_op {
     fn push_move_and_resolve(
         move_existing_from: AbsPathBuf,
         move_conflicting_from: AbsPathBuf,
-        conflict: collab_project::fs::ResolveConflict<'_>,
+        conflict: ResolveConflict<'_>,
         ops: &mut SmallVec<[ResolvedFsOp; 1]>,
         renames: &mut SmallVec<[NodeRename; 2]>,
     ) {
@@ -1431,7 +1432,7 @@ mod impl_integrate_fs_op {
     }
 
     fn resolve_naming_conflict(
-        mut conflict: collab_project::fs::ResolveConflict<'_>,
+        mut conflict: ResolveConflict<'_>,
         conflict_source: NamingConflictSource,
         _local_peer: &Peer,
         _remote_peers: &Peers,
