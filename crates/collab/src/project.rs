@@ -6,23 +6,16 @@ use std::collections::hash_map;
 use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_project::fs::{
-    DirectoryId,
-    File,
-    FileId,
-    FileMut,
-    FsOp,
-    GlobalFileId,
-    Node,
-    NodeMut,
-    NodeRename,
-};
-use collab_project::{PeerId, binary, text};
-use collab_server::message::{self, Message, Peer};
+use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
+use collab_project::text::{CursorId, SelectionId, TextReplacement};
+use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
 use compact_str::format_compact;
 use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
+use puff::directory::LocalDirectoryId;
+use puff::file::{GlobalFileId, LocalFileId};
+use puff::ops::Rename;
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
 
@@ -71,10 +64,10 @@ pub(crate) struct Project<Ed: CollabEditor> {
     local_peer_id: PeerId,
     /// Map from a remote selections's ID to the corresponding selection
     /// displayed in the editor.
-    peer_selections: FxHashMap<text::SelectionId, Ed::PeerSelection>,
+    peer_selections: FxHashMap<SelectionId, Ed::PeerSelection>,
     /// Map from a remote cursor's ID to the corresponding tooltip displayed in
     /// the editor.
-    peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltip>,
+    peer_tooltips: FxHashMap<CursorId, Ed::PeerTooltip>,
     /// Map from a peer's ID to the corresponding [`Peer`]. Contains both the
     /// local peer and the remote peers.
     peers: FxHashMap<PeerId, Peer>,
@@ -100,20 +93,20 @@ pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
     pub(crate) host_id: PeerId,
     pub(crate) id_maps: IdMaps<Ed>,
     pub(crate) local_peer: Peer,
-    pub(crate) remote_peers: message::Peers,
+    pub(crate) remote_peers: collab_types::Peers,
     pub(crate) project: collab_project::Project,
     pub(crate) session_id: SessionId<Ed>,
 }
 
 #[derive(cauchy::Default)]
 pub(crate) struct IdMaps<Ed: Editor> {
-    pub(crate) buffer2file: FxHashMap<Ed::BufferId, FileId>,
-    pub(crate) cursor2cursor: FxHashMap<Ed::CursorId, text::CursorId>,
-    pub(crate) file2buffer: FxHashMap<FileId, Ed::BufferId>,
-    pub(crate) node2dir: FxHashMap<<Ed::Fs as fs::Fs>::NodeId, DirectoryId>,
-    pub(crate) node2file: FxHashMap<<Ed::Fs as fs::Fs>::NodeId, FileId>,
-    pub(crate) selection2selection:
-        FxHashMap<Ed::SelectionId, text::SelectionId>,
+    pub(crate) buffer2file: FxHashMap<Ed::BufferId, LocalFileId>,
+    pub(crate) cursor2cursor: FxHashMap<Ed::CursorId, CursorId>,
+    pub(crate) file2buffer: FxHashMap<LocalFileId, Ed::BufferId>,
+    pub(crate) node2dir:
+        FxHashMap<<Ed::Fs as fs::Fs>::NodeId, LocalDirectoryId>,
+    pub(crate) node2file: FxHashMap<<Ed::Fs as fs::Fs>::NodeId, LocalFileId>,
+    pub(crate) selection2selection: FxHashMap<Ed::SelectionId, SelectionId>,
 }
 
 #[derive(cauchy::Debug)]
@@ -184,17 +177,17 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
 
     pub(crate) fn handle_request(
         &self,
-        request: message::ProjectRequest,
-    ) -> message::ProjectResponse {
-        let (peers, project) = self.with_project(|proj| {
+        request: collab_types::ProjectRequest,
+    ) -> collab_types::ProjectResponse {
+        let (peers, encoded_project) = self.with_project(|proj| {
             let peers = proj.peers.values().cloned().collect();
-            let project = Box::new(proj.inner.clone().into_state());
-            (peers, project)
+            // let project = Box::new(proj.inner.clone().into_state());
+            (peers, todo!())
         });
 
-        message::ProjectResponse {
+        collab_types::ProjectResponse {
             peers,
-            project,
+            encoded_project,
             respond_to: request.requested_by.id,
         }
     }
@@ -220,15 +213,11 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 self.integrate_selection_creation(selection_creation, ctx)
                     .await
             },
-            Message::DeletedCursor(cursor_deletion) => {
-                self.integrate_cursor_deletion(cursor_deletion, ctx).await
-            },
-            Message::DeletedFsNode(deletion) => {
+            Message::DeletedDirectory(deletion) => {
                 let _ = self.integrate_fs_op(deletion, ctx).await;
             },
-            Message::DeletedSelection(selection_deletion) => {
-                self.integrate_selection_deletion(selection_deletion, ctx)
-                    .await;
+            Message::DeletedFile(deletion) => {
+                let _ = self.integrate_fs_op(deletion, ctx).await;
             },
             Message::EditedBinary(binary_edit) => {
                 let _ = self.integrate_binary_edit(binary_edit, ctx).await;
@@ -237,9 +226,12 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 self.integrate_text_edit(text_edit, ctx).await
             },
             Message::MovedCursor(cursor_movement) => {
-                self.integrate_cursor_movement(cursor_movement, ctx).await
+                self.integrate_cursor_move(cursor_movement, ctx).await
             },
-            Message::MovedFsNode(movement) => {
+            Message::MovedDirectory(movement) => {
+                let _ = self.integrate_fs_op(movement, ctx).await;
+            },
+            Message::MovedFile(movement) => {
                 let _ = self.integrate_fs_op(movement, ctx).await;
             },
             Message::MovedSelection(selection_movement) => {
@@ -265,6 +257,16 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 ctx.emit_error(notify::Message::from_display(
                     "received unexpected ProjectResponse message",
                 ));
+            },
+            Message::RemovedCursor(cursor_deletion) => {
+                self.integrate_cursor_deletion(cursor_deletion, ctx).await
+            },
+            Message::RemovedSelection(selection_deletion) => {
+                self.integrate_selection_deletion(selection_deletion, ctx)
+                    .await;
+            },
+            Message::RenamedFsNode(rename) => {
+                let _ = self.integrate_fs_op(rename, ctx).await;
             },
             Message::SavedTextFile(file_id) => {
                 let _ = self.integrate_file_save(file_id, ctx).await;
@@ -366,12 +368,12 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
 
     async fn integrate_cursor_deletion(
         &self,
-        deletion: text::CursorDeletion,
+        removal: text::CursorRemoval,
         ctx: &mut Context<Ed>,
     ) {
         let Some(tooltip) = self.with_project(|proj| {
             proj.inner
-                .integrate_cursor_deletion(deletion)
+                .integrate_cursor_removal(removal)
                 .and_then(|cursor_id| proj.peer_tooltips.remove(&cursor_id))
         }) else {
             return;
@@ -380,13 +382,13 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         Ed::remove_peer_tooltip(tooltip, ctx).await;
     }
 
-    async fn integrate_cursor_movement(
+    async fn integrate_cursor_move(
         &self,
-        movement: text::CursorMovement,
+        movement: text::CursorMove,
         ctx: &mut Context<Ed>,
     ) {
         let Some(move_tooltip) = self.with_project(|proj| {
-            let cursor = proj.inner.integrate_cursor_movement(movement)?;
+            let cursor = proj.inner.integrate_cursor_move(movement)?;
             let tooltip = proj.peer_tooltips.get_mut(&cursor.id())?;
             Some(Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx))
         }) else {
@@ -424,7 +426,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         &self,
         op: T,
         ctx: &mut Context<Ed>,
-    ) -> Result<SmallVec<[NodeRename; 2]>, IntegrateFsOpError<Ed::Fs>> {
+    ) -> Result<SmallVec<[Rename; 2]>, IntegrateFsOpError<Ed::Fs>> {
         use impl_integrate_fs_op as r#impl;
 
         let mut actions = SmallVec::new();
@@ -526,11 +528,11 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
 
     async fn integrate_selection_deletion(
         &self,
-        deletion: text::SelectionDeletion,
+        deletion: text::SelectionRemoval,
         ctx: &mut Context<Ed>,
     ) {
         let Some(selection) = self.with_project(|proj| {
-            proj.inner.integrate_selection_deletion(deletion).and_then(
+            proj.inner.integrate_selection_removal(deletion).and_then(
                 |selection_id| proj.peer_selections.remove(&selection_id),
             )
         }) else {
@@ -542,12 +544,11 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
 
     async fn integrate_selection_movement(
         &self,
-        movement: text::SelectionMovement,
+        movement: text::SelectionMove,
         ctx: &mut Context<Ed>,
     ) {
         let Some(move_selection) = self.with_project(|proj| {
-            let selection =
-                proj.inner.integrate_selection_movement(movement)?;
+            let selection = proj.inner.integrate_selection_move(movement)?;
             let peer_selection =
                 proj.peer_selections.get_mut(&selection.id())?;
             Some(Ed::move_peer_selection(
@@ -616,12 +617,12 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     ) -> Result<Option<Message>, SynchronizeError<Ed>> {
         enum FileContents {
             Binary(Arc<[u8]>),
-            Text(text::crop::Rope),
+            Text(crop::Rope),
         }
 
         enum FileDiff {
             Binary(Vec<u8>),
-            Text(SmallVec<[text::TextReplacement; 1]>),
+            Text(SmallVec<[TextReplacement; 1]>),
         }
 
         // Get the file's contents before the modification.
@@ -745,7 +746,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     fn cursor_of_cursor_id(
         &mut self,
         cursor_id: &Ed::CursorId,
-    ) -> text::CursorMut<'_> {
+    ) -> collab_project::text::CursorMut<'_> {
         let Some(&project_cursor_id) =
             self.id_maps.cursor2cursor.get(cursor_id)
         else {
@@ -796,7 +797,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     fn selection_of_selection_id(
         &mut self,
         selection_id: &Ed::SelectionId,
-    ) -> text::SelectionMut<'_> {
+    ) -> collab_project::text::SelectionMut<'_> {
         let Some(&project_selection_id) =
             self.id_maps.selection2selection.get(selection_id)
         else {
@@ -891,7 +892,7 @@ impl<Ed: CollabEditor> Project<Ed> {
 
                 self.id_maps.cursor2cursor.remove(&event.cursor_id);
 
-                Message::DeletedCursor(deletion)
+                Message::RemovedCursor(deletion)
             },
         }
     }
@@ -967,10 +968,10 @@ impl<Ed: CollabEditor> Project<Ed> {
             panic!("parent is not a directory");
         };
 
-        let (file_mut, creation) = match node_contents {
+        let Ok((creation, file_mut)) = (match node_contents {
             FsNodeContents::Directory => {
                 match parent.create_directory(node_name) {
-                    Ok((dir_mut, creation)) => {
+                    Ok((creation, dir_mut)) => {
                         let dir_id = dir_mut.as_directory().id();
                         self.id_maps.node2dir.insert(node_id, dir_id);
                         return Message::CreatedDirectory(creation);
@@ -987,8 +988,9 @@ impl<Ed: CollabEditor> Project<Ed> {
             FsNodeContents::Symlink(target_path) => {
                 parent.create_symlink(node_name, target_path)
             },
-        }
-        .expect("no duplicate node names");
+        }) else {
+            unreachable!("no duplicate node names");
+        };
 
         let file_id = file_mut.as_file().id();
         self.id_maps.node2file.insert(node_id, file_id);
@@ -1000,11 +1002,13 @@ impl<Ed: CollabEditor> Project<Ed> {
         deletion: fs::NodeDeletion<Ed::Fs>,
     ) -> Message {
         let node_id = deletion.node_id;
+
         let deletion = match self.project_node(&node_id) {
-            NodeMut::Directory(dir) => {
-                dir.delete().expect("dir is not the project root")
+            NodeMut::Directory(dir) => match dir.delete() {
+                Ok(deletion) => Message::DeletedDirectory(deletion),
+                Err(_) => unreachable!("dir is not the project root"),
             },
-            NodeMut::File(file) => file.delete(),
+            NodeMut::File(file) => Message::DeletedFile(file.delete()),
         };
 
         let ids = &mut self.id_maps;
@@ -1016,7 +1020,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             ids.node2dir.remove(&node_id);
         }
 
-        Message::DeletedFsNode(deletion)
+        deletion
     }
 
     fn synchronize_node_move(
@@ -1044,17 +1048,15 @@ impl<Ed: CollabEditor> Project<Ed> {
 
         let parent_id = parent.as_directory().id();
 
-        let movement = match self.project_node(&r#move.node_id) {
-            NodeMut::Directory(mut dir) => {
-                dir.r#move(parent_id).expect("invalid move on directory")
-            },
+        match self.project_node(&r#move.node_id) {
+            NodeMut::Directory(mut dir) => Message::MovedDirectory(
+                dir.r#move(parent_id).expect("invalid move on directory"),
+            ),
 
-            NodeMut::File(mut file) => {
-                file.r#move(parent_id).expect("invalid move on file")
-            },
-        };
-
-        Message::MovedFsNode(movement)
+            NodeMut::File(mut file) => Message::MovedFile(
+                file.r#move(parent_id).expect("invalid move on file"),
+            ),
+        }
     }
 
     fn synchronize_selection(&mut self, event: SelectionEvent<Ed>) -> Message {
@@ -1078,13 +1080,13 @@ impl<Ed: CollabEditor> Project<Ed> {
                 Message::MovedSelection(movement)
             },
             SelectionEventKind::Removed => {
-                let deletion = self
+                let removal = self
                     .selection_of_selection_id(&event.selection_id)
                     .delete();
 
                 self.id_maps.selection2selection.remove(&event.selection_id);
 
-                Message::DeletedSelection(deletion)
+                Message::RemovedSelection(removal)
             },
         }
     }
@@ -1095,7 +1097,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     fn text_file_of_buffer(
         &mut self,
         buffer_id: &Ed::BufferId,
-    ) -> text::TextFileMut<'_> {
+    ) -> collab_project::text::TextFileMut<'_> {
         let Some(&file_id) = self.id_maps.buffer2file.get(buffer_id) else {
             panic!("unknown buffer ID: {buffer_id:?}");
         };
@@ -1255,14 +1257,15 @@ mod impl_integrate_fs_op {
     //! the implementation of [`ProjectHandle::integrate_fs_op`].
 
     use abs_path::{NodeName, NodeNameBuf};
-    use collab_project::fs::{AttachedOrSync, ResolveConflict, SyncAction};
+    use collab_project::fs::{ResolveConflict, SyncAction};
     use ed::fs::Directory;
+    use puff::node::IsVisible;
 
     use super::*;
 
     pub(super) enum FileContents {
         Binary(Arc<[u8]>),
-        Text(text::crop::Rope),
+        Text(crop::Rope),
         Symlink(compact_str::CompactString),
     }
 
@@ -1290,7 +1293,7 @@ mod impl_integrate_fs_op {
         action: SyncAction<'_>,
         peers: &FxHashMap<PeerId, Peer>,
         actions: &mut SmallVec<[ResolvedFsAction; 1]>,
-    ) -> Option<[NodeRename; 2]> {
+    ) -> Option<[Rename; 2]> {
         match action {
             SyncAction::Create(create) => {
                 push_node_creation(create.node(), &mut actions);
@@ -1385,7 +1388,7 @@ mod impl_integrate_fs_op {
     /// If the node is a directory, it recursively pushes the creation actions
     /// for all its children.
     fn push_node_creation(
-        node: Node<impl AttachedOrSync>,
+        node: Node<impl IsVisible>,
         actions: &mut SmallVec<[ResolvedFsAction; 1]>,
     ) {
         match node {
@@ -1422,7 +1425,7 @@ mod impl_integrate_fs_op {
         conflict: ResolveConflict<'_>,
         peers: &FxHashMap<PeerId, Peer>,
         actions: &mut SmallVec<[ResolvedFsAction; 1]>,
-    ) -> [NodeRename; 2] {
+    ) -> [Rename; 2] {
         let (rename_conflicting, rename_existing) = resolve_naming_conflict(
             conflict,
             NamingConflictSource::Movement,
@@ -1460,7 +1463,7 @@ mod impl_integrate_fs_op {
         mut conflict: ResolveConflict<'_>,
         conflict_source: NamingConflictSource,
         peers: &FxHashMap<PeerId, Peer>,
-    ) -> (NodeRename, NodeRename) {
+    ) -> (Rename, Rename) {
         let conflicting = conflict.conflicting_node();
         let existing = conflict.existing_node();
 
@@ -1725,8 +1728,8 @@ pub(crate) enum ContentsAtPathError<Fs: fs::Fs> {
 }
 
 fn text_diff(
-    _lhs: text::crop::Rope,
+    _lhs: crop::Rope,
     _rhs: &str,
-) -> Option<SmallVec<[text::TextReplacement; 1]>> {
+) -> Option<SmallVec<[TextReplacement; 1]>> {
     todo!();
 }

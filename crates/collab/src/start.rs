@@ -5,15 +5,10 @@ use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
-use collab_project::fs::{
-    DirectoryId,
-    File as ProjectFile,
-    FileId,
-    Node as ProjectNode,
-};
+use collab_project::fs::{File as ProjectFile, Node as ProjectNode};
 use collab_project::{Project, ProjectBuilder};
-use collab_server::message::{Peer, PeerId};
 use collab_server::{SessionIntent, client};
+use collab_types::{Peer, PeerId, puff};
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
@@ -22,6 +17,8 @@ use ed::shared::{MultiThreaded, Shared};
 use ed::{Buffer, Context, Editor};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
+use puff::directory::LocalDirectoryId;
+use puff::file::LocalFileId;
 use smol_str::ToSmolStr;
 use walkdir::FsExt;
 
@@ -496,9 +493,9 @@ pub struct AllButOne<Fs: fs::Fs> {
 
 #[derive(cauchy::Default)]
 struct NodeIdMaps<Fs: fs::Fs> {
-    file2node: FxHashMap<FileId, Fs::NodeId>,
-    node2dir: FxHashMap<Fs::NodeId, DirectoryId>,
-    node2file: FxHashMap<Fs::NodeId, FileId>,
+    file2node: FxHashMap<LocalFileId, Fs::NodeId>,
+    node2dir: FxHashMap<Fs::NodeId, LocalDirectoryId>,
+    node2file: FxHashMap<Fs::NodeId, LocalFileId>,
 }
 
 impl<Fs: fs::Fs> walkdir::Filter<Fs> for AllButOne<Fs> {

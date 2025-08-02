@@ -655,6 +655,7 @@ dependencies = [
  "clipboard",
  "collab-project",
  "collab-server",
+ "collab-types",
  "compact_str",
  "derive_more",
  "duplex-stream 0.0.9 (git+ssh://git@github.com/nomad/collab.git)",

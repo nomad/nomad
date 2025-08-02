@@ -10,13 +10,12 @@ use auth::AuthInfos;
 use collab_project::Project;
 use collab_project::fs::{
     Directory as ProjectDirectory,
-    DirectoryId,
     File as ProjectFile,
-    FileId,
     Node,
 };
 use collab_server::message::{Message, Peer, ProjectRequest};
 use collab_server::{SessionIntent, client};
+use collab_types::puff;
 use ed::Context;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
@@ -25,6 +24,8 @@ use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
 use fxhash::FxHashMap;
+use puff::directory::LocalDirectoryId;
+use puff::file::LocalFileId;
 
 use crate::collab::Collab;
 use crate::config::Config;
@@ -193,7 +194,8 @@ async fn request_project<Ed: CollabEditor>(
 
         match message {
             Message::ProjectResponse(response) => {
-                let proj = Project::from_state(local_id, *response.project);
+                // let proj = Project::from_state(local_id, *response.project);
+                let proj = todo!();
                 break Ok((proj, buffered));
             },
             other => buffered.push(other),
@@ -268,7 +270,7 @@ async fn write_children<Fs: fs::Fs>(
         .children()
         .map(|node| match node {
             Node::Directory(directory) => future::Either::Left(async move {
-                let dir_name = directory.name().expect("dir is not root");
+                let dir_name = directory.try_name().expect("dir is not root");
 
                 let dir = fs_dir
                     .create_directory(dir_name)
@@ -425,8 +427,8 @@ struct ProjectPtr(NonNull<Project>);
 
 #[derive(cauchy::Default)]
 struct NodeIdMaps<Fs: fs::Fs> {
-    node2dir: FxHashMap<Fs::NodeId, DirectoryId>,
-    node2file: FxHashMap<Fs::NodeId, FileId>,
+    node2dir: FxHashMap<Fs::NodeId, LocalDirectoryId>,
+    node2file: FxHashMap<Fs::NodeId, LocalFileId>,
 }
 
 impl ProjectPtr {

@@ -26,6 +26,7 @@ collab-project = { git = "ssh://git@github.com/nomad/collab-server.git" }
 collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
   "client",
 ] }
+collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true }
