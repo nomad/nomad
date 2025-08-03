@@ -1259,6 +1259,7 @@ mod impl_integrate_fs_op {
     use abs_path::{NodeName, NodeNameBuf};
     use collab_project::fs::{ResolveConflict, SyncAction};
     use ed::fs::Directory;
+    use futures_util::FutureExt;
     use puff::node::IsVisible;
 
     use super::*;
@@ -1289,6 +1290,7 @@ mod impl_integrate_fs_op {
         Movement,
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(super) fn push_resolved_actions(
         action: SyncAction<'_>,
         peers: &FxHashMap<PeerId, Peer>,
@@ -1420,6 +1422,7 @@ mod impl_integrate_fs_op {
     }
 
     /// TODO: docs.
+    #[allow(clippy::too_many_arguments)]
     fn push_move_and_resolve(
         move_existing_from: AbsPathBuf,
         move_conflicting_from: AbsPathBuf,
@@ -1460,6 +1463,7 @@ mod impl_integrate_fs_op {
         [rename_conflicting, rename_existing]
     }
 
+    #[allow(clippy::too_many_lines)]
     fn resolve_naming_conflict(
         mut conflict: ResolveConflict<'_>,
         conflict_source: NamingConflictSource,
@@ -1617,6 +1621,7 @@ mod impl_integrate_fs_op {
                             .await
                             .map_err(IntegrateFsOpError::CreateFile)?
                             .write_chunks(rope.chunks())
+                            .boxed()
                             .await
                             .map_err(IntegrateFsOpError::WriteFile),
                     }

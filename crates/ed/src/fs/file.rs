@@ -80,6 +80,12 @@ pub trait File: Send + Sync {
     fn watch(&self) -> Self::EventStream;
 
     /// TODO: docs.
+    ///
+    /// Note that because of a [compiler bug][bug], the returned future won't
+    /// actually be `Send`. An easy workaround is to
+    /// [box](futures_util::FutureExt::boxed) the future before `await`ing it.
+    ///
+    /// [bug]: https://github.com/rust-lang/rust/issues/100013
     fn write_chunks<Chunks, Chunk>(
         &mut self,
         chunks: Chunks,
