@@ -37,7 +37,7 @@ impl Auth {
     #[track_caller]
     pub fn logged_in<Gh>(github_handle: Gh) -> Self
     where
-        Gh: TryInto<collab_server::message::GitHubHandle>,
+        Gh: TryInto<collab_types::GitHubHandle>,
         Gh::Error: core::fmt::Debug,
     {
         Self {

@@ -1296,7 +1296,7 @@ mod impl_integrate_fs_op {
     ) -> Option<[Rename; 2]> {
         match action {
             SyncAction::Create(create) => {
-                push_node_creation(create.node(), &mut actions);
+                push_node_creation(create.node(), actions);
                 None
             },
             SyncAction::Delete(delete) => {
@@ -1317,8 +1317,9 @@ mod impl_integrate_fs_op {
                 ));
                 None
             },
-            SyncAction::CreateAndResolve(create_and_resolve) => {
-                let create_node = create_and_resolve.create().node();
+            SyncAction::CreateAndResolve(mut create_and_resolve) => {
+                let create = create_and_resolve.create();
+                let create_node = create.node();
                 let create_node_path = create_node.path();
                 let orig_len = actions.len();
 
@@ -1331,7 +1332,7 @@ mod impl_integrate_fs_op {
                 ));
 
                 // Push the creation actions for the new node.
-                push_node_creation(create_node, &mut actions);
+                push_node_creation(create_node, actions);
 
                 let (rename_conflicting, rename_existing) =
                     resolve_naming_conflict(
@@ -1343,7 +1344,7 @@ mod impl_integrate_fs_op {
                 match &mut actions[orig_len] {
                     ResolvedFsAction::MoveNode(_, dest_path) => {
                         dest_path.pop();
-                        dest_path.push(rename_existing.name());
+                        dest_path.push(rename_existing.new_name());
                     },
                     _ => unreachable!("we pushed a MoveNode action above"),
                 }
@@ -1352,14 +1353,14 @@ mod impl_integrate_fs_op {
                     ResolvedFsAction::CreateDirectory(path)
                     | ResolvedFsAction::CreateFile(path, _) => {
                         path.pop();
-                        path.push(rename_conflicting.name());
+                        path.push(rename_conflicting.new_name());
                     },
                     _ => unreachable!("we pushed a Create* action above"),
                 }
 
                 Some([rename_conflicting, rename_existing])
             },
-            SyncAction::MoveAndResolve(move_and_resolve) => {
+            SyncAction::MoveAndResolve(mut move_and_resolve) => {
                 let r#move = move_and_resolve.r#move();
                 Some(push_move_and_resolve(
                     r#move.new_path(),
@@ -1369,7 +1370,7 @@ mod impl_integrate_fs_op {
                     actions,
                 ))
             },
-            SyncAction::RenameAndResolve(rename_and_resolve) => {
+            SyncAction::RenameAndResolve(mut rename_and_resolve) => {
                 let rename = rename_and_resolve.rename();
                 Some(push_move_and_resolve(
                     rename.new_path(),
@@ -1435,14 +1436,14 @@ mod impl_integrate_fs_op {
         let move_existing_to = {
             let mut path = move_existing_from.clone();
             path.pop();
-            path.push(rename_existing.name());
+            path.push(rename_existing.new_name());
             path
         };
 
         let move_conflicting_to = {
             let mut path = move_existing_from.clone();
             path.pop();
-            path.push(rename_conflicting.name());
+            path.push(rename_conflicting.new_name());
             path
         };
 
@@ -1486,8 +1487,8 @@ mod impl_integrate_fs_op {
             );
 
             if let (Some(creator_conflicting), Some(creator_existing)) = (
-                peers.get(conflicting.created_by()),
-                peers.get(existing.created_by()),
+                peers.get(&conflicting.created_by()),
+                peers.get(&existing.created_by()),
             ) {
                 let gen_name =
                     |current_name: &NodeName, node_creator: &Peer| {
@@ -1498,12 +1499,17 @@ mod impl_integrate_fs_op {
                     };
 
                 let mut conflicting = conflict.conflicting_node_mut();
-                let new_name =
-                    gen_name(conflicting.name(), creator_conflicting);
+                let new_name = gen_name(
+                    conflicting.try_name().expect("node is not root"),
+                    creator_conflicting,
+                );
                 let rename_conflicting = conflicting.force_rename(new_name);
 
                 let mut existing = conflict.existing_node_mut();
-                let new_name = gen_name(existing.name(), creator_existing);
+                let new_name = gen_name(
+                    existing.try_name().expect("node is not root"),
+                    creator_existing,
+                );
                 let rename_existing = existing.force_rename(new_name);
 
                 match conflict.assume_resolved() {
@@ -1519,9 +1525,9 @@ mod impl_integrate_fs_op {
         // Create 2 deterministically-seeded RNGs to produce name suffixes.
         let (seed_conflicting, seed_existing) =
             if conflicting.created_by() != existing.created_by() {
-                (conflicting.created_by(), existing.created_by())
+                (conflicting.created_by().into(), existing.created_by().into())
             } else {
-                let seed = existing.created_by();
+                let seed = existing.created_by().into();
                 let mut rng = fastrand::Rng::with_seed(seed);
                 (rng.u64(..), rng.u64(..))
             };
@@ -1541,17 +1547,20 @@ mod impl_integrate_fs_op {
                 .expect("new name is valid")
         };
 
-        let orig_name_conflicting = conflicting.name().to_owned();
-        let orig_name_existing = existing.name().to_owned();
+        let orig_name_conflicting =
+            conflicting.try_name().expect("node is not root").to_owned();
+
+        let orig_name_existing =
+            existing.try_name().expect("node is not root").to_owned();
 
         loop {
             let mut conflicting = conflict.conflicting_node_mut();
             let new_name =
-                gen_name(orig_name_conflicting, &mut rng_conflicting);
+                gen_name(&orig_name_conflicting, &mut rng_conflicting);
             let rename_conflicting = conflicting.force_rename(new_name);
 
             let mut existing = conflict.existing_node_mut();
-            let new_name = gen_name(orig_name_existing, &mut rng_existing);
+            let new_name = gen_name(&orig_name_existing, &mut rng_existing);
             let rename_existing = existing.force_rename(new_name);
 
             match conflict.assume_resolved() {

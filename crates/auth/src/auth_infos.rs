@@ -1,5 +1,5 @@
-use collab_server::message::GitHubHandle;
 use collab_server::nomad::NomadAuthenticateInfos;
+use collab_types::GitHubHandle;
 
 /// TODO: docs.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

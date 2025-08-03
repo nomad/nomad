@@ -13,9 +13,8 @@ use collab_project::fs::{
     File as ProjectFile,
     Node,
 };
-use collab_server::message::{Message, Peer, ProjectRequest};
 use collab_server::{SessionIntent, client};
-use collab_types::puff;
+use collab_types::{Message, Peer, ProjectRequest, puff};
 use ed::Context;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;

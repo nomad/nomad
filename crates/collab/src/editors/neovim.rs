@@ -7,8 +7,8 @@ use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use collab_server::Config;
-use collab_server::message::{Peer, PeerId};
 use collab_server::nomad::{NomadConfig, NomadSessionId};
+use collab_types::{Peer, PeerId};
 use ed::command::{CommandArgs, Parse};
 use ed::fs::{self, Directory};
 use ed::{ByteOffset, Context, notify};

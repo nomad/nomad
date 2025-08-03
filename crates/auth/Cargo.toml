@@ -15,6 +15,7 @@ abs-path = { workspace = true }
 collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
   "nomad",
 ] }
+collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 ed = { workspace = true }
 event-listener = "5"
 keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }

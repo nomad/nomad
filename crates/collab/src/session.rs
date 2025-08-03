@@ -1,7 +1,7 @@
 use std::io;
 
 use collab_server::client::ClientRxError;
-use collab_server::message::Message;
+use collab_types::Message;
 use ed::{Context, notify};
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};

@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use collab_server::message::GitHubHandle;
+use collab_types::GitHubHandle;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};

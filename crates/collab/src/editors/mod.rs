@@ -8,7 +8,7 @@ use core::ops::Range;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use collab_server::Authenticator;
-use collab_server::message::Peer;
+use collab_types::Peer;
 use ed::command::CommandArgs;
 use ed::{ByteOffset, Context, Editor, fs, notify};
 use futures_util::{AsyncRead, AsyncWrite};
