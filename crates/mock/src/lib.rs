@@ -15,6 +15,10 @@ mod mock;
 pub mod serde;
 pub mod value;
 
+/// This re-export is needed by the `mock::fs!` macro, but is not part of the
+/// crate's public API.
+#[doc(hidden)]
+pub use abs_path::NodeName;
 pub use context_ext::ContextExt;
 pub use editor_ext::EditorExt;
 pub use mock::Mock;

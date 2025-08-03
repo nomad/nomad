@@ -6,8 +6,6 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[features]
-
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
 async-broadcast = "0.7"

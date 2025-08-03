@@ -116,7 +116,7 @@ impl ToTokens for Directory {
         for (child_name, child) in self.children.iter() {
             definition.extend(quote! {
                 #variable_name.insert_child(
-                    <&::ed::fs::NodeName>::try_from(#child_name).unwrap(),
+                    <&::mock::NodeName>::try_from(#child_name).unwrap(),
                     #child,
                 );
             });
