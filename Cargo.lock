@@ -2156,12 +2156,10 @@ dependencies = [
 [[package]]
 name = "pando"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/pando.git#98c4bba6629503709b750dabb930729f91e62200"
+source = "git+ssh://git@github.com/nomad/pando.git#799dba88b23546b1a4a0edad35eb914b120f3a41"
 dependencies = [
  "fxhash",
  "serde",
- "unsigned-varint",
- "varint-simd",
 ]
 
 [[package]]
@@ -2300,7 +2298,7 @@ dependencies = [
 [[package]]
 name = "puff"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/puff.git#e4697b0a1ea7d37ecd1d3217c1d67c50128b965a"
+source = "git+ssh://git@github.com/nomad/puff.git#9018889a58fa16d3620b1372c776b7c8600840bc"
 dependencies = [
  "abs-path",
  "fxhash",
