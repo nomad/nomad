@@ -1,6 +1,6 @@
 use core::ops::AddAssign;
 
-/// A counter over [`Integer`]s that can be [pre](Self::pre_increment) and
+/// A generic counter that can be [pre](Self::pre_increment) and
 /// [post](Self::post_increment) incremented.
 #[derive(
     Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash,
@@ -12,9 +12,6 @@ pub struct Counter<T> {
     pub value: T,
 }
 
-/// A trait for types that can be used as the inner value of a [`Counter`].
-pub trait Integer: Copy + From<u8> + AddAssign {}
-
 impl<T> Counter<T> {
     /// Creates a new `Counter` with the given initial value.
     #[inline]
@@ -23,7 +20,7 @@ impl<T> Counter<T> {
     }
 }
 
-impl<T: Integer> Counter<T> {
+impl<T: Copy + From<u8> + AddAssign> Counter<T> {
     /// Post-increments the counter by 1 and returns the old value.
     ///
     /// # Examples
@@ -66,5 +63,3 @@ impl<T> From<T> for Counter<T> {
         Self::new(value)
     }
 }
-
-impl<T: Copy + From<u8> + AddAssign> Integer for T {}

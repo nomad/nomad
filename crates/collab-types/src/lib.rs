@@ -13,15 +13,17 @@ mod peer;
 mod peer_id;
 mod project_request;
 mod project_response;
+mod protocol;
 pub mod text;
 
-pub use counter::{Counter, Integer};
+pub use counter::Counter;
 pub use github_handle::GitHubHandle;
 pub use message::Message;
 pub use peer::Peer;
 pub use peer_id::PeerId;
 pub use project_request::ProjectRequest;
 pub use project_response::ProjectResponse;
+pub use protocol::Protocol;
 
 /// TODO: docs.
 pub type Peers = smallvec::SmallVec<[Peer; 8]>;

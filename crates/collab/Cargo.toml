@@ -22,7 +22,7 @@ neovim = [
 abs-path = { workspace = true, features = ["macros"] }
 auth = { workspace = true }
 cauchy = { workspace = true }
-collab-project = { workspace = true }
+collab-project = { workspace = true, features = ["serde"] }
 collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
   "client",
 ] }
