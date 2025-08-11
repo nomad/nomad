@@ -6,7 +6,7 @@ use core::fmt;
 use core::ops::Range;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_server::test::TestSessionId;
+pub use collab_server::test::TestSessionId as MockSessionId;
 use collab_types::Peer;
 use duplex_stream::{DuplexStream, duplex};
 use ed::notify::{self, MaybeResult};
@@ -25,13 +25,11 @@ use serde::{Deserialize, Serialize};
 use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 
-pub type SessionId = TestSessionId;
-
 #[allow(clippy::type_complexity)]
 pub struct CollabMock<Ed: Editor, F = ()> {
     inner: Ed,
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
-    clipboard: Option<TestSessionId>,
+    clipboard: Option<MockSessionId>,
     default_dir_for_remote_projects: Option<AbsPathBuf>,
     home_dir: Option<AbsPathBuf>,
     lsp_root_with: Option<Box<dyn FnMut(Ed::BufferId) -> Option<AbsPathBuf>>>,
@@ -39,9 +37,9 @@ pub struct CollabMock<Ed: Editor, F = ()> {
     select_session_with: Option<
         Box<
             dyn FnMut(
-                &[(AbsPathBuf, TestSessionId)],
+                &[(AbsPathBuf, MockSessionId)],
                 ActionForSelectedSession,
-            ) -> Option<&(AbsPathBuf, TestSessionId)>,
+            ) -> Option<&(AbsPathBuf, MockSessionId)>,
         >,
     >,
     server_tx: Option<flume::Sender<DuplexStream>>,
@@ -61,7 +59,7 @@ pub struct MockConfig {
 #[derive(Default)]
 pub struct MockAuthenticator;
 
-pub struct MockProtocol;
+pub struct MockParams;
 
 #[derive(Debug)]
 pub struct AnyError {
@@ -111,9 +109,9 @@ where
     pub fn select_session_with(
         mut self,
         fun: impl FnMut(
-            &[(AbsPathBuf, TestSessionId)],
+            &[(AbsPathBuf, MockSessionId)],
             ActionForSelectedSession,
-        ) -> Option<&(AbsPathBuf, TestSessionId)>
+        ) -> Option<&(AbsPathBuf, MockSessionId)>
         + 'static,
     ) -> Self {
         self.select_session_with = Some(Box::new(fun) as _);
@@ -164,14 +162,7 @@ where
 
 impl CollabServer {
     pub async fn run(self) {
-        let (done_tx, done_rx) = flume::bounded::<()>(1);
-
-        std::thread::spawn(move || {
-            self.inner.run(self.conn_rx.into_stream());
-            let _ = done_tx.send(());
-        });
-
-        done_rx.recv_async().await.expect("tx is still alive");
+        self.inner.run(self.conn_rx.into_stream()).await;
     }
 }
 
@@ -214,7 +205,7 @@ where
     type PeerSelection = ();
     type PeerTooltip = ();
     type ProjectFilter = F;
-    type ServerProtocol = MockProtocol;
+    type ServerParams = MockParams;
 
     type ConnectToServerError = AnyError;
     type CopySessionIdError = Infallible;
@@ -248,7 +239,7 @@ where
     }
 
     async fn copy_session_id(
-        session_id: TestSessionId,
+        session_id: MockSessionId,
         ctx: &mut Context<Self>,
     ) -> Result<(), Self::CopySessionIdError> {
         ctx.with_editor(|this| this.clipboard = Some(session_id));
@@ -333,10 +324,10 @@ where
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(AbsPathBuf, TestSessionId)],
+        sessions: &'pairs [(AbsPathBuf, MockSessionId)],
         action: ActionForSelectedSession,
         ctx: &mut Context<Self>,
-    ) -> Option<&'pairs (AbsPathBuf, TestSessionId)> {
+    ) -> Option<&'pairs (AbsPathBuf, MockSessionId)> {
         ctx.with_editor(|this| {
             this.select_session_with.as_mut()?(sessions, action)
         })
@@ -483,7 +474,7 @@ impl collab_server::Config for MockConfig {
     type Authenticator = MockAuthenticator;
     type Executor =
         <collab_server::test::TestConfig as collab_server::Config>::Executor;
-    type Protocol = MockProtocol;
+    type Params = MockParams;
 
     fn authenticator(&self) -> &Self::Authenticator {
         &MockAuthenticator
@@ -493,7 +484,7 @@ impl collab_server::Config for MockConfig {
         self.inner.executor()
     }
 
-    fn new_session_id(&self) -> TestSessionId {
+    fn new_session_id(&self) -> MockSessionId {
         self.inner.new_session_id()
     }
 }
@@ -507,12 +498,12 @@ impl collab_server::Authenticator for MockAuthenticator {
     }
 }
 
-impl collab_types::Protocol for MockProtocol {
-    const MAX_FRAGMENT_LEN: u32 = 64;
+impl collab_types::Params for MockParams {
+    const MAX_FRAME_LEN: u32 = 64;
 
     type AuthenticateInfos = auth::AuthInfos;
     type AuthenticateError = Never;
-    type SessionId = TestSessionId;
+    type SessionId = MockSessionId;
 }
 
 impl<E: Error + 'static> From<E> for AnyError {

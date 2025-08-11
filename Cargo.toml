@@ -14,7 +14,7 @@ publish = false
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
 async-net = "2"
 cauchy = { git = "ssh://git@github.com/nomad/cauchy.git" }
-collab-types = { git = "ssh://git@github.com/nomad/collab-server.git", branch = "message-channel" }
+collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 compact_str = "0.9"
 derive_more = { version = "2", features = ["display"] }
 flume = { version = "0.11", features = ["async"] }

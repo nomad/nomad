@@ -7,7 +7,7 @@ use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
 use collab_project::fs::{File as ProjectFile, Node as ProjectNode};
 use collab_project::{Project, ProjectBuilder};
-use collab_server::{SessionIntent, client};
+use collab_server::client as collab_client;
 use collab_types::{Peer, PeerId, puff};
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
@@ -100,13 +100,14 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
 
         let github_handle = auth_infos.github_handle.clone();
 
-        let knock = collab_server::Knock::<Ed::ServerProtocol> {
+        let knock = collab_client::Knock::<Ed::ServerParams> {
             auth_infos: auth_infos.into(),
-            session_intent: SessionIntent::StartNew(project_name.to_owned()),
+            session_intent: collab_client::SessionIntent::StartNew(
+                project_name.to_owned(),
+            ),
         };
 
-        let welcome = client::Knocker::new(reader, writer)
-            .knock(knock)
+        let welcome = collab_client::knock(reader, writer, knock)
             .await
             .map_err(StartError::Knock)?;
 
@@ -395,7 +396,7 @@ pub enum StartError<Ed: CollabEditor> {
     ConnectToServer(Ed::ConnectToServerError),
 
     /// TODO: docs.
-    Knock(client::KnockError<Ed::ServerProtocol>),
+    Knock(collab_client::KnockError<Ed::ServerParams>),
 
     /// TODO: docs.
     NoBufferFocused,

@@ -13,7 +13,7 @@ use collab_project::fs::{
     File as ProjectFile,
     Node,
 };
-use collab_server::{SessionIntent, client};
+use collab_server::client as collab_client;
 use collab_types::{Message, Peer, ProjectRequest, puff};
 use ed::Context;
 use ed::action::AsyncAction;
@@ -72,13 +72,14 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
 
         let github_handle = auth_infos.github_handle.clone();
 
-        let knock = collab_server::Knock::<Ed::ServerProtocol> {
+        let knock = collab_client::Knock::<Ed::ServerParams> {
             auth_infos: auth_infos.into(),
-            session_intent: SessionIntent::JoinExisting(session_id),
+            session_intent: collab_client::SessionIntent::JoinExisting(
+                session_id,
+            ),
         };
 
-        let mut welcome = client::Knocker::new(reader, writer)
-            .knock(knock)
+        let mut welcome = collab_client::knock(reader, writer, knock)
             .await
             .map_err(JoinError::Knock)?;
 
@@ -359,7 +360,7 @@ pub enum JoinError<Ed: CollabEditor> {
     DefaultDirForRemoteProjects(Ed::DefaultDirForRemoteProjectsError),
 
     /// TODO: docs.
-    Knock(client::KnockError<Ed::ServerProtocol>),
+    Knock(collab_client::KnockError<Ed::ServerParams>),
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
@@ -389,7 +390,7 @@ pub enum RequestProjectError {
     RecvResponse(
         #[from]
         #[partial_eq(skip)]
-        client::ClientRxError,
+        collab_client::ReceiveError,
     ),
 
     /// TODO: docs.

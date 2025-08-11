@@ -70,7 +70,7 @@ impl CollabEditor for Neovim {
     type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerTooltip;
     type ProjectFilter = walkdir::GitIgnore;
-    type ServerProtocol = collab_types::nomad::NomadProtocol;
+    type ServerParams = collab_types::nomad::NomadParams;
 
     type ConnectToServerError = NeovimConnectToServerError;
     type CopySessionIdError = NeovimCopySessionIdError;

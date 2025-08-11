@@ -1,7 +1,7 @@
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;
-use collab::mock::{CollabMock, CollabServer, SessionId};
+use collab::mock::{CollabMock, CollabServer, MockSessionId};
 use collab::start::StartError;
 use ed::action::AsyncAction;
 use futures_lite::future::{self, FutureExt};
@@ -70,7 +70,7 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         // Start session at "/a/b".
         ctx.create_and_focus(path!("/a/b/bar.txt"), agent_id).await.unwrap();
         collab.start().call((), ctx).await.unwrap();
-        let project = collab.project(SessionId(1)).unwrap();
+        let project = collab.project(MockSessionId(1)).unwrap();
         assert_eq!(project.root(), "/a/b");
 
         // Can't start new session at "/a", it overlaps "/a/b".

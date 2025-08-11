@@ -1,6 +1,6 @@
 use std::io;
 
-use collab_server::client::ClientRxError;
+use collab_server::client as collab_client;
 use collab_types::Message;
 use ed::{Context, notify};
 use flume::Receiver;
@@ -33,7 +33,7 @@ pub(crate) struct Session<Ed: CollabEditor, F: Filter<Ed::Fs>> {
 #[display("{_0}")]
 pub(crate) enum SessionError<Ed: CollabEditor, F: Filter<Ed::Fs>> {
     EventRx(#[from] EventError<Ed::Fs, F>),
-    MessageRx(#[from] ClientRxError),
+    MessageRx(#[from] collab_client::ReceiveError),
     #[display("the server kicked this peer out of the session")]
     MessageRxExhausted,
     MessageTx(#[from] io::Error),

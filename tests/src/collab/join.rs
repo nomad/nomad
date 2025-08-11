@@ -1,7 +1,7 @@
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;
-use collab::mock::{CollabMock, CollabServer, SessionId};
+use collab::mock::{CollabMock, CollabServer, MockSessionId};
 use ed::action::AsyncAction;
 use ed::command::Parse;
 use ed::fs::Fs;
@@ -35,7 +35,7 @@ fn replicate_simple_project() {
         let agent_id = ctx.new_agent_id();
         ctx.create_and_focus(path!("/foo/mars.txt"), agent_id).await.unwrap();
         collab.start().call((), ctx).await.unwrap();
-        started_tx.send(SessionId(1)).unwrap();
+        started_tx.send(MockSessionId(1)).unwrap();
     });
 
     let run_peer2 = peer2.run(async move |ctx| {

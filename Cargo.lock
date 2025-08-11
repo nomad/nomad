@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "auth-types"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel#9450e505b51b26ec016bad0bab3a9e70e5e6cd3e"
+source = "git+ssh://git@github.com/nomad/collab-server.git#a6d0c8271c5d830e60486adeffd5194af0cddf8a"
 dependencies = [
  "serde",
  "smol_str",
@@ -659,7 +659,7 @@ dependencies = [
  "collab-types",
  "compact_str",
  "derive_more",
- "duplex-stream 0.0.9 (git+ssh://git@github.com/nomad/collab-server.git)",
+ "duplex-stream",
  "ed",
  "fastrand",
  "flume",
@@ -693,15 +693,13 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel#9450e505b51b26ec016bad0bab3a9e70e5e6cd3e"
+source = "git+ssh://git@github.com/nomad/collab-server.git#a6d0c8271c5d830e60486adeffd5194af0cddf8a"
 dependencies = [
- "abs-path",
  "bincode",
  "cauchy",
  "collab-types",
  "derive_more",
- "duplex-stream 0.0.9 (git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel)",
- "futures-executor",
+ "duplex-stream",
  "futures-util",
  "generic-server",
  "message-channel",
@@ -713,7 +711,7 @@ dependencies = [
 [[package]]
 name = "collab-types"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel#9450e505b51b26ec016bad0bab3a9e70e5e6cd3e"
+source = "git+ssh://git@github.com/nomad/collab-server.git#a6d0c8271c5d830e60486adeffd5194af0cddf8a"
 dependencies = [
  "auth-types",
  "bytes",
@@ -979,18 +977,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel#9450e505b51b26ec016bad0bab3a9e70e5e6cd3e"
-dependencies = [
- "async-compat",
- "futures-util",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
-name = "duplex-stream"
-version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#e5a01e380db5ba7e986c01d8893cd5c0d38b3bd6"
+source = "git+ssh://git@github.com/nomad/collab-server.git#a6d0c8271c5d830e60486adeffd5194af0cddf8a"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1219,7 +1206,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel#9450e505b51b26ec016bad0bab3a9e70e5e6cd3e"
+source = "git+ssh://git@github.com/nomad/collab-server.git#a6d0c8271c5d830e60486adeffd5194af0cddf8a"
 dependencies = [
  "flume",
  "futures-util",
@@ -1695,13 +1682,16 @@ dependencies = [
 [[package]]
 name = "message-channel"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git?branch=message-channel#9450e505b51b26ec016bad0bab3a9e70e5e6cd3e"
+source = "git+ssh://git@github.com/nomad/collab-server.git#a6d0c8271c5d830e60486adeffd5194af0cddf8a"
 dependencies = [
+ "bincode",
  "cauchy",
  "collab-types",
  "derive_more",
  "leb128",
+ "nohash",
  "varint-simd",
+ "zstd",
 ]
 
 [[package]]
@@ -2305,7 +2295,7 @@ dependencies = [
 [[package]]
 name = "puff"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/puff.git#30770bcbaae8294feb100205ea5746b51e6fc5e6"
+source = "git+ssh://git@github.com/nomad/puff.git#5f98ad004e28e235f4b4732df12ec91b00ff6e76"
 dependencies = [
  "abs-path",
  "fxhash",
@@ -3769,4 +3759,32 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "zstd"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
+dependencies = [
+ "zstd-safe",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "7.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.0.15+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb81183ddd97d0c74cedf1d50d85c8d08c1b8b68ee863bdee9e706eedba1a237"
+dependencies = [
+ "cc",
+ "pkg-config",
 ]
