@@ -86,7 +86,11 @@ where
             }
             num_checked += 1;
             if num_checked == initial_len {
-                return Poll::Ready(None);
+                return if self.list.is_empty() {
+                    Poll::Ready(None)
+                } else {
+                    Poll::Pending
+                };
             }
             if num_checked == num_loop_after {
                 idx = 0;
