@@ -9,7 +9,7 @@ use walkdir::Filter;
 
 use crate::editors::CollabEditor;
 use crate::event::{self, Event};
-use crate::seq_ext::StreamableSeq;
+use crate::list_ext::List;
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 

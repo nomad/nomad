@@ -12,7 +12,7 @@ pub mod join;
 pub mod leave;
 pub mod project;
 mod root_markers;
-mod seq_ext;
+mod list_ext;
 mod session;
 pub mod start;
 pub mod yank;
