@@ -75,7 +75,7 @@ pub(crate) struct Project<Ed: CollabEditor> {
     session_id: SessionId<Ed>,
 }
 
-#[derive(cauchy::Clone, cauchy::Default)]
+#[derive(cauchy::Debug, cauchy::Clone, cauchy::Default)]
 pub(crate) struct Projects<Ed: CollabEditor> {
     active: Shared<FxHashMap<SessionId<Ed>, ProjectHandle<Ed>>>,
     starting: Shared<FxHashSet<AbsPathBuf>>,
@@ -1636,6 +1636,12 @@ mod impl_integrate_fs_op {
 impl<B> NoActiveSessionError<B> {
     pub(crate) fn new() -> Self {
         Self(PhantomData)
+    }
+}
+
+impl<Ed: CollabEditor> fmt::Debug for ProjectHandle<Ed> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("ProjectHandle").field(&self.root()).finish()
     }
 }
 
