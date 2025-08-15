@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 auth = ["__any", "dep:auth"]
 collab = ["__any", "dep:auth", "dep:collab"]
 mock = ["__any", "__editor"]
-neovim = ["__any", "__editor", "dep:neovim"]
+neovim = ["__any", "__editor", "dep:neovim", "auth?/neovim", "collab?/neovim"]
 walkdir = ["__any", "dep:tempdir", "dep:walkdir"]
 
 # Sentinel features.
