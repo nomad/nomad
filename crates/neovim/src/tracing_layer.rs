@@ -1,5 +1,9 @@
 use std::io;
 
+use compact_str::CompactString;
+use ed::executor::{Executor, LocalSpawner, Task};
+use ed::shared::MultiThreaded;
+use ed::{Editor, Shared};
 use tracing_subscriber::fmt;
 use tracing_subscriber::registry::LookupSpan;
 
@@ -16,8 +20,15 @@ pub struct TracingLayer<S> {
     >,
 }
 
-#[derive(Copy, Clone)]
-struct MessageAreaWriter;
+#[derive(Clone)]
+struct MessageAreaWriter {
+    /// The buffer where the messages are written.
+    buffer: Shared<CompactString, MultiThreaded>,
+
+    /// The sender used to send messages to the main thread when `Self` is
+    /// flushed.
+    message_tx: flume::Sender<CompactString>,
+}
 
 impl<S> TracingLayer<S> {
     pub(crate) fn new(nvim: &mut Neovim) -> Self {
@@ -31,8 +42,21 @@ impl<S> TracingLayer<S> {
 }
 
 impl MessageAreaWriter {
-    fn new(_nvim: &mut Neovim) -> Self {
-        todo!();
+    fn new(nvim: &mut Neovim) -> Self {
+        let (message_tx, message_rx) = flume::unbounded();
+
+        // Note: we do this because print! can only be called from the main
+        // thread.
+        nvim.executor()
+            .local_spawner()
+            .spawn(async move {
+                while let Ok(message) = message_rx.recv_async().await {
+                    nvim_oxi::print!("{message}");
+                }
+            })
+            .detach();
+
+        Self { buffer: Default::default(), message_tx }
     }
 }
 
@@ -40,17 +64,22 @@ impl fmt::MakeWriter<'_> for MessageAreaWriter {
     type Writer = Self;
 
     fn make_writer(&self) -> Self::Writer {
-        todo!();
+        self.clone()
     }
 }
 
 impl io::Write for MessageAreaWriter {
-    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-        todo!();
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.buffer.with_mut(|message_buffer| {
+            message_buffer.push_str(&String::from_utf8_lossy(buf))
+        });
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        todo!();
+        let message = self.buffer.take();
+        self.message_tx.send(message).expect("the task is still running");
+        Ok(())
     }
 }
 
