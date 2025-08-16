@@ -5,6 +5,7 @@ use ed::notify::Name;
 use ed::plugin::Plugin;
 use ed::{Borrowed, Context};
 use neovim::Neovim;
+use tracing_subscriber::layer::SubscriberExt;
 
 #[neovim::plugin]
 fn nomad() -> Nomad {
@@ -36,7 +37,15 @@ impl Module<Neovim> for Nomad {
     }
 
     fn on_init(&self, ctx: &mut Context<Neovim, Borrowed>) {
-        ctx.set_emitter(neovim::notify::detect());
+        ctx.set_notifier(neovim::notify::detect());
+
+        let subscriber = tracing_subscriber::Registry::default()
+            .with(ctx.tracing_layer())
+            .with(ctx.tracing_layer());
+
+        if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
+            panic!("failed to set global tracing subscriber: {err}");
+        }
     }
 
     fn on_new_config(

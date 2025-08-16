@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 pub mod api;
 pub mod buffer;
 mod convert;
@@ -15,6 +17,8 @@ pub mod selection;
 pub mod serde;
 #[cfg(feature = "test")]
 pub mod tests;
+#[cfg(feature = "tracing")]
+mod tracing_layer;
 pub mod utils;
 pub mod value;
 
@@ -28,3 +32,5 @@ pub use neovim_macros::test;
 #[doc(hidden)]
 pub use nvim_oxi as oxi;
 pub use nvim_oxi::mlua;
+#[cfg(feature = "tracing")]
+pub use tracing_layer::TracingLayer;

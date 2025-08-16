@@ -17,7 +17,9 @@ neovim-nightly = ["neovim/nightly"]
 auth = { workspace = true, features = ["neovim"] }
 collab = { workspace = true, features = ["neovim"] }
 ed = { workspace = true }
-neovim = { workspace = true }
+neovim = { workspace = true, features = ["tracing"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 version = { workspace = true }
 
 [lints]

@@ -75,8 +75,15 @@ impl Neovim {
 
     /// TODO: docs.
     #[inline]
-    pub fn set_emitter(&mut self, emitter: impl Into<notify::NeovimEmitter>) {
+    pub fn set_notifier(&mut self, emitter: impl Into<notify::NeovimEmitter>) {
         self.emitter = emitter.into();
+    }
+
+    /// Returns a new instance of the [`TracingLayer`](crate::TracingLayer).
+    #[cfg(feature = "tracing")]
+    #[inline]
+    pub fn tracing_layer(&mut self) -> crate::TracingLayer {
+        todo!();
     }
 
     /// Should only be called by the `#[neovim::plugin]` macro.

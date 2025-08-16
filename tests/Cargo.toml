@@ -37,6 +37,7 @@ mock = { workspace = true }
 pin-project-lite = { workspace = true }
 rand = "0.9"
 rand_chacha = "0.9"
+tracing-subscriber = { workspace = true }
 
 # Auth-related dependencies.
 auth = { workspace = true, optional = true, features = ["mock"] }

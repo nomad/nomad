@@ -32,6 +32,7 @@ smallvec = "1"
 smol_str = "0.3"
 strsim = "0.11"
 tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # Internal dependencies.
 auth = { path = "./crates/auth" }
