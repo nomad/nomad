@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::process;
 use std::sync::{Arc, OnceLock};
 
@@ -214,14 +214,52 @@ impl GitIgnore {
     /// Continuosly reads from the `stdout` of the `git check-ignore` process
     /// until it hits EOF or an error occurs.
     fn read_from_stdout(
-        _stdout: process::ChildStdout,
-        _message_tx: flume::Sender<Message>,
+        mut stdout: process::ChildStdout,
+        message_tx: flume::Sender<Message>,
     ) {
         /// See https://git-scm.com/docs/git-check-ignore#_output for more
         /// infos on what each variant represents.
-        enum State {}
+        enum ReadingState {
+            Source,
+            Linenum,
+            Pattern,
+            Pathname,
+        }
 
-        todo!();
+        let mut state = ReadingState::Source;
+        let mut buf = Vec::new();
+        let mut is_ignored = false;
+
+        loop {
+            buf.clear();
+
+            match stdout.read_to_end(&mut buf) {
+                Ok(0) | Err(_) => return,
+                Ok(_non_zero) => (),
+            }
+
+            let mut buf = &buf[..];
+
+            while let Some(split_idx) = buf.iter().position(|&b| b == 0) {
+                buf = &buf[split_idx + 1..];
+
+                match state {
+                    ReadingState::Source => {
+                        is_ignored = split_idx == 0;
+                        state = ReadingState::Linenum;
+                    },
+                    ReadingState::Linenum => state = ReadingState::Pattern,
+                    ReadingState::Pattern => state = ReadingState::Pathname,
+                    ReadingState::Pathname => {
+                        state = ReadingState::Source;
+                        message_tx
+                            .send(Message::FromStdout(is_ignored))
+                            .expect("event loop is still running");
+                        is_ignored = false;
+                    },
+                }
+            }
+        }
     }
 
     /// Continuosly reads from the `stderr` of the `git check-ignore` process
