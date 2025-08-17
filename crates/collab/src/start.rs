@@ -418,9 +418,11 @@ pub enum StartError<Ed: CollabEditor> {
 }
 
 /// The type of error that can occur when reading a [`FsNode`] fails.
-#[derive(cauchy::Debug, cauchy::PartialEq)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
 pub enum ReadNodeError<Fs: fs::Fs> {
     /// TODO: docs.
+    #[display("read two nodes at the same path: {_0}")]
     DuplicateNodeAtPath(AbsPathBuf),
 
     /// TODO: docs.
@@ -437,12 +439,14 @@ pub enum ReadNodeError<Fs: fs::Fs> {
 }
 
 /// The type of error that can occur when reading a [`Project`] fails.
-#[derive(cauchy::Debug, cauchy::PartialEq)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
 pub enum ReadProjectError<Ed: CollabEditor> {
     /// TODO: docs.
     GetRoot(<Ed::Fs as Fs>::NodeAtPathError),
 
     /// TODO: docs.
+    #[display("no file or directory at the project root: {_0}")]
     NoNodeAtRootPath(AbsPathBuf),
 
     /// TODO: docs.
@@ -452,6 +456,7 @@ pub enum ReadProjectError<Ed: CollabEditor> {
     ReadNode(ReadNodeError<Ed::Fs>),
 
     /// TODO: docs.
+    #[display("path to project root points to a symlink: {_0}")]
     RootIsSymlink(AbsPathBuf),
 
     /// TODO: docs.
@@ -556,7 +561,7 @@ impl<Ed: CollabEditor> notify::Error for StartError<Ed> {
 
 impl<Ed: CollabEditor> notify::Error for ReadProjectError<Ed> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        (notify::Level::Error, notify::Message::from_display(self))
     }
 }
 
@@ -614,12 +619,6 @@ mod neovim_error_impls {
             let msg = "couldn't determine path to project root. Either move \
                        the cursor to a text buffer, or pass one explicitly";
             (notify::Level::Error, notify::Message::from_str(msg))
-        }
-    }
-
-    impl notify::Error for ReadProjectError<Neovim> {
-        fn to_message(&self) -> (notify::Level, notify::Message) {
-            todo!();
         }
     }
 
