@@ -14,10 +14,12 @@ name = "nomad"
 neovim-nightly = ["neovim/nightly"]
 
 [dependencies]
+abs-path = { workspace = true, features = ["macros"] }
 auth = { workspace = true, features = ["neovim"] }
 cauchy = { workspace = true }
 collab = { workspace = true, features = ["neovim"] }
 ed = { workspace = true }
+either = { workspace = true }
 neovim = { workspace = true, features = ["tracing"] }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }

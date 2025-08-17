@@ -1,13 +1,30 @@
+use core::error::Error;
+
+use abs_path::{AbsPathBuf, NodeName, node};
 use ed::module::{ApiCtx, Empty, Module};
 use ed::notify::Name;
 use ed::plugin::Plugin;
 use ed::{Borrowed, Context};
+use either::Either;
 use neovim::Neovim;
 use tracing_subscriber::layer::SubscriberExt;
 
 use crate::file_appender::FileAppender;
 
 pub(crate) struct Nomad;
+
+impl Nomad {
+    /// The prefix for the log file names.
+    pub(crate) const LOG_FILENAME_PREFIX: &NodeName = node!("nomad.log");
+
+    /// Returns the directory under which the log files should be stored.
+    fn log_dir(&self) -> Result<AbsPathBuf, impl Error> {
+        neovim::oxi::api::call_function::<_, String>("stdpath", ("data",))
+            .map_err(Either::Left)
+            .and_then(|path| path.parse::<AbsPathBuf>().map_err(Either::Right))
+            .map(|neovim_data_dir| neovim_data_dir.join(node!("nomad")))
+    }
+}
 
 impl Plugin<Neovim> for Nomad {
     const COMMAND_NAME: Name = "Mad";
@@ -36,7 +53,7 @@ impl Module<Neovim> for Nomad {
 
         let subscriber = tracing_subscriber::Registry::default()
             .with(ctx.tracing_layer())
-            .with(FileAppender::new(ctx));
+            .with(self.log_dir().map(|dir| FileAppender::new(dir, ctx)).ok());
 
         if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
             panic!("failed to set global tracing subscriber: {err}");

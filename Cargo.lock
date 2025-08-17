@@ -1904,10 +1904,12 @@ checksum = "a0f889fb66f7acdf83442c35775764b51fed3c606ab9cee51500dbde2cf528ca"
 name = "nomad-neovim"
 version = "0.1.0-dev"
 dependencies = [
+ "abs-path",
  "auth",
  "cauchy",
  "collab",
  "ed",
+ "either",
  "neovim",
  "tracing",
  "tracing-appender",

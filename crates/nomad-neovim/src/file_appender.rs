@@ -1,12 +1,17 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use ed::{BorrowState, Context};
-use neovim::Neovim;
+use abs_path::{AbsPath, AbsPathBuf};
+use ed::{BorrowState, Context, Editor};
 use tracing::error;
+use tracing::level_filters::LevelFilter;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
+use tracing_appender::rolling::{InitError, RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::{self, format, time};
 use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::{Layer, filter};
+
+use crate::nomad::Nomad;
 
 /// A [`tracing_subscriber::Layer`] implementation that appends logs to a file
 /// that is rolled over daily.
@@ -17,11 +22,16 @@ pub(crate) struct FileAppender<S> {
 }
 
 struct FileAppenderInner<S> {
-    inner: fmt::Layer<
+    #[allow(clippy::type_complexity)]
+    inner: filter::Filtered<
+        fmt::Layer<
+            S,
+            format::DefaultFields,
+            format::Format<format::Full, time::ChronoUtc>,
+            NonBlocking,
+        >,
+        LevelFilter,
         S,
-        format::DefaultFields,
-        format::Format<format::Full, time::ChronoUtc>,
-        NonBlocking,
     >,
 
     /// We need to keep this guard around for the entire lifetime of the
@@ -33,8 +43,14 @@ struct FileAppenderInner<S> {
     _guard: WorkerGuard,
 }
 
-impl<S: 'static> FileAppender<S> {
-    pub(crate) fn new(ctx: &mut Context<Neovim, impl BorrowState>) -> Self {
+impl<S> FileAppender<S>
+where
+    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
+{
+    pub(crate) fn new(
+        log_dir: AbsPathBuf,
+        ctx: &mut Context<impl Editor, impl BorrowState>,
+    ) -> Self {
         let this = Self {
             inner: Arc::new(OnceLock::new()),
             creating_inner_has_failed: Arc::new(AtomicBool::new(false)),
@@ -45,19 +61,16 @@ impl<S: 'static> FileAppender<S> {
         ctx.spawn_background({
             let this = this.clone();
             async move {
-                match FileAppenderInner::new() {
-                    Ok(file_appender) => match this.inner.set(file_appender) {
-                        Ok(_) => (),
-                        Err(_) => unreachable!("only set once"),
+                match FileAppenderInner::new(&log_dir) {
+                    Ok(file_appender) => {
+                        assert!(this.inner.set(file_appender).is_ok());
                     },
                     Err(err) => {
-                        error!(
-                            "failed to create tracing file appender: {err}"
-                        );
                         this.creating_inner_has_failed
                             .store(true, Ordering::Relaxed);
+                        error!("failed to create file appender: {err}");
                     },
-                }
+                };
             }
         })
         .detach();
@@ -66,13 +79,32 @@ impl<S: 'static> FileAppender<S> {
     }
 }
 
-impl<S> FileAppenderInner<S> {
-    fn new() -> Result<Self, std::io::Error> {
-        todo!();
+impl<S> FileAppenderInner<S>
+where
+    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
+{
+    fn new(log_dir: &AbsPath) -> Result<Self, InitError> {
+        let file_appender = RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix(Nomad::LOG_FILENAME_PREFIX.to_string())
+            .build(log_dir)?;
+
+        let (non_blocking, _guard) =
+            tracing_appender::non_blocking(file_appender);
+
+        let inner = fmt::Layer::default()
+            .with_ansi(false)
+            // Formats timestamps as "2001-07-08T00:34:60Z".
+            .with_timer(time::ChronoUtc::new("%FT%TZ".to_owned()))
+            .with_writer(non_blocking)
+            // Only log events at the INFO, WARN and ERROR levels.
+            .with_filter(LevelFilter::INFO);
+
+        Ok(Self { inner, _guard })
     }
 }
 
-impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for FileAppender<S>
+impl<S> tracing_subscriber::Layer<S> for FileAppender<S>
 where
     S: tracing::Subscriber + for<'a> LookupSpan<'a>,
 {
