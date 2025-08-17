@@ -1,19 +1,38 @@
+use ed::notify;
+
+use crate::oxi::api::types::LogLevel;
+
 /// Same as [`Into`], but for types defined in other crates (for which we
 /// couldn't implement [`Into`] because of the orphan rule).
 pub(crate) trait Convert<T> {
     fn convert(self) -> T;
 }
 
-impl Convert<crate::oxi::api::types::LogLevel> for ed::notify::Level {
+impl Convert<LogLevel> for notify::Level {
     #[inline]
-    fn convert(self) -> crate::oxi::api::types::LogLevel {
+    fn convert(self) -> LogLevel {
         match self {
-            Self::Off => crate::oxi::api::types::LogLevel::Off,
-            Self::Trace => crate::oxi::api::types::LogLevel::Trace,
-            Self::Debug => crate::oxi::api::types::LogLevel::Debug,
-            Self::Info => crate::oxi::api::types::LogLevel::Info,
-            Self::Warn => crate::oxi::api::types::LogLevel::Warn,
-            Self::Error => crate::oxi::api::types::LogLevel::Error,
+            Self::Off => LogLevel::Off,
+            Self::Trace => LogLevel::Trace,
+            Self::Debug => LogLevel::Debug,
+            Self::Info => LogLevel::Info,
+            Self::Warn => LogLevel::Warn,
+            Self::Error => LogLevel::Error,
+        }
+    }
+}
+
+impl Convert<notify::Level> for LogLevel {
+    #[inline]
+    fn convert(self) -> notify::Level {
+        match self {
+            Self::Off => notify::Level::Off,
+            Self::Trace => notify::Level::Trace,
+            Self::Debug => notify::Level::Debug,
+            Self::Info => notify::Level::Info,
+            Self::Warn => notify::Level::Warn,
+            Self::Error => notify::Level::Error,
+            _ => notify::Level::Off,
         }
     }
 }

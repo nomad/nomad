@@ -168,6 +168,12 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
 
     /// TODO: docs.
     #[inline]
+    pub fn namespace(&self) -> &Namespace {
+        self.borrow.namespace()
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn new_agent_id(&mut self) -> AgentId {
         self.borrow.with_state(|state| state.next_agent_id())
     }
@@ -229,11 +235,6 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub(crate) fn plugin_id(&self) -> PluginId {
         self.borrow.plugin_id()
-    }
-
-    #[inline]
-    fn namespace(&self) -> &Namespace {
-        self.borrow.namespace()
     }
 
     #[inline]
