@@ -13,11 +13,13 @@ publish = false
 # Third-party dependencies.
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
 async-net = "2"
+auth-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 cauchy = { git = "ssh://git@github.com/nomad/cauchy.git" }
 collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 compact_str = "0.9"
 derive_more = { version = "2", features = ["display"] }
 either = "1"
+event-listener = "5"
 flume = { version = "0.11", features = ["async"] }
 futures-executor = { version = "0.3" }
 futures-lite = { version = "2", default-features = false }
@@ -25,9 +27,11 @@ futures-util = { version = "0.3", default-features = false }
 fxhash = "0.2"
 git2 = { version = "0.20", default-features = false }
 indexmap = "2"
+keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }
 nohash = "0.2"
 pin-project-lite = "0.2"
 serde = "1"
+serde_json = "1"
 slotmap = "1"
 smallvec = "1"
 smol_str = "0.3"
@@ -38,7 +42,6 @@ tracing-subscriber = "0.3"
 
 # Internal dependencies.
 auth = { path = "./crates/auth" }
-auth-types = { path = "./crates/auth-types" }
 clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
 collab-project = { path = "./crates/collab-project" }
