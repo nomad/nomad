@@ -1,6 +1,6 @@
 use core::mem;
 use std::collections::VecDeque;
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, BufRead, Write};
 use std::process;
 use std::sync::{Arc, OnceLock};
 
@@ -87,6 +87,7 @@ enum StdoutReadState {
     Pathname,
 }
 
+#[derive(Debug)]
 enum Message {
     /// Sent by the stdout task when a new line is read. The `bool` indicates
     /// whether the path (which is not included in the message) is ignored.
@@ -268,21 +269,20 @@ impl GitIgnore {
     /// Continuosly reads from the `stdout` of the `git check-ignore` process
     /// until it hits EOF or an error occurs.
     fn read_from_stdout(
-        mut stdout: process::ChildStdout,
+        stdout: process::ChildStdout,
         message_tx: flume::Sender<Message>,
     ) {
-        let mut buf = Vec::new();
+        let mut reader = io::BufReader::new(stdout);
         let mut parser = StdoutParser::default();
 
         loop {
-            buf.clear();
+            let mut buf = match reader.fill_buf() {
+                Ok(buf) if buf.is_empty() => return,
+                Ok(buf) => buf,
+                Err(_err) => return,
+            };
 
-            match stdout.read_to_end(&mut buf) {
-                Ok(0) | Err(_) => return,
-                Ok(_non_zero) => (),
-            }
-
-            let mut buf = &buf[..];
+            let buf_len = buf.len();
 
             while let Some((is_ignored, new_buf)) = parser.feed(buf) {
                 buf = new_buf;
@@ -290,6 +290,8 @@ impl GitIgnore {
                     .send(Message::FromStdout(is_ignored))
                     .expect("event loop is still running");
             }
+
+            reader.consume(buf_len);
         }
     }
 
