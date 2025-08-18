@@ -1,4 +1,3 @@
-use core::convert::Infallible;
 use core::fmt;
 use core::ops::Range;
 use std::ffi::OsString;
@@ -71,7 +70,7 @@ impl CollabEditor for Neovim {
     type Io = async_net::TcpStream;
     type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerTooltip;
-    type ProjectFilter = walkdir::GitIgnore;
+    type ProjectFilter = Option<walkdir::GitIgnore>;
     type ServerParams = collab_types::nomad::NomadParams;
 
     type ConnectToServerError = NeovimConnectToServerError;
@@ -79,7 +78,7 @@ impl CollabEditor for Neovim {
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
     type HomeDirError = NeovimHomeDirError;
     type LspRootError = NeovimLspRootError;
-    type ProjectFilterError = Infallible;
+    type ProjectFilterError = walkdir::CreateError;
 
     async fn confirm_start(
         project_root: &AbsPath,
@@ -277,12 +276,23 @@ impl CollabEditor for Neovim {
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
     ) -> Result<Self::ProjectFilter, Self::ProjectFilterError> {
-        match ctx.with_editor(|nvim| {
+        let create_res = ctx.with_editor(|nvim| {
             let spawner = nvim.executor().background_spawner();
             walkdir::GitIgnore::new(&project_root.path(), spawner)
-        }) {
-            Ok(gitignore) => Ok(gitignore),
-            Err(err) => todo!("handle {err}"),
+        });
+
+        match create_res {
+            Ok(gitignore) => Ok(Some(gitignore)),
+
+            Err(err) => match &err {
+                // If 'git' is not in $PATH that likely means the project
+                // is not inside a Git repository.
+                walkdir::CreateError::GitNotInPath
+                | walkdir::CreateError::PathNotInGitRepository => Ok(None),
+
+                walkdir::CreateError::CommandFailed(_)
+                | walkdir::CreateError::InvalidPath => Err(err),
+            },
         }
     }
 
