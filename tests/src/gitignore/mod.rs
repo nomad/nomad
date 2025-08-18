@@ -10,7 +10,7 @@ use walkdir::{GitIgnore, GitIgnoreFilterError};
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-fn gitignore_1() {
+fn simple() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
         "b.txt": "",
@@ -23,7 +23,7 @@ fn gitignore_1() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-fn gitignore_2() {
+fn changes_to_gitignore_are_picked_up() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
         "b.txt": "",
@@ -40,7 +40,7 @@ fn gitignore_2() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-fn gitignore_slashed_dirs_are_ignored() {
+fn slashed_dirs_are_ignored() {
     let repo = GitRepository::init(mock::fs! {
         "target": {},
         ".gitignore": "target/",
@@ -48,6 +48,27 @@ fn gitignore_slashed_dirs_are_ignored() {
 
     let ignored_res = repo.is_ignored(repo.path().join(node!("target")));
     assert_eq!(ignored_res, Ok(true));
+}
+
+#[test]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+fn errors_if_path_is_outside_repo() {
+    let repo = GitRepository::init(mock::fs! {});
+    let parent_path = repo.path().parent().unwrap();
+    let err = repo.is_ignored(parent_path).unwrap_err();
+    assert_eq!(
+        err,
+        GitIgnoreFilterError::PathOutsideRepo {
+            path: parent_path.to_owned(),
+            // On macOS the repo is created under /tmp, which is a symlink to
+            // /private/tmp. Since git returns the canonical path in the error
+            // message, we need to canonicalize it here too.
+            repo_path: std::fs::canonicalize(repo.path())
+                .unwrap()
+                .try_into()
+                .unwrap(),
+        }
+    );
 }
 
 struct GitRepository {
