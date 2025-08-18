@@ -6,6 +6,7 @@ use std::sync::{Arc, OnceLock};
 use abs_path::{AbsPath, AbsPathBuf};
 use ed::executor::{BackgroundSpawner, Task};
 use ed::fs::{self, os};
+use either::Either;
 use futures_util::{StreamExt, select_biased};
 
 use crate::Filter;
@@ -38,18 +39,15 @@ pub enum GitIgnoreCreateError {
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 pub enum GitIgnoreFilterError {
-    /// The name corresponding to a node's metadata could not be obtained.
-    #[display("{_0}")]
-    NodeName(fs::MetadataNameError),
-
-    /// The path given to [`GitIgnore::should_filter`] does not exist.
+    /// The given path does not exist.
     #[display("the path {_0:?} does not exist")]
     PathDoesNotExist(AbsPathBuf),
 
-    /// The path is outside the repository.
+    /// The path is outside the repository whose path was given to
+    /// [`GitIgnore::new`].
     #[display("the path {path:?} is outside the repository at {repo_path:?}")]
     PathOutsideRepo {
-        /// The path given to [`GitIgnore::should_filter`].
+        /// The path that is outside the repository.
         path: AbsPathBuf,
 
         /// The repo's path.
@@ -67,7 +65,7 @@ pub enum GitIgnoreFilterError {
 /// A request to check if a path is ignored, together with a sender that the
 /// background task can use to send the result back.
 struct CheckRequest {
-    node_path: AbsPathBuf,
+    path: AbsPathBuf,
     result_tx: flume::Sender<Result<bool, GitIgnoreFilterError>>,
 }
 
@@ -81,6 +79,42 @@ enum Message {
 }
 
 impl GitIgnore {
+    /// Checks if the given path is ignored by Git.
+    pub async fn is_ignored(
+        &self,
+        path: impl Into<AbsPathBuf>,
+    ) -> Result<bool, GitIgnoreFilterError> {
+        let mut path = Some(path.into());
+
+        loop {
+            if let Some(exit_status) = self.exit_status.get() {
+                return Err(GitIgnoreFilterError::ProcessExited(
+                    exit_status.as_ref().ok().cloned(),
+                ));
+            }
+
+            let (result_tx, result_rx) = flume::bounded(1);
+
+            let request = CheckRequest {
+                path: path.take().expect("we never send two requests"),
+                result_tx,
+            };
+
+            if self.request_tx.send(request).is_err() {
+                // The background task just completed. Loop again, there will
+                // be an exit status set.
+                continue;
+            }
+
+            match result_rx.recv_async().await {
+                Ok(result) => return result,
+                // The background task just completed. Loop again, there will
+                // be an exit status set.
+                Err(_recv_err) => continue,
+            }
+        }
+    }
+
     /// Creates a new `GitIgnore` filter.
     pub fn new(
         repo_path: &AbsPath,
@@ -163,7 +197,7 @@ impl GitIgnore {
         loop {
             select_biased! {
                 request = request_stream.select_next_some() => {
-                    let path = request.node_path.as_str().as_bytes();
+                    let path = request.path.as_str().as_bytes();
 
                     let write_res = stdin
                         .write_all(path)
@@ -318,43 +352,16 @@ impl GitIgnoreFilterError {
 // We're shelling out to Git to get the list of ignored files, so this can only
 // be a filter on a real filesystem.
 impl Filter<os::OsFs> for GitIgnore {
-    type Error = GitIgnoreFilterError;
+    type Error = Either<fs::MetadataNameError, GitIgnoreFilterError>;
 
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
         node_meta: &impl fs::Metadata<Fs = os::OsFs>,
     ) -> Result<bool, Self::Error> {
-        loop {
-            if let Some(exit_status) = self.exit_status.get() {
-                return Err(GitIgnoreFilterError::ProcessExited(
-                    exit_status.as_ref().ok().cloned(),
-                ));
-            }
-
-            let node_name =
-                node_meta.name().map_err(GitIgnoreFilterError::NodeName)?;
-
-            let (result_tx, result_rx) = flume::bounded(1);
-
-            let request = CheckRequest {
-                node_path: dir_path.join(node_name),
-                result_tx,
-            };
-
-            if self.request_tx.send(request).is_err() {
-                // The background task just completed. Loop again, there will
-                // be an exit status set.
-                continue;
-            }
-
-            match result_rx.recv_async().await {
-                Ok(result) => return result,
-                // The background task just completed. Loop again, there will
-                // be an exit status set.
-                Err(_recv_err) => continue,
-            }
-        }
+        let node_name = node_meta.name().map_err(Either::Left)?;
+        let node_path = dir_path.join(node_name);
+        self.is_ignored(node_path).await.map_err(Either::Right)
     }
 }
 

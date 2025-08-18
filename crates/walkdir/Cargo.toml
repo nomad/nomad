@@ -19,6 +19,7 @@ futures-util = { workspace = true, features = ["default"] }
 send-future = "0.1"
 
 compact_str = { workspace = true, optional = true }
+either = { workspace = true, optional = true }
 
 [dev-dependencies]
 abs-path = { workspace = true, features = ["macros"] }
