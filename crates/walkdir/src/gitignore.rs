@@ -279,6 +279,12 @@ impl GitIgnore {
         }
     }
 
+    /// Returns the number of instances to this `GitIgnore` filter.
+    fn num_instances(&self) -> usize {
+        let is_event_loop_running = self.exit_status.get().is_none();
+        Arc::strong_count(&self.exit_status) - is_event_loop_running as usize
+    }
+
     /// Continuosly reads from the `stdout` of the `git check-ignore` process
     /// until it hits EOF or an error occurs.
     fn read_from_stdout(
@@ -392,7 +398,7 @@ impl StdoutParser {
 
 impl Drop for GitIgnore {
     fn drop(&mut self) {
-        if self.message_tx.sender_count() == 1 {
+        if self.num_instances() == 1 {
             let _ = self.message_tx.send(Message::TerminateProcess);
         }
     }
