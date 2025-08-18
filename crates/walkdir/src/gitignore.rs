@@ -74,12 +74,21 @@ enum Message {
         result_tx: flume::Sender<Result<bool, GitIgnoreFilterError>>,
     },
 
-    /// Sent by the stdout task when a new line is read. The `bool` indicates
-    /// whether the path (which is not included in the message) is ignored.
-    FromStdout(bool),
+    /// `Ok` variants are sent by the stdout task when a new output is read.
+    /// The `bool` indicates whether the path (which is not included in the
+    /// message) is ignored.
+    ///
+    /// `Err` variants are sent by the stderr task when a new line is read
+    /// that indicates an error.
+    ReadIgnoreResult(Result<bool, GitIgnoreFilterError>),
 
-    /// Sent by the stderr task when an error occurs.
-    FromStderr(GitIgnoreFilterError),
+    /// Sent by the stdout task when it has reached EOF or if an error occured
+    /// while reading.
+    StdoutClosed,
+
+    /// Sent by the stderr task when it has reached EOF or if an error occured
+    /// while reading.
+    StderrClosed,
 
     /// Sent when dropping the last `GitIgnore` instance.
     TerminateProcess,
@@ -212,9 +221,11 @@ impl GitIgnore {
         exit_status: Arc<OnceLock<io::Result<process::ExitStatus>>>,
     ) {
         let mut result_tx_queue = VecDeque::new();
+        let mut is_stdout_closed = false;
+        let mut is_stderr_closed = false;
 
         while let Ok(message) = message_rx.recv_async().await {
-            let result = match message {
+            match message {
                 Message::CheckRequest { path, result_tx } => {
                     result_tx_queue.push_front(result_tx);
 
@@ -222,16 +233,29 @@ impl GitIgnore {
                         .write_all(path.as_bytes())
                         .and_then(|()| stdin.write_all(b"\0"));
 
-                    match write_res {
-                        Ok(()) => continue,
-                        // Just give up if we can't write to stdin.
-                        Err(_) => break,
+                    // Just give up if we can't write to stdin.
+                    if write_res.is_err() {
+                        break;
                     }
                 },
 
-                Message::FromStdout(is_ignored) => Ok(is_ignored),
+                Message::ReadIgnoreResult(result) => {
+                    // We can always pop from the front of the queue because
+                    // 'git check-ignore' outputs paths in the same order they
+                    // were sent to stdin.
+                    let result_tx = result_tx_queue
+                        .pop_back()
+                        .expect("the queue should not be empty");
 
-                Message::FromStderr(err) => Err(err),
+                    // The receiver might've been dropped, and that's ok.
+                    let _ = result_tx.send(result);
+                },
+
+                // Stop the event loop when both stdout and stderr are closed.
+                Message::StdoutClosed if is_stderr_closed => break,
+                Message::StderrClosed if is_stdout_closed => break,
+                Message::StdoutClosed => is_stdout_closed = true,
+                Message::StderrClosed => is_stderr_closed = true,
 
                 Message::TerminateProcess => {
                     // NOTE: sending SIGKILL only marks the child as defunct,
@@ -242,17 +266,7 @@ impl GitIgnore {
                     let _ = child.wait();
                     return;
                 },
-            };
-
-            // We can always pop from the front of the queue because
-            // 'git check-ignore' outputs paths in the same order they were
-            // sent to stdin.
-            let result_tx = result_tx_queue
-                .pop_back()
-                .expect("the queue should not be empty");
-
-            // The receiver might've been dropped, and that's ok.
-            let _ = result_tx.send(result);
+            }
         }
 
         drop(stdin);
@@ -296,22 +310,23 @@ impl GitIgnore {
 
         loop {
             let mut buf = match reader.fill_buf() {
-                Ok(buf) if buf.is_empty() => return,
+                Ok(buf) if buf.is_empty() => break,
                 Ok(buf) => buf,
-                Err(_err) => return,
+                Err(_err) => break,
             };
 
             let buf_len = buf.len();
 
             while let Some((is_ignored, new_buf)) = parser.feed(buf) {
                 buf = new_buf;
-                message_tx
-                    .send(Message::FromStdout(is_ignored))
-                    .expect("event loop is still running");
+                let message = Message::ReadIgnoreResult(Ok(is_ignored));
+                let _ = message_tx.send(message);
             }
 
             reader.consume(buf_len);
         }
+
+        let _ = message_tx.send(Message::StdoutClosed);
     }
 
     /// Continuosly reads from the `stderr` of the `git check-ignore` process
@@ -327,16 +342,17 @@ impl GitIgnore {
             line.clear();
 
             match reader.read_line(&mut line) {
-                Ok(0) | Err(_) => return,
+                Ok(0) | Err(_) => break,
                 Ok(_non_zero) => (),
             }
 
             if let Some(err) = GitIgnoreFilterError::parse_stderr_line(&line) {
-                message_tx
-                    .send(Message::FromStderr(err))
-                    .expect("event loop is still running");
+                let message = Message::ReadIgnoreResult(Err(err));
+                let _ = message_tx.send(message);
             }
         }
+
+        let _ = message_tx.send(Message::StderrClosed);
     }
 }
 
