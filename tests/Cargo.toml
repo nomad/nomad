@@ -14,10 +14,11 @@ crate-type = ["cdylib"]
 # Features that enable a specific set of tests.
 auth = ["__any", "dep:auth"]
 collab = ["__any", "dep:auth", "dep:collab"]
+gitignore = ["__any", "dep:tempdir", "dep:thread-pool", "dep:walkdir"]
 mock = ["__any", "__editor"]
 neovim = ["__any", "__editor", "dep:neovim", "auth?/neovim", "collab?/neovim"]
 thread-pool = ["__any", "dep:thread-pool"]
-walkdir = ["__any", "dep:tempdir", "dep:thread-pool", "dep:walkdir"]
+walkdir = ["__any", "dep:walkdir"]
 
 # Sentinel features.
 __any = []

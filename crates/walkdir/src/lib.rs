@@ -13,5 +13,5 @@ mod walkdir;
 pub use filter::{And, Filter, Filtered};
 pub use fs_ext::{FsExt, Walker};
 #[cfg(feature = "gitignore")]
-pub use gitignore::GitIgnore;
+pub use gitignore::{GitIgnore, GitIgnoreCreateError, GitIgnoreFilterError};
 pub use walkdir::{WalkDir, WalkError};

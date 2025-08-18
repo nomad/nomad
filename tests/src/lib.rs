@@ -11,6 +11,8 @@
 
 #[cfg(all(test, feature = "collab"))]
 mod collab;
+#[cfg(all(test, feature = "gitignore"))]
+mod gitignore;
 #[cfg(all(test, feature = "mock"))]
 mod mock;
 #[cfg(feature = "neovim")]
