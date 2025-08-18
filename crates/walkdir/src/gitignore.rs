@@ -1,4 +1,4 @@
-use core::mem;
+use core::{fmt, mem};
 use std::collections::VecDeque;
 use std::io::{self, BufRead, Write};
 use std::process;
@@ -29,11 +29,11 @@ pub struct GitIgnore {
 }
 
 /// The type of error that can occur when creating the [`GitIgnore`] filter.
-#[derive(Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq)]
-pub enum GitIgnoreCreateError {
-    /// Running the `git check-ignore` command failed.
-    #[display("running {cmd:?} failed: {_0}", cmd = GitIgnore::command())]
-    CommandFailed(#[partial_eq(skip)] io::Error),
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
+pub enum CreateError {
+    /// Shelling out to `git` failed.
+    #[display("{_0}")]
+    CommandFailed(CommandError),
 
     /// The `git` executable is not in the user's `$PATH`.
     #[display("the 'git' executable is not in $PATH")]
@@ -48,9 +48,25 @@ pub enum GitIgnoreCreateError {
     PathNotInGitRepository,
 }
 
+/// The type of error returned when shelling out to `git` while creating a
+/// [`GitIgnore`] fails.
+#[derive(derive_more::Display, cauchy::Error)]
+#[display(
+    "running {cmd:?} failed: {inner}",
+    cmd = if self.failed_checking_if_in_git_repo {
+        GitIgnore::is_in_repo_command()
+    } else {
+        GitIgnore::check_ignore_command()
+    },
+)]
+pub struct CommandError {
+    inner: io::Error,
+    failed_checking_if_in_git_repo: bool,
+}
+
 /// The type of error that can occur when using the [`GitIgnore`] filter.
 #[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
-pub enum GitIgnoreFilterError {
+pub enum IgnoreError {
     /// The given path does not exist.
     #[display("the path {_0:?} does not exist")]
     PathDoesNotExist(AbsPathBuf),
@@ -80,7 +96,7 @@ enum Message {
     /// the background task can use to send the result back.
     CheckRequest {
         path: AbsPathBuf,
-        result_tx: flume::Sender<Result<bool, GitIgnoreFilterError>>,
+        result_tx: flume::Sender<Result<bool, IgnoreError>>,
     },
 
     /// `Ok` variants are sent by the stdout task when a new output is read.
@@ -88,7 +104,7 @@ enum Message {
     ///
     /// `Err` variants are sent by the stderr task when a new line is read
     /// that was successfully parsed into a [`GitIgnoreFilterError`].
-    ReadIgnoreResult(Result<bool, GitIgnoreFilterError>),
+    ReadIgnoreResult(Result<bool, IgnoreError>),
 
     /// Sent by the stdout task when it has reached EOF or if an error occured
     /// while reading.
@@ -124,9 +140,9 @@ impl GitIgnore {
     pub async fn is_ignored(
         &self,
         path: impl Into<AbsPathBuf>,
-    ) -> Result<bool, GitIgnoreFilterError> {
+    ) -> Result<bool, IgnoreError> {
         if let Some(exit_status) = self.exit_status.get() {
-            return Err(GitIgnoreFilterError::ProcessExited(
+            return Err(IgnoreError::ProcessExited(
                 exit_status.as_ref().ok().cloned(),
             ));
         }
@@ -140,7 +156,7 @@ impl GitIgnore {
                 "event loop has stopped running, so the exit status must've \
                  been set",
             );
-            return Err(GitIgnoreFilterError::ProcessExited(
+            return Err(IgnoreError::ProcessExited(
                 exit_status.as_ref().ok().cloned(),
             ));
         }
@@ -154,29 +170,47 @@ impl GitIgnore {
     pub fn new(
         repo_path: &AbsPath,
         bg_spawner: &mut impl BackgroundSpawner,
-    ) -> Result<Self, GitIgnoreCreateError> {
-        let mut child = Self::command()
+    ) -> Result<Self, CreateError> {
+        let is_in_git_repo = Self::is_in_repo_command()
+            .current_dir(repo_path)
+            .stdout(process::Stdio::null())
+            .stderr(process::Stdio::null())
+            .status()
+            .map_err(|io_err| match io_err.kind() {
+                io::ErrorKind::NotFound => {
+                    // The command not being found and the path not existing
+                    // both result in the same error (at least on macOS), so
+                    // check if the path exists to distinguish between the two.
+                    if std::fs::metadata(repo_path).is_ok() {
+                        CreateError::GitNotInPath
+                    } else {
+                        CreateError::InvalidPath
+                    }
+                },
+                _ => CreateError::CommandFailed(CommandError {
+                    inner: io_err,
+                    failed_checking_if_in_git_repo: true,
+                }),
+            })?
+            .success();
+
+        if !is_in_git_repo {
+            return Err(CreateError::PathNotInGitRepository);
+        }
+
+        let mut child = Self::check_ignore_command()
             .current_dir(repo_path)
             .stdin(process::Stdio::piped())
             .stdout(process::Stdio::piped())
             .stderr(process::Stdio::piped())
             .spawn()
-            .map_err(|io_err| match io_err.kind() {
-                // The command not being found and the path not existing both
-                // result in the same error (at least on macOS), so check if
-                // the path exists to distinguish between the two.
-                io::ErrorKind::NotFound => {
-                    if std::fs::metadata(repo_path).is_ok() {
-                        GitIgnoreCreateError::GitNotInPath
-                    } else {
-                        GitIgnoreCreateError::InvalidPath
-                    }
-                },
-                _ => GitIgnoreCreateError::CommandFailed(io_err),
-            })?;
+            .map_err(|io_err| CommandError {
+                failed_checking_if_in_git_repo: false,
+                inner: io_err,
+            })
+            .map_err(CreateError::CommandFailed)?;
 
         let process_id = child.id();
-
         let stdin = child.stdin.take().expect("stdin handle present");
         let stdout = child.stdout.take().expect("stdout handle present");
         let stderr = child.stderr.take().expect("stderr handle present");
@@ -220,7 +254,7 @@ impl GitIgnore {
             .map_or_else(|| Ok(self.process_id), Err)
     }
 
-    fn command() -> process::Command {
+    fn check_ignore_command() -> process::Command {
         let mut cmd = process::Command::new("git");
 
         // See https://git-scm.com/docs/git-check-ignore#_options for more
@@ -310,9 +344,15 @@ impl GitIgnore {
         );
 
         for result_tx in result_txs {
-            let _ = result_tx
-                .send(Err(GitIgnoreFilterError::ProcessExited(maybe_status)));
+            let _ =
+                result_tx.send(Err(IgnoreError::ProcessExited(maybe_status)));
         }
+    }
+
+    fn is_in_repo_command() -> process::Command {
+        let mut cmd = process::Command::new("git");
+        cmd.arg("rev-parse").arg("--is-inside-work-tree");
+        cmd
     }
 
     /// Returns the number of instances of this `GitIgnore` filter.
@@ -368,7 +408,7 @@ impl GitIgnore {
                 Ok(_non_zero) => (),
             }
 
-            if let Some(err) = GitIgnoreFilterError::parse_stderr_line(&line) {
+            if let Some(err) = IgnoreError::parse_stderr_line(&line) {
                 let message = Message::ReadIgnoreResult(Err(err));
                 let _ = message_tx.send(message);
             }
@@ -378,7 +418,7 @@ impl GitIgnore {
     }
 }
 
-impl GitIgnoreFilterError {
+impl IgnoreError {
     fn parse_path_does_not_exist(line: &str) -> Option<Self> {
         line.strip_prefix("fatal: Invalid path '")
             .and_then(|rest| rest.strip_suffix("': No such file or directory"))
@@ -445,7 +485,7 @@ impl Drop for GitIgnore {
 // We're shelling out to Git, so this can only be a filter on a real
 // filesystem.
 impl Filter<os::OsFs> for GitIgnore {
-    type Error = Either<fs::MetadataNameError, GitIgnoreFilterError>;
+    type Error = Either<fs::MetadataNameError, IgnoreError>;
 
     async fn should_filter(
         &self,
@@ -455,6 +495,21 @@ impl Filter<os::OsFs> for GitIgnore {
         let node_name = node_meta.name().map_err(Either::Left)?;
         let node_path = dir_path.join(node_name);
         self.is_ignored(node_path).await.map_err(Either::Right)
+    }
+}
+
+impl fmt::Debug for CommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.inner, f)
+    }
+}
+
+impl PartialEq for CommandError {
+    fn eq(&self, other: &Self) -> bool {
+        self.failed_checking_if_in_git_repo
+            == other.failed_checking_if_in_git_repo
+            && self.inner.kind() == other.inner.kind()
+            && self.inner.to_string() == other.inner.to_string()
     }
 }
 
@@ -513,10 +568,10 @@ mod tests {
     fn parse_stderr_1() {
         let stderr =
             "fatal: /foo: '/foo' is outside repository at '/foo/bar'\n";
-        let err = GitIgnoreFilterError::parse_stderr_line(stderr).unwrap();
+        let err = IgnoreError::parse_stderr_line(stderr).unwrap();
         assert_eq!(
             err,
-            GitIgnoreFilterError::PathOutsideRepo {
+            IgnoreError::PathOutsideRepo {
                 path: path!("/foo").to_owned(),
                 repo_path: path!("/foo/bar").to_owned(),
             }
@@ -527,12 +582,10 @@ mod tests {
     fn parse_stderr_2() {
         let stderr =
             "fatal: Invalid path '/foo/bar': No such file or directory\n";
-        let err = GitIgnoreFilterError::parse_stderr_line(stderr).unwrap();
+        let err = IgnoreError::parse_stderr_line(stderr).unwrap();
         assert_eq!(
             err,
-            GitIgnoreFilterError::PathDoesNotExist(
-                path!("/foo/bar").to_owned()
-            )
+            IgnoreError::PathDoesNotExist(path!("/foo/bar").to_owned())
         )
     }
 }

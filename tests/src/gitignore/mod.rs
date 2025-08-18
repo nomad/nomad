@@ -8,7 +8,7 @@ use ed::fs::os::OsFs;
 use futures_lite::future;
 use tempdir::{FsExt, TempDir};
 use thread_pool::ThreadPool;
-use walkdir::{GitIgnore, GitIgnoreCreateError, GitIgnoreFilterError};
+use walkdir::{CreateError, GitIgnore, IgnoreError};
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
@@ -60,7 +60,7 @@ fn errors_if_path_is_outside_repo() {
     let err = repo.is_ignored(parent_path).unwrap_err();
     assert_eq!(
         err,
-        GitIgnoreFilterError::PathOutsideRepo {
+        IgnoreError::PathOutsideRepo {
             path: parent_path.to_owned(),
             // On macOS the repo is created under /tmp, which is a symlink to
             // /private/tmp. Since git returns the canonical path in the error
@@ -79,7 +79,7 @@ fn errors_if_path_doesnt_exist() {
     let repo = GitRepository::init(mock::fs! {});
     let path = path!("/foo/bar");
     let err = repo.is_ignored(path).unwrap_err();
-    let GitIgnoreFilterError::PathDoesNotExist(error_path) = err else {
+    let IgnoreError::PathDoesNotExist(error_path) = err else {
         panic!("expected PathDoesNotExist error, got: {err:?}");
     };
     // Git stops at the first component that doesn't exist, so we can't assert
@@ -104,14 +104,14 @@ fn exit_status_is_returned_if_process_is_killed() {
         .expect("failed to kill gitignore process");
 
     let err = repo.is_ignored(repo.path()).unwrap_err();
-    let GitIgnoreFilterError::ProcessExited(maybe_exit_status) = err else {
+    let IgnoreError::ProcessExited(maybe_exit_status) = err else {
         panic!("expected ProcessExited error, got: {err:?}");
     };
 
     // Calling `is_ignored` continues returning the same exit status.
     assert_eq!(
         repo.is_ignored(repo.path()).unwrap_err(),
-        GitIgnoreFilterError::ProcessExited(maybe_exit_status)
+        IgnoreError::ProcessExited(maybe_exit_status)
     );
 
     // Getting the PID will now fail and return the exit status instead.
@@ -156,7 +156,7 @@ fn creating_gitignore_fails_if_git_is_not_in_path() {
     let tempdir = future::block_on(OsFs::default().tempdir()).unwrap();
     let mut spawner = ThreadPool::default();
     let err = GitIgnore::new(tempdir.path(), &mut spawner).unwrap_err();
-    assert_eq!(err, GitIgnoreCreateError::GitNotInPath);
+    assert_eq!(err, CreateError::GitNotInPath);
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn creating_gitignore_fails_if_git_is_not_in_path() {
 fn creating_gitignore_fails_if_path_doesnt_exist() {
     let mut spawner = ThreadPool::default();
     let err = GitIgnore::new(path!("/foo/bar"), &mut spawner).unwrap_err();
-    assert_eq!(err, GitIgnoreCreateError::InvalidPath);
+    assert_eq!(err, CreateError::InvalidPath);
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn creating_gitignore_fails_if_not_in_git_repo() {
     let tempdir = future::block_on(OsFs::default().tempdir()).unwrap();
     let mut spawner = ThreadPool::default();
     let err = GitIgnore::new(tempdir.path(), &mut spawner).unwrap_err();
-    assert_eq!(err, GitIgnoreCreateError::PathNotInGitRepository);
+    assert_eq!(err, CreateError::PathNotInGitRepository);
 }
 
 struct GitRepository {
@@ -220,7 +220,7 @@ impl GitRepository {
     fn is_ignored(
         &self,
         path: impl AsRef<AbsPath>,
-    ) -> Result<bool, GitIgnoreFilterError> {
+    ) -> Result<bool, IgnoreError> {
         future::block_on(async {
             self.gitignore.is_ignored(path.as_ref()).await
         })
