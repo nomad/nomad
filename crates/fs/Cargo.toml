@@ -7,7 +7,10 @@ license.workspace = true
 publish.workspace = true
 
 [features]
+default = ["walk"]
 os-fs = ["futures-util/io", "dep:async-fs", "dep:notify"]
+filter = ["dep:either"]
+walk = ["dep:flume", "dep:send-future"]
 
 [dependencies]
 abs-path = { workspace = true }
@@ -16,7 +19,10 @@ derive_more = { workspace = true }
 futures-util = { workspace = true, features = ["alloc", "async-await-macro"] }
 
 async-fs = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
+either = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
+send-future = { workspace = true, optional = true }
 
 [lints]
 workspace = true

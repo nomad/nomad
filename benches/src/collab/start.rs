@@ -19,11 +19,11 @@ mod read_neovim {
     use ed::fs::os::{OsDirectory, OsFs};
     use ed::fs::{Directory, Fs};
     use ed::{Context, Editor};
+    use fs_filters::gitignore::GitIgnore;
     use futures_lite::future;
     use mock::fs::MockFs;
     use mock::{ContextExt, Mock};
     use thread_pool::ThreadPool;
-    use walkdir::GitIgnore;
 
     use super::*;
 

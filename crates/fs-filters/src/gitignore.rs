@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use core::{fmt, mem};
 use std::collections::VecDeque;
 use std::io::{self, BufRead, Write};
@@ -7,11 +9,10 @@ use std::sync::{Arc, OnceLock};
 use abs_path::{AbsPath, AbsPathBuf};
 use ed::executor::{BackgroundSpawner, Task};
 use either::Either;
+use fs::filter::Filter;
 
-use crate::Filter;
-
-/// A [`Filter`] that filters out nodes based on the various exclusion rules
-/// used by Git.
+/// A filesystem [`Filter`] that filters out nodes based on the various
+/// exclusion rules used by Git.
 #[derive(Clone, cauchy::Debug)]
 pub struct GitIgnore {
     /// A sender used to send [`Message`]s to the background task.

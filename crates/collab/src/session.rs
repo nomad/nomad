@@ -4,8 +4,8 @@ use collab_server::client as collab_client;
 use collab_types::Message;
 use ed::{Context, notify};
 use flume::Receiver;
+use fs::filter::Filter;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
-use walkdir::Filter;
 
 use crate::editors::{CollabEditor, MessageRx, MessageTx};
 use crate::event_stream::{EventError, EventStream};

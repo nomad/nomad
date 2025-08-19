@@ -6,17 +6,15 @@
 #![cfg_attr(not(test), allow(dead_code, unused_imports))]
 
 mod ed;
+mod fs;
+mod fs_filters;
 mod utils;
 
 #[cfg(feature = "collab")]
 mod collab;
-#[cfg(feature = "gitignore")]
-mod gitignore;
 #[cfg(feature = "mock")]
 mod mock;
 #[cfg(feature = "neovim")]
 mod neovim;
 #[cfg(feature = "thread-pool")]
 mod thread_pool;
-#[cfg(feature = "walkdir")]
-mod walkdir;

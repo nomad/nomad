@@ -1,8 +1,8 @@
 use core::fmt;
 
 use abs_path::AbsPathBuf;
+use fs::walk::FsExt;
 use futures_lite::{StreamExt, future};
-use walkdir::FsExt;
 
 #[test]
 fn paths_simple() {

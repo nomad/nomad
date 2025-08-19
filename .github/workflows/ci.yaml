@@ -62,7 +62,7 @@ jobs:
       - name: Generate coverage report
         run: |
           cargo llvm-cov --no-report --workspace
-          cargo llvm-cov --no-report --package=tests --features=auth,collab,mock,walkdir
+          cargo llvm-cov --no-report --package=tests --all-features
           cargo llvm-cov report --codecov --output-path codecov.json
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
@@ -131,16 +131,8 @@ jobs:
             ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run unit tests
         run: cargo test --workspace --no-fail-fast
-      - name: Run integration tests for crates/auth
-        run: cargo test --package=tests --features=auth --no-fail-fast
-      - name: Run integration tests for crates/collab
-        run: cargo test --package=tests --features=collab --no-fail-fast
-      - name: Run integration tests for crates/mock
-        run: cargo test --package=tests --features=mock --no-fail-fast
-      - name: Run integration tests for crates/thread-pool
-        run: cargo test --package=tests --features=thread-pool --no-fail-fast
-      - name: Run integration tests for crates/walkdir
-        run: cargo test --package=tests --features=walkdir --no-fail-fast
+      - name: Run integration tests
+        run: cargo test --package=tests --all-features
 
   tests-neovim:
     name: tests (Neovim)

@@ -29,7 +29,7 @@ pub trait CollabEditor: Editor {
     type PeerTooltip;
 
     /// TODO: docs.
-    type ProjectFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
+    type ProjectFilter: fs::filter::Filter<Self::Fs, Error: Send> + Send + Sync;
 
     /// TODO: docs.
     type ServerParams: collab_types::Params<

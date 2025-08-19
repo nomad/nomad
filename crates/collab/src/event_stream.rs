@@ -1,11 +1,11 @@
 use abs_path::AbsPathBuf;
 use ed::{AgentId, Buffer, Context, Cursor, Selection, Shared};
+use fs::filter::Filter;
 use fs::{Directory, File, Fs};
 use futures_util::future::FusedFuture;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
-use walkdir::Filter;
 
 use crate::editors::CollabEditor;
 use crate::event::{self, Event};
@@ -55,7 +55,7 @@ pub(crate) struct EventStreamBuilder<Fs: fs::Fs, State = NeedsProjectFilter> {
 
 /// An [`EventStreamBuilder`] typestate indicating that it won't be possible
 /// to call the [`build`](EventStreamBuilder::build) method until the user
-/// provides a [`walkdir::Filter`].
+/// provides a [`Filter`].
 pub(crate) struct NeedsProjectFilter;
 
 /// An [`EventStreamBuilder`] typestate indicating that it's ready to be built.

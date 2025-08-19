@@ -15,13 +15,13 @@ use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use ed::{Buffer, Context, Editor};
 use either::Either;
+use fs::walk::FsExt;
 use fs::{Directory, File, Fs, Metadata, Node, Symlink};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
 use puff::file::LocalFileId;
 use smol_str::ToSmolStr;
-use walkdir::FsExt;
 
 use crate::collab::Collab;
 use crate::config::Config;
@@ -465,9 +465,9 @@ pub enum ReadProjectError<Ed: CollabEditor> {
     /// TODO: docs.
     #[allow(clippy::type_complexity)]
     WalkRoot(
-        walkdir::WalkError<
+        fs::walk::WalkError<
             Ed::Fs,
-            walkdir::Filtered<ProjectFilter<Ed>, Ed::Fs>,
+            fs::walk::Filtered<ProjectFilter<Ed>, Ed::Fs>,
             ReadNodeError<Ed::Fs>,
         >,
     ),
@@ -495,7 +495,7 @@ pub enum SearchProjectRootError<Ed: CollabEditor> {
     Lsp(Ed::LspRootError),
 }
 
-/// A [`walkdir::Filter`] that filters out every node but one.
+/// A [`fs::filter::Filter`] that filters out every node but one.
 pub struct AllButOne<Fs: fs::Fs> {
     id: Fs::NodeId,
 }
@@ -507,7 +507,7 @@ struct NodeIdMaps<Fs: fs::Fs> {
     node2file: FxHashMap<Fs::NodeId, LocalFileId>,
 }
 
-impl<Fs: fs::Fs> walkdir::Filter<Fs> for AllButOne<Fs> {
+impl<Fs: fs::Fs> fs::filter::Filter<Fs> for AllButOne<Fs> {
     type Error = Infallible;
 
     async fn should_filter(

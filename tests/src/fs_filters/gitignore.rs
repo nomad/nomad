@@ -5,10 +5,10 @@ use std::{thread, time};
 use abs_path::{AbsPath, node, path};
 use fs::Directory;
 use fs::os::OsFs;
+use fs_filters::gitignore::{CreateError, GitIgnore, IgnoreError};
 use futures_lite::future;
 use tempdir::{FsExt, TempDir};
 use thread_pool::ThreadPool;
-use walkdir::{CreateError, GitIgnore, IgnoreError};
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]

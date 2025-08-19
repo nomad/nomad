@@ -10,6 +10,7 @@ use collab_types::nomad::ulid;
 use ed::executor::Executor;
 use ed::{ByteOffset, Context, Editor, notify};
 use fs::Directory;
+use fs_filters::gitignore;
 use mlua::{Function, Table};
 use neovim::buffer::{BufferId, HighlightRangeHandle};
 use neovim::{Neovim, mlua, oxi};
@@ -70,7 +71,7 @@ impl CollabEditor for Neovim {
     type Io = async_net::TcpStream;
     type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerTooltip;
-    type ProjectFilter = Option<walkdir::GitIgnore>;
+    type ProjectFilter = Option<gitignore::GitIgnore>;
     type ServerParams = collab_types::nomad::NomadParams;
 
     type ConnectToServerError = NeovimConnectToServerError;
@@ -78,7 +79,7 @@ impl CollabEditor for Neovim {
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
     type HomeDirError = NeovimHomeDirError;
     type LspRootError = NeovimLspRootError;
-    type ProjectFilterError = walkdir::CreateError;
+    type ProjectFilterError = gitignore::CreateError;
 
     async fn confirm_start(
         project_root: &AbsPath,
@@ -278,7 +279,7 @@ impl CollabEditor for Neovim {
     ) -> Result<Self::ProjectFilter, Self::ProjectFilterError> {
         let create_res = ctx.with_editor(|nvim| {
             let spawner = nvim.executor().background_spawner();
-            walkdir::GitIgnore::new(&project_root.path(), spawner)
+            gitignore::GitIgnore::new(&project_root.path(), spawner)
         });
 
         match create_res {
@@ -287,11 +288,11 @@ impl CollabEditor for Neovim {
             Err(err) => match &err {
                 // If 'git' is not in $PATH that likely means the project
                 // is not inside a Git repository.
-                walkdir::CreateError::GitNotInPath
-                | walkdir::CreateError::PathNotInGitRepository => Ok(None),
+                gitignore::CreateError::GitNotInPath
+                | gitignore::CreateError::PathNotInGitRepository => Ok(None),
 
-                walkdir::CreateError::CommandFailed(_)
-                | walkdir::CreateError::InvalidPath => Err(err),
+                gitignore::CreateError::CommandFailed(_)
+                | gitignore::CreateError::InvalidPath => Err(err),
             },
         }
     }

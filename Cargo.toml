@@ -69,6 +69,7 @@ collab = { path = "./crates/collab" }
 collab-project = { path = "./crates/collab-project" }
 ed = { path = "./crates/ed" }
 fs = { path = "./crates/fs" }
+fs-filters = { path = "./crates/fs-filters" }
 mock = { path = "./crates/mock" }
 neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }
@@ -77,7 +78,6 @@ tempdir = { path = "./crates/tempdir" }
 thread-pool = { path = "./crates/thread-pool" }
 tracing-layers = { path = "./crates/tracing-layers" }
 version = { path = "./crates/version" }
-walkdir = { path = "./crates/walkdir" }
 
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"

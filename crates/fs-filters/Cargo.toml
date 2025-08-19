@@ -1,0 +1,34 @@
+[package]
+name = "fs-filters"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+gitignore = [
+  "fs/os-fs",
+  "dep:abs-path",
+  "dep:cauchy",
+  "dep:derive_more",
+  "dep:ed",
+  "dep:either",
+  "dep:flume",
+]
+
+[dependencies]
+fs = { workspace = true, features = ["filter"] }
+
+abs-path = { workspace = true, optional = true }
+cauchy = { workspace = true, optional = true }
+derive_more = { workspace = true, optional = true }
+ed = { workspace = true, optional = true }
+either = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
+
+[dev-dependencies]
+abs-path = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

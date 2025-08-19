@@ -14,11 +14,10 @@ crate-type = ["cdylib"]
 # Features that enable a specific set of tests.
 auth = ["dep:auth"]
 collab = ["dep:auth", "dep:collab"]
-gitignore = ["dep:tempdir", "dep:thread-pool", "dep:walkdir"]
+gitignore = ["dep:tempdir", "dep:thread-pool", "fs-filters/gitignore"]
 mock = []
 neovim = ["dep:neovim", "auth?/neovim", "collab?/neovim"]
 thread-pool = ["dep:thread-pool"]
-walkdir = ["dep:walkdir"]
 
 # Other features.
 neovim-nightly = ["neovim", "neovim/nightly"]
@@ -30,6 +29,7 @@ cauchy = { workspace = true }
 ed = { workspace = true }
 flume = { workspace = true }
 fs = { workspace = true }
+fs-filters = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
 futures-util = { workspace = true, features = ["default"] }
 mock = { workspace = true }
@@ -43,7 +43,6 @@ collab = { workspace = true, optional = true, features = ["mock"] }
 neovim = { workspace = true, optional = true, features = ["test"] }
 tempdir = { workspace = true, optional = true }
 thread-pool = { workspace = true, optional = true }
-walkdir = { workspace = true, optional = true, features = ["gitignore"] }
 
 [build-dependencies]
 neovim = { workspace = true, features = ["test"] }

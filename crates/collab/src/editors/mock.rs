@@ -87,7 +87,7 @@ impl<Ed: Editor> CollabMock<Ed, ()> {
 impl<Ed, F> CollabMock<Ed, F>
 where
     Ed: Editor,
-    F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
+    F: fs::filter::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     pub fn confirm_start_with(
         mut self,
@@ -137,7 +137,7 @@ where
     ) -> CollabMock<Ed, NewF>
     where
         Fun: FnMut(&<Ed::Fs as fs::Fs>::Directory) -> NewF + 'static,
-        NewF: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
+        NewF: fs::filter::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
     {
         CollabMock {
             inner: self.inner,
@@ -198,7 +198,7 @@ impl AnyError {
 impl<Ed, F> CollabEditor for CollabMock<Ed, F>
 where
     Ed: BaseEditor,
-    F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
+    F: fs::filter::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
     type PeerSelection = ();
@@ -343,7 +343,7 @@ where
 impl<Ed, F> Editor for CollabMock<Ed, F>
 where
     Ed: BaseEditor,
-    F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
+    F: fs::filter::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Api = <Ed as Editor>::Api;
     type Buffer<'a> = <Ed as Editor>::Buffer<'a>;

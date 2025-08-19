@@ -297,10 +297,10 @@ dependencies = [
  "criterion",
  "ed",
  "fs",
+ "fs-filters",
  "futures-lite",
  "mock",
  "thread-pool",
- "walkdir 0.1.0-dev",
 ]
 
 [[package]]
@@ -708,6 +708,7 @@ dependencies = [
  "fastrand",
  "flume",
  "fs",
+ "fs-filters",
  "futures-util",
  "fxhash",
  "home",
@@ -717,7 +718,6 @@ dependencies = [
  "smallvec",
  "smol_str",
  "tracing",
- "walkdir 0.1.0-dev",
 ]
 
 [[package]]
@@ -862,7 +862,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinytemplate",
- "walkdir 2.5.0",
+ "walkdir",
 ]
 
 [[package]]
@@ -1161,8 +1161,24 @@ dependencies = [
  "async-fs",
  "cauchy",
  "derive_more",
+ "either",
+ "flume",
  "futures-util",
  "notify",
+ "send-future",
+]
+
+[[package]]
+name = "fs-filters"
+version = "0.1.0-dev"
+dependencies = [
+ "abs-path",
+ "cauchy",
+ "derive_more",
+ "ed",
+ "either",
+ "flume",
+ "fs",
 ]
 
 [[package]]
@@ -1960,7 +1976,7 @@ dependencies = [
  "log",
  "mio",
  "notify-types",
- "walkdir 2.5.0",
+ "walkdir",
  "windows-sys 0.60.2",
 ]
 
@@ -3026,6 +3042,7 @@ dependencies = [
  "ed",
  "flume",
  "fs",
+ "fs-filters",
  "futures-lite",
  "futures-util",
  "mock",
@@ -3036,7 +3053,6 @@ dependencies = [
  "tempdir 0.1.0-dev",
  "thread-pool",
  "tracing-subscriber",
- "walkdir 0.1.0-dev",
 ]
 
 [[package]]
@@ -3401,21 +3417,6 @@ name = "virtue"
 version = "0.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
-
-[[package]]
-name = "walkdir"
-version = "0.1.0-dev"
-dependencies = [
- "abs-path",
- "cauchy",
- "derive_more",
- "ed",
- "either",
- "flume",
- "fs",
- "futures-util",
- "send-future",
-]
 
 [[package]]
 name = "walkdir"
