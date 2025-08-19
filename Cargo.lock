@@ -297,8 +297,8 @@ dependencies = [
  "criterion",
  "ed",
  "fs",
- "fs-filters",
  "futures-lite",
+ "gitignore",
  "mock",
  "real-fs",
  "thread-pool",
@@ -709,9 +709,9 @@ dependencies = [
  "fastrand",
  "flume",
  "fs",
- "fs-filters",
  "futures-util",
  "fxhash",
+ "gitignore",
  "home",
  "indexmap",
  "neovim",
@@ -1168,20 +1168,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs-filters"
-version = "0.1.0-dev"
-dependencies = [
- "abs-path",
- "cauchy",
- "derive_more",
- "ed",
- "either",
- "flume",
- "fs",
- "real-fs",
-]
-
-[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1359,6 +1345,20 @@ dependencies = [
  "libgit2-sys",
  "log",
  "url",
+]
+
+[[package]]
+name = "gitignore"
+version = "0.1.0-dev"
+dependencies = [
+ "abs-path",
+ "cauchy",
+ "derive_more",
+ "ed",
+ "either",
+ "flume",
+ "fs",
+ "real-fs",
 ]
 
 [[package]]
@@ -3043,9 +3043,9 @@ dependencies = [
  "ed",
  "flume",
  "fs",
- "fs-filters",
  "futures-lite",
  "futures-util",
+ "gitignore",
  "mock",
  "neovim",
  "pin-project-lite",

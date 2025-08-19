@@ -1,13 +1,10 @@
 [package]
-name = "fs-filters"
+name = "gitignore"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true
-
-[features]
-gitignore = []
 
 [dependencies]
 abs-path = { workspace = true }

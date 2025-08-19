@@ -69,7 +69,7 @@ collab = { path = "./crates/collab" }
 collab-project = { path = "./crates/collab-project" }
 ed = { path = "./crates/ed" }
 fs = { path = "./crates/fs" }
-fs-filters = { path = "./crates/fs-filters" }
+gitignore = { path = "./crates/gitignore" }
 mock = { path = "./crates/mock" }
 neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }

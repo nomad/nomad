@@ -6,7 +6,7 @@ use crate::Directory;
 pub struct TempDirectory {
     pub(crate) inner: Directory,
 
-    /// We need to keep the inner handle around so that the directory can be
+    /// We need to keep the inner handle around so that the directory is
     /// deleted when `Self` is dropped.
     pub(crate) _handle: tempdir::TempDir,
 }

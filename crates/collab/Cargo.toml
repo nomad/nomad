@@ -11,9 +11,9 @@ benches = []
 mock = ["collab-server/server", "collab-server/test", "dep:duplex-stream"]
 neovim = [
   "collab-types/nomad",
-  "fs-filters/gitignore",
   "dep:async-net",
   "dep:clipboard",
+  "dep:gitignore",
   "dep:home",
   "dep:neovim",
 ]
@@ -32,7 +32,6 @@ either = { workspace = true }
 fastrand = { workspace = true }
 flume = { workspace = true, features = ["async"] }
 fs = { workspace = true, features = ["filter"] }
-fs-filters = { workspace = true }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }
@@ -47,6 +46,7 @@ duplex-stream = { workspace = true, optional = true }
 # Neovim-only dependencies.
 async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
+gitignore = { workspace = true, optional = true }
 home = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true }
 

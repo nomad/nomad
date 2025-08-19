@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 # Features that enable a specific set of tests.
 auth = ["dep:auth"]
 collab = ["dep:auth", "dep:collab"]
-gitignore = ["dep:real-fs", "dep:thread-pool", "fs-filters/gitignore"]
+gitignore = ["dep:gitignore", "dep:real-fs", "dep:thread-pool"]
 mock = []
 neovim = ["dep:neovim", "auth?/neovim", "collab?/neovim"]
 thread-pool = ["dep:thread-pool"]
@@ -29,7 +29,6 @@ cauchy = { workspace = true }
 ed = { workspace = true }
 flume = { workspace = true }
 fs = { workspace = true }
-fs-filters = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
 futures-util = { workspace = true, features = ["default"] }
 mock = { workspace = true }
@@ -40,6 +39,7 @@ tracing-subscriber = { workspace = true }
 
 auth = { workspace = true, optional = true, features = ["mock"] }
 collab = { workspace = true, optional = true, features = ["mock"] }
+gitignore = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true, features = ["test"] }
 real-fs = { workspace = true, optional = true, features = ["tempdir"] }
 thread-pool = { workspace = true, optional = true }

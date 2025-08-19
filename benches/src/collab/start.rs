@@ -18,8 +18,8 @@ mod read_neovim {
     use ed::executor::Executor;
     use ed::{Context, Editor};
     use fs::{Directory, Fs};
-    use fs_filters::gitignore::GitIgnore;
     use futures_lite::future;
+    use gitignore::GitIgnore;
     use mock::fs::MockFs;
     use mock::{ContextExt, Mock};
     use real_fs::RealFs;

@@ -7,11 +7,12 @@
 
 mod ed;
 mod fs;
-mod fs_filters;
 mod utils;
 
 #[cfg(feature = "collab")]
 mod collab;
+#[cfg(feature = "gitignore")]
+mod gitignore;
 #[cfg(feature = "mock")]
 mod mock;
 #[cfg(feature = "neovim")]

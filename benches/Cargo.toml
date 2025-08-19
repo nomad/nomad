@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-collab = ["dep:collab", "dep:fs-filters", "fs-filters/gitignore", "dep:real-fs"]
+collab = ["dep:collab", "dep:gitignore", "dep:real-fs"]
 
 [dependencies]
 abs-path = { workspace = true }
@@ -20,7 +20,7 @@ thread-pool = { workspace = true }
 
 # Collab-related dependencies.
 collab = { workspace = true, optional = true, features = ["benches", "mock"] }
-fs-filters = { workspace = true, optional = true }
+gitignore = { workspace = true, optional = true }
 real-fs = { workspace = true, optional = true }
 
 [build-dependencies]

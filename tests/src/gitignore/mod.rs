@@ -4,8 +4,8 @@ use std::{thread, time};
 
 use abs_path::{AbsPath, node, path};
 use fs::Directory;
-use fs_filters::gitignore::{CreateError, GitIgnore, IgnoreError};
 use futures_lite::future;
+use gitignore::{CreateError, GitIgnore, IgnoreError};
 use real_fs::RealFs;
 use thread_pool::ThreadPool;
 

@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use core::{fmt, mem};
+use core::mem;
 use std::collections::VecDeque;
 use std::io::{self, BufRead, Write};
 use std::process;
@@ -10,6 +10,8 @@ use abs_path::{AbsPath, AbsPathBuf};
 use ed::executor::{BackgroundSpawner, Task};
 use either::Either;
 use fs::filter::Filter;
+
+use crate::{CommandError, CreateError, IgnoreError};
 
 /// A filesystem [`Filter`] that filters out nodes based on the various
 /// exclusion rules used by Git.
@@ -26,68 +28,6 @@ pub struct GitIgnore {
     /// The ID of the `git check-ignore` process.
     #[debug(skip)]
     process_id: u32,
-}
-
-/// The type of error that can occur when creating a new [`GitIgnore`].
-#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
-pub enum CreateError {
-    /// Shelling out to `git` failed.
-    #[display("{_0}")]
-    CommandFailed(CommandError),
-
-    /// The `git` executable is not in the user's `$PATH`.
-    #[display("the 'git' executable is not in $PATH")]
-    GitNotInPath,
-
-    /// The path given to [`GitIgnore::new`] doesn't exist.
-    #[display("the path does not exist")]
-    InvalidPath,
-
-    /// The path given to [`GitIgnore::new`] doesn't point to a Git repository.
-    #[display("the path does not point to a Git repository")]
-    PathNotInGitRepository,
-}
-
-/// The type of error that can occur when shelling out to `git` while creating
-/// a new [`GitIgnore`].
-#[derive(derive_more::Display, cauchy::Error)]
-#[display(
-    "running {cmd:?} failed: {inner}",
-    cmd = if self.failed_checking_if_in_git_repo {
-        GitIgnore::is_in_repo_command()
-    } else {
-        GitIgnore::check_ignore_command()
-    },
-)]
-pub struct CommandError {
-    inner: io::Error,
-    failed_checking_if_in_git_repo: bool,
-}
-
-/// The type of error that can occur when using the [`GitIgnore`] filter.
-#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
-pub enum IgnoreError {
-    /// The given path does not exist.
-    #[display("the path {_0:?} does not exist")]
-    PathDoesNotExist(AbsPathBuf),
-
-    /// The path is outside the repository whose path was given to
-    /// [`GitIgnore::new`].
-    #[display("the path {path:?} is outside the repository at {repo_path:?}")]
-    PathOutsideRepo {
-        /// The path that is outside the repository.
-        path: AbsPathBuf,
-
-        /// The repo's path.
-        repo_path: AbsPathBuf,
-    },
-
-    /// The `git check-ignore` process has exited.
-    #[display(
-        "the 'git check-ignore ..' process has exited{}",
-        _0.map_or(Default::default(), |status| format!(" with status {status}"))
-    )]
-    ProcessExited(Option<process::ExitStatus>),
 }
 
 #[derive(Debug)]
@@ -255,7 +195,7 @@ impl GitIgnore {
             .map_or_else(|| Ok(self.process_id), Err)
     }
 
-    fn check_ignore_command() -> process::Command {
+    pub(crate) fn check_ignore_command() -> process::Command {
         let mut cmd = process::Command::new("git");
 
         // See https://git-scm.com/docs/git-check-ignore#_options for more
@@ -266,6 +206,12 @@ impl GitIgnore {
             .arg("--verbose")
             .arg("-z");
 
+        cmd
+    }
+
+    pub(crate) fn is_in_repo_command() -> process::Command {
+        let mut cmd = process::Command::new("git");
+        cmd.arg("rev-parse").arg("--is-inside-work-tree");
         cmd
     }
 
@@ -350,12 +296,6 @@ impl GitIgnore {
         }
     }
 
-    fn is_in_repo_command() -> process::Command {
-        let mut cmd = process::Command::new("git");
-        cmd.arg("rev-parse").arg("--is-inside-work-tree");
-        cmd
-    }
-
     /// Returns the number of instances of this `GitIgnore` filter.
     fn num_instances(&self) -> usize {
         let is_event_loop_running = self.exit_status.get().is_none();
@@ -419,31 +359,6 @@ impl GitIgnore {
     }
 }
 
-impl IgnoreError {
-    fn parse_path_does_not_exist(line: &str) -> Option<Self> {
-        line.strip_prefix("fatal: Invalid path '")
-            .and_then(|rest| rest.strip_suffix("': No such file or directory"))
-            .and_then(|path| path.parse::<AbsPathBuf>().ok())
-            .map(Self::PathDoesNotExist)
-    }
-
-    fn parse_path_outside_repo(line: &str) -> Option<Self> {
-        let (left, right) = line.split_once("' is outside repository at '")?;
-        let (_, path) = left.split_once(": '")?;
-        let repo_path = right.strip_suffix('\'')?;
-        Some(Self::PathOutsideRepo {
-            path: path.parse().ok()?,
-            repo_path: repo_path.parse().ok()?,
-        })
-    }
-
-    fn parse_stderr_line(line: &str) -> Option<Self> {
-        let line = line.trim_end();
-        Self::parse_path_does_not_exist(line)
-            .or_else(|| Self::parse_path_outside_repo(line))
-    }
-}
-
 impl StdoutParser {
     fn feed<'buf>(
         &mut self,
@@ -499,25 +414,8 @@ impl Filter<real_fs::RealFs> for GitIgnore {
     }
 }
 
-impl fmt::Debug for CommandError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.inner, f)
-    }
-}
-
-impl PartialEq for CommandError {
-    fn eq(&self, other: &Self) -> bool {
-        self.failed_checking_if_in_git_repo
-            == other.failed_checking_if_in_git_repo
-            && self.inner.kind() == other.inner.kind()
-            && self.inner.to_string() == other.inner.to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use abs_path::path;
-
     use super::*;
 
     #[test]
@@ -563,30 +461,5 @@ mod tests {
         let (is_ignored, rest) = parser.feed(rest).unwrap();
         assert!(!is_ignored);
         assert!(rest.is_empty());
-    }
-
-    #[test]
-    fn parse_stderr_1() {
-        let stderr =
-            "fatal: /foo: '/foo' is outside repository at '/foo/bar'\n";
-        let err = IgnoreError::parse_stderr_line(stderr).unwrap();
-        assert_eq!(
-            err,
-            IgnoreError::PathOutsideRepo {
-                path: path!("/foo").to_owned(),
-                repo_path: path!("/foo/bar").to_owned(),
-            }
-        )
-    }
-
-    #[test]
-    fn parse_stderr_2() {
-        let stderr =
-            "fatal: Invalid path '/foo/bar': No such file or directory\n";
-        let err = IgnoreError::parse_stderr_line(stderr).unwrap();
-        assert_eq!(
-            err,
-            IgnoreError::PathDoesNotExist(path!("/foo/bar").to_owned())
-        )
     }
 }

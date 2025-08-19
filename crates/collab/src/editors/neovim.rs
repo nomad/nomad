@@ -10,7 +10,6 @@ use collab_types::nomad::ulid;
 use ed::executor::Executor;
 use ed::{ByteOffset, Context, Editor, notify};
 use fs::Directory;
-use fs_filters::gitignore;
 use mlua::{Function, Table};
 use neovim::buffer::{BufferId, HighlightRangeHandle};
 use neovim::{Neovim, mlua, oxi};
