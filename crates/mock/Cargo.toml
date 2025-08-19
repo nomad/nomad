@@ -14,6 +14,7 @@ cauchy = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true, features = ["async-task"] }
 flume = { workspace = true, features = ["async"] }
+fs = { workspace = true }
 futures-lite = { workspace = true, features = ["std"] }
 fxhash = { workspace = true }
 indexmap = { workspace = true }

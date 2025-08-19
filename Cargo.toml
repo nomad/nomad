@@ -12,6 +12,7 @@ publish = false
 [workspace.dependencies]
 # Third-party dependencies.
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
+async-fs = "2"
 async-net = "2"
 async-task = "4.7"
 auth-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
@@ -30,6 +31,7 @@ git2 = { version = "0.20", default-features = false }
 indexmap = "2"
 keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }
 nohash = "0.2"
+notify = "8"
 pin-project-lite = "0.2"
 serde = "1"
 serde_json = "1"
@@ -47,6 +49,7 @@ clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
 collab-project = { path = "./crates/collab-project" }
 ed = { path = "./crates/ed" }
+fs = { path = "./crates/fs" }
 mock = { path = "./crates/mock" }
 neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }

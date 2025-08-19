@@ -10,7 +10,7 @@ publish.workspace = true
 abs-path = { workspace = true }
 cauchy = { workspace = true }
 derive_more = { workspace = true }
-ed = { workspace = true, features = ["os-fs"] }
+fs = { workspace = true, features = ["os-fs"] }
 futures-util = { workspace = true }
 tempdir-inner = { version = "0.3", package = "tempdir" }
 

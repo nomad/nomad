@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-gitignore = ["ed/os-fs"]
+gitignore = ["fs/os-fs"]
 
 [dependencies]
 abs-path = { workspace = true }
@@ -16,6 +16,7 @@ derive_more = { workspace = true }
 ed = { workspace = true }
 either = { workspace = true }
 flume = { workspace = true, features = ["async"] }
+fs = { workspace = true }
 futures-util = { workspace = true, features = ["default"] }
 send-future = "0.1"
 

@@ -3,7 +3,6 @@
 mod directory;
 mod file;
 mod fs;
-mod fs_event;
 mod fs_node;
 mod metadata;
 mod node_kind;
@@ -29,7 +28,6 @@ pub use fs::{
     ReadFileError,
     ReadFileToStringError,
 };
-pub use fs_event::{FsEvent, FsEventKind};
 pub use fs_node::{FsNode, NodeDeleteError, NodeMoveError};
 pub use metadata::{Metadata, MetadataNameError};
 pub use node_kind::NodeKind;

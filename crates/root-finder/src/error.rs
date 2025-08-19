@@ -1,5 +1,3 @@
-use ed::fs;
-
 /// TODO: docs.
 #[derive(
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,

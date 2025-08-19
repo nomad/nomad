@@ -2,7 +2,7 @@ use core::error::Error;
 
 use abs_path::{AbsPath, NodeName};
 
-use crate::fs::{self, Fs, FsNode};
+use crate::{Fs, FsNode, Metadata};
 
 /// TODO: docs.
 pub trait Symlink: Send + Sync {
@@ -46,7 +46,7 @@ pub trait Symlink: Send + Sync {
     /// TODO: docs.
     #[inline]
     fn id(&self) -> <Self::Fs as Fs>::NodeId {
-        fs::Metadata::id(&self.meta())
+        Metadata::id(&self.meta())
     }
 
     /// TODO: docs.

@@ -1,6 +1,6 @@
 use abs_path::AbsPathBuf;
-use ed::fs::{self, Directory, File, Fs};
 use ed::{AgentId, Buffer, Context, Cursor, Selection, Shared};
+use fs::{Directory, File, Fs};
 use futures_util::future::FusedFuture;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;

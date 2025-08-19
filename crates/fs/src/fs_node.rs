@@ -1,10 +1,10 @@
 use abs_path::AbsPath;
 
-use crate::fs::{self, Directory, File, NodeKind, Symlink};
+use crate::{Directory, File, NodeKind, Symlink};
 
 /// TODO: docs.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum FsNode<Fs: fs::Fs> {
+pub enum FsNode<Fs: crate::Fs> {
     /// TODO: docs.
     File(Fs::File),
 
@@ -20,7 +20,7 @@ pub enum FsNode<Fs: fs::Fs> {
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 #[display("{_0}")]
-pub enum NodeDeleteError<Fs: fs::Fs> {
+pub enum NodeDeleteError<Fs: crate::Fs> {
     /// TODO: docs.
     File(<Fs::File as File>::DeleteError),
 
@@ -36,7 +36,7 @@ pub enum NodeDeleteError<Fs: fs::Fs> {
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 #[display("{_0}")]
-pub enum NodeMoveError<Fs: fs::Fs> {
+pub enum NodeMoveError<Fs: crate::Fs> {
     /// TODO: docs.
     File(<Fs::File as File>::MoveError),
 
@@ -47,7 +47,7 @@ pub enum NodeMoveError<Fs: fs::Fs> {
     Symlink(<Fs::Symlink as Symlink>::MoveError),
 }
 
-impl<Fs: fs::Fs> FsNode<Fs> {
+impl<Fs: crate::Fs> FsNode<Fs> {
     /// TODO: docs.
     #[inline]
     pub async fn delete(self) -> Result<(), NodeDeleteError<Fs>> {

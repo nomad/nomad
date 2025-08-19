@@ -18,7 +18,6 @@ use ed::{
     ByteOffset,
     Context,
     Editor,
-    fs,
 };
 use serde::{Deserialize, Serialize};
 

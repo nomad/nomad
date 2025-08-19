@@ -1,17 +1,22 @@
 [package]
-name = "root-finder"
+name = "fs"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+os-fs = ["futures-util/io", "dep:async-fs", "dep:notify"]
+
 [dependencies]
 abs-path = { workspace = true }
 cauchy = { workspace = true }
 derive_more = { workspace = true }
-fs = { workspace = true }
 futures-util = { workspace = true }
+
+async-fs = { workspace = true, optional = true }
+notify = { workspace = true, optional = true }
 
 [lints]
 workspace = true

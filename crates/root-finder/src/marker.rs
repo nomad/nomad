@@ -1,5 +1,5 @@
 use abs_path::NodeName;
-use ed::fs::NodeKind;
+use fs::NodeKind;
 
 /// TODO: docs.
 pub trait Marker {

@@ -2,11 +2,11 @@ use core::fmt;
 
 use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
-use ed::fs::os::OsFs;
-use ed::fs::{self, Fs};
 use ed::notify::Namespace;
 use ed::plugin::Plugin;
 use ed::{AgentId, BaseEditor, BorrowState, Buffer, Context, Editor, Shared};
+use fs::Fs;
+use fs::os::OsFs;
 
 use crate::buffer::{
     BufferId,

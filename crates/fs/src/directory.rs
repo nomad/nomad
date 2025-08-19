@@ -4,7 +4,7 @@ use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select_biased};
 
-use crate::fs::{self, File, Fs, Metadata, Symlink};
+use crate::{File, Fs, FsNode, Metadata, MetadataNameError, Symlink};
 
 /// TODO: docs.
 pub trait Directory: Send + Sync + Sized {
@@ -80,7 +80,7 @@ pub trait Directory: Send + Sync + Sized {
     /// TODO: docs.
     #[inline]
     fn id(&self) -> <Self::Fs as Fs>::NodeId {
-        fs::Metadata::id(&self.meta())
+        Metadata::id(&self.meta())
     }
 
     /// TODO: docs.
@@ -135,15 +135,14 @@ pub trait Directory: Send + Sync + Sized {
         &self,
     ) -> impl Future<
         Output = Result<
-            impl Stream<
-                Item = Result<fs::FsNode<Self::Fs>, ReadNodeError<Self::Fs>>,
-            > + Send,
+            impl Stream<Item = Result<FsNode<Self::Fs>, ReadNodeError<Self::Fs>>>
+            + Send,
             Self::ListError,
         >,
     > + Send
     where
         Self: AsRef<Self::Fs>,
-        <Self::Fs as fs::Fs>::Directory:
+        <Self::Fs as Fs>::Directory:
             Directory<ReadMetadataError = Self::ReadMetadataError>,
     {
         async move {
@@ -206,7 +205,7 @@ pub trait Directory: Send + Sync + Sized {
         src: &Src,
     ) -> impl Future<Output = Result<(), ReplicateError<Self::Fs, Src::Fs>>> + Send
     where
-        <Self::Fs as fs::Fs>::Directory: Directory<
+        <Self::Fs as Fs>::Directory: Directory<
                 CreateDirectoryError = Self::CreateDirectoryError,
                 CreateFileError = Self::CreateFileError,
                 CreateSymlinkError = Self::CreateSymlinkError,
@@ -251,7 +250,7 @@ pub trait Directory: Send + Sync + Sized {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub enum DirectoryEvent<Fs: fs::Fs> {
+pub enum DirectoryEvent<Fs: crate::Fs> {
     /// TODO: docs.
     Creation(NodeCreation<Fs>),
 
@@ -264,7 +263,7 @@ pub enum DirectoryEvent<Fs: fs::Fs> {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct NodeCreation<Fs: fs::Fs> {
+pub struct NodeCreation<Fs: crate::Fs> {
     /// TODO: docs.
     pub node_id: Fs::NodeId,
 
@@ -277,7 +276,7 @@ pub struct NodeCreation<Fs: fs::Fs> {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct NodeDeletion<Fs: fs::Fs> {
+pub struct NodeDeletion<Fs: crate::Fs> {
     /// The ID of the node that was deleted.
     pub node_id: Fs::NodeId,
 
@@ -290,7 +289,7 @@ pub struct NodeDeletion<Fs: fs::Fs> {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct NodeMove<Fs: fs::Fs> {
+pub struct NodeMove<Fs: crate::Fs> {
     /// The ID of the node that was moved.
     pub node_id: Fs::NodeId,
 
@@ -313,9 +312,9 @@ pub struct NodeMove<Fs: fs::Fs> {
     cauchy::Eq,
 )]
 #[display("{_0}")]
-pub enum ReadNodeError<Fs: fs::Fs> {
+pub enum ReadNodeError<Fs: crate::Fs> {
     /// TODO: docs.
-    MetadataName(fs::MetadataNameError),
+    MetadataName(MetadataNameError),
 
     /// TODO: docs.
     NodeAtPath(Fs::NodeAtPathError),
@@ -339,34 +338,34 @@ pub enum ReplicateError<Dst: Fs, Src: Fs> {
     CreateDirectory(<Dst::Directory as Directory>::CreateDirectoryError),
 
     /// TODO: docs.
-    CreateFile(<Dst::Directory as fs::Directory>::CreateFileError),
+    CreateFile(<Dst::Directory as Directory>::CreateFileError),
 
     /// TODO: docs.
-    CreateSymlink(<Dst::Directory as fs::Directory>::CreateSymlinkError),
+    CreateSymlink(<Dst::Directory as Directory>::CreateSymlinkError),
 
     /// TODO: docs.
     ListDirectory(<Src::Directory as Directory>::ListError),
 
     /// TODO: docs.
-    ReadFile(<Src::File as fs::File>::ReadError),
+    ReadFile(<Src::File as File>::ReadError),
 
     /// TODO: docs.
     ReadNode(ReadNodeError<Src>),
 
     /// TODO: docs.
-    ReadSymlink(<Src::Symlink as fs::Symlink>::ReadError),
+    ReadSymlink(<Src::Symlink as Symlink>::ReadError),
 
     /// TODO: docs.
-    WriteFile(<Dst::File as fs::File>::WriteError),
+    WriteFile(<Dst::File as File>::WriteError),
 }
 
 #[inline]
-async fn replicate_node<Dst: Directory, Src: fs::Fs>(
+async fn replicate_node<Dst: Directory, Src: Fs>(
     dst_dir: &Dst,
-    src_node: &fs::FsNode<Src>,
+    src_node: &FsNode<Src>,
 ) -> Result<(), ReplicateError<Dst::Fs, Src>>
 where
-    <Dst::Fs as fs::Fs>::Directory: Directory<
+    <Dst::Fs as Fs>::Directory: Directory<
             CreateDirectoryError = Dst::CreateDirectoryError,
             CreateFileError = Dst::CreateFileError,
             CreateSymlinkError = Dst::CreateSymlinkError,
@@ -374,7 +373,7 @@ where
     Src::Directory: AsRef<Src>,
 {
     match src_node {
-        fs::FsNode::Directory(src_dir) => {
+        FsNode::Directory(src_dir) => {
             let src_dir_name = src_dir.name().expect("dir is not root");
 
             let dst_dir = dst_dir
@@ -384,7 +383,7 @@ where
 
             dst_dir.replicate_from(src_dir).boxed().await?;
         },
-        fs::FsNode::File(src_file) => {
+        FsNode::File(src_file) => {
             let mut dst_file = dst_dir
                 .create_file(src_file.name())
                 .await
@@ -398,7 +397,7 @@ where
                 .await
                 .map_err(ReplicateError::WriteFile)?;
         },
-        fs::FsNode::Symlink(src_symlink) => {
+        FsNode::Symlink(src_symlink) => {
             let src_target_path = src_symlink
                 .read_path()
                 .await

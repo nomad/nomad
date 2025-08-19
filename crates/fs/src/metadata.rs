@@ -2,8 +2,7 @@ use std::ffi::OsString;
 
 use abs_path::{InvalidNodeNameError, NodeName};
 
-use crate::ByteOffset;
-use crate::fs::{Fs, NodeKind};
+use crate::{Fs, NodeKind};
 
 /// TODO: docs.
 pub trait Metadata: Send + Sync {
@@ -11,7 +10,7 @@ pub trait Metadata: Send + Sync {
     type Fs: Fs;
 
     /// TODO: docs.
-    fn byte_len(&self) -> ByteOffset;
+    fn byte_len(&self) -> usize;
 
     /// TODO: docs.
     fn created_at(&self) -> Option<<Self::Fs as Fs>::Timestamp>;

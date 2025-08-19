@@ -1,8 +1,5 @@
 //! TODO: docs.
 
-use core::pin::Pin;
-use core::task::{Context, Poll, ready};
-use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
@@ -12,14 +9,12 @@ use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{AsyncWriteExt, select};
 
-use crate::ByteOffset;
-use crate::fs::{
+use crate::{
     Directory,
     DirectoryEvent,
     File,
     FileEvent,
     Fs,
-    FsEvent,
     FsNode,
     Metadata,
     MetadataNameError,
@@ -59,18 +54,6 @@ pub struct OsMetadata {
     inner: async_fs::Metadata,
     node_kind: NodeKind,
     node_name: OsString,
-}
-
-pin_project_lite::pin_project! {
-    /// TODO: docs.
-    pub struct OsWatcher {
-        buffered: VecDeque<FsEvent<SystemTime>>,
-        #[pin]
-        inner: flume::r#async::RecvStream<
-            'static,
-            Result<(notify::Event, SystemTime), notify::Error>,
-        >,
-    }
 }
 
 impl OsFile {
@@ -474,8 +457,8 @@ impl Metadata for OsMetadata {
     type Fs = OsFs;
 
     #[inline]
-    fn byte_len(&self) -> ByteOffset {
-        self.inner.len() as ByteOffset
+    fn byte_len(&self) -> usize {
+        self.inner.len() as usize
     }
 
     #[inline]
@@ -509,29 +492,6 @@ impl Metadata for OsMetadata {
     #[inline]
     fn node_kind(&self) -> NodeKind {
         self.node_kind
-    }
-}
-
-impl Stream for OsWatcher {
-    type Item = Result<FsEvent<SystemTime>, notify::Error>;
-
-    #[inline]
-    fn poll_next(
-        self: Pin<&mut Self>,
-        ctx: &mut Context,
-    ) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
-        loop {
-            if let Some(event) = this.buffered.pop_front() {
-                return Poll::Ready(Some(Ok(event)));
-            }
-            let Some((event, timestamp)) =
-                ready!(this.inner.as_mut().poll_next(ctx)).transpose()?
-            else {
-                return Poll::Ready(None);
-            };
-            this.buffered.extend(FsEvent::from_notify(event, timestamp));
-        }
     }
 }
 

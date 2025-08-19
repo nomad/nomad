@@ -10,7 +10,7 @@ use core::str::FromStr;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use collab_types::Peer;
-use ed::{ByteOffset, Context, Editor, fs, notify};
+use ed::{ByteOffset, Context, Editor, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::config;

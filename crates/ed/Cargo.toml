@@ -8,7 +8,6 @@ publish.workspace = true
 
 [features]
 async-task = ["dep:async-task"]
-os-fs = ["futures-util/io", "dep:async-fs", "dep:notify"]
 
 [dependencies]
 abs-path = { workspace = true, features = ["serde"] }
@@ -16,6 +15,7 @@ cauchy = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 flume = { workspace = true, features = ["async"] }
+fs = { workspace = true }
 futures-lite = { workspace = true, features = ["std"] }
 futures-util = { workspace = true, features = ["alloc", "async-await-macro"] }
 fxhash = { workspace = true }
@@ -25,9 +25,7 @@ smallvec = { workspace = true }
 smol_str = { workspace = true }
 strsim = { workspace = true }
 
-async-fs = { version = "2", optional = true }
 async-task = { workspace = true, optional = true }
-notify = { version = "8", optional = true }
 
 [lints]
 workspace = true

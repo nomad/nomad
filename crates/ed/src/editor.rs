@@ -20,7 +20,6 @@ use crate::{
     MapAccess,
     Selection,
     Value,
-    fs,
 };
 
 /// TODO: docs.

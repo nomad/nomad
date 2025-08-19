@@ -4,16 +4,7 @@ use abs_path::AbsPath;
 use ed::executor::BackgroundSpawner;
 use ed::notify::{self, MaybeResult};
 use ed::shared::Shared;
-use ed::{
-    AgentId,
-    ApiValue,
-    BaseEditor,
-    BorrowState,
-    Context,
-    Edit,
-    Editor,
-    fs,
-};
+use ed::{AgentId, ApiValue, BaseEditor, BorrowState, Context, Edit, Editor};
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use slotmap::{DefaultKey, SlotMap};

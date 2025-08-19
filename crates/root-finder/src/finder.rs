@@ -1,5 +1,5 @@
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::fs::{self, Directory, File, Metadata, Symlink};
+use fs::{self, Directory, File, Metadata, Symlink};
 use futures_util::StreamExt;
 
 use crate::{FindRootError, Marker};

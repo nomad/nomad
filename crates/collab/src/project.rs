@@ -10,8 +10,8 @@ use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
 use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
 use compact_str::format_compact;
-use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
+use fs::{File as _, Fs, FsNode, Symlink as _};
 use fxhash::{FxHashMap, FxHashSet};
 use puff::directory::LocalDirectoryId;
 use puff::file::{GlobalFileId, LocalFileId};
@@ -1252,7 +1252,7 @@ mod impl_integrate_fs_op {
 
     use abs_path::{NodeName, NodeNameBuf};
     use collab_project::fs::{ResolveConflict, SyncAction};
-    use ed::fs::Directory;
+    use fs::Directory;
     use futures_util::FutureExt;
     use puff::node::IsVisible;
 

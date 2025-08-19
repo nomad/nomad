@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::fs::{self, Directory};
+use fs::Directory;
 use futures_util::stream::FusedStream;
 
 use crate::walkdir::ForEachHandler;

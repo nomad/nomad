@@ -5,7 +5,7 @@ use core::hash::Hash;
 
 use abs_path::{AbsPath, AbsPathBuf};
 
-use crate::fs::{self, Directory, File, FsNode, Metadata, Symlink};
+use crate::{Directory, File, FsNode, Metadata, Symlink};
 
 /// TODO: docs.
 pub trait Fs: Clone + Send + Sync + 'static {
@@ -224,7 +224,7 @@ pub trait Fs: Clone + Send + Sync + 'static {
 pub enum DeleteNodeError<Fs: self::Fs> {
     /// Deleting the node failed.
     #[display("{_0}")]
-    DeleteNode(fs::NodeDeleteError<Fs>),
+    DeleteNode(crate::NodeDeleteError<Fs>),
 
     /// Getting the node at the given path failed.
     #[display("{_0}")]
@@ -278,7 +278,7 @@ pub enum MoveNodeError<Fs: self::Fs> {
 
     /// Moving the node failed.
     #[display("{_0}")]
-    MoveNode(fs::NodeMoveError<Fs>),
+    MoveNode(crate::NodeMoveError<Fs>),
 
     /// There wasn't any node at the given path.
     #[display("no file or directory at {_0:?}")]

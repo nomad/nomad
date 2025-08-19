@@ -1,5 +1,5 @@
 use abs_path::{AbsPath, NodeName};
-use ed::fs::{Directory, Fs, os};
+use fs::{Directory, Fs, os};
 use futures_util::Stream;
 
 /// TODO: docs.

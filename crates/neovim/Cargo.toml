@@ -18,7 +18,8 @@ cauchy = { workspace = true }
 compact_str = { workspace = true }
 concurrent-queue = "2.5"
 derive_more = { workspace = true }
-ed = { workspace = true, features = ["async-task", "os-fs"] }
+ed = { workspace = true, features = ["async-task"] }
+fs = { workspace = true, features = ["os-fs"] }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [

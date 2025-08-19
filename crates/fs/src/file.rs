@@ -3,8 +3,7 @@ use core::error::Error;
 use abs_path::{AbsPath, NodeName};
 use futures_util::Stream;
 
-use crate::ByteOffset;
-use crate::fs::{self, Fs};
+use crate::{Fs, Metadata};
 
 /// TODO: docs.
 pub trait File: Send + Sync {
@@ -31,8 +30,8 @@ pub trait File: Send + Sync {
 
     /// TODO: docs.
     #[inline]
-    fn byte_len(&self) -> ByteOffset {
-        fs::Metadata::byte_len(&self.meta())
+    fn byte_len(&self) -> usize {
+        Metadata::byte_len(&self.meta())
     }
 
     /// TODO: docs.
@@ -43,7 +42,7 @@ pub trait File: Send + Sync {
     /// TODO: docs.
     #[inline]
     fn id(&self) -> <Self::Fs as Fs>::NodeId {
-        fs::Metadata::id(&self.meta())
+        Metadata::id(&self.meta())
     }
 
     /// TODO: docs.
@@ -107,7 +106,7 @@ pub trait File: Send + Sync {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub enum FileEvent<Fs: fs::Fs> {
+pub enum FileEvent<Fs: crate::Fs> {
     /// TODO: docs.
     IdChange(FileIdChange<Fs>),
 
@@ -117,7 +116,7 @@ pub enum FileEvent<Fs: fs::Fs> {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct FileModification<Fs: fs::Fs> {
+pub struct FileModification<Fs: crate::Fs> {
     /// The node ID of the file.
     pub file_id: Fs::NodeId,
 
@@ -127,7 +126,7 @@ pub struct FileModification<Fs: fs::Fs> {
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct FileIdChange<Fs: fs::Fs> {
+pub struct FileIdChange<Fs: crate::Fs> {
     /// The file's old node ID.
     pub old_id: Fs::NodeId,
 

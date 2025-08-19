@@ -296,6 +296,7 @@ dependencies = [
  "collab",
  "criterion",
  "ed",
+ "fs",
  "futures-lite",
  "mock",
  "thread-pool",
@@ -682,6 +683,7 @@ dependencies = [
  "either",
  "fastrand",
  "flume",
+ "fs",
  "futures-util",
  "fxhash",
  "home",
@@ -1026,16 +1028,15 @@ name = "ed"
 version = "0.1.0-dev"
 dependencies = [
  "abs-path",
- "async-fs",
  "async-task",
  "cauchy",
  "compact_str",
  "derive_more",
  "flume",
+ "fs",
  "futures-lite",
  "futures-util",
  "fxhash",
- "notify",
  "pin-project-lite",
  "serde",
  "smallvec",
@@ -1127,6 +1128,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs"
+version = "0.1.0-dev"
+dependencies = [
+ "abs-path",
+ "async-fs",
+ "cauchy",
+ "derive_more",
+ "futures-util",
+ "notify",
 ]
 
 [[package]]
@@ -1832,6 +1845,7 @@ dependencies = [
  "derive_more",
  "ed",
  "flume",
+ "fs",
  "futures-lite",
  "fxhash",
  "indexmap",
@@ -1872,6 +1886,7 @@ dependencies = [
  "derive_more",
  "ed",
  "flume",
+ "fs",
  "neovim-macros",
  "nohash",
  "nvim-oxi",
@@ -2601,7 +2616,7 @@ dependencies = [
  "abs-path",
  "cauchy",
  "derive_more",
- "ed",
+ "fs",
  "futures-util",
 ]
 
@@ -2970,7 +2985,7 @@ dependencies = [
  "abs-path",
  "cauchy",
  "derive_more",
- "ed",
+ "fs",
  "futures-util",
  "tempdir 0.3.7",
 ]
@@ -3227,6 +3242,7 @@ dependencies = [
  "abs-path",
  "cauchy",
  "ed",
+ "fs",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -3381,6 +3397,7 @@ dependencies = [
  "ed",
  "either",
  "flume",
+ "fs",
  "futures-util",
  "send-future",
 ]

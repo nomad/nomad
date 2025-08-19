@@ -2,7 +2,7 @@ use core::error::Error;
 use core::pin::Pin;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::fs::{self, Directory, Metadata};
+use fs::{Directory, Metadata};
 use futures_util::stream::{self, FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 

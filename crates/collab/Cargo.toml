@@ -33,6 +33,7 @@ ed = { workspace = true }
 either = { workspace = true }
 fastrand = "2"
 flume = { workspace = true, features = ["async"] }
+fs = { workspace = true }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }

@@ -12,7 +12,6 @@ mod context;
 mod cursor;
 mod editor;
 pub mod executor;
-pub mod fs;
 pub mod module;
 pub mod notify;
 pub mod plugin;

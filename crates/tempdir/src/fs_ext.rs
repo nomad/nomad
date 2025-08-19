@@ -2,8 +2,8 @@ use std::io;
 use std::path::PathBuf;
 
 use abs_path::AbsPath;
-use ed::fs::Fs;
-use ed::fs::os::OsFs;
+use fs::Fs;
+use fs::os::OsFs;
 
 use crate::TempDir;
 
