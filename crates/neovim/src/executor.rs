@@ -1,13 +1,11 @@
 //! TODO: docs.
 
 use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
 use std::rc::Rc;
 
 use async_task::Builder;
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use ed::executor::{Executor, LocalSpawner, Task};
+use ed::executor::{Executor, LocalSpawner};
 use thread_pool::ThreadPool;
 
 use crate::oxi;
@@ -29,14 +27,6 @@ pub struct NeovimLocalSpawner {
 
     /// TODO: docs
     runnable_queue: Rc<RunnableQueue>,
-}
-
-pin_project_lite::pin_project! {
-    /// TODO: docs.
-    pub struct NeovimLocalTask<T> {
-        #[pin]
-        inner: async_task::Task<T>,
-    }
 }
 
 /// The queue of runnables that are ready to be polled.
@@ -138,7 +128,7 @@ impl Default for NeovimLocalSpawner {
 }
 
 impl LocalSpawner for NeovimLocalSpawner {
-    type Task<T> = NeovimLocalTask<T>;
+    type Task<T> = async_task::Task<T>;
 
     #[inline]
     fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
@@ -168,22 +158,6 @@ impl LocalSpawner for NeovimLocalSpawner {
         // Poll the future once immediately.
         runnable.run();
 
-        NeovimLocalTask { inner: task }
-    }
-}
-
-impl<T> Task<T> for NeovimLocalTask<T> {
-    #[inline]
-    fn detach(self) {
-        self.inner.detach()
-    }
-}
-
-impl<T> Future for NeovimLocalTask<T> {
-    type Output = T;
-
-    #[inline]
-    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<T> {
-        self.project().inner.poll(ctx)
+        task
     }
 }

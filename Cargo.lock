@@ -687,7 +687,6 @@ dependencies = [
  "home",
  "indexmap",
  "neovim",
- "pin-project-lite",
  "serde",
  "smallvec",
  "smol_str",
@@ -1028,6 +1027,7 @@ version = "0.1.0-dev"
 dependencies = [
  "abs-path",
  "async-fs",
+ "async-task",
  "cauchy",
  "compact_str",
  "derive_more",
@@ -1875,7 +1875,6 @@ dependencies = [
  "neovim-macros",
  "nohash",
  "nvim-oxi",
- "pin-project-lite",
  "serde",
  "serde_path_to_error",
  "slotmap",

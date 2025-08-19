@@ -13,6 +13,7 @@ publish = false
 # Third-party dependencies.
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
 async-net = "2"
+async-task = "4.7"
 auth-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 cauchy = { git = "ssh://git@github.com/nomad/cauchy.git" }
 collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }

@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
 use compact_str::CompactString;
-use ed::executor::{Executor, LocalSpawner, Task};
+use ed::executor::{Executor, LocalSpawner};
 use ed::shared::MultiThreaded;
 use ed::{Editor, Shared};
 use tracing_subscriber::fmt;

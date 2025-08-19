@@ -13,12 +13,12 @@ tracing = ["dep:flume", "dep:tracing", "dep:tracing-subscriber"]
 
 [dependencies]
 abs-path = { workspace = true }
-async-task = "4.7"
+async-task = { workspace = true }
 cauchy = { workspace = true }
 compact_str = { workspace = true }
 concurrent-queue = "2.5"
 derive_more = { workspace = true }
-ed = { workspace = true, features = ["os-fs"] }
+ed = { workspace = true, features = ["async-task", "os-fs"] }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [
@@ -26,7 +26,6 @@ nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [
   "mlua",
   "neovim-0-11",
 ] }
-pin-project-lite = { workspace = true }
 serde = { workspace = true }
 serde_path_to_error = "0.1"
 slotmap = { workspace = true }

@@ -36,7 +36,6 @@ flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }
-pin-project-lite = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["const_new"] }
 smol_str = { workspace = true }

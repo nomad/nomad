@@ -125,3 +125,11 @@ impl<T: Send + 'static, Ed: Editor> Future for BackgroundTask<T, Ed> {
         self.project().inner.poll(cx)
     }
 }
+
+#[cfg(feature = "async-task")]
+impl<T> Task<T> for async_task::Task<T> {
+    #[inline]
+    fn detach(self) {
+        Self::detach(self);
+    }
+}

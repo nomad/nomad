@@ -1,5 +1,3 @@
-use core::pin::Pin;
-use core::task::{Context, Poll};
 use std::rc::Rc;
 
 use async_task::Runnable;
@@ -10,13 +8,6 @@ pub struct Executor<BackgroundSpawner = Spawner> {
     pub(crate) runner: Runner,
     local_spawner: Spawner,
     background_spawner: BackgroundSpawner,
-}
-
-pin_project_lite::pin_project! {
-    pub struct Task<T> {
-        #[pin]
-        inner: async_task::Task<T>,
-    }
 }
 
 #[derive(Clone)]
@@ -75,24 +66,24 @@ impl Spawner {
         }
     }
 
-    fn spawn_background<Fut>(&self, fut: Fut) -> Task<Fut::Output>
+    fn spawn_background<Fut>(&self, fut: Fut) -> async_task::Task<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
         let (runnable, task) = async_task::spawn(fut, self.schedule());
         runnable.schedule();
-        Task { inner: task }
+        task
     }
 
-    fn spawn_local<Fut>(&self, fut: Fut) -> Task<Fut::Output>
+    fn spawn_local<Fut>(&self, fut: Fut) -> async_task::Task<Fut::Output>
     where
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
         let (runnable, task) = async_task::spawn_local(fut, self.schedule());
         runnable.schedule();
-        Task { inner: task }
+        task
     }
 }
 
@@ -137,7 +128,7 @@ impl AsMut<Self> for Runner {
 }
 
 impl LocalSpawner for Spawner {
-    type Task<T> = Task<T>;
+    type Task<T> = async_task::Task<T>;
 
     fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
     where
@@ -149,7 +140,7 @@ impl LocalSpawner for Spawner {
 }
 
 impl BackgroundSpawner for Spawner {
-    type Task<T: Send + 'static> = Task<T>;
+    type Task<T: Send + 'static> = async_task::Task<T>;
 
     fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
     where
@@ -163,22 +154,5 @@ impl BackgroundSpawner for Spawner {
 impl AsRef<Self> for Executor {
     fn as_ref(&self) -> &Self {
         self
-    }
-}
-
-impl<T> Future for Task<T> {
-    type Output = T;
-
-    fn poll(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
-        self.project().inner.poll(ctx)
-    }
-}
-
-impl<T> executor::Task<T> for Task<T> {
-    fn detach(self) {
-        self.inner.detach();
     }
 }
