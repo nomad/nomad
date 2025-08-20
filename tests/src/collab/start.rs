@@ -1,9 +1,8 @@
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;
-use collab::mock::{CollabMock, CollabServer, MockSessionId};
+use collab::mock::{CollabMock, CollabServer};
 use collab::start::StartError;
-use editor::action::AsyncAction;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};
 
@@ -11,7 +10,7 @@ use mock::{EditorExt, Mock};
 fn cannot_start_session_if_not_logged_in() {
     CollabMock::<Mock>::default().block_on(async |ctx| {
         let collab = Collab::from(&Auth::default());
-        let err = collab.start().call((), ctx).await.unwrap_err();
+        let err = collab.start(ctx).await.unwrap_err();
         assert_eq!(err, StartError::UserNotLoggedIn);
     });
 }
@@ -20,7 +19,7 @@ fn cannot_start_session_if_not_logged_in() {
 fn cannot_start_session_if_no_buffer_is_focused() {
     CollabMock::<Mock>::default().block_on(async |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));
-        let err = collab.start().call((), ctx).await.unwrap_err();
+        let err = collab.start(ctx).await.unwrap_err();
         assert_eq!(err, StartError::NoBufferFocused);
     });
 }
@@ -38,7 +37,7 @@ fn cannot_start_session_if_project_root_is_fs_root() {
         let collab = Collab::from(&Auth::logged_in("peer1"));
         let agent_id = ctx.new_agent_id();
         ctx.create_and_focus(path!("/foo.txt"), agent_id).await.unwrap();
-        let err = collab.start().call((), ctx).await.unwrap_err();
+        let err = collab.start(ctx).await.unwrap_err();
         assert_eq!(err, StartError::ProjectRootIsFsRoot);
     });
 }
@@ -68,13 +67,13 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
 
         // Start session at "/a/b".
         ctx.create_and_focus(path!("/a/b/bar.txt"), agent_id).await.unwrap();
-        collab.start().call((), ctx).await.unwrap();
-        let project = collab.project(MockSessionId(1)).unwrap();
+        let session_id = collab.start(ctx).await.unwrap();
+        let project = collab.project(session_id).unwrap();
         assert_eq!(project.root(), "/a/b");
 
         // Can't start new session at "/a", it overlaps "/a/b".
         ctx.create_and_focus(path!("/a/foo.txt"), agent_id).await.unwrap();
-        let err = match collab.start().call((), ctx).await.unwrap_err() {
+        let err = match collab.start(ctx).await.unwrap_err() {
             StartError::OverlappingProject(err) => err,
             other => panic!("unexpected error: {other:?}"),
         };

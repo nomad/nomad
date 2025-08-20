@@ -2,23 +2,22 @@ use smol_str::SmolStr;
 
 use crate::action::Action;
 use crate::command::CommandArgs;
-use crate::notify::{self, MaybeResult, Name};
-use crate::{Borrowed, ByteOffset, Context, Editor};
+use crate::{Borrowed, ByteOffset, Context, Editor, notify};
 
 /// TODO: docs.
 pub trait Command<Ed: Editor>: 'static {
     /// TODO: docs.
-    const NAME: Name;
+    const NAME: &str;
 
     /// TODO: docs.
     type Args<'args>: TryFrom<CommandArgs<'args>, Error: notify::Error>;
 
     /// TODO: docs.
-    fn call<'this, 'args>(
-        &'this mut self,
-        args: Self::Args<'args>,
+    fn call(
+        &mut self,
+        args: Self::Args<'_>,
         ctx: &mut Context<Ed, Borrowed<'_>>,
-    ) -> impl MaybeResult<()> + use<'this, 'args, Self, Ed>;
+    );
 
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn + 'static {}
@@ -82,16 +81,16 @@ where
     for<'a> A::Args<'a>: TryFrom<CommandArgs<'a>, Error: notify::Error>,
     Ed: Editor,
 {
-    const NAME: Name = A::NAME;
+    const NAME: &str = A::NAME;
 
     type Args<'a> = A::Args<'a>;
 
     #[inline]
-    fn call<'this, 'args>(
-        &'this mut self,
-        args: Self::Args<'args>,
+    fn call(
+        &mut self,
+        args: Self::Args<'_>,
         ctx: &mut Context<Ed, Borrowed<'_>>,
-    ) -> impl MaybeResult<()> + use<'this, 'args, A, Ed> {
+    ) {
         A::call(self, args, ctx)
     }
 

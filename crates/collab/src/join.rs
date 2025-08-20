@@ -49,15 +49,11 @@ pub struct Join<Ed: CollabEditor> {
     stop_channels: StopChannels<Ed>,
 }
 
-impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
-    const NAME: Name = "join";
-
-    type Args = command::Parse<SessionId<Ed>>;
-
+impl<Ed: CollabEditor> Join<Ed> {
     #[allow(clippy::too_many_lines)]
-    async fn call(
-        &mut self,
-        command::Parse(session_id): Self::Args,
+    pub(crate) async fn call_inner(
+        &self,
+        session_id: SessionId<Ed>,
         ctx: &mut Context<Ed>,
     ) -> Result<(), JoinError<Ed>> {
         let auth_infos =
@@ -147,6 +143,22 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
         .detach();
 
         Ok(())
+    }
+}
+
+impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
+    const NAME: Name = "join";
+
+    type Args = command::Parse<SessionId<Ed>>;
+
+    async fn call(
+        &mut self,
+        command::Parse(session_id): Self::Args,
+        ctx: &mut Context<Ed>,
+    ) {
+        if let Err(err) = self.call_inner(session_id, ctx).await {
+            Ed::on_join_error(err, ctx)
+        }
     }
 }
 

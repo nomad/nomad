@@ -12,11 +12,12 @@ use executor::Executor;
 use fs::Directory;
 use mlua::{Function, Table};
 use neovim::buffer::{BufferId, HighlightRangeHandle};
+use neovim::notify::ContextExt;
 use neovim::{Neovim, mlua, oxi};
 use smol_str::ToSmolStr;
 
-use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
+use crate::{config, join, leave, start, yank};
 
 pub type SessionId = ulid::Ulid;
 
@@ -270,6 +271,31 @@ impl CollabEditor for Neovim {
         });
 
         async {}
+    }
+
+    fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>) {
+        // ctx.notify_error(error);
+        todo!()
+    }
+
+    fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>) {
+        ctx.notify_error(error);
+    }
+
+    fn on_start_error(
+        error: start::StartError<Self>,
+        ctx: &mut Context<Self>,
+    ) {
+        match error {
+            start::StartError::UserDidNotConfirm => (),
+            other => todo!(),
+            // other => ctx.notify_error(other),
+        }
+    }
+
+    fn on_yank_error(error: yank::YankError<Self>, ctx: &mut Context<Self>) {
+        // ctx.notify_error(error);
+        todo!()
     }
 
     fn project_filter(

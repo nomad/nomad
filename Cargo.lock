@@ -249,6 +249,8 @@ version = "0.1.0-dev"
 dependencies = [
  "abs-path",
  "auth-types",
+ "cauchy",
+ "derive_more",
  "editor",
  "event-listener",
  "keyring",

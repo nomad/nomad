@@ -3,11 +3,10 @@
 use auth_types::AuthInfos;
 use editor::action::AsyncAction;
 use editor::command::ToCompletionFn;
-use editor::notify::{self, Name};
 use editor::{Context, Editor, Shared};
 
-use crate::Auth;
 use crate::credential_store::{self, CredentialStore};
+use crate::{Auth, AuthEditor};
 
 /// TODO: docs.
 #[derive(Clone, Default)]
@@ -16,14 +15,9 @@ pub struct Logout {
     infos: Shared<Option<AuthInfos>>,
 }
 
-impl<Ed: Editor> AsyncAction<Ed> for Logout {
-    const NAME: Name = "logout";
-
-    type Args = ();
-
-    async fn call(
-        &mut self,
-        _: Self::Args,
+impl Logout {
+    pub(crate) async fn call_inner<Ed: Editor>(
+        &self,
         ctx: &mut Context<Ed>,
     ) -> Result<(), LogoutError> {
         self.infos.with_mut(|maybe_infos| {
@@ -43,15 +37,31 @@ impl<Ed: Editor> AsyncAction<Ed> for Logout {
     }
 }
 
+impl<Ed: AuthEditor> AsyncAction<Ed> for Logout {
+    const NAME: &str = "logout";
+
+    type Args = ();
+
+    async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
+        if let Err(err) = self.call_inner(ctx).await {
+            Ed::on_logout_error(err, ctx);
+        }
+    }
+}
+
 /// TODO: docs.
+#[derive(Debug, derive_more::Display, cauchy::Error)]
 pub enum LogoutError {
     /// TODO: docs.
+    #[display("Couldn't delete credentials from keyring: {_0}")]
     DeleteCredential(keyring::Error),
 
     /// TODO: docs.
+    #[display("Couldn't get credentials from keyring: {_0}")]
     GetCredential(keyring::Error),
 
     /// TODO: docs.
+    #[display("Not logged in")]
     NotLoggedIn,
 }
 
@@ -75,25 +85,5 @@ impl From<credential_store::Error> for LogoutError {
             GetCredential(err) => Self::GetCredential(err),
             Op(err) => Self::DeleteCredential(err),
         }
-    }
-}
-
-impl notify::Error for LogoutError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-        match self {
-            Self::DeleteCredential(err) => {
-                msg.push_str("couldn't delete credentials from keyring: ")
-                    .push_str(err.to_string());
-            },
-            Self::GetCredential(err) => {
-                msg.push_str("couldn't get credential from keyring: ")
-                    .push_str(err.to_string());
-            },
-            Self::NotLoggedIn => {
-                msg.push_str("not logged in");
-            },
-        }
-        (notify::Level::Error, msg)
     }
 }

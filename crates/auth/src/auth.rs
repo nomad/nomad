@@ -5,8 +5,8 @@ use editor::{Borrowed, Context, Shared};
 
 use crate::AuthEditor;
 use crate::credential_store::CredentialStore;
-use crate::login::Login;
-use crate::logout::Logout;
+use crate::login::{Login, LoginError};
+use crate::logout::{Logout, LogoutError};
 
 /// TODO: docs.
 #[derive(Default)]
@@ -22,14 +22,20 @@ impl Auth {
         &self.infos
     }
 
-    /// Returns a new instance of the [`Login`] action.
-    pub fn login(&self) -> Login {
-        self.into()
+    /// Calls the [`Login`] action.
+    pub async fn login<Ed: AuthEditor>(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), LoginError<Ed>> {
+        Login::from(self).call_inner(ctx).await
     }
 
-    /// Returns a new instance of the [`Logout`] action.
-    pub fn logout(&self) -> Logout {
-        self.into()
+    /// Calls the [`Logout`] action.
+    pub async fn logout<Ed: AuthEditor>(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), LogoutError> {
+        Logout::from(self).call_inner(ctx).await
     }
 
     /// TODO: docs.
@@ -53,7 +59,7 @@ impl<Ed: AuthEditor> Module<Ed> for Auth {
     type Config = ();
 
     fn api(&self, ctx: &mut ApiCtx<Ed>) {
-        ctx.with_function(self.login()).with_function(self.logout());
+        ctx.with_function(Login::from(self)).with_function(Logout::from(self));
     }
 
     fn on_init(&self, ctx: &mut Context<Ed, Borrowed>) {

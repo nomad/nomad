@@ -5,29 +5,36 @@ use editor::{Borrowed, Context, Shared};
 
 use crate::config::Config;
 use crate::editors::{CollabEditor, SessionId};
-use crate::join::Join;
-use crate::leave::{Leave, StopChannels};
+use crate::join::{Join, JoinError};
+use crate::leave::{self, Leave, LeaveError};
 use crate::project::{ProjectHandle, Projects};
-use crate::start::Start;
-use crate::yank::Yank;
+use crate::start::{Start, StartError};
+use crate::yank::{Yank, YankError};
 
 /// TODO: docs.
 pub struct Collab<Ed: CollabEditor> {
     pub(crate) auth_infos: Shared<Option<AuthInfos>>,
     pub(crate) config: Shared<Config>,
     pub(crate) projects: Projects<Ed>,
-    pub(crate) stop_channels: StopChannels<Ed>,
+    pub(crate) stop_channels: leave::StopChannels<Ed>,
 }
 
 impl<Ed: CollabEditor> Collab<Ed> {
-    /// Returns a new instance of the [`Join`] action.
-    pub fn join(&self) -> Join<Ed> {
-        self.into()
+    /// Calls the [`Join`] action with the given session ID.
+    pub async fn join(
+        &self,
+        session_id: SessionId<Ed>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), JoinError<Ed>> {
+        Join::from(self).call_inner(session_id, ctx).await
     }
 
-    /// Returns a new instance of the [`Leave`] action.
-    pub fn leave(&self) -> Leave<Ed> {
-        self.into()
+    /// Calls the [`Leave`] action.
+    pub async fn leave(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), LeaveError> {
+        Leave::from(self).call_inner(ctx).await
     }
 
     /// Returns a handle to the project for the given [`SessionId`], if any.
@@ -38,14 +45,20 @@ impl<Ed: CollabEditor> Collab<Ed> {
         self.projects.get(session_id)
     }
 
-    /// Returns a new instance of the [`Start`] action.
-    pub fn start(&self) -> Start<Ed> {
-        self.into()
+    /// Calls the [`Start`] action.
+    pub async fn start(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<SessionId<Ed>, StartError<Ed>> {
+        Start::from(self).call_inner(ctx).await
     }
 
-    /// Returns a new instance of the [`Yank`] action.
-    pub fn yank(&self) -> Yank<Ed> {
-        self.into()
+    /// Calls the [`Yank`] action.
+    pub async fn yank(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), YankError<Ed>> {
+        Yank::from(self).call_inner(ctx).await
     }
 }
 
@@ -55,14 +68,14 @@ impl<Ed: CollabEditor> Module<Ed> for Collab<Ed> {
     type Config = Config;
 
     fn api(&self, ctx: &mut ApiCtx<Ed>) {
-        ctx.with_command(self.join())
-            .with_command(self.leave())
-            .with_command(self.start())
-            .with_command(self.yank())
-            .with_function(self.join())
-            .with_function(self.leave())
-            .with_function(self.start())
-            .with_function(self.yank());
+        ctx.with_command(Join::from(self))
+            .with_command(Leave::from(self))
+            .with_command(Start::from(self))
+            .with_command(Yank::from(self))
+            .with_function(Join::from(self))
+            .with_function(Leave::from(self))
+            .with_function(Start::from(self))
+            .with_function(Yank::from(self));
     }
 
     fn on_new_config(

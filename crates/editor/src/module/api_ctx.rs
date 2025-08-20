@@ -140,16 +140,8 @@ impl<Ed: Editor> ApiCtx<'_, Ed> {
                         return None;
                     },
                 };
-                let res = state.with_ctx(namespace, plugin_id, |ctx| {
-                    fun.call(args, ctx).into_result()
-                });
-                let ret = match res? {
-                    Ok(ret) => ret,
-                    Err(err) => {
-                        state.emit_err(namespace, err);
-                        return None;
-                    },
-                };
+                let ret = state
+                    .with_ctx(namespace, plugin_id, |ctx| fun.call(args, ctx));
                 match state.serialize(&ret).into_result() {
                     Ok(ret) => Some(ret),
                     Err(err) => {

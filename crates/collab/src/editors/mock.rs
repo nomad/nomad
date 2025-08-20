@@ -11,8 +11,8 @@ use collab_types::Peer;
 use duplex_stream::{DuplexStream, duplex};
 use editor::{ByteOffset, Context, Editor, EditorAdapter, notify};
 
-use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
+use crate::{config, join, leave, start, yank};
 
 #[allow(clippy::type_complexity)]
 pub struct CollabMock<Ed: Editor, F = ()> {
@@ -294,6 +294,22 @@ where
         async move {}
     }
 
+    fn on_join_error(_: join::JoinError<Self>, _: &mut Context<Self>) {
+        unimplemented!()
+    }
+
+    fn on_leave_error(_: leave::LeaveError, _: &mut Context<Self>) {
+        unimplemented!()
+    }
+
+    fn on_start_error(_: start::StartError<Self>, _: &mut Context<Self>) {
+        unimplemented!()
+    }
+
+    fn on_yank_error(_: yank::YankError<Self>, _: &mut Context<Self>) {
+        unimplemented!()
+    }
+
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
@@ -306,7 +322,7 @@ where
     async fn remove_peer_selection(
         _selection: Self::PeerSelection,
         _ctx: &mut Context<Self>,
-    ) -> () {
+    ) {
     }
 
     async fn remove_peer_tooltip(

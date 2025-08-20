@@ -5,7 +5,7 @@ use core::ops;
 use auth_types::AuthInfos;
 use editor::{Borrowed, Context, Editor, EditorAdapter};
 
-use crate::AuthEditor;
+use crate::{AuthEditor, login, logout};
 
 pub struct AuthMock<Ed> {
     inner: Ed,
@@ -32,6 +32,14 @@ impl<Ed: Editor> AuthEditor for AuthMock<Ed> {
         _: &mut Context<Self>,
     ) -> Result<AuthInfos, Self::LoginError> {
         todo!()
+    }
+
+    fn on_login_error(_: login::LoginError<Self>, _: &mut Context<Self>) {
+        unimplemented!()
+    }
+
+    fn on_logout_error(_: logout::LogoutError, _: &mut Context<Self>) {
+        unimplemented!()
     }
 }
 

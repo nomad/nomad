@@ -29,16 +29,11 @@ pub(crate) struct StopRequest {
     stopped_tx: Sender<()>,
 }
 
-impl<Ed: CollabEditor> AsyncAction<Ed> for Leave<Ed> {
-    const NAME: Name = "leave";
-
-    type Args = ();
-
-    async fn call(
-        &mut self,
-        _: Self::Args,
+impl<Ed: CollabEditor> Leave<Ed> {
+    pub(crate) async fn call_inner(
+        &self,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), NoActiveSessionError<Ed>> {
+    ) -> Result<(), LeaveError> {
         let Some(stop_sender) = self
             .projects
             .select(ActionForSelectedSession::Leave, ctx)
@@ -57,6 +52,26 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Leave<Ed> {
 
         Ok(())
     }
+}
+
+impl<Ed: CollabEditor> AsyncAction<Ed> for Leave<Ed> {
+    const NAME: Name = "leave";
+
+    type Args = ();
+
+    async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
+        if let Err(err) = self.call_inner(ctx).await {
+            Ed::on_leave_error(err, ctx);
+        }
+    }
+}
+
+/// The type of error that can occur when [`Leave`]ing fails.
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
+pub enum LeaveError {
+    /// TODO: docs.
+    #[display("{}", NoActiveSessionError)]
+    NoActiveSession,
 }
 
 impl<Ed: CollabEditor> StopChannels<Ed> {
@@ -99,4 +114,10 @@ impl<Ed: CollabEditor> From<&Collab<Ed>> for Leave<Ed> {
 
 impl<Ed: CollabEditor> ToCompletionFn<Ed> for Leave<Ed> {
     fn to_completion_fn(&self) {}
+}
+
+impl From<NoActiveSessionError> for LeaveError {
+    fn from(_: NoActiveSessionError) -> Self {
+        Self::NoActiveSession
+    }
 }

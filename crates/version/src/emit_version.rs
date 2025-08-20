@@ -22,11 +22,7 @@ impl<Ed: Editor> Action<Ed> for EmitVersion {
     type Args<'args> = ();
     type Return = ();
 
-    fn call<'s: 's, 'a: 'a>(
-        &mut self,
-        _: Self::Args<'_>,
-        ctx: &mut Context<Ed, Borrowed>,
-    ) {
+    fn call(&mut self, _: Self::Args<'_>, ctx: &mut Context<Ed, Borrowed>) {
         ctx.emit_info(Message::from_display(VERSION));
     }
 }

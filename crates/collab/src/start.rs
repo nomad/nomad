@@ -11,9 +11,8 @@ use collab_server::client as collab_client;
 use collab_types::{Peer, PeerId, puff};
 use editor::action::AsyncAction;
 use editor::command::ToCompletionFn;
-use editor::notify::{self, Name};
 use editor::shared::{MultiThreaded, Shared};
-use editor::{Buffer, Context, Editor};
+use editor::{Buffer, Context, Editor, notify};
 use either::Either;
 use fs::walk::FsExt;
 use fs::{Directory, File, Fs, Metadata, Node, Symlink};
@@ -34,8 +33,8 @@ use crate::project::{
     OverlappingProjectError,
     Projects,
 };
-use crate::root_markers;
 use crate::session::Session;
+use crate::{SessionId, root_markers};
 
 /// TODO: docs.
 pub type ProjectFilter<B> =
@@ -52,17 +51,12 @@ pub struct Start<Ed: CollabEditor> {
     stop_channels: StopChannels<Ed>,
 }
 
-impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
-    const NAME: Name = "start";
-
-    type Args = ();
-
+impl<Ed: CollabEditor> Start<Ed> {
     #[allow(clippy::too_many_lines)]
-    async fn call(
-        &mut self,
-        _: Self::Args,
+    pub(crate) async fn call_inner(
+        &self,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), StartError<Ed>> {
+    ) -> Result<SessionId<Ed>, StartError<Ed>> {
         let auth_infos =
             self.auth_infos.cloned().ok_or(StartError::UserNotLoggedIn)?;
 
@@ -82,7 +76,7 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
             .map_err(StartError::OverlappingProject)?;
 
         if !Ed::confirm_start(project_guard.root(), ctx).await {
-            return Ok(());
+            return Err(StartError::UserDidNotConfirm);
         }
 
         let project_name = project_guard
@@ -140,7 +134,19 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
         })
         .detach();
 
-        Ok(())
+        Ok(welcome.session_id)
+    }
+}
+
+impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
+    const NAME: &str = "start";
+
+    type Args = ();
+
+    async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
+        if let Err(err) = self.call_inner(ctx).await {
+            Ed::on_start_error(err, ctx);
+        }
     }
 }
 
@@ -414,6 +420,9 @@ pub enum StartError<Ed: CollabEditor> {
     SearchProjectRoot(SearchProjectRootError<Ed>),
 
     /// TODO: docs.
+    UserDidNotConfirm,
+
+    /// TODO: docs.
     UserNotLoggedIn,
 }
 
@@ -555,6 +564,7 @@ impl<Ed: CollabEditor> notify::Error for StartError<Ed> {
             ),
             Self::ReadProject(err) => err.to_message(),
             Self::SearchProjectRoot(err) => err.to_message(),
+            Self::UserDidNotConfirm => todo!(),
             Self::UserNotLoggedIn => {
                 UserNotLoggedInError::<Ed>::new().to_message()
             },

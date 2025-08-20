@@ -5,7 +5,7 @@ use crate::notify;
 /// TODO: docs
 pub trait MaybeResult<T> {
     /// TODO: docs.
-    type Error: notify::Error;
+    type Error;
 
     /// TODO: docs
     fn into_result(self) -> Result<T, Self::Error>;

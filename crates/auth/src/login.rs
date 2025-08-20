@@ -3,7 +3,6 @@
 use auth_types::{AuthInfos, GitHubHandle};
 use editor::action::AsyncAction;
 use editor::command::ToCompletionFn;
-use editor::notify::{self, Name};
 use editor::{Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
@@ -16,14 +15,9 @@ pub struct Login {
     infos: Shared<Option<AuthInfos>>,
 }
 
-impl<Ed: AuthEditor> AsyncAction<Ed> for Login {
-    const NAME: Name = "login";
-
-    type Args = ();
-
-    async fn call(
-        &mut self,
-        _: Self::Args,
+impl Login {
+    pub(crate) async fn call_inner<Ed: AuthEditor>(
+        &self,
         ctx: &mut Context<Ed>,
     ) -> Result<(), LoginError<Ed>> {
         if let Some(handle) = self.infos.with(|maybe_infos| {
@@ -46,18 +40,35 @@ impl<Ed: AuthEditor> AsyncAction<Ed> for Login {
     }
 }
 
+impl<Ed: AuthEditor> AsyncAction<Ed> for Login {
+    const NAME: &str = "login";
+
+    type Args = ();
+
+    async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
+        if let Err(err) = self.call_inner(ctx).await {
+            Ed::on_login_error(err, ctx);
+        }
+    }
+}
+
 /// TODO: docs.
+#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
 pub enum LoginError<Ed: AuthEditor> {
     /// TODO: docs.
+    #[display("Already logged in as {_0}")]
     AlreadyLoggedIn(GitHubHandle),
 
     /// TODO: docs.
+    #[display("Couldn't get credentials from keyring: {_0}")]
     GetCredential(keyring::Error),
 
     /// TODO: docs.
+    #[display("{_0}")]
     Login(Ed::LoginError),
 
     /// TODO: docs.
+    #[display("Couldn't persist credentials: {_0}")]
     PersistAuthInfos(keyring::Error),
 }
 
@@ -81,27 +92,5 @@ impl<Ed: AuthEditor> From<credential_store::Error> for LoginError<Ed> {
             GetCredential(err) => Self::GetCredential(err),
             Op(err) => Self::PersistAuthInfos(err),
         }
-    }
-}
-
-impl<Ed: AuthEditor> notify::Error for LoginError<Ed> {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-        match self {
-            Self::AlreadyLoggedIn(handle) => {
-                msg.push_str("Already logged in as ")
-                    .push_info(handle.as_str());
-            },
-            Self::GetCredential(err) => {
-                msg.push_str("Couldn't get credential from keyring: ")
-                    .push_str(err.to_string());
-            },
-            Self::Login(err) => return err.to_message(),
-            Self::PersistAuthInfos(err) => {
-                msg.push_str("Couldn't persist credentials: ")
-                    .push_str(err.to_string());
-            },
-        }
-        (notify::Level::Error, msg)
     }
 }

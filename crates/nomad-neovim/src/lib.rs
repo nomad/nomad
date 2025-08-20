@@ -96,9 +96,9 @@ impl Module<Neovim> for Nomad {
         let auth = auth::Auth::default();
         let collab = collab::Collab::from(&auth);
 
-        ctx.with_command(auth.login())
-            .with_command(auth.logout())
-            .with_command(collab.start())
+        ctx.with_command(auth::login::Login::from(&auth))
+            .with_command(auth::logout::Logout::from(&auth))
+            .with_command(collab::start::Start::from(&collab))
             .with_command(version::EmitVersion::new())
             .with_constant(version::VERSION)
             .with_module(auth)

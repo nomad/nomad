@@ -3,7 +3,6 @@
 use editor::Context;
 use editor::action::AsyncAction;
 use editor::command::ToCompletionFn;
-use editor::notify::{self, Name};
 
 use crate::collab::Collab;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
@@ -16,21 +15,15 @@ pub struct Yank<Ed: CollabEditor> {
     projects: Projects<Ed>,
 }
 
-impl<Ed: CollabEditor> AsyncAction<Ed> for Yank<Ed> {
-    const NAME: Name = "yank";
-
-    type Args = ();
-
-    async fn call(
-        &mut self,
-        _: Self::Args,
+impl<Ed: CollabEditor> Yank<Ed> {
+    pub(crate) async fn call_inner(
+        &self,
         ctx: &mut Context<Ed>,
     ) -> Result<(), YankError<Ed>> {
         let Some((_, session_id)) = self
             .projects
             .select(ActionForSelectedSession::CopySessionId, ctx)
-            .await
-            .map_err(YankError::NoActiveSession)?
+            .await?
         else {
             return Ok(());
         };
@@ -41,12 +34,29 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Yank<Ed> {
     }
 }
 
+impl<Ed: CollabEditor> AsyncAction<Ed> for Yank<Ed> {
+    const NAME: &str = "yank";
+
+    type Args = ();
+
+    async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
+        if let Err(err) = self.call_inner(ctx).await {
+            Ed::on_yank_error(err, ctx);
+        }
+    }
+}
+
 /// The type of error that can occur when [`Yank`]ing fails.
+#[derive(
+    cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
+)]
 pub enum YankError<Ed: CollabEditor> {
     /// TODO: docs.
-    NoActiveSession(NoActiveSessionError<Ed>),
+    #[display("{}", NoActiveSessionError)]
+    NoActiveSession,
 
     /// TODO: docs.
+    #[display("{_0}")]
     PasteSessionId(Ed::CopySessionIdError),
 }
 
@@ -60,11 +70,8 @@ impl<Ed: CollabEditor> ToCompletionFn<Ed> for Yank<Ed> {
     fn to_completion_fn(&self) {}
 }
 
-impl<Ed: CollabEditor> notify::Error for YankError<Ed> {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        match self {
-            YankError::NoActiveSession(err) => err.to_message(),
-            YankError::PasteSessionId(err) => err.to_message(),
-        }
+impl<Ed: CollabEditor> From<NoActiveSessionError> for YankError<Ed> {
+    fn from(_: NoActiveSessionError) -> Self {
+        Self::NoActiveSession
     }
 }

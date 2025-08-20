@@ -13,6 +13,8 @@ neovim = ["keyring/apple-native", "keyring/secret-service", "dep:neovim"]
 [dependencies]
 abs-path = { workspace = true }
 auth-types = { workspace = true, features = ["serde"] }
+cauchy = { workspace = true }
+derive_more = { workspace = true }
 editor = { workspace = true }
 event-listener = { workspace = true }
 keyring = { workspace = true }

@@ -13,7 +13,7 @@ use collab_types::Peer;
 use editor::{ByteOffset, Context, Editor, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
-use crate::config;
+use crate::{config, join, leave, start, yank};
 
 /// An [`Editor`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -43,7 +43,7 @@ pub trait CollabEditor: Editor {
 
     /// The type of error returned by
     /// [`copy_session_id`](CollabEditor::copy_session_id).
-    type CopySessionIdError: Debug + notify::Error;
+    type CopySessionIdError: Debug;
 
     /// The type of error returned by
     /// [`default_dir_for_remote_projects`](CollabEditor::default_dir_for_remote_projects).
@@ -128,6 +128,18 @@ pub trait CollabEditor: Editor {
         ctx: &'ctx mut Context<Self>,
     ) -> impl Future<Output = ()> + use<'ctx, Self>;
 
+    /// Called when the [`Join`](join::Join) action returns an error.
+    fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>);
+
+    /// Called when the [`Leave`](leave::Leave) action returns an error.
+    fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>);
+
+    /// Called when the [`Start`](start::Start) action returns an error.
+    fn on_start_error(error: start::StartError<Self>, ctx: &mut Context<Self>);
+
+    /// Called when the [`Yank`](yank::Yank) action returns an error.
+    fn on_yank_error(error: yank::YankError<Self>, ctx: &mut Context<Self>);
+
     /// TODO: docs.
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
@@ -168,23 +180,23 @@ pub enum ActionForSelectedSession {
 }
 
 /// TODO: docs.
-pub type SessionId<B> =
-    <<B as CollabEditor>::ServerParams as collab_types::Params>::SessionId;
+pub type SessionId<Ed> =
+    <<Ed as CollabEditor>::ServerParams as collab_types::Params>::SessionId;
 
 /// TODO: docs.
-pub(crate) type MessageRx<B> = collab_server::client::Receiver<Reader<B>>;
+pub(crate) type MessageRx<Ed> = collab_server::client::Receiver<Reader<Ed>>;
 
 /// TODO: docs.
-pub(crate) type MessageTx<B> = collab_server::client::Sender<Writer<B>>;
+pub(crate) type MessageTx<Ed> = collab_server::client::Sender<Writer<Ed>>;
 
 /// TODO: docs.
-pub(crate) type Reader<B> =
-    futures_util::io::ReadHalf<<B as CollabEditor>::Io>;
+pub(crate) type Reader<Ed> =
+    futures_util::io::ReadHalf<<Ed as CollabEditor>::Io>;
 
 /// TODO: docs.
-pub(crate) type Writer<B> =
-    futures_util::io::WriteHalf<<B as CollabEditor>::Io>;
+pub(crate) type Writer<Ed> =
+    futures_util::io::WriteHalf<<Ed as CollabEditor>::Io>;
 
 /// TODO: docs.
-pub(crate) type Welcome<B> =
-    collab_server::client::Welcome<Reader<B>, Writer<B>, SessionId<B>>;
+pub(crate) type Welcome<Ed> =
+    collab_server::client::Welcome<Reader<Ed>, Writer<Ed>, SessionId<Ed>>;

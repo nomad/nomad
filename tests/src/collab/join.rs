@@ -1,9 +1,7 @@
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;
-use collab::mock::{CollabMock, CollabServer, MockSessionId};
-use editor::action::AsyncAction;
-use editor::command::Parse;
+use collab::mock::{CollabMock, CollabServer};
 use fs::Fs;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};
@@ -33,14 +31,14 @@ fn replicate_simple_project() {
         let collab = Collab::from(&Auth::logged_in("peer1"));
         let agent_id = ctx.new_agent_id();
         ctx.create_and_focus(path!("/foo/mars.txt"), agent_id).await.unwrap();
-        collab.start().call((), ctx).await.unwrap();
-        session_id_tx.send(MockSessionId(1)).unwrap();
+        let session_id = collab.start(ctx).await.unwrap();
+        session_id_tx.send(session_id).unwrap();
     });
 
     let run_peer2 = peer2.run(async move |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer2"));
         let session_id = session_id_rx.recv_async().await.unwrap();
-        collab.join().call(Parse(session_id), ctx).await.unwrap();
+        collab.join(session_id, ctx).await.unwrap();
         let fs2 = ctx.fs();
         assert_eq!(
             fs1.node_at_path(path!("/foo")).await.unwrap().unwrap(),

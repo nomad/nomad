@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-use core::marker::PhantomData;
 use core::{fmt, iter};
 use std::collections::hash_map;
 use std::sync::Arc;
@@ -49,7 +48,9 @@ pub struct OverlappingProjectError {
 }
 
 /// TODO: docs.
-pub struct NoActiveSessionError<B>(PhantomData<B>);
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
+#[display("there's no active collaborative editing session")]
+pub struct NoActiveSessionError;
 
 /// TODO: docs.
 pub(crate) struct Project<Ed: CollabEditor> {
@@ -1173,7 +1174,7 @@ impl<Ed: CollabEditor> Projects<Ed> {
         &self,
         action: ActionForSelectedSession,
         ctx: &mut Context<Ed>,
-    ) -> Result<Option<(AbsPathBuf, SessionId<Ed>)>, NoActiveSessionError<Ed>>
+    ) -> Result<Option<(AbsPathBuf, SessionId<Ed>)>, NoActiveSessionError>
     {
         let active_sessions = self.active.with(|map| {
             map.iter()
@@ -1185,7 +1186,7 @@ impl<Ed: CollabEditor> Projects<Ed> {
         });
 
         let session = match &*active_sessions {
-            [] => return Err(NoActiveSessionError::new()),
+            [] => return Err(NoActiveSessionError),
             [single] => single,
             sessions => {
                 match Ed::select_session(sessions, action, ctx).await {
@@ -1633,12 +1634,6 @@ mod impl_integrate_fs_op {
     }
 }
 
-impl<B> NoActiveSessionError<B> {
-    pub(crate) fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
 impl<Ed: CollabEditor> fmt::Debug for ProjectHandle<Ed> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("ProjectHandle").field(&self.root()).finish()
@@ -1678,19 +1673,6 @@ impl notify::Error for OverlappingProjectError {
             .push_info(self.existing_root.to_smolstr())
             .push_str(" (sessions cannot overlap)");
         (notify::Level::Error, msg)
-    }
-}
-
-impl<B> fmt::Debug for NoActiveSessionError<B> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("NoActiveSessionError")
-    }
-}
-
-impl<B> notify::Error for NoActiveSessionError<B> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        let msg = "there's no active collaborative editing session";
-        (notify::Level::Error, notify::Message::from_str(msg))
     }
 }
 
