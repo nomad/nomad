@@ -46,7 +46,7 @@ impl Event for BufEnter {
     ) -> AutocmdId {
         let callback = move |args: api::types::AutocmdCallbackArgs| {
             nvim.with_mut(|nvim| {
-                let buffer_id = BufferId::new(args.buffer);
+                let buffer_id = BufferId::new(args.buffer.clone());
 
                 let Some(callbacks) = nvim
                     .events2
@@ -66,10 +66,10 @@ impl Event for BufEnter {
 
                 let Some(buffer) = nvim.buffer(buffer_id) else {
                     tracing::error!(
-                        buffer_id = ?buffer_id,
+                        buffer_name = ?args.buffer.get_name().ok(),
                         "BufEnter triggered for an invalid buffer",
                     );
-                    return false;
+                    return true;
                 };
 
                 for callback in callbacks {
