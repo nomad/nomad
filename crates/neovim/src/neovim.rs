@@ -21,10 +21,10 @@ use crate::{api, executor, notify, oxi, serde, value};
 
 /// TODO: docs.
 pub struct Neovim {
-    buffers_state: BuffersState,
+    pub(crate) buffers_state: BuffersState,
     emitter: notify::NeovimEmitter,
-    events: Shared<Events>,
-    events2: Events,
+    pub(crate) events: Shared<Events>,
+    pub(crate) events2: Events,
     executor: executor::NeovimExecutor,
     reinstate_panic_hook: bool,
 }
@@ -77,6 +77,16 @@ impl Neovim {
         crate::TracingLayer::new(self)
     }
 
+    /// Same as [`buffer`](Self::buffer), but it doesn't need an exclusive
+    /// reference.
+    #[inline]
+    pub(crate) fn buffer_inner(
+        &self,
+        buf_id: BufferId,
+    ) -> Option<NeovimBuffer<'_>> {
+        NeovimBuffer::new(buf_id, &self.events, &self.buffers_state)
+    }
+
     /// Should only be called by the `#[neovim::plugin]` macro.
     #[doc(hidden)]
     #[inline]
@@ -87,13 +97,6 @@ impl Neovim {
     #[cfg(feature = "test")]
     pub(crate) fn new_test(augroup_name: &str) -> Self {
         Self::new_inner(augroup_name, true)
-    }
-
-    /// Same as [`buffer`](Self::buffer), but it doesn't need an exclusive
-    /// reference.
-    #[inline]
-    fn buffer_inner(&self, buf_id: BufferId) -> Option<NeovimBuffer<'_>> {
-        NeovimBuffer::new(buf_id, &self.events, &self.buffers_state)
     }
 
     #[inline]

@@ -1,5 +1,6 @@
-use editor::AgentId;
+use editor::{AccessMut, AgentId, Editor};
 
+use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{
     AutocmdId,
@@ -9,7 +10,7 @@ use crate::events::{
     Events,
     EventsBorrow,
 };
-use crate::oxi::api;
+use crate::oxi::{self, api};
 
 #[derive(Clone, Copy)]
 pub(crate) struct BufEnter;
@@ -33,43 +34,62 @@ impl Event for BufEnter {
     fn key(&self) {}
 
     #[inline]
-    fn register(&self, events: EventsBorrow) -> AutocmdId {
-        let augroup_id = events.augroup_id;
+    fn register(&self, _: EventsBorrow) -> AutocmdId {
+        todo!();
+    }
 
-        let bufs_state = events.borrow.buffers_state.clone();
-        let events = events.handle;
+    #[inline]
+    fn register2(
+        &self,
+        events: &mut Events,
+        mut nvim: impl AccessMut<Neovim> + 'static,
+    ) -> AutocmdId {
+        let callback = oxi::Function::from_fn_mut(
+            move |args: api::types::AutocmdCallbackArgs| {
+                nvim.with_mut(|nvim| {
+                    let buffer_id = BufferId::new(args.buffer);
 
-        let opts = api::opts::CreateAutocmdOpts::builder()
-            .group(augroup_id)
-            .callback(move |args: api::types::AutocmdCallbackArgs| {
-                let buffer_id = BufferId::new(args.buffer);
+                    let Some(callbacks) = nvim
+                        .events2
+                        .on_buffer_focused
+                        .as_ref()
+                        .map(|cbs| cbs.cloned())
+                    else {
+                        return true;
+                    };
 
-                let Some((callbacks, focused_by)) = events.with_mut(|ev| {
-                    let callbacks = ev.on_buffer_focused.as_ref()?;
-
-                    let focused_by = ev
+                    let focused_by = nvim
+                        .events2
                         .agent_ids
                         .focused_buffer
                         .remove(&buffer_id)
                         .unwrap_or(AgentId::UNKNOWN);
 
-                    Some((callbacks.cloned(), focused_by))
-                }) else {
-                    return true;
-                };
+                    let Some(buffer) = nvim.buffer(buffer_id) else {
+                        tracing::error!(
+                            "BufEnter triggered for an invalid buffer ID: \
+                             {buffer_id:?}",
+                        );
+                        return false;
+                    };
 
-                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
+                    for callback in callbacks {
+                        callback((&buffer, focused_by));
+                    }
 
-                for callback in callbacks {
-                    callback((&buffer, focused_by));
-                }
+                    false
+                })
+            },
+        );
 
-                false
-            })
-            .build();
-
-        api::create_autocmd(["BufEnter"], &opts)
-            .expect("couldn't create autocmd on BufEnter")
+        api::create_autocmd(
+            ["BufEnter"],
+            &api::opts::CreateAutocmdOpts::builder()
+                .group(events.augroup_id)
+                .callback(callback)
+                .build(),
+        )
+        .expect("couldn't create autocmd on BufEnter")
     }
 
     #[inline]
