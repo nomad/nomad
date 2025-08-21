@@ -1,6 +1,7 @@
-use editor::AgentId;
+use editor::{AccessMut, AgentId, Editor};
 use nohash::IntMap as NoHashMap;
 
+use crate::Neovim;
 use crate::buffer::BufferId;
 use crate::cursor::NeovimCursor;
 use crate::events::{
@@ -11,7 +12,7 @@ use crate::events::{
     Events,
     EventsBorrow,
 };
-use crate::oxi::api;
+use crate::oxi::{self, api};
 
 #[derive(Clone, Copy)]
 pub(crate) struct CursorMoved(pub(crate) BufferId);
@@ -37,37 +38,45 @@ impl Event for CursorMoved {
     }
 
     #[inline]
-    fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
-        let augroup_id = events.augroup_id;
+    fn register(&self, _: EventsBorrow) -> AutocmdId {
+        todo!();
+    }
 
-        let bufs_state = events.borrow.buffers_state.clone();
-        let events = events.handle;
+    #[inline]
+    fn register2(
+        &self,
+        events: &mut Events,
+        mut nvim: impl AccessMut<Neovim> + 'static,
+    ) -> AutocmdId {
+        let callback = move |args: api::types::AutocmdCallbackArgs| {
+            nvim.with_mut(|nvim| {
+                let buffer_id = BufferId::new(args.buffer.clone());
 
-        let opts = api::opts::CreateAutocmdOpts::builder()
-            .group(augroup_id)
-            .buffer(self.0.into())
-            .callback(move |args: api::types::AutocmdCallbackArgs| {
-                let buffer_id = BufferId::new(args.buffer);
-
-                let Some((callbacks, moved_by)) = events.with_mut(|ev| {
-                    let callbacks = ev.on_cursor_moved.get(&buffer_id)?;
-
-                    let moved_by = ev
-                        .agent_ids
-                        .moved_cursor
-                        .remove(&buffer_id)
-                        .unwrap_or(AgentId::UNKNOWN);
-
-                    Some((callbacks.cloned(), moved_by))
-                }) else {
+                let Some(callbacks) = nvim
+                    .events2
+                    .on_cursor_moved
+                    .get(&buffer_id)
+                    .map(|cbs| cbs.cloned())
+                else {
                     return true;
                 };
 
-                let cursor = NeovimCursor::new(Events::buffer(
-                    buffer_id,
-                    &events,
-                    &bufs_state,
-                ));
+                let moved_by = nvim
+                    .events2
+                    .agent_ids
+                    .moved_cursor
+                    .remove(&buffer_id)
+                    .unwrap_or(AgentId::UNKNOWN);
+
+                let Some(buffer) = nvim.buffer(buffer_id) else {
+                    tracing::error!(
+                        buffer_name = ?args.buffer.get_name().ok(),
+                        "CursorMoved triggered for an invalid buffer",
+                    );
+                    return true;
+                };
+
+                let cursor = NeovimCursor::new(buffer);
 
                 for callback in callbacks {
                     callback((&cursor, moved_by));
@@ -75,7 +84,7 @@ impl Event for CursorMoved {
 
                 false
             })
-            .build();
+        };
 
         // Neovim has 3 separate cursor-move-related autocommand events --
         // CursorMoved, CursorMovedI and CursorMovedC -- which are triggered
@@ -84,9 +93,15 @@ impl Event for CursorMoved {
         //
         // Since ed has no concept of modes, we register the callback on both
         // CursorMoved and CursorMovedI.
-
-        api::create_autocmd(["CursorMoved", "CursorMovedI"], &opts)
-            .expect("couldn't create autocmd on CursorMoved{I}")
+        api::create_autocmd(
+            ["CursorMoved", "CursorMovedI"],
+            &api::opts::CreateAutocmdOpts::builder()
+                .group(events.augroup_id)
+                .buffer(self.0.into())
+                .callback(oxi::Function::from_fn_mut(callback))
+                .build(),
+        )
+        .expect("couldn't create autocmd on CursorMoved{I}")
     }
 
     #[inline]
