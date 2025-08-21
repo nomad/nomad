@@ -7,18 +7,17 @@ use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};
 
+use crate::Neovim;
 use crate::buffer::{BufferId, BuffersState, NeovimBuffer};
-use crate::events::{AugroupId, CallbacksContainer, Event};
+use crate::events::{self, AugroupId, CallbacksContainer, Event};
 use crate::option::{SetUneditableEolAgentIds, UneditableEndOfLine};
 use crate::oxi::api;
-use crate::{Neovim, events};
 
 /// TODO: docs.
 pub struct EventHandle {
-    events: Shared<Events>,
     /// A list of `(callback_key, event_kind)` pairs, where the `callback_key`
     /// is the key of the callback stored in the [`Callbacks`]' [`SlotMap`].
-    event_keys_kind: SmallVec<[(slotmap::DefaultKey, EventKind); 1]>,
+    inner: SmallVec<[(slotmap::DefaultKey, EventKind); 1]>,
 }
 
 pub(crate) struct EventsBorrow<'a> {
@@ -103,14 +102,14 @@ pub(crate) struct AgentIds {
     pub(crate) set_uneditable_eol: SetUneditableEolAgentIds,
 }
 
-/// TODO: docs.
-pub(crate) struct Callbacks<T: Event> {
-    /// TODO: docs.
+/// Groups the callbacks registered for a specific event type.
+pub(crate) struct Callbacks<Ev: Event> {
+    /// A map from callback key to the corresponding function.
     #[allow(clippy::type_complexity)]
-    inner: SlotMap<slotmap::DefaultKey, Rc<dyn Fn(T::Args<'_>) + 'static>>,
+    inner: SlotMap<slotmap::DefaultKey, Rc<dyn Fn(Ev::Args<'_>) + 'static>>,
 
-    /// TODO: docs.
-    output: T::RegisterOutput,
+    /// The value returned by [`register`](Event::register)ing the event.
+    register_output: Ev::RegisterOutput,
 }
 
 pub(crate) enum EventKind {
@@ -129,28 +128,17 @@ impl EventHandle {
     /// Merges two [`EventHandle`]s into one.
     #[inline]
     pub(crate) fn merge(mut self, mut other: Self) -> Self {
-        self.event_keys_kind.extend(other.event_keys_kind.drain(..));
+        self.inner.extend(other.inner.drain(..));
         self
-    }
-
-    #[inline]
-    fn new2(event_key: slotmap::DefaultKey, event_kind: EventKind) -> Self {
-        Self {
-            event_keys_kind: smallvec_inline![(event_key, event_kind)],
-            events: todo!(),
-        }
     }
 
     #[inline]
     fn new(
         event_key: slotmap::DefaultKey,
         event_kind: EventKind,
-        events: Shared<Events>,
+        _events: Shared<Events>,
     ) -> Self {
-        Self {
-            events,
-            event_keys_kind: smallvec_inline![(event_key, event_kind)],
-        }
+        Self { inner: smallvec_inline![(event_key, event_kind)] }
     }
 }
 
@@ -204,19 +192,19 @@ impl Events {
         callback: impl FnMut(T::Args<'_>) + 'static,
         nvim: impl AccessMut<Neovim> + 'static,
     ) -> EventHandle {
-        let event_key = if let Some(callbacks) =
+        let callback_key = if let Some(callbacks) =
             event.container(self).get_mut(event.key())
         {
             callbacks.insert(callback)
         } else {
             let register_output = event.register2(self, nvim);
             let mut callbacks = Callbacks::new(register_output);
-            let event_key = callbacks.insert(callback);
+            let callback_key = callbacks.insert(callback);
             event.container(self).insert(event.key(), callbacks);
-            event_key
+            callback_key
         };
 
-        EventHandle::new2(event_key, event.kind())
+        EventHandle { inner: smallvec_inline![(callback_key, event.kind())] }
     }
 
     pub(crate) fn new(
@@ -255,37 +243,41 @@ impl Events {
             .expect("couldn't get buffer")
     }
 
-    fn cleanup(
-        &mut self,
-        event_key: slotmap::DefaultKey,
-        event_kind: &EventKind,
-    ) {
-        match event_kind {
-            EventKind::BufEnter(ev) => self.cleanup_event(event_key, ev),
-            EventKind::BufLeave(ev) => self.cleanup_event(event_key, ev),
-            EventKind::BufReadPost(ev) => self.cleanup_event(event_key, ev),
-            EventKind::BufUnload(ev) => self.cleanup_event(event_key, ev),
-            EventKind::BufWritePost(ev) => self.cleanup_event(event_key, ev),
-            EventKind::CursorMoved(ev) => self.cleanup_event(event_key, ev),
-            EventKind::ModeChanged(ev) => self.cleanup_event(event_key, ev),
-            EventKind::OnBytes(ev) => self.cleanup_event(event_key, ev),
-            EventKind::UneditableEolSet(ev) => {
-                self.cleanup_event(event_key, ev)
-            },
+    /// TODO: docs.
+    pub(crate) fn cleanup_event_handle(&mut self, event_handle: EventHandle) {
+        use EventKind::*;
+
+        for (cb_key, event_kind) in event_handle.inner.into_iter() {
+            match &event_kind {
+                BufEnter(ev) => self.remove_callback(ev, cb_key),
+                BufLeave(ev) => self.remove_callback(ev, cb_key),
+                BufReadPost(ev) => self.remove_callback(ev, cb_key),
+                BufUnload(ev) => self.remove_callback(ev, cb_key),
+                BufWritePost(ev) => self.remove_callback(ev, cb_key),
+                CursorMoved(ev) => self.remove_callback(ev, cb_key),
+                ModeChanged(ev) => self.remove_callback(ev, cb_key),
+                OnBytes(ev) => self.remove_callback(ev, cb_key),
+                UneditableEolSet(ev) => self.remove_callback(ev, cb_key),
+            }
         }
     }
 
-    fn cleanup_event<Ev: Event>(
+    /// Removes the callback registered for the given event with the given
+    /// key.
+    ///
+    /// If the callback was the last one on the event, the event itself will be
+    /// unregistered.
+    fn remove_callback<Ev: Event>(
         &mut self,
-        event_key: slotmap::DefaultKey,
         event: &Ev,
+        callback_key: slotmap::DefaultKey,
     ) {
         let mut container = event.container(self);
         let Some(callbacks) = container.get_mut(event.key()) else { return };
-        callbacks.remove(event_key);
+        callbacks.remove(callback_key);
         if callbacks.is_empty() {
             match container.remove(event.key()) {
-                Some(callbacks) => Ev::unregister(callbacks.output),
+                Some(callbacks) => Ev::unregister(callbacks.register_output),
                 None => unreachable!("just checked"),
             }
         }
@@ -320,7 +312,7 @@ impl<T: Event> Callbacks<T> {
 
     #[inline]
     fn new(output: T::RegisterOutput) -> Self {
-        Self { inner: Default::default(), output }
+        Self { inner: Default::default(), register_output: output }
     }
 
     #[inline]
@@ -342,16 +334,5 @@ impl DerefMut for EventsBorrow<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.borrow
-    }
-}
-
-impl Drop for EventHandle {
-    #[inline]
-    fn drop(&mut self) {
-        self.events.with_mut(|events| {
-            for (key, kind) in self.event_keys_kind.drain(..) {
-                events.cleanup(key, &kind);
-            }
-        })
     }
 }
