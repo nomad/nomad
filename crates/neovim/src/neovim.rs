@@ -24,6 +24,7 @@ pub struct Neovim {
     buffers_state: BuffersState,
     emitter: notify::NeovimEmitter,
     events: Shared<Events>,
+    events2: Events,
     executor: executor::NeovimExecutor,
     reinstate_panic_hook: bool,
 }
@@ -102,6 +103,7 @@ impl Neovim {
         let buffers_state = BuffersState::new(decoration_provider);
         Self {
             buffers_state: buffers_state.clone(),
+            events2: Events::new(augroup_name, buffers_state.clone()),
             events: Shared::new(Events::new(augroup_name, buffers_state)),
             emitter: Default::default(),
             executor: Default::default(),
@@ -259,15 +261,15 @@ impl Editor for Neovim {
     fn on_buffer_created<Fun>(
         &mut self,
         mut fun: Fun,
-        _: impl AccessMut<Self> + Clone + 'static,
+        access: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
-        Events::insert(
-            self.events.clone(),
+        self.events2.insert2(
             events::BufReadPost,
             move |(buf, created_by)| fun(buf, created_by),
+            access,
         )
     }
 

@@ -64,6 +64,7 @@ where
     A: Access<T>,
     F: Fn(&T) -> &U,
 {
+    #[track_caller]
     #[inline]
     fn with<R>(&self, fun: impl FnOnce(&U) -> R) -> R {
         self.inner.with(|t| fun((self.fun)(t)))
@@ -77,6 +78,7 @@ where
     FnAccess: Fn(&T) -> &U,
     FnAccessMut: FnMut(&mut T) -> &mut U,
 {
+    #[track_caller]
     #[inline]
     fn with<R>(&self, fun: impl FnOnce(&U) -> R) -> R {
         self.inner.with(|t| fun((self.fun_access)(t)))
@@ -90,6 +92,7 @@ where
     FnAccess: Fn(&T) -> &U,
     FnAccessMut: FnMut(&mut T) -> &mut U,
 {
+    #[track_caller]
     #[inline]
     fn with_mut<R>(&mut self, fun: impl FnOnce(&mut U) -> R) -> R {
         self.inner.with_mut(|t| fun((self.fun_access_mut)(t)))

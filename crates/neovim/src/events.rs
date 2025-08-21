@@ -4,11 +4,12 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 use std::rc::Rc;
 
-use editor::{AgentId, Edit, Shared};
+use editor::{AccessMut, AgentId, Edit, Shared};
 use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};
 
+use crate::Neovim;
 use crate::buffer::{BufferId, BuffersState, NeovimBuffer};
 use crate::cursor::NeovimCursor;
 use crate::mode::ModeStr;
@@ -26,6 +27,7 @@ pub struct EventHandle {
     event_keys_kind: SmallVec<[(slotmap::DefaultKey, EventKind); 1]>,
 }
 
+/// TODO: docs.
 pub(crate) trait Event: Sized {
     /// The type of arguments given to the callbacks registered for this
     /// event.
@@ -48,6 +50,15 @@ pub(crate) trait Event: Sized {
 
     /// TODO: docs.
     fn register(&self, events: EventsBorrow) -> Self::RegisterOutput;
+
+    /// TODO: docs.
+    fn register2(
+        &self,
+        _events: &mut Events,
+        _nvim: impl AccessMut<Neovim> + 'static,
+    ) -> Self::RegisterOutput {
+        todo!();
+    }
 
     /// TODO: docs.
     fn unregister(out: Self::RegisterOutput);
@@ -73,17 +84,48 @@ pub(crate) struct EventsBorrow<'a> {
 }
 
 pub(crate) struct Events {
+    /// TODO: docs.
     pub(crate) agent_ids: AgentIds,
+
+    /// The ID of the group that `Self` will register autocommands in.
     pub(crate) augroup_id: AugroupId,
+
+    /// TODO: docs.
     pub(crate) buffers_state: BuffersState,
+
+    /// TODO: docs.
     pub(crate) on_uneditable_eol_set: Option<Callbacks<UneditableEndOfLine>>,
+
+    /// The callback registered to the [`BufReadPost`] event, or `None` if no
+    /// callback have been registered to that event.
     on_buffer_created: Option<Callbacks<BufReadPost>>,
+
+    /// Map from a buffer's ID to the callbacks registered to the [`OnBytes`]
+    /// event on that buffer.
     on_buffer_edited: NoHashMap<BufferId, Callbacks<OnBytes>>,
+
+    /// The callback registered to the [`BufEnter`] event, or `None` if no
+    /// callback have been registered to that event.
     on_buffer_focused: Option<Callbacks<BufEnter>>,
+
+    /// Map from a buffer's ID to the callbacks registered to the [`BufUnload`]
+    /// event on that buffer.
     on_buffer_removed: NoHashMap<BufferId, Callbacks<BufUnload>>,
+
+    /// Map from a buffer's ID to the callbacks registered to the
+    /// [`BufWritePost`] event on that buffer.
     on_buffer_saved: NoHashMap<BufferId, Callbacks<BufWritePost>>,
+
+    /// Map from a buffer's ID to the callbacks registered to the [`BufLeave`]
+    /// event on that buffer.
     on_buffer_unfocused: NoHashMap<BufferId, Callbacks<BufLeave>>,
+
+    /// Map from a buffer's ID to the callbacks registered to the
+    /// [`CursorMoved`] event on that buffer.
     on_cursor_moved: NoHashMap<BufferId, Callbacks<CursorMoved>>,
+
+    /// The callback registered to the [`ModeChanged`] event, or `None` if no
+    /// callback have been registered to that event .
     on_mode_changed: Option<Callbacks<ModeChanged>>,
 }
 
@@ -149,6 +191,14 @@ impl EventHandle {
     }
 
     #[inline]
+    fn new2(event_key: slotmap::DefaultKey, event_kind: EventKind) -> Self {
+        Self {
+            event_keys_kind: smallvec_inline![(event_key, event_kind)],
+            events: todo!(),
+        }
+    }
+
+    #[inline]
     fn new(
         event_key: slotmap::DefaultKey,
         event_kind: EventKind,
@@ -178,8 +228,6 @@ impl Events {
         event: T,
         fun: impl FnMut(T::Args<'_>) + 'static,
     ) -> EventHandle {
-        let event_kind = event.kind();
-
         let event_key = events.with_mut(|this| {
             if let Some(callbacks) = event.container(this).get_mut(event.key())
             {
@@ -200,7 +248,30 @@ impl Events {
             event_key
         });
 
+        let event_kind = event.kind();
+
         EventHandle::new(event_key, event_kind, events)
+    }
+
+    pub(crate) fn insert2<T: Event>(
+        &mut self,
+        event: T,
+        callback: impl FnMut(T::Args<'_>) + 'static,
+        nvim: impl AccessMut<Neovim> + 'static,
+    ) -> EventHandle {
+        let event_key = if let Some(callbacks) =
+            event.container(self).get_mut(event.key())
+        {
+            callbacks.insert(callback)
+        } else {
+            let register_output = event.register2(self, nvim);
+            let mut callbacks = Callbacks::new(register_output);
+            let event_key = callbacks.insert(callback);
+            event.container(self).insert(event.key(), callbacks);
+            event_key
+        };
+
+        EventHandle::new2(event_key, event.kind())
     }
 
     pub(crate) fn new(
