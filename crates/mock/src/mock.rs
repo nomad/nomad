@@ -38,11 +38,6 @@ pub struct EventHandle {
     callbacks: Callbacks,
 }
 
-#[derive(cauchy::Debug, cauchy::PartialEq, cauchy::Eq)]
-pub struct CreateBufferError<Fs: fs::Fs> {
-    inner: fs::ReadFileToStringError<Fs>,
-}
-
 #[derive(Default)]
 pub(crate) struct Callbacks {
     inner: Shared<SlotMap<DefaultKey, CallbackKind>>,
@@ -171,7 +166,7 @@ impl Editor for Mock {
     type SelectionId = SelectionId;
 
     type BufferSaveError = ();
-    type CreateBufferError = CreateBufferError<MockFs>;
+    type CreateBufferError = fs::ReadFileToStringError<MockFs>;
     type SerializeError = SerializeError;
     type DeserializeError = DeserializeError;
 
@@ -201,7 +196,7 @@ impl Editor for Mock {
                 fs::ReadFileError::NoNodeAtPath(_),
             )) => String::default(),
 
-            Err(other) => return Err(CreateBufferError { inner: other }),
+            Err(other) => return Err(other),
         };
 
         this.with_mut(|this| {
