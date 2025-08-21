@@ -263,7 +263,7 @@ impl<Ed: CollabEditor> EventStream<Ed> {
             },
 
             event::BufferEvent::Removed(buffer_id) => {
-                self.buffer_streams.remove(buffer_id);
+                self.buffer_streams.remove(buffer_id, ctx);
             },
 
             _ => {},
@@ -292,7 +292,7 @@ impl<Ed: CollabEditor> EventStream<Ed> {
             },
             event::CursorEventKind::Moved(_) => Some(event),
             event::CursorEventKind::Removed => {
-                self.cursor_streams.remove(&event.cursor_id);
+                self.cursor_streams.remove(&event.cursor_id, ctx);
                 Some(event)
             },
         }
@@ -328,7 +328,7 @@ impl<Ed: CollabEditor> EventStream<Ed> {
                 if let Some(buf_id) =
                     self.buf_id_of_file_id.get(&deletion.node_id)
                 {
-                    self.buffer_streams.remove(buf_id);
+                    self.buffer_streams.remove(buf_id, ctx);
                 }
 
                 if deletion.node_id != deletion.deletion_root_id {
@@ -365,7 +365,7 @@ impl<Ed: CollabEditor> EventStream<Ed> {
                         if let Some(buf_id) =
                             self.buf_id_of_file_id.get(&r#move.node_id)
                         {
-                            self.buffer_streams.remove(buf_id);
+                            self.buffer_streams.remove(buf_id, ctx);
                         }
                     } else {
                         self.dir_streams.remove(&r#move.node_id);
@@ -416,7 +416,7 @@ impl<Ed: CollabEditor> EventStream<Ed> {
             },
             event::SelectionEventKind::Moved(_) => Some(event),
             event::SelectionEventKind::Removed => {
-                self.selection_streams.remove(&event.selection_id);
+                self.selection_streams.remove(&event.selection_id, ctx);
                 Some(event)
             },
         }
@@ -599,9 +599,16 @@ impl<Ed: CollabEditor> BufferStreams<Ed> {
         }
     }
 
-    /// Removes the event handle corresponding to the buffer with the given ID.
-    fn remove(&mut self, buffer_id: &Ed::BufferId) {
-        self.handles.remove(buffer_id);
+    /// Removes the event handles corresponding to the buffer with the given
+    /// ID.
+    fn remove(&mut self, buffer_id: &Ed::BufferId, ctx: &mut Context<Ed>) {
+        if let Some(buffer_handles) = self.handles.remove(buffer_id) {
+            ctx.with_editor(|editor| {
+                for handle in buffer_handles {
+                    editor.remove_event(handle);
+                }
+            });
+        }
     }
 
     fn select_next_some(
@@ -670,9 +677,16 @@ impl<Ed: CollabEditor> CursorStreams<Ed> {
         }
     }
 
-    /// Removes the event handle corresponding to the cursor with the given ID.
-    fn remove(&mut self, cursor_id: &Ed::CursorId) {
-        self.handles.remove(cursor_id);
+    /// Removes the event handles corresponding to the cursor with the given
+    /// ID.
+    fn remove(&mut self, cursor_id: &Ed::CursorId, ctx: &mut Context<Ed>) {
+        if let Some(cursor_handles) = self.handles.remove(cursor_id) {
+            ctx.with_editor(|editor| {
+                for handle in cursor_handles {
+                    editor.remove_event(handle);
+                }
+            });
+        }
     }
 
     fn select_next_some(
@@ -769,10 +783,20 @@ impl<Ed: CollabEditor> SelectionStreams<Ed> {
         }
     }
 
-    /// Removes the event handle corresponding to the selection with the given
+    /// Removes the event handles corresponding to the selection with the given
     /// ID.
-    fn remove(&mut self, selection_id: &Ed::SelectionId) {
-        self.handles.remove(selection_id);
+    fn remove(
+        &mut self,
+        selection_id: &Ed::SelectionId,
+        ctx: &mut Context<Ed>,
+    ) {
+        if let Some(selection_handles) = self.handles.remove(selection_id) {
+            ctx.with_editor(|editor| {
+                for handle in selection_handles {
+                    editor.remove_event(handle);
+                }
+            });
+        }
     }
 
     fn select_next_some(
