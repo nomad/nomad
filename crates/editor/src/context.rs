@@ -88,7 +88,13 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     where
         Fun: FnMut(&Ed::Buffer<'_>, AgentId) + 'static,
     {
-        self.with_editor(move |ed| ed.on_buffer_created(fun))
+        let state_handle = self.borrow.state_handle();
+        self.with_editor(move |ed| {
+            ed.on_buffer_created(
+                fun,
+                state_handle.map_mut(Deref::deref, DerefMut::deref_mut),
+            )
+        })
     }
 
     /// TODO: docs.

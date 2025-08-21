@@ -40,7 +40,7 @@ impl NeovimLocalSpawner {
         let runnable_queue = Rc::new(RunnableQueue::new());
 
         // This callback will be registered to be executed on the next tick of
-        // the libuv event loop everytime a future wakes its `Waker`.
+        // the libuv event loop every time a future wakes its `Waker`.
         let async_handle = {
             let runnable_queue = Rc::clone(&runnable_queue);
 

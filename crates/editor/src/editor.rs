@@ -121,7 +121,11 @@ pub trait Editor: 'static + Sized {
     fn executor(&mut self) -> &mut Self::Executor;
 
     /// TODO: docs.
-    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_buffer_created<Fun>(
+        &mut self,
+        fun: Fun,
+        access: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static;
 

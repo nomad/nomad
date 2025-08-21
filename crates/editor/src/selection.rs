@@ -16,7 +16,7 @@ pub trait Selection {
     /// Returns the selection's ID.
     fn id(&self) -> <Self::Editor as Editor>::SelectionId;
 
-    /// Registers the given callback to be executed everytime the selection is
+    /// Registers the given callback to be executed every time the selection is
     /// moved, i.e. every time its start or end offset is changed.
     ///
     /// The callback is given a reference to this selection, plus the

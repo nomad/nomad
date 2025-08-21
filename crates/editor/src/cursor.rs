@@ -17,7 +17,7 @@ pub trait Cursor {
     /// TODO: docs.
     fn r#move(&mut self, offset: ByteOffset, agent_id: AgentId);
 
-    /// Registers the given callback to be executed everytime the cursor is
+    /// Registers the given callback to be executed every time the cursor is
     /// moved.
     ///
     /// The callback is given a reference to this cursor, plus the [`AgentId`]

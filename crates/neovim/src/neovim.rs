@@ -256,7 +256,11 @@ impl Editor for Neovim {
     }
 
     #[inline]
-    fn on_buffer_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_buffer_created<Fun>(
+        &mut self,
+        mut fun: Fun,
+        _: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {

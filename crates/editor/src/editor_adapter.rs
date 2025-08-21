@@ -1,10 +1,9 @@
-use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
 use abs_path::AbsPath;
 
 use crate::notify::MaybeResult;
-use crate::{Access, AccessMut, AgentId, Editor};
+use crate::{AccessMut, AgentId, Editor};
 
 /// TODO: docs.
 pub trait EditorAdapter: 'static + Sized + DerefMut<Target: Editor> {}
@@ -47,7 +46,7 @@ impl<Ed: EditorAdapter> Editor for Ed {
     ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>
     {
         <<Self as Deref>::Target>::create_buffer(
-            AccessAdapter::new(this),
+            this.map_mut(Deref::deref, DerefMut::deref_mut),
             file_path,
             agent_id,
         )
@@ -87,11 +86,18 @@ impl<Ed: EditorAdapter> Editor for Ed {
     }
 
     #[inline]
-    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_buffer_created<Fun>(
+        &mut self,
+        fun: Fun,
+        access: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
-        self.deref_mut().on_buffer_created(fun)
+        self.deref_mut().on_buffer_created(
+            fun,
+            access.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 
     #[inline]
@@ -143,39 +149,5 @@ impl<Ed: EditorAdapter> Editor for Ed {
         T: serde::Deserialize<'de>,
     {
         self.deref_mut().deserialize(value)
-    }
-}
-
-struct AccessAdapter<A, T> {
-    access: A,
-    accessed: PhantomData<T>,
-}
-
-impl<A, T> AccessAdapter<A, T> {
-    #[inline]
-    fn new(access: A) -> Self {
-        Self { access, accessed: PhantomData }
-    }
-}
-
-impl<A, T> Access<T::Target> for AccessAdapter<A, T>
-where
-    A: Access<T>,
-    T: Deref,
-{
-    #[inline]
-    fn with<R>(&self, fun: impl FnOnce(&T::Target) -> R) -> R {
-        self.access.with(|inner: &T| fun(inner.deref()))
-    }
-}
-
-impl<A, T> AccessMut<T::Target> for AccessAdapter<A, T>
-where
-    A: AccessMut<T>,
-    T: DerefMut,
-{
-    #[inline]
-    fn with_mut<R>(&mut self, fun: impl FnOnce(&mut T::Target) -> R) -> R {
-        self.access.with_mut(|inner: &mut T| fun(inner.deref_mut()))
     }
 }
