@@ -44,49 +44,47 @@ impl Event for BufEnter {
         events: &mut Events,
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
-        let callback = oxi::Function::from_fn_mut(
-            move |args: api::types::AutocmdCallbackArgs| {
-                nvim.with_mut(|nvim| {
-                    let buffer_id = BufferId::new(args.buffer);
+        let callback = move |args: api::types::AutocmdCallbackArgs| {
+            nvim.with_mut(|nvim| {
+                let buffer_id = BufferId::new(args.buffer);
 
-                    let Some(callbacks) = nvim
-                        .events2
-                        .on_buffer_focused
-                        .as_ref()
-                        .map(|cbs| cbs.cloned())
-                    else {
-                        return true;
-                    };
+                let Some(callbacks) = nvim
+                    .events2
+                    .on_buffer_focused
+                    .as_ref()
+                    .map(|cbs| cbs.cloned())
+                else {
+                    return true;
+                };
 
-                    let focused_by = nvim
-                        .events2
-                        .agent_ids
-                        .focused_buffer
-                        .remove(&buffer_id)
-                        .unwrap_or(AgentId::UNKNOWN);
+                let focused_by = nvim
+                    .events2
+                    .agent_ids
+                    .focused_buffer
+                    .remove(&buffer_id)
+                    .unwrap_or(AgentId::UNKNOWN);
 
-                    let Some(buffer) = nvim.buffer(buffer_id) else {
-                        tracing::error!(
-                            "BufEnter triggered for an invalid buffer ID: \
-                             {buffer_id:?}",
-                        );
-                        return false;
-                    };
+                let Some(buffer) = nvim.buffer(buffer_id) else {
+                    tracing::error!(
+                        buffer_id = ?buffer_id,
+                        "BufEnter triggered for an invalid buffer",
+                    );
+                    return false;
+                };
 
-                    for callback in callbacks {
-                        callback((&buffer, focused_by));
-                    }
+                for callback in callbacks {
+                    callback((&buffer, focused_by));
+                }
 
-                    false
-                })
-            },
-        );
+                false
+            })
+        };
 
         api::create_autocmd(
             ["BufEnter"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
-                .callback(callback)
+                .callback(oxi::Function::from_fn_mut(callback))
                 .build(),
         )
         .expect("couldn't create autocmd on BufEnter")
