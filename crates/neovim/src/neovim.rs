@@ -43,14 +43,13 @@ impl Neovim {
             .expect("couldn't create buffer")
             .into();
 
-        self.events.with_mut(|events| {
-            if events.contains(&events::BufReadPost) {
-                events.agent_ids.created_buffer.insert(buffer_id, agent_id);
-            }
-            if events.contains(&events::BufEnter) {
-                events.agent_ids.focused_buffer.insert(buffer_id, agent_id);
-            }
-        });
+        if self.events2.contains(&events::BufReadPost) {
+            self.events2.agent_ids.created_buffer.insert(buffer_id, agent_id);
+        }
+
+        if self.events2.contains(&events::BufEnter) {
+            self.events2.agent_ids.focused_buffer.insert(buffer_id, agent_id);
+        }
 
         buffer_id
     }
@@ -277,17 +276,17 @@ impl Editor for Neovim {
     fn on_cursor_created<Fun>(
         &mut self,
         mut fun: Fun,
-        _this: impl AccessMut<Self> + Clone + 'static,
+        this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
     {
-        Events::insert(
-            self.events.clone(),
+        self.events2.insert2(
             events::BufEnter,
             move |(buf, focused_by)| {
                 fun(&NeovimCursor::new(buf.clone()), focused_by)
             },
+            this,
         )
     }
 
@@ -295,13 +294,12 @@ impl Editor for Neovim {
     fn on_selection_created<Fun>(
         &mut self,
         mut fun: Fun,
-        _this: impl AccessMut<Self> + Clone + 'static,
+        this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {
-        Events::insert(
-            self.events.clone(),
+        self.events2.insert2(
             events::ModeChanged,
             move |(buf, old_mode, new_mode, changed_by)| {
                 if new_mode.has_selected_range()
@@ -312,6 +310,7 @@ impl Editor for Neovim {
                     fun(&NeovimSelection::new(buf.clone()), changed_by);
                 }
             },
+            this,
         )
     }
 
