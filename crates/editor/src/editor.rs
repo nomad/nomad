@@ -109,7 +109,7 @@ pub trait Editor: 'static + Sized {
         this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static;
+        Fun: FnMut(&mut Self::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn on_cursor_created<Fun>(
@@ -118,7 +118,7 @@ pub trait Editor: 'static + Sized {
         this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static;
+        Fun: FnMut(&mut Self::Cursor<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn on_selection_created<Fun>(
@@ -127,7 +127,7 @@ pub trait Editor: 'static + Sized {
         this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static;
+        Fun: FnMut(&mut Self::Selection<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn reinstate_panic_hook(&self) -> bool;

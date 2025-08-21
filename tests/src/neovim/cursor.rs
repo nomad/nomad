@@ -67,7 +67,7 @@ trait ByteOffsetExt {
         let editor = ctx.editor();
 
         ctx.with_borrowed(|ctx| {
-            ctx.current_buffer().unwrap().for_each_cursor(move |cursor| {
+            ctx.current_buffer().unwrap().for_each_cursor(move |mut cursor| {
                 let tx2 = tx.clone();
                 mem::forget(cursor.on_moved(
                     move |cursor, _moved_by| {

@@ -294,9 +294,10 @@ async fn read_project<Ed: CollabEditor>(
         };
 
         if let Some(node_id) = node_id_maps.file2node.get(&file_id) {
-            event_stream.watch_buffer(&buffer, node_id.clone(), ed.clone());
-            id_maps.buffer2file.insert(buffer.id(), file_id);
-            id_maps.file2buffer.insert(file_id, buffer.id());
+            let buffer_id = buffer.id();
+            event_stream.watch_buffer(buffer, node_id.clone(), ed.clone());
+            id_maps.buffer2file.insert(buffer_id.clone(), file_id);
+            id_maps.file2buffer.insert(file_id, buffer_id);
         }
     });
 

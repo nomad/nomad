@@ -75,7 +75,6 @@ pub struct GraphemeOffsets<'a> {
     point: Point,
 }
 
-#[derive(Clone)]
 pub(crate) struct BuffersState {
     decoration_provider: DecorationProvider,
     on_bytes_replacement_extend_deletion_end_by_one: Shared<bool>,
@@ -907,7 +906,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
 
     #[inline]
     fn on_edited<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
@@ -920,7 +919,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
         let on_bytes_handle = self.events.insert(
             events::OnBytes(self.id()),
             move |(this, edit)| {
-                fun2.with_mut(|fun| fun(this, edit));
+                fun2.with_mut(|fun| fun(&this, edit));
 
                 if this.has_uneditable_eol() {
                     // If the buffer has an uneditable eol, then:
@@ -952,7 +951,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
                         replacements: smallvec_inline![replacement],
                     };
 
-                    fun2.with_mut(|fun| fun(this, &edit));
+                    fun2.with_mut(|fun| fun(&this, &edit));
                 }
             },
             nvim.clone(),
@@ -1009,7 +1008,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
 
     #[inline]
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         mut fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
@@ -1025,7 +1024,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
 
     #[inline]
     fn on_saved<Fun>(
-        &self,
+        &mut self,
         mut fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
@@ -1034,7 +1033,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     {
         self.events.insert(
             events::BufWritePost(self.id()),
-            move |(this, saved_by)| fun(this, saved_by),
+            move |(this, saved_by)| fun(&this, saved_by),
             nvim,
         )
     }

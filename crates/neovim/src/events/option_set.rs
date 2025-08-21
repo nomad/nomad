@@ -61,7 +61,7 @@ impl<T: NeovimOption> OptionSet<T> {
 impl<T: WatchedOption> Event for OptionSet<T> {
     /// A tuple of `(buffer, old_value, new_value)`, where `buffer` is only
     /// present for buffer-local options.
-    type Args<'a> = (Option<&'a NeovimBuffer<'a>>, &'a T::Value, &'a T::Value);
+    type Args<'a> = (Option<NeovimBuffer<'a>>, &'a T::Value, &'a T::Value);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -88,14 +88,14 @@ impl<T: WatchedOption> Event for OptionSet<T> {
             events,
             nvim,
             |is_buffer_local, old_value, new_value, nvim| {
-                let Some(callbacks) = T::callbacks(&mut nvim.events2)
+                let Some(callbacks) = T::callbacks(&mut nvim.events)
                     .as_ref()
                     .map(|cbs| cbs.cloned())
                 else {
                     return true;
                 };
 
-                let buffer = if is_buffer_local {
+                let mut maybe_buf = if is_buffer_local {
                     let buffer_id = BufferId::of_focused();
 
                     match nvim.buffer(buffer_id) {
@@ -115,7 +115,11 @@ impl<T: WatchedOption> Event for OptionSet<T> {
                 };
 
                 for callback in callbacks {
-                    callback((buffer.as_ref(), old_value, new_value));
+                    callback((
+                        maybe_buf.as_mut().map(|buf| buf.reborrow()),
+                        old_value,
+                        new_value,
+                    ));
                 }
 
                 false

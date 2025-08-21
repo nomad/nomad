@@ -209,7 +209,7 @@ impl Event for UneditableEndOfLine {
             let new_value = value(new_option_value);
 
             let Some(callbacks) = nvim
-                .events2
+                .events
                 .on_uneditable_eol_set
                 .as_ref()
                 .map(|cbs| cbs.cloned())
@@ -217,7 +217,7 @@ impl Event for UneditableEndOfLine {
                 return true;
             };
 
-            let ids = &mut nvim.events2.agent_ids.set_uneditable_eol;
+            let ids = &mut nvim.events.agent_ids.set_uneditable_eol;
 
             let set_by = match option {
                 Option::Eol => mem::take(&mut ids.set_eol),

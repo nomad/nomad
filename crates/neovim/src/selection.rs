@@ -42,7 +42,7 @@ impl Selection for NeovimSelection<'_> {
 
     #[inline]
     fn on_moved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
@@ -52,8 +52,10 @@ impl Selection for NeovimSelection<'_> {
         let is_selection_alive = Shared::<bool>::new(true);
         let fun = Shared::<Fun>::new(fun);
 
+        let buffer_id = self.buffer_id();
+
         let cursor_moved_handle = self.events.insert(
-            events::CursorMoved(self.buffer_id()),
+            events::CursorMoved(buffer_id),
             {
                 let is_selection_alive = is_selection_alive.clone();
                 let fun = fun.clone();
@@ -68,8 +70,6 @@ impl Selection for NeovimSelection<'_> {
             },
             nvim.clone(),
         );
-
-        let buffer_id = self.buffer_id();
 
         let mode_changed_handle = self.events.insert(
             events::ModeChanged,
@@ -93,7 +93,7 @@ impl Selection for NeovimSelection<'_> {
 
     #[inline]
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         mut fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle

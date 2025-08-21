@@ -10,7 +10,7 @@ use crate::oxi::{self, api};
 pub(crate) struct BufUnload(pub(crate) BufferId);
 
 impl Event for BufUnload {
-    type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
+    type Args<'a> = (NeovimBuffer<'a>, AgentId);
     type Container<'ev> = &'ev mut NoHashMap<BufferId, Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -40,7 +40,7 @@ impl Event for BufUnload {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
                 let Some(callbacks) = nvim
-                    .events2
+                    .events
                     .on_buffer_removed
                     .get(&buffer_id)
                     .map(|cbs| cbs.cloned())
@@ -49,13 +49,13 @@ impl Event for BufUnload {
                 };
 
                 let removed_by = nvim
-                    .events2
+                    .events
                     .agent_ids
                     .removed_buffer
                     .remove(&buffer_id)
                     .unwrap_or(AgentId::UNKNOWN);
 
-                let Some(buffer) = nvim.buffer(buffer_id) else {
+                let Some(mut buffer) = nvim.buffer(buffer_id) else {
                     tracing::error!(
                         buffer_name = ?args.buffer.get_name().ok(),
                         "BufUnload triggered for an invalid buffer",
@@ -64,7 +64,7 @@ impl Event for BufUnload {
                 };
 
                 for callback in callbacks {
-                    callback((&buffer, removed_by));
+                    callback((buffer.reborrow(), removed_by));
                 }
 
                 false

@@ -41,7 +41,7 @@ impl Event for CursorMoved {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
                 let Some(callbacks) = nvim
-                    .events2
+                    .events
                     .on_cursor_moved
                     .get(&buffer_id)
                     .map(|cbs| cbs.cloned())
@@ -50,7 +50,7 @@ impl Event for CursorMoved {
                 };
 
                 let moved_by = nvim
-                    .events2
+                    .events
                     .agent_ids
                     .moved_cursor
                     .remove(&buffer_id)

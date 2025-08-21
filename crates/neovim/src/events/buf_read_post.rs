@@ -9,7 +9,7 @@ use crate::oxi::{self, api};
 pub(crate) struct BufReadPost;
 
 impl Event for BufReadPost {
-    type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
+    type Args<'a> = (NeovimBuffer<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -37,7 +37,7 @@ impl Event for BufReadPost {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
                 let Some(callbacks) = nvim
-                    .events2
+                    .events
                     .on_buffer_created
                     .as_ref()
                     .map(|cbs| cbs.cloned())
@@ -46,13 +46,13 @@ impl Event for BufReadPost {
                 };
 
                 let created_by = nvim
-                    .events2
+                    .events
                     .agent_ids
                     .created_buffer
                     .remove(&buffer_id)
                     .unwrap_or(AgentId::UNKNOWN);
 
-                let Some(buffer) = nvim.buffer(buffer_id) else {
+                let Some(mut buffer) = nvim.buffer(buffer_id) else {
                     tracing::error!(
                         buffer_name = ?args.buffer.get_name().ok(),
                         "BufReadPost triggered for an invalid buffer",
@@ -61,7 +61,7 @@ impl Event for BufReadPost {
                 };
 
                 for callback in callbacks {
-                    callback((&buffer, created_by));
+                    callback((buffer.reborrow(), created_by));
                 }
 
                 false

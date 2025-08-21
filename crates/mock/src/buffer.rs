@@ -108,13 +108,13 @@ impl<'a> Buffer<'a> {
                 .collect::<Vec<_>>()
         });
 
-        let cursor = Cursor {
+        let mut cursor = Cursor {
             cursor_id: CursorId { buffer_id: self.id(), id_in_buffer },
             buffer: self.reborrow(),
         };
 
         for callback in on_cursor_created {
-            callback.with_mut(|cb| cb(&cursor, agent_id));
+            callback.with_mut(|cb| cb(&mut cursor, agent_id));
         }
 
         cursor
@@ -308,7 +308,7 @@ impl<'a> editor::Buffer for Buffer<'a> {
     }
 
     fn on_edited<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle
@@ -321,7 +321,7 @@ impl<'a> editor::Buffer for Buffer<'a> {
     }
 
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle
@@ -334,7 +334,7 @@ impl<'a> editor::Buffer for Buffer<'a> {
     }
 
     fn on_saved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle
@@ -410,7 +410,7 @@ impl editor::Cursor for Cursor<'_> {
     }
 
     fn on_moved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle
@@ -423,7 +423,7 @@ impl editor::Cursor for Cursor<'_> {
     }
 
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle
@@ -472,7 +472,7 @@ impl editor::Selection for Selection<'_> {
     }
 
     fn on_moved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle
@@ -487,7 +487,7 @@ impl editor::Selection for Selection<'_> {
     }
 
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         _: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> mock::EventHandle

@@ -43,7 +43,7 @@ pub trait Buffer {
 
     /// TODO: docs.
     fn on_edited<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
@@ -52,7 +52,7 @@ pub trait Buffer {
 
     /// TODO: docs.
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
@@ -61,7 +61,7 @@ pub trait Buffer {
 
     /// TODO: docs.
     fn on_saved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle

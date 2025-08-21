@@ -37,7 +37,7 @@ impl Event for BufEnter {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
                 let Some(callbacks) = nvim
-                    .events2
+                    .events
                     .on_buffer_focused
                     .as_ref()
                     .map(|cbs| cbs.cloned())
@@ -46,7 +46,7 @@ impl Event for BufEnter {
                 };
 
                 let focused_by = nvim
-                    .events2
+                    .events
                     .agent_ids
                     .focused_buffer
                     .remove(&buffer_id)

@@ -82,7 +82,7 @@ impl Cursor for NeovimCursor<'_> {
 
     #[inline]
     fn on_moved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
@@ -92,8 +92,10 @@ impl Cursor for NeovimCursor<'_> {
         let old_point = Shared::<Point>::new(self.point());
         let fun = Shared::<Fun>::new(fun);
 
+        let buffer_id = self.buffer_id();
+
         let cursor_moved_handle = self.events.insert(
-            events::CursorMoved(self.buffer_id()),
+            events::CursorMoved(buffer_id),
             {
                 let fun = fun.clone();
                 let old_point = old_point.clone();
@@ -106,8 +108,6 @@ impl Cursor for NeovimCursor<'_> {
             },
             nvim.clone(),
         );
-
-        let buffer_id = self.buffer_id();
 
         // The cursor position moves one character to the left when going from
         // normal to insert mode and one character to the right when going
@@ -133,15 +133,16 @@ impl Cursor for NeovimCursor<'_> {
 
     #[inline]
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         mut fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
     where
         Fun: FnMut(BufferId, AgentId) + 'static,
     {
+        let buffer_id = self.buffer_id();
         self.events.insert(
-            events::BufLeave(self.buffer_id()),
+            events::BufLeave(buffer_id),
             move |(buf, unfocused_by)| fun(buf.id(), unfocused_by),
             nvim,
         )

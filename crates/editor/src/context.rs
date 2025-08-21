@@ -92,7 +92,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Ed::EventHandle
     where
-        Fun: FnMut(&Ed::Buffer<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Ed::Buffer<'_>, AgentId) + 'static,
     {
         let editor = self.editor();
         self.with_editor(move |ed| ed.on_buffer_created(fun, editor))
@@ -102,7 +102,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub fn on_cursor_created<Fun>(&mut self, fun: Fun) -> Ed::EventHandle
     where
-        Fun: FnMut(&Ed::Cursor<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Ed::Cursor<'_>, AgentId) + 'static,
     {
         let editor = self.editor();
         self.with_editor(move |ed| ed.on_cursor_created(fun, editor))
@@ -112,7 +112,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub fn on_selection_created<Fun>(&mut self, fun: Fun) -> Ed::EventHandle
     where
-        Fun: FnMut(&Ed::Selection<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Ed::Selection<'_>, AgentId) + 'static,
     {
         let editor = self.editor();
         self.with_editor(move |ed| ed.on_selection_created(fun, editor))

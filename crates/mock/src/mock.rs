@@ -46,7 +46,7 @@ pub(crate) struct Callbacks {
 #[allow(clippy::type_complexity)]
 #[allow(dead_code)]
 pub(crate) enum CallbackKind {
-    BufferCreated(Shared<Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>>),
+    BufferCreated(Shared<Box<dyn FnMut(&mut Buffer<'_>, AgentId) + 'static>>),
     BufferEdited(
         BufferId,
         Shared<Box<dyn FnMut(&Buffer<'_>, &Edit) + 'static>>,
@@ -62,7 +62,7 @@ pub(crate) enum CallbackKind {
         Shared<Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>>,
     ),
     #[allow(dead_code)]
-    CursorCreated(Shared<Box<dyn FnMut(&Cursor<'_>, AgentId) + 'static>>),
+    CursorCreated(Shared<Box<dyn FnMut(&mut Cursor<'_>, AgentId) + 'static>>),
     CursorMoved(
         CursorId,
         Shared<Box<dyn FnMut(&Cursor<'_>, AgentId) + 'static>>,
@@ -74,7 +74,7 @@ pub(crate) enum CallbackKind {
     ),
     #[allow(dead_code)]
     SelectionCreated(
-        Shared<Box<dyn FnMut(&Selection<'_>, AgentId) + 'static>>,
+        Shared<Box<dyn FnMut(&mut Selection<'_>, AgentId) + 'static>>,
     ),
     #[allow(dead_code)]
     SelectionMoved(
@@ -207,7 +207,7 @@ impl Editor for Mock {
                 BufferInner::new(buffer_id, file_path.to_owned(), contents),
             );
 
-            let buffer = this.buffer_mut(buffer_id);
+            let mut buffer = this.buffer_mut(buffer_id);
 
             let on_buffer_created = buffer.callbacks.with(|callbacks| {
                 callbacks
@@ -220,7 +220,7 @@ impl Editor for Mock {
             });
 
             for callback in on_buffer_created {
-                callback.with_mut(|cb| cb(&buffer, agent_id));
+                callback.with_mut(|cb| cb(&mut buffer, agent_id));
             }
 
             Ok(buffer_id)
@@ -270,7 +270,7 @@ impl Editor for Mock {
         _: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Self::Buffer<'_>, AgentId) + 'static,
     {
         self.callbacks
             .insert(CallbackKind::BufferCreated(Shared::new(Box::new(fun))))
@@ -282,7 +282,7 @@ impl Editor for Mock {
         _: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Self::Cursor<'_>, AgentId) + 'static,
     {
         let cb_kind = CallbackKind::CursorCreated(Shared::new(Box::new(fun)));
         self.callbacks.insert(cb_kind)
@@ -294,7 +294,7 @@ impl Editor for Mock {
         _: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Self::Selection<'_>, AgentId) + 'static,
     {
         let cb_kind =
             CallbackKind::SelectionCreated(Shared::new(Box::new(fun)));

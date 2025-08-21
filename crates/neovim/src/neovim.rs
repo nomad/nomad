@@ -4,7 +4,7 @@ use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
 use editor::notify::Namespace;
 use editor::plugin::Plugin;
-use editor::{AccessMut, AgentId, Buffer, Editor, Shared};
+use editor::{AccessMut, AgentId, Buffer, Editor};
 use fs::Fs;
 
 use crate::buffer::{
@@ -25,8 +25,7 @@ use crate::{api, executor, notify, oxi, serde, value};
 pub struct Neovim {
     pub(crate) buffers_state: BuffersState,
     emitter: notify::NeovimEmitter,
-    pub(crate) events: Shared<Events>,
-    pub(crate) events2: Events,
+    pub(crate) events: Events,
     executor: executor::NeovimExecutor,
     reinstate_panic_hook: bool,
 }
@@ -45,12 +44,12 @@ impl Neovim {
             .expect("couldn't create buffer")
             .into();
 
-        if self.events2.contains(&events::BufReadPost) {
-            self.events2.agent_ids.created_buffer.insert(buffer_id, agent_id);
+        if self.events.contains(&events::BufReadPost) {
+            self.events.agent_ids.created_buffer.insert(buffer_id, agent_id);
         }
 
-        if self.events2.contains(&events::BufEnter) {
-            self.events2.agent_ids.focused_buffer.insert(buffer_id, agent_id);
+        if self.events.contains(&events::BufEnter) {
+            self.events.agent_ids.focused_buffer.insert(buffer_id, agent_id);
         }
 
         buffer_id
@@ -96,8 +95,7 @@ impl Neovim {
         let decoration_provider = DecorationProvider::new(augroup_name);
         Self {
             buffers_state: BuffersState::new(decoration_provider),
-            events2: Events::new(augroup_name),
-            events: Shared::new(Events::new(augroup_name)),
+            events: Events::new(augroup_name),
             emitter: Default::default(),
             executor: Default::default(),
             reinstate_panic_hook,
@@ -125,7 +123,7 @@ impl Editor for Neovim {
 
     #[inline]
     fn buffer(&mut self, buf_id: Self::BufferId) -> Option<Self::Buffer<'_>> {
-        NeovimBuffer::new(buf_id, &mut self.events2, &self.buffers_state)
+        NeovimBuffer::new(buf_id, &mut self.events, &self.buffers_state)
     }
 
     #[inline]
@@ -265,11 +263,11 @@ impl Editor for Neovim {
         this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Self::Buffer<'_>, AgentId) + 'static,
     {
-        self.events2.insert(
+        self.events.insert(
             events::BufReadPost,
-            move |(buf, created_by)| fun(buf, created_by),
+            move |(mut buf, created_by)| fun(&mut buf, created_by),
             this,
         )
     }
@@ -281,11 +279,13 @@ impl Editor for Neovim {
         this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Self::Cursor<'_>, AgentId) + 'static,
     {
-        self.events2.insert(
+        self.events.insert(
             events::BufEnter,
-            move |(buf, focused_by)| fun(&NeovimCursor::new(buf), focused_by),
+            move |(buf, focused_by)| {
+                fun(&mut NeovimCursor::new(buf), focused_by)
+            },
             this,
         )
     }
@@ -297,9 +297,9 @@ impl Editor for Neovim {
         this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
-        Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
+        Fun: FnMut(&mut Self::Selection<'_>, AgentId) + 'static,
     {
-        self.events2.insert(
+        self.events.insert(
             events::ModeChanged,
             move |(buf, old_mode, new_mode, changed_by)| {
                 if new_mode.has_selected_range()
@@ -307,7 +307,7 @@ impl Editor for Neovim {
                     // already displaying a selected range.
                     && !old_mode.has_selected_range()
                 {
-                    fun(&NeovimSelection::new(buf), changed_by);
+                    fun(&mut NeovimSelection::new(buf), changed_by);
                 }
             },
             this,

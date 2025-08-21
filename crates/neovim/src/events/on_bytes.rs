@@ -11,7 +11,7 @@ use crate::oxi::{self, api};
 pub(crate) struct OnBytes(pub(crate) BufferId);
 
 impl Event for OnBytes {
-    type Args<'a> = (&'a NeovimBuffer<'a>, &'a Edit);
+    type Args<'a> = (NeovimBuffer<'a>, &'a Edit);
     type Container<'ev> = &'ev mut NoHashMap<BufferId, Callbacks<Self>>;
     type RegisterOutput = ();
 
@@ -41,7 +41,7 @@ impl Event for OnBytes {
         let callback = move |args: api::opts::OnBytesArgs| {
             nvim.with_mut(|nvim| {
                 let Some(callbacks) = nvim
-                    .events2
+                    .events
                     .on_buffer_edited
                     .get(&buffer_id)
                     .map(|cbs| cbs.cloned())
@@ -50,13 +50,13 @@ impl Event for OnBytes {
                 };
 
                 let edited_by = nvim
-                    .events2
+                    .events
                     .agent_ids
                     .edited_buffer
                     .remove(&buffer_id)
                     .unwrap_or(AgentId::UNKNOWN) ;
 
-                let Some(buffer) = nvim.buffer(buffer_id) else {
+                let Some(mut buffer) = nvim.buffer(buffer_id) else {
                     tracing::error!(
                         buffer_name = ?api::Buffer::from(buffer_id).get_name().ok(),
                         "OnBytes triggered for an invalid buffer",
@@ -72,7 +72,7 @@ impl Event for OnBytes {
                 };
 
                 for callback in callbacks {
-                    callback((&buffer, &edit));
+                    callback((buffer.reborrow(), &edit));
                 }
 
                 false

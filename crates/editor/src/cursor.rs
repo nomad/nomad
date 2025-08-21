@@ -23,7 +23,7 @@ pub trait Cursor {
     /// The callback is given a reference to this cursor, plus the [`AgentId`]
     /// of the agent that moved it.
     fn on_moved<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
@@ -36,7 +36,7 @@ pub trait Cursor {
     /// The callback is given this cursor's ID, plus the [`AgentId`] of the
     /// agent that removed it.
     fn on_removed<Fun>(
-        &self,
+        &mut self,
         fun: Fun,
         editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle

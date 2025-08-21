@@ -38,7 +38,7 @@ impl Event for ModeChanged {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
                 let Some(callbacks) = nvim
-                    .events2
+                    .events
                     .on_mode_changed
                     .as_ref()
                     .map(|cbs| cbs.cloned())
