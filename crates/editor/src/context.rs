@@ -321,7 +321,7 @@ impl<Ed: Editor> Context<Ed, NotBorrowed> {
     pub fn block_on<T>(&mut self, fun: impl AsyncFnOnce(&mut Self) -> T) -> T {
         let mut this = Self { borrow: self.borrow.clone() };
         let future = async move { fun(&mut this).await };
-        self.with_editor(|ed| ed.executor().block_on(future))
+        future::block_on(self.with_editor(|ed| ed.executor().run(future)))
     }
 
     /// TODO: docs.
@@ -425,6 +425,7 @@ where
 }
 
 impl<Ed: Editor> Access<Ed> for Context<Ed, NotBorrowed> {
+    #[track_caller]
     #[inline]
     fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
         self.borrow.with(move |state| f(state))
@@ -432,6 +433,7 @@ impl<Ed: Editor> Access<Ed> for Context<Ed, NotBorrowed> {
 }
 
 impl<Ed: Editor> AccessMut<Ed> for Context<Ed, NotBorrowed> {
+    #[track_caller]
     #[inline]
     fn with_mut<T>(&mut self, f: impl FnOnce(&mut Ed) -> T) -> T {
         self.borrow.with_mut(move |state| f(state))
@@ -442,6 +444,7 @@ impl<Ed: Editor, Bs: BorrowState> Access<Ed> for &Context<Ed, Bs>
 where
     Context<Ed, Bs>: Access<Ed>,
 {
+    #[track_caller]
     #[inline]
     fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
         (**self).with(f)
@@ -452,6 +455,7 @@ impl<Ed: Editor, Bs: BorrowState> Access<Ed> for &mut Context<Ed, Bs>
 where
     Context<Ed, Bs>: Access<Ed>,
 {
+    #[track_caller]
     #[inline]
     fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
         (**self).with(f)
@@ -462,6 +466,7 @@ impl<Ed: Editor, Bs: BorrowState> AccessMut<Ed> for &mut Context<Ed, Bs>
 where
     Context<Ed, Bs>: AccessMut<Ed>,
 {
+    #[track_caller]
     #[inline]
     fn with_mut<T>(&mut self, f: impl FnOnce(&mut Ed) -> T) -> T {
         (**self).with_mut(f)
@@ -477,6 +482,7 @@ impl<'a> BorrowState for Borrowed<'a> {
 }
 
 impl<Ed: Editor> Access<State<Ed>> for NotBorrowedInner<Ed> {
+    #[track_caller]
     #[inline]
     fn with<T>(&self, f: impl FnOnce(&State<Ed>) -> T) -> T {
         self.state_handle.with(f)
@@ -484,6 +490,7 @@ impl<Ed: Editor> Access<State<Ed>> for NotBorrowedInner<Ed> {
 }
 
 impl<Ed: Editor> AccessMut<State<Ed>> for NotBorrowedInner<Ed> {
+    #[track_caller]
     #[inline]
     fn with_mut<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
         self.state_handle.with_mut(f)

@@ -19,10 +19,4 @@ pub trait Executor {
 
     /// TODO: docs.
     fn background_spawner(&mut self) -> &mut Self::BackgroundSpawner;
-
-    /// Blocks the current thread until the given future completes.
-    #[inline]
-    fn block_on<T>(&mut self, future: impl Future<Output = T>) -> T {
-        futures_lite::future::block_on(self.run(future))
-    }
 }

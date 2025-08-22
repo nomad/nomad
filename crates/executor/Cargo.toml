@@ -10,7 +10,6 @@ publish.workspace = true
 async-task = ["dep:async-task"]
 
 [dependencies]
-futures-lite = { workspace = true }
 pin-project-lite = { workspace = true }
 
 async-task = { workspace = true, optional = true }
