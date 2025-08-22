@@ -26,9 +26,9 @@ impl TestEditor for neovim::Neovim {
         _: AgentId,
     ) -> Self::BufferId {
         use neovim::oxi::api::{self, opts};
-        use neovim::tests::ContextExt;
+        use neovim::tests::NeovimExt;
 
-        let buf_id = this.scratch_buffer();
+        let buf_id = this.create_scratch_buffer();
 
         // The (fix)eol options mess us the fuzzy edits tests because inserting
         // text when the buffer is empty will also cause a trailing \n to be

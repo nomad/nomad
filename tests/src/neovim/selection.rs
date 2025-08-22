@@ -3,12 +3,14 @@ use core::time::Duration;
 use editor::Context;
 use futures_util::{FutureExt, StreamExt, select_biased};
 use neovim::Neovim;
-use neovim::tests::ContextExt;
+use neovim::tests::NeovimExt;
 
 use crate::editor::selection::SelectionEvent;
 
 #[neovim::test]
 async fn charwise_simple(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("ihello<Esc>b");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -25,6 +27,8 @@ async fn charwise_simple(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn charwise_past_eof(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello<Esc>0");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -45,6 +49,8 @@ async fn charwise_past_eof(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn charwise_past_eol(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello<CR>World<Esc>0<Up>");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -69,6 +75,8 @@ async fn charwise_past_eol(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn charwise_multibyte(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("i🦀ƒoo🐤<Esc>0");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -91,6 +99,8 @@ async fn charwise_multibyte(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn charwise_to_linewise_to_charwise(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello<CR>World<Esc><Left>");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -116,6 +126,8 @@ async fn charwise_to_linewise_to_charwise(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn charwise_to_blockwise_to_charwise(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello<CR>World<Esc><Left>");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -142,6 +154,8 @@ async fn charwise_to_blockwise_to_charwise(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn linewise_simple(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello<Esc>2<Left>");
 
     let mut events = SelectionEvent::new_stream(ctx);
@@ -155,6 +169,8 @@ async fn linewise_simple(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn blockwise_is_ignored(ctx: &mut Context<Neovim>) {
+    ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello<CR>2<Left>");
 
     let mut events = SelectionEvent::new_stream(ctx);

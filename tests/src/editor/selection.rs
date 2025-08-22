@@ -12,8 +12,7 @@ pub(crate) enum SelectionEvent {
 }
 
 impl SelectionEvent {
-    /// Returns a never-ending [`Stream`] of [`SelectionEvent`]s on the current
-    /// buffer.
+    /// Returns a never-ending [`Stream`] of [`SelectionEvent`]s.
     #[track_caller]
     pub(crate) fn new_stream<Ed: Editor>(
         ctx: &mut Context<Ed>,

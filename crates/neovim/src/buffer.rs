@@ -758,15 +758,9 @@ impl<'a> NeovimBuffer<'a> {
 }
 
 impl BufferId {
-    /// Returns the underlying buffer number of this [`BufferId`].
-    #[inline]
-    pub fn bufnr(self) -> u32 {
-        self.0 as u32
-    }
-
     /// Returns the [`BufferId`] of the currently focused buffer.
     #[inline]
-    pub fn of_focused() -> Self {
+    pub(crate) fn of_focused() -> Self {
         Self::new(api::Buffer::current())
     }
 

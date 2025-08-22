@@ -112,8 +112,7 @@ pub(crate) struct CursorMovement<Ed: Editor> {
 }
 
 impl<Ed: Editor> CursorEvent<Ed> {
-    /// Returns a never-ending [`Stream`] of [`CursorEvent`]s on the current
-    /// buffer.
+    /// Returns a never-ending [`Stream`] of [`CursorEvent`]s.
     #[track_caller]
     pub(crate) fn new_stream(
         ctx: &mut Context<Ed>,
@@ -144,7 +143,7 @@ impl<Ed: Editor> CursorEvent<Ed> {
 
             let tx2 = tx.clone();
             mem::forget(cursor.on_removed(
-                move |_selection_id, removed_by| {
+                move |_cursor_id, removed_by| {
                     let event = Self::Removed(removed_by);
                     let _ = tx2.send(event);
                 },

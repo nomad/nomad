@@ -5,9 +5,8 @@ use futures_util::future::FutureExt;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;
 use neovim::Neovim;
-use neovim::buffer::BufferId;
 use neovim::oxi::api::{self, opts};
-use neovim::tests::ContextExt;
+use neovim::tests::NeovimExt;
 
 use crate::editor::buffer::EditExt;
 
@@ -17,9 +16,9 @@ async fn deleting_trailing_newline_is_like_unsetting_eol(
 ) {
     let agent_id = ctx.new_agent_id();
 
-    ctx.feedkeys("iHello");
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
-    let buffer_id = BufferId::of_focused();
+    ctx.feedkeys("iHello");
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
@@ -45,9 +44,9 @@ async fn inserting_after_trailing_newline_unsets_eol(
 ) {
     let agent_id = ctx.new_agent_id();
 
-    ctx.feedkeys("iHello");
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
-    let buffer_id = BufferId::of_focused();
+    ctx.feedkeys("iHello");
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
@@ -73,9 +72,9 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
 ) {
     let agent_id = ctx.new_agent_id();
 
-    ctx.feedkeys("iHello");
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
-    let buffer_id = BufferId::of_focused();
+    ctx.feedkeys("iHello");
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
@@ -104,9 +103,9 @@ async fn replacement_including_trailing_newline_unsets_eol(
 ) {
     let agent_id = ctx.new_agent_id();
 
-    ctx.feedkeys("iHello");
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
-    let buffer_id = BufferId::of_focused();
+    ctx.feedkeys("iHello");
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
@@ -130,7 +129,7 @@ async fn replacement_including_trailing_newline_unsets_eol(
 async fn unsetting_eol_is_like_deleting_trailing_newline(
     ctx: &mut Context<Neovim>,
 ) {
-    let buffer_id = BufferId::of_focused();
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
     // Eol is only relevant in non-empty buffers.
     ctx.feedkeys("iHello");
@@ -151,7 +150,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
 async fn setting_eol_is_like_inserting_trailing_newline(
     ctx: &mut Context<Neovim>,
 ) {
-    let buffer_id = BufferId::of_focused();
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
     // Eol is only relevant in non-empty buffers.
     ctx.feedkeys("iHello");
@@ -176,7 +175,7 @@ async fn inserting_in_empty_buf_with_eol_causes_newline_insertion(
 ) {
     let agent_id = ctx.new_agent_id();
 
-    let buffer_id = BufferId::of_focused();
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
@@ -200,9 +199,9 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
 ) {
     let agent_id = ctx.new_agent_id();
 
-    ctx.feedkeys("iHello");
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
 
-    let buffer_id = BufferId::of_focused();
+    ctx.feedkeys("iHello");
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
@@ -223,8 +222,10 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
 
 #[neovim::test]
 fn grapheme_offsets_empty(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     let mut offsets = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .grapheme_offsets()
             .collect::<Vec<_>>()
@@ -236,10 +237,12 @@ fn grapheme_offsets_empty(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 fn grapheme_offsets_ascii(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello");
 
     let mut offsets = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .grapheme_offsets()
             .collect::<Vec<_>>()
@@ -257,10 +260,12 @@ fn grapheme_offsets_ascii(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 fn grapheme_offsets_multiline(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("ifoo<CR>bar");
 
     let mut offsets = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .grapheme_offsets()
             .collect::<Vec<_>>()
@@ -280,10 +285,12 @@ fn grapheme_offsets_multiline(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 fn grapheme_offsets_multibyte_chars(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("i🦆🦀🐎🦖🐤");
 
     let mut offsets = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .grapheme_offsets()
             .collect::<Vec<_>>()
@@ -301,11 +308,13 @@ fn grapheme_offsets_multibyte_chars(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 fn grapheme_offsets_multichar_graphemes(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     // Polar bear is 13 bytes, scientist is 11.
     ctx.feedkeys("i🐻‍❄️🧑‍🔬");
 
     let mut offsets = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .grapheme_offsets()
             .collect::<Vec<_>>()
@@ -320,11 +329,13 @@ fn grapheme_offsets_multichar_graphemes(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 fn grapheme_offsets_start_from_middle_of_grapheme(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     // Polar bear is 13 bytes, scientist is 11.
     ctx.feedkeys("i🐻‍❄️🧑‍🔬");
 
     let mut offsets = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             // Start between the ZWJ and the snowflake emoji.
             .grapheme_offsets_from(7)
@@ -340,8 +351,10 @@ fn grapheme_offsets_start_from_middle_of_grapheme(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 fn highlight_ranges_empty(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     let mut ranges = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .highlight_ranges()
             .collect::<Vec<_>>()
@@ -354,18 +367,18 @@ fn highlight_ranges_empty(ctx: &mut Context<Neovim>) {
 #[neovim::test]
 #[ignore = "nvim_buf_get_extmarks() doesn't include ephemeral extmarks"]
 fn highlight_range_simple(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello");
 
     let _hl_range_handle = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
-            .unwrap()
-            .highlight_range(0..5, "Normal")
+        ctx.buffer(buffer_id).unwrap().highlight_range(0..5, "Normal")
     });
 
     ctx.redraw();
 
     let mut ranges = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .highlight_ranges()
             .collect::<Vec<_>>()
@@ -382,18 +395,18 @@ fn highlight_range_simple(ctx: &mut Context<Neovim>) {
 #[neovim::test]
 #[ignore = "nvim_buf_get_extmarks() doesn't include ephemeral extmarks"]
 fn highlight_range_including_eol(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello");
 
     let _hl_range_handle = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
-            .unwrap()
-            .highlight_range(0..6, "Normal")
+        ctx.buffer(buffer_id).unwrap().highlight_range(0..6, "Normal")
     });
 
     ctx.redraw();
 
     let mut ranges = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
+        ctx.buffer(buffer_id)
             .unwrap()
             .highlight_ranges()
             .collect::<Vec<_>>()
@@ -412,22 +425,19 @@ fn highlight_range_including_eol(ctx: &mut Context<Neovim>) {
 fn highlight_range_is_removed_when_handle_is_dropped(
     ctx: &mut Context<Neovim>,
 ) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
     ctx.feedkeys("iHello");
 
     let hl_range_handle = ctx.with_borrowed(|ctx| {
-        ctx.buffer(BufferId::of_focused())
-            .unwrap()
-            .highlight_range(0..5, "Normal")
+        ctx.buffer(buffer_id).unwrap().highlight_range(0..5, "Normal")
     });
 
     ctx.redraw();
 
     ctx.with_borrowed(|ctx| {
-        let num_ranges = ctx
-            .buffer(BufferId::of_focused())
-            .unwrap()
-            .highlight_ranges()
-            .count();
+        let num_ranges =
+            ctx.buffer(buffer_id).unwrap().highlight_ranges().count();
 
         assert_eq!(num_ranges, 1);
     });
@@ -437,11 +447,8 @@ fn highlight_range_is_removed_when_handle_is_dropped(
     ctx.redraw();
 
     ctx.with_borrowed(|ctx| {
-        let num_ranges = ctx
-            .buffer(BufferId::of_focused())
-            .unwrap()
-            .highlight_ranges()
-            .count();
+        let num_ranges =
+            ctx.buffer(buffer_id).unwrap().highlight_ranges().count();
 
         assert_eq!(num_ranges, 0);
     });

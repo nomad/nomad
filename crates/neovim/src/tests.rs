@@ -1,16 +1,41 @@
 //! TODO: docs.
 
-use editor::{AccessMut, AgentId, Buffer, Context};
+use editor::{AccessMut, AgentId, Buffer, Context, Editor};
 
 use crate::Neovim;
 use crate::buffer::BufferId;
 use crate::oxi::api;
 
 /// TODO: docs.
-pub trait ContextExt: AccessMut<Neovim> {
+pub trait NeovimExt: AccessMut<Neovim> {
     /// TODO: docs.
     fn cmd(&self, cmd: &str) {
         api::command(cmd).expect("couldn't execute command");
+    }
+
+    /// TODO: docs..
+    fn create_scratch_buffer(&mut self) -> BufferId {
+        self.with_mut(|nvim| {
+            let scratch_buf_count = nvim.scratch_buffer_count;
+            let file_name = format!("scratch-{scratch_buf_count}");
+            nvim.scratch_buffer_count += 1;
+            let file_path: abs_path::AbsPathBuf = std::env::temp_dir()
+                .join(file_name)
+                .try_into()
+                .expect("it's valid");
+            nvim.create_buffer(&file_path, AgentId::UNKNOWN).id()
+        })
+    }
+
+    /// TODO: docs..
+    fn create_and_focus_scratch_buffer(&mut self) -> BufferId {
+        let buffer_id = self.create_scratch_buffer();
+        self.with_mut(|nvim| {
+            nvim.buffer(buffer_id)
+                .expect("just created the buffer")
+                .focus(AgentId::UNKNOWN)
+        });
+        buffer_id
     }
 
     /// Enters insert mode as if "i" was typed in normal mode.
@@ -40,23 +65,9 @@ pub trait ContextExt: AccessMut<Neovim> {
     fn redraw(&self) {
         self.cmd("redraw");
     }
-
-    /// TODO: docs..
-    fn scratch_buffer(&mut self) -> BufferId {
-        self.with_mut(|nvim| {
-            let scratch_buf_count = nvim.scratch_buffer_count;
-            let file_name = format!("scratch-{scratch_buf_count}");
-            nvim.scratch_buffer_count += 1;
-            let file_path: abs_path::AbsPathBuf = std::env::temp_dir()
-                .join(file_name)
-                .try_into()
-                .expect("it's valid");
-            nvim.create_buffer(&file_path, AgentId::UNKNOWN).id()
-        })
-    }
 }
 
-impl<T: AccessMut<Neovim>> ContextExt for T {}
+impl<T: AccessMut<Neovim>> NeovimExt for T {}
 
 #[doc(hidden)]
 pub mod test_macro {
