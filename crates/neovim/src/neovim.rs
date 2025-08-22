@@ -40,33 +40,12 @@ pub struct Neovim {
 
     /// TODO: docs.
     reinstate_panic_hook: bool,
+
+    #[cfg(feature = "test")]
+    pub(crate) scratch_buffer_count: u32,
 }
 
 impl Neovim {
-    /// Same as [`oxi::api::create_buf`], but keeps track of the [`AgentId`]
-    /// that created the buffer.
-    #[inline]
-    pub fn create_buf(
-        &mut self,
-        is_listed: bool,
-        is_scratch: bool,
-        agent_id: AgentId,
-    ) -> BufferId {
-        let buffer_id = oxi::api::create_buf(is_listed, is_scratch)
-            .expect("couldn't create buffer")
-            .into();
-
-        if self.events.contains(&events::BufReadPost) {
-            self.events.agent_ids.created_buffer.insert(buffer_id, agent_id);
-        }
-
-        if self.events.contains(&events::BufEnter) {
-            self.events.agent_ids.focused_buffer.insert(buffer_id, agent_id);
-        }
-
-        buffer_id
-    }
-
     /// TODO: docs.
     #[inline]
     pub fn highlight_range<'a>(
@@ -97,6 +76,30 @@ impl Neovim {
         Self::new_inner(augroup_name, false)
     }
 
+    #[inline]
+    pub(crate) fn create_buffer(
+        &mut self,
+        file_path: &AbsPath,
+        agent_id: AgentId,
+    ) -> NeovimBuffer<'_> {
+        let mut buffer =
+            oxi::api::create_buf(true, false).expect("couldn't create buffer");
+
+        buffer.set_name(file_path).expect("couldn't set name");
+
+        let buffer_id = BufferId::new(buffer);
+
+        if self.events.contains(&events::BufReadPost) {
+            self.events.agent_ids.created_buffer.insert(buffer_id, agent_id);
+        }
+
+        if self.events.contains(&events::BufEnter) {
+            self.events.agent_ids.focused_buffer.insert(buffer_id, agent_id);
+        }
+
+        self.buffer(buffer_id).expect("just created the buffer")
+    }
+
     #[cfg(feature = "test")]
     pub(crate) fn new_test(augroup_name: &str) -> Self {
         Self::new_inner(augroup_name, true)
@@ -111,6 +114,8 @@ impl Neovim {
             emitter: Default::default(),
             executor: Default::default(),
             reinstate_panic_hook,
+            #[cfg(feature = "test")]
+            scratch_buffer_count: 0,
         }
     }
 }
@@ -198,9 +203,7 @@ impl Editor for Neovim {
         };
 
         this.with_mut(|this| {
-            let buf_id = this.create_buf(true, false, agent_id);
-
-            let mut buffer = this.buffer(buf_id).expect("just created");
+            let mut buffer = this.create_buffer(file_path, agent_id);
 
             // 'eol' is turned on by default, so avoid inserting the file's
             // trailing newline or we'll get an extra line.
@@ -217,8 +220,6 @@ impl Editor for Neovim {
                     agent_id,
                 );
             }
-
-            buffer.inner().set_name(file_path).expect("couldn't set name");
 
             // TODO: do we have to set the buffer's filetype?
             // vim.filetype.match(buffer.inner())

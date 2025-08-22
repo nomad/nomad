@@ -1,12 +1,13 @@
 //! TODO: docs.
 
-use editor::{BorrowState, Context};
+use editor::{AccessMut, AgentId, Buffer, Context};
 
 use crate::Neovim;
+use crate::buffer::BufferId;
 use crate::oxi::api;
 
 /// TODO: docs.
-pub trait ContextExt {
+pub trait ContextExt: AccessMut<Neovim> {
     /// TODO: docs.
     fn cmd(&self, cmd: &str) {
         api::command(cmd).expect("couldn't execute command");
@@ -39,9 +40,23 @@ pub trait ContextExt {
     fn redraw(&self) {
         self.cmd("redraw");
     }
+
+    /// TODO: docs..
+    fn scratch_buffer(&mut self) -> BufferId {
+        self.with_mut(|nvim| {
+            let scratch_buf_count = nvim.scratch_buffer_count;
+            let file_name = format!("scratch-{scratch_buf_count}");
+            nvim.scratch_buffer_count += 1;
+            let file_path: abs_path::AbsPathBuf = std::env::temp_dir()
+                .join(file_name)
+                .try_into()
+                .expect("it's valid");
+            nvim.create_buffer(&file_path, AgentId::UNKNOWN).id()
+        })
+    }
 }
 
-impl<Bs: BorrowState> ContextExt for editor::Context<Neovim, Bs> {}
+impl<T: AccessMut<Neovim>> ContextExt for T {}
 
 #[doc(hidden)]
 pub mod test_macro {

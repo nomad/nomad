@@ -23,22 +23,21 @@ pub(crate) trait ContextExt<Ed: TestEditor> {
 impl TestEditor for neovim::Neovim {
     async fn create_scratch_buffer(
         mut this: impl AccessMut<Self>,
-        agent_id: AgentId,
+        _: AgentId,
     ) -> Self::BufferId {
         use neovim::oxi::api::{self, opts};
+        use neovim::tests::ContextExt;
 
-        let buffer_id =
-            this.with_mut(|nvim| nvim.create_buf(true, true, agent_id));
+        let buf_id = this.scratch_buffer();
 
         // The (fix)eol options mess us the fuzzy edits tests because inserting
         // text when the buffer is empty will also cause a trailing \n to be
         // inserted, so unset them.
-        let opts =
-            opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+        let opts = opts::OptionOpts::builder().buffer(buf_id.into()).build();
         api::set_option_value::<bool>("eol", false, &opts).unwrap();
         api::set_option_value::<bool>("fixeol", false, &opts).unwrap();
 
-        buffer_id
+        buf_id
     }
 }
 
@@ -48,7 +47,7 @@ impl TestEditor for mock::Mock {
         agent_id: AgentId,
     ) -> Self::BufferId {
         let scratch_file_path = |num_scratch: u32| {
-            let file_name = format!("scratch-{num_scratch}.txt")
+            let file_name = format!("scratch-{num_scratch}")
                 .parse::<abs_path::NodeNameBuf>()
                 .expect("it's valid");
             abs_path::AbsPathBuf::root().join(&file_name)
