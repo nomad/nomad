@@ -17,11 +17,6 @@ pub trait Buffer {
     fn byte_len(&self) -> ByteOffset;
 
     /// TODO: docs.
-    fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
-    where
-        R: IntoIterator<Item = Replacement>;
-
-    /// TODO: docs.
     fn get_text(&self, byte_range: Range<ByteOffset>) -> impl Chunks;
 
     /// TODO: docs.
@@ -32,9 +27,6 @@ pub trait Buffer {
     fn is_empty(&self) -> bool {
         self.byte_len() == 0
     }
-
-    /// TODO: docs.
-    fn focus(&mut self, agent_id: AgentId);
 
     /// TODO: docs.
     fn for_each_cursor<Fun>(&mut self, fun: Fun)
@@ -72,7 +64,15 @@ pub trait Buffer {
     fn path(&self) -> Cow<'_, AbsPath>;
 
     /// TODO: docs.
-    fn save(
+    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    where
+        R: IntoIterator<Item = Replacement>;
+
+    /// TODO: docs.
+    fn schedule_focus(&mut self, agent_id: AgentId);
+
+    /// TODO: docs.
+    fn schedule_save(
         &mut self,
         agent_id: AgentId,
     ) -> Result<(), <Self::Editor as Editor>::BufferSaveError>;

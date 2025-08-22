@@ -234,61 +234,12 @@ impl<'a> editor::Buffer for Buffer<'a> {
         self.contents.len()
     }
 
-    fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
-    where
-        R: IntoIterator<Item = Replacement>,
-    {
-        let edit = Edit {
-            made_by: agent_id,
-            replacements: replacements.into_iter().collect(),
-        };
-
-        for replacement in &edit.replacements {
-            self.contents.replace_range(
-                replacement.removed_range(),
-                replacement.inserted_text(),
-            );
-            for cursor in self.cursors.values_mut() {
-                cursor.react_to_replacement(replacement);
-            }
-            for selection in self.selections.values_mut() {
-                selection.react_to_replacement(replacement);
-            }
-        }
-
-        let on_buffer_edited = self.callbacks.with(|callbacks| {
-            callbacks
-                .values()
-                .filter_map(|cb_kind| match cb_kind {
-                    CallbackKind::BufferEdited(buf_id, fun)
-                        if *buf_id == self.id() =>
-                    {
-                        Some(fun.clone())
-                    },
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-        });
-
-        for callback in on_buffer_edited {
-            callback.with_mut(|cb| cb(self, &edit));
-        }
-    }
-
     fn get_text(&self, byte_range: Range<ByteOffset>) -> impl Chunks {
         &self.contents[byte_range]
     }
 
     fn id(&self) -> BufferId {
         self.id
-    }
-
-    fn focus(&mut self, agent_id: AgentId) {
-        *self.current_buffer = Some(self.id);
-
-        if self.cursors.is_empty() {
-            self.create_cursor(0, agent_id);
-        }
     }
 
     fn for_each_cursor<Fun>(&mut self, mut fun: Fun)
@@ -350,7 +301,56 @@ impl<'a> editor::Buffer for Buffer<'a> {
         Cow::Borrowed(&self.file_path)
     }
 
-    fn save(
+    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    where
+        R: IntoIterator<Item = Replacement>,
+    {
+        let edit = Edit {
+            made_by: agent_id,
+            replacements: replacements.into_iter().collect(),
+        };
+
+        for replacement in &edit.replacements {
+            self.contents.replace_range(
+                replacement.removed_range(),
+                replacement.inserted_text(),
+            );
+            for cursor in self.cursors.values_mut() {
+                cursor.react_to_replacement(replacement);
+            }
+            for selection in self.selections.values_mut() {
+                selection.react_to_replacement(replacement);
+            }
+        }
+
+        let on_buffer_edited = self.callbacks.with(|callbacks| {
+            callbacks
+                .values()
+                .filter_map(|cb_kind| match cb_kind {
+                    CallbackKind::BufferEdited(buf_id, fun)
+                        if *buf_id == self.id() =>
+                    {
+                        Some(fun.clone())
+                    },
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        });
+
+        for callback in on_buffer_edited {
+            callback.with_mut(|cb| cb(self, &edit));
+        }
+    }
+
+    fn schedule_focus(&mut self, agent_id: AgentId) {
+        *self.current_buffer = Some(self.id);
+
+        if self.cursors.is_empty() {
+            self.create_cursor(0, agent_id);
+        }
+    }
+
+    fn schedule_save(
         &mut self,
         _agent_id: AgentId,
     ) -> Result<(), <Self::Editor as editor::Editor>::BufferSaveError> {
@@ -387,7 +387,7 @@ impl editor::Cursor for Cursor<'_> {
         self.cursor_id
     }
 
-    fn r#move(&mut self, offset: ByteOffset, agent_id: AgentId) {
+    fn schedule_move(&mut self, offset: ByteOffset, agent_id: AgentId) {
         self.offset = offset;
 
         let on_cursor_moved = self.buffer.callbacks.with(|callbacks| {

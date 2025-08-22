@@ -40,7 +40,9 @@ pub(crate) async fn on_cursor_created_2(ctx: &mut Context<impl TestEditor>) {
     let mut events = CursorEvent::new_stream(ctx);
 
     // Focusing the buffer again shouldn't do anything.
-    ctx.with_borrowed(|ctx| ctx.buffer(scratch1_id).unwrap().focus(agent_id));
+    ctx.with_borrowed(|ctx| {
+        ctx.buffer(scratch1_id).unwrap().schedule_focus(agent_id)
+    });
 
     // Now create and focus a second buffer, which should create a cursor.
     let scratch2_id = ctx.create_and_focus_scratch_buffer(agent_id).await;
@@ -63,7 +65,10 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
-        buf.edit([Replacement::insertion(0, "Hello world")], agent_id);
+        buf.schedule_edit(
+            [Replacement::insertion(0, "Hello world")],
+            agent_id,
+        );
     });
 
     // Drain the event stream.
@@ -76,7 +81,7 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
         buf.for_each_cursor(|mut cursor| {
-            cursor.r#move(5, agent_id);
+            cursor.schedule_move(5, agent_id);
         });
     });
 

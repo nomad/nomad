@@ -276,14 +276,6 @@ impl<'a, Ed: EditorAdapter> Buffer for BufferAdapter<'a, Ed> {
     }
 
     #[inline]
-    fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
-    where
-        R: IntoIterator<Item = crate::Replacement>,
-    {
-        self.inner.edit(replacements, agent_id);
-    }
-
-    #[inline]
     fn get_text(
         &self,
         byte_range: std::ops::Range<crate::ByteOffset>,
@@ -294,11 +286,6 @@ impl<'a, Ed: EditorAdapter> Buffer for BufferAdapter<'a, Ed> {
     #[inline]
     fn id(&self) -> <Self::Editor as Editor>::BufferId {
         self.inner.id()
-    }
-
-    #[inline]
-    fn focus(&mut self, agent_id: AgentId) {
-        self.inner.focus(agent_id);
     }
 
     #[inline]
@@ -369,11 +356,24 @@ impl<'a, Ed: EditorAdapter> Buffer for BufferAdapter<'a, Ed> {
     }
 
     #[inline]
-    fn save(
+    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    where
+        R: IntoIterator<Item = crate::Replacement>,
+    {
+        self.inner.schedule_edit(replacements, agent_id);
+    }
+
+    #[inline]
+    fn schedule_focus(&mut self, agent_id: AgentId) {
+        self.inner.schedule_focus(agent_id);
+    }
+
+    #[inline]
+    fn schedule_save(
         &mut self,
         agent_id: AgentId,
     ) -> Result<(), <Self::Editor as Editor>::BufferSaveError> {
-        self.inner.save(agent_id)
+        self.inner.schedule_save(agent_id)
     }
 }
 
@@ -396,8 +396,8 @@ impl<'a, Ed: EditorAdapter> Cursor for CursorAdapter<'a, Ed> {
     }
 
     #[inline]
-    fn r#move(&mut self, offset: crate::ByteOffset, agent_id: AgentId) {
-        self.inner.r#move(offset, agent_id);
+    fn schedule_move(&mut self, offset: crate::ByteOffset, agent_id: AgentId) {
+        self.inner.schedule_move(offset, agent_id);
     }
 
     #[inline]

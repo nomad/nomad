@@ -835,36 +835,6 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     }
 
     #[inline]
-    fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
-    where
-        R: IntoIterator<Item = Replacement>,
-    {
-        let buffer_id = self.id;
-
-        for replacement in replacements {
-            if replacement.is_no_op() {
-                continue;
-            }
-
-            if self.events.contains(&events::OnBytes(buffer_id)) {
-                self.events
-                    .agent_ids
-                    .edited_buffer
-                    .insert(buffer_id, agent_id);
-            }
-
-            let range = replacement.removed_range();
-            let deletion_start = self.point_of_byte(range.start);
-            let deletion_end = self.point_of_byte(range.end);
-            self.replace_text_in_point_range(
-                deletion_start..deletion_end,
-                replacement.inserted_text(),
-                agent_id,
-            );
-        }
-    }
-
-    #[inline]
     fn get_text(&self, byte_range: Range<ByteOffset>) -> impl Chunks {
         let start = self.point_of_byte(byte_range.start);
         let end = self.point_of_byte(byte_range.end);
@@ -874,13 +844,6 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     #[inline]
     fn id(&self) -> BufferId {
         self.id
-    }
-
-    #[inline]
-    fn focus(&mut self, _agent_id: AgentId) {
-        api::Window::current()
-            .set_buf(&self.inner())
-            .expect("buffer is valid");
     }
 
     #[inline]
@@ -1036,7 +999,44 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     }
 
     #[inline]
-    fn save(
+    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    where
+        R: IntoIterator<Item = Replacement>,
+    {
+        let buffer_id = self.id;
+
+        for replacement in replacements {
+            if replacement.is_no_op() {
+                continue;
+            }
+
+            if self.events.contains(&events::OnBytes(buffer_id)) {
+                self.events
+                    .agent_ids
+                    .edited_buffer
+                    .insert(buffer_id, agent_id);
+            }
+
+            let range = replacement.removed_range();
+            let deletion_start = self.point_of_byte(range.start);
+            let deletion_end = self.point_of_byte(range.end);
+            self.replace_text_in_point_range(
+                deletion_start..deletion_end,
+                replacement.inserted_text(),
+                agent_id,
+            );
+        }
+    }
+
+    #[inline]
+    fn schedule_focus(&mut self, _agent_id: AgentId) {
+        api::Window::current()
+            .set_buf(&self.inner())
+            .expect("buffer is valid");
+    }
+
+    #[inline]
+    fn schedule_save(
         &mut self,
         _agent_id: AgentId,
     ) -> Result<(), <Self::Editor as editor::Editor>::BufferSaveError> {

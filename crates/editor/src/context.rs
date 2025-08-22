@@ -229,7 +229,7 @@ where
         let buffer_id = self.create_buffer(file_path, agent_id).await?;
         self.with_editor(|ed| {
             if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
-                buffer.focus(agent_id);
+                buffer.schedule_focus(agent_id);
             }
         });
         Ok(buffer_id)

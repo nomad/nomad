@@ -14,9 +14,6 @@ pub trait Cursor {
     /// Returns the cursor's ID.
     fn id(&self) -> <Self::Editor as Editor>::CursorId;
 
-    /// TODO: docs.
-    fn r#move(&mut self, offset: ByteOffset, agent_id: AgentId);
-
     /// Registers the given callback to be executed every time the cursor is
     /// moved.
     ///
@@ -42,4 +39,7 @@ pub trait Cursor {
     ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(<Self::Editor as Editor>::CursorId, AgentId) + 'static;
+
+    /// TODO: docs.
+    fn schedule_move(&mut self, offset: ByteOffset, agent_id: AgentId);
 }

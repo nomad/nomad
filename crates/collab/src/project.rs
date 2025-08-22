@@ -418,7 +418,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         ctx.with_borrowed(|ctx| {
             let mut buffer = ctx.buffer(buf_id).expect("invalid buffer ID");
             if Ed::should_remote_save_cause_local_save(&buffer) {
-                buffer.save(agent_id)
+                buffer.schedule_save(agent_id)
             } else {
                 Ok(())
             }
@@ -606,7 +606,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         };
 
         ctx.with_borrowed(|ctx| {
-            ctx.buffer(buffer_id).expect("buffer exists").edit(
+            ctx.buffer(buffer_id).expect("buffer exists").schedule_edit(
                 replacements.into_iter().map(Convert::convert),
                 agent_id,
             );

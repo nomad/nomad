@@ -33,7 +33,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
         self.with_mut(|nvim| {
             nvim.buffer(buffer_id)
                 .expect("just created the buffer")
-                .focus(AgentId::UNKNOWN)
+                .schedule_focus(AgentId::UNKNOWN)
         });
         buffer_id
     }

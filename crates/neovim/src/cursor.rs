@@ -58,28 +58,6 @@ impl Cursor for NeovimCursor<'_> {
         self.buffer_id()
     }
 
-    #[track_caller]
-    #[inline]
-    fn r#move(&mut self, offset: ByteOffset, agent_id: AgentId) {
-        debug_assert!(
-            offset <= self.buffer.byte_len(),
-            "offset {offset:?} is past end of buffer, length is {:?}",
-            self.buffer.byte_len()
-        );
-
-        let buffer_id = self.buffer_id();
-
-        if self.events.contains(&events::CursorMoved(buffer_id)) {
-            self.events.agent_ids.moved_cursor.insert(buffer_id, agent_id);
-        }
-
-        let point = self.buffer.point_of_byte(offset);
-
-        api::Window::current()
-            .set_cursor(point.line_idx + 1, point.byte_offset)
-            .expect("couldn't set cursor");
-    }
-
     #[inline]
     fn on_moved<Fun>(
         &mut self,
@@ -146,6 +124,28 @@ impl Cursor for NeovimCursor<'_> {
             move |(buf, unfocused_by)| fun(buf.id(), unfocused_by),
             nvim,
         )
+    }
+
+    #[track_caller]
+    #[inline]
+    fn schedule_move(&mut self, offset: ByteOffset, agent_id: AgentId) {
+        debug_assert!(
+            offset <= self.buffer.byte_len(),
+            "offset {offset:?} is past end of buffer, length is {:?}",
+            self.buffer.byte_len()
+        );
+
+        let buffer_id = self.buffer_id();
+
+        if self.events.contains(&events::CursorMoved(buffer_id)) {
+            self.events.agent_ids.moved_cursor.insert(buffer_id, agent_id);
+        }
+
+        let point = self.buffer.point_of_byte(offset);
+
+        api::Window::current()
+            .set_cursor(point.line_idx + 1, point.byte_offset)
+            .expect("couldn't set cursor");
     }
 }
 
