@@ -3,7 +3,8 @@ use editor::{AccessMut, AgentId, Editor};
 use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
-use crate::oxi::{self, api};
+use crate::oxi::api;
+use crate::utils::CallbackExt;
 
 #[derive(Clone, Copy)]
 pub(crate) struct BufReadPost;
@@ -32,7 +33,7 @@ impl Event for BufReadPost {
         events: &Events,
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
-        let callback = move |args: api::types::AutocmdCallbackArgs| {
+        let callback = (move |args: api::types::AutocmdCallbackArgs| {
             nvim.with_mut(|nvim| {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
@@ -66,13 +67,16 @@ impl Event for BufReadPost {
 
                 false
             })
-        };
+        })
+        .catch_unwind()
+        .map(|maybe_detach| maybe_detach.unwrap_or(true))
+        .into_function();
 
         api::create_autocmd(
             ["BufReadPost"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
-                .callback(oxi::Function::from_fn_mut(callback))
+                .callback(callback)
                 .build(),
         )
         .expect("couldn't create autocmd on BufReadPost")

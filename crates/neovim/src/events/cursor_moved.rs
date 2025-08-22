@@ -5,7 +5,8 @@ use crate::Neovim;
 use crate::buffer::BufferId;
 use crate::cursor::NeovimCursor;
 use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
-use crate::oxi::{self, api};
+use crate::oxi::api;
+use crate::utils::CallbackExt;
 
 #[derive(Clone, Copy)]
 pub(crate) struct CursorMoved(pub(crate) BufferId);
@@ -36,7 +37,7 @@ impl Event for CursorMoved {
         events: &Events,
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
-        let callback = move |args: api::types::AutocmdCallbackArgs| {
+        let callback = (move |args: api::types::AutocmdCallbackArgs| {
             nvim.with_mut(|nvim| {
                 let buffer_id = BufferId::new(args.buffer.clone());
 
@@ -72,7 +73,10 @@ impl Event for CursorMoved {
 
                 false
             })
-        };
+        })
+        .catch_unwind()
+        .map(|maybe_detach| maybe_detach.unwrap_or(true))
+        .into_function();
 
         // Neovim has 3 separate cursor-move-related autocommand events --
         // CursorMoved, CursorMovedI and CursorMovedC -- which are triggered
@@ -86,7 +90,7 @@ impl Event for CursorMoved {
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .buffer(self.0.into())
-                .callback(oxi::Function::from_fn_mut(callback))
+                .callback(callback)
                 .build(),
         )
         .expect("couldn't create autocmd on CursorMoved{I}")

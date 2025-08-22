@@ -146,6 +146,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     }
 
     /// TODO: docs.
+    #[track_caller]
     #[inline]
     pub fn with_editor<T>(&mut self, fun: impl FnOnce(&mut Ed) -> T) -> T {
         self.borrow.with_mut(move |state| fun(state))

@@ -7,6 +7,7 @@ use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
 use crate::option::NeovimOption;
 use crate::oxi::{self, api};
+use crate::utils::CallbackExt;
 
 /// TODO: docs.
 pub(crate) trait WatchedOption: NeovimOption {
@@ -30,7 +31,7 @@ impl<T: NeovimOption> OptionSet<T> {
     where
         F: Fn(bool, &T::Value, &T::Value, &mut Neovim) -> bool + 'static,
     {
-        let callback = move |_: api::types::AutocmdCallbackArgs| {
+        let callback = (move |_: api::types::AutocmdCallbackArgs| {
             let is_local = api::get_vvar::<oxi::String>("option_type")
                 .expect("couldn't get option_type")
                 == "local";
@@ -44,14 +45,17 @@ impl<T: NeovimOption> OptionSet<T> {
             nvim.with_mut(|nvim| {
                 on_option_set(is_local, &old_value, &new_value, nvim)
             })
-        };
+        })
+        .catch_unwind()
+        .map(|maybe_detach| maybe_detach.unwrap_or(true))
+        .into_function();
 
         api::create_autocmd(
             ["OptionSet"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .patterns([T::LONG_NAME])
-                .callback(oxi::Function::from_fn_mut(callback))
+                .callback(callback)
                 .build(),
         )
         .expect("couldn't create autocmd on OptionSet")

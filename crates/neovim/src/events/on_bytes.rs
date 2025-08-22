@@ -5,7 +5,8 @@ use smallvec::smallvec_inline;
 use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{Callbacks, Event, EventKind, Events};
-use crate::oxi::{self, api};
+use crate::oxi::api;
+use crate::utils::CallbackExt;
 
 #[derive(Clone, Copy)]
 pub(crate) struct OnBytes(pub(crate) BufferId);
@@ -38,7 +39,7 @@ impl Event for OnBytes {
     ) {
         let buffer_id = self.0;
 
-        let callback = move |args: api::opts::OnBytesArgs| {
+        let callback = (move |args: api::opts::OnBytesArgs| {
             nvim.with_mut(|nvim| {
                 let Some(callbacks) = nvim
                     .events
@@ -77,13 +78,16 @@ impl Event for OnBytes {
 
                 false
             })
-        };
+        })
+        .catch_unwind()
+        .map(|maybe_detach| maybe_detach.unwrap_or(true))
+        .into_function();
 
         api::Buffer::from(buffer_id)
             .attach(
                 false,
                 &api::opts::BufAttachOpts::builder()
-                    .on_bytes(oxi::Function::from_fn_mut(callback))
+                    .on_bytes(callback)
                     .build(),
             )
             .expect("couldn't attach to buffer");

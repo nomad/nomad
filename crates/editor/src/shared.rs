@@ -296,12 +296,16 @@ impl<T: fmt::Debug + ?Sized, Access: SharedAccess> fmt::Debug
 }
 
 impl<T: ?Sized, A: SharedAccess> crate::Access<T> for Shared<T, A> {
+    #[track_caller]
+    #[inline]
     fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
         Self::with(self, fun)
     }
 }
 
 impl<T: ?Sized, A: SharedAccess> crate::AccessMut<T> for Shared<T, A> {
+    #[track_caller]
+    #[inline]
     fn with_mut<R>(&mut self, fun: impl FnOnce(&mut T) -> R) -> R {
         Self::with_mut(self, fun)
     }
