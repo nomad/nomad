@@ -13,7 +13,6 @@ use crate::buffer::{
     HighlightRange,
     HighlightRangeHandle,
     NeovimBuffer,
-    Point,
 };
 use crate::buffer_ext::BufferExt;
 use crate::cursor::NeovimCursor;
@@ -227,11 +226,9 @@ impl Editor for Neovim {
             };
 
             if !contents.is_empty() {
-                buffer.replace_text_in_point_range(
-                    Point::zero()..Point::zero(),
-                    contents,
-                    agent_id,
-                );
+                buffer
+                    .set_text(0..0, 0, 0, contents.lines())
+                    .expect("couldn't set buffer text");
             }
 
             // TODO: do we have to set the buffer's filetype?

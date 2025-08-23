@@ -90,8 +90,7 @@ pub(crate) struct AgentIds {
     pub(crate) saved_buffer: NoHashMap<BufferId, AgentId>,
 
     /// TODO: docs.
-    pub(crate) set_uneditable_eol:
-        events::set_uneditable_eol::SetUneditableEolAgentIds,
+    pub(crate) set_uneditable_eol: events::SetUneditableEolAgentIds,
 }
 
 /// Groups the callbacks registered for a specific event type.

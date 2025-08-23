@@ -22,7 +22,10 @@ pub(crate) use events::{Callbacks, EventHandle, EventKind, Events};
 pub(crate) use mode_changed::ModeChanged;
 pub(crate) use on_bytes::OnBytes;
 pub(crate) use option_set::OptionSet;
-pub(crate) use set_uneditable_eol::SetUneditableEndOfLine;
+pub(crate) use set_uneditable_eol::{
+    SetUneditableEndOfLine,
+    SetUneditableEolAgentIds,
+};
 
 pub(crate) type AugroupId = u32;
 pub(crate) type AutocmdId = u32;

@@ -1,6 +1,4 @@
-use core::mem;
-
-use editor::{AccessMut, AgentId, Editor};
+use editor::{AccessMut, AgentId, Editor, Shared};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
@@ -18,18 +16,18 @@ use crate::{Neovim, events};
 #[derive(Clone, Copy)]
 pub(crate) struct SetUneditableEndOfLine;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct SetUneditableEolAgentIds {
-    set_eol: AgentId,
-    set_fix_eol: AgentId,
+    set_eol: Shared<AgentId>,
+    set_fix_eol: Shared<AgentId>,
 }
 
 impl SetUneditableEolAgentIds {
     #[inline]
-    pub(crate) fn set(&mut self, agent_id: AgentId) {
+    pub(crate) fn set(&self, agent_id: AgentId) {
         debug_assert!(!agent_id.is_unknown());
-        self.set_eol = agent_id;
-        self.set_fix_eol = agent_id;
+        self.set_eol.set(agent_id);
+        self.set_fix_eol.set(agent_id);
     }
 }
 
@@ -105,8 +103,8 @@ impl Event for SetUneditableEndOfLine {
             let ids = &mut nvim.events.agent_ids.set_uneditable_eol;
 
             let set_by = match option {
-                Option::Eol => mem::take(&mut ids.set_eol),
-                Option::FixEol => mem::take(&mut ids.set_fix_eol),
+                Option::Eol => ids.set_eol.take(),
+                Option::FixEol => ids.set_fix_eol.take(),
                 Option::Binary => AgentId::UNKNOWN,
             };
 
