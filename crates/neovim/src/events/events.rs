@@ -32,7 +32,7 @@ pub(crate) struct Events {
 
     /// The callback registered to the [`BufReadPost`] event, or `None` if no
     /// callback have been registered to that event.
-    pub(crate) on_buffer_created: Option<Callbacks<events::BufReadPost>>,
+    pub(crate) on_buffer_created: Option<Callbacks<events::BufferCreated>>,
 
     /// Map from a buffer's ID to the callbacks registered to the [`OnBytes`]
     /// event on that buffer.
@@ -108,7 +108,7 @@ pub(crate) struct Callbacks<Ev: Event> {
 pub(crate) enum EventKind {
     BufEnter(events::BufEnter),
     BufLeave(events::BufLeave),
-    BufReadPost(events::BufReadPost),
+    BufferCreated(events::BufferCreated),
     BufUnload(events::BufUnload),
     BufWritePost(events::BufWritePost),
     CursorMoved(events::CursorMoved),
@@ -178,7 +178,7 @@ impl Events {
             match &event_kind {
                 BufEnter(ev) => self.remove_callback(ev, cb_key),
                 BufLeave(ev) => self.remove_callback(ev, cb_key),
-                BufReadPost(ev) => self.remove_callback(ev, cb_key),
+                BufferCreated(ev) => self.remove_callback(ev, cb_key),
                 BufUnload(ev) => self.remove_callback(ev, cb_key),
                 BufWritePost(ev) => self.remove_callback(ev, cb_key),
                 CursorMoved(ev) => self.remove_callback(ev, cb_key),

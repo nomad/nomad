@@ -92,7 +92,7 @@ impl Neovim {
 
         let buffer_id = BufferId::from(buffer);
 
-        if self.events.contains(&events::BufReadPost) {
+        if self.events.contains(&events::BufferCreated) {
             self.events.agent_ids.created_buffer.insert(buffer_id, agent_id);
         }
 
@@ -290,7 +290,7 @@ impl Editor for Neovim {
         Fun: FnMut(&mut Self::Buffer<'_>, AgentId) + 'static,
     {
         self.events.insert(
-            events::BufReadPost,
+            events::BufferCreated,
             move |(mut buf, created_by)| fun(&mut buf, created_by),
             this,
         )

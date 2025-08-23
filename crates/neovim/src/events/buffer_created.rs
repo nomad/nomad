@@ -7,9 +7,9 @@ use crate::oxi::api;
 use crate::utils::CallbackExt;
 
 #[derive(Clone, Copy)]
-pub(crate) struct BufReadPost;
+pub(crate) struct BufferCreated;
 
-impl Event for BufReadPost {
+impl Event for BufferCreated {
     type Args<'a> = (NeovimBuffer<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
@@ -24,7 +24,7 @@ impl Event for BufReadPost {
 
     #[inline]
     fn kind(&self) -> EventKind {
-        EventKind::BufReadPost(*self)
+        EventKind::BufferCreated(*self)
     }
 
     #[inline]
@@ -65,13 +65,13 @@ impl Event for BufReadPost {
         .into_function();
 
         api::create_autocmd(
-            ["BufReadPost"],
+            ["BufReadPost", "BufNewFile", "BufFilePost"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .callback(callback)
                 .build(),
         )
-        .expect("couldn't create autocmd on BufReadPost")
+        .expect("couldn't create autocmd")
     }
 
     #[inline]
