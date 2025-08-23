@@ -9,8 +9,8 @@ use crate::oxi::api;
 /// TODO: docs.
 pub trait NeovimExt: AccessMut<Neovim> {
     /// TODO: docs.
-    fn cmd(&self, cmd: &str) {
-        api::command(cmd).expect("couldn't execute command");
+    fn command(&self, cmd: impl AsRef<str>) {
+        api::command(cmd.as_ref()).expect("couldn't execute command");
     }
 
     /// TODO: docs..
@@ -55,7 +55,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
     #[track_caller]
     fn enter_insert_with_i(&self) {
         assert!(api::get_mode().mode == "n", "not in normal mode");
-        self.cmd("startinsert");
+        self.command("startinsert");
     }
 
     /// TODO: docs.
@@ -72,7 +72,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
 
     /// Shortand for `ctx.cmd("redraw")`.
     fn redraw(&self) {
-        self.cmd("redraw");
+        self.command("redraw");
     }
 }
 

@@ -37,31 +37,23 @@ impl Event for BufReadPost {
             nvim.with_mut(|nvim| {
                 let buffer_id = BufferId::from(args.buffer.clone());
 
-                let Some(callbacks) = nvim
-                    .events
-                    .on_buffer_created
-                    .as_ref()
-                    .map(|cbs| cbs.cloned())
-                else {
+                let Some(mut buffer) = nvim.buffer(buffer_id) else {
+                    return false;
+                };
+
+                let events = &mut buffer.nvim.events;
+
+                let Some(callbacks) = &events.on_buffer_created else {
                     return true;
                 };
 
-                let created_by = nvim
-                    .events
+                let created_by = events
                     .agent_ids
                     .created_buffer
                     .remove(&buffer_id)
                     .unwrap_or(AgentId::UNKNOWN);
 
-                let Some(mut buffer) = nvim.buffer(buffer_id) else {
-                    tracing::error!(
-                        buffer_name = ?args.buffer.get_name().ok(),
-                        "BufReadPost triggered for an invalid buffer",
-                    );
-                    return true;
-                };
-
-                for callback in callbacks {
+                for callback in callbacks.cloned() {
                     callback((buffer.reborrow(), created_by));
                 }
 
