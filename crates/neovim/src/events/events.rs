@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 use std::rc::Rc;
 
-use editor::{AccessMut, AgentId};
+use editor::{AccessMut, AgentId, Shared};
 use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};
@@ -74,8 +74,8 @@ pub(crate) struct AgentIds {
     /// TODO: docs.
     pub(crate) created_buffer: NoHashMap<BufferId, AgentId>,
 
-    /// TODO: docs.
-    pub(crate) edited_buffer: NoHashMap<BufferId, AgentId>,
+    /// The [`AgentId`] of the agent that last scheduled an edit on a buffer.
+    pub(crate) edited_buffer: Shared<AgentId>,
 
     /// TODO: docs.
     pub(crate) focused_buffer: NoHashMap<BufferId, AgentId>,

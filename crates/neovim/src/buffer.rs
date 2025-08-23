@@ -387,20 +387,15 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
     {
         let buffer_id = self.id();
 
-        if self.nvim.events.contains(&events::OnBytes(buffer_id)) {
-            self.nvim
-                .events
-                .agent_ids
-                .edited_buffer
-                .insert(buffer_id, agent_id);
-        }
-
         let replacements = replacements
             .into_iter()
             .filter(|repl| !repl.is_no_op())
             .collect::<SmallVec<[_; 1]>>();
 
-        let buffers_stage = self.nvim.buffers_state.clone();
+        let buffers_state = self.nvim.buffers_state.clone();
+
+        let edited_buffer_agent_id =
+            self.nvim.events.agent_ids.edited_buffer.clone();
 
         let set_uneditable_eol_agent_id =
             self.nvim.events.agent_ids.set_uneditable_eol.clone();
@@ -420,7 +415,8 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                     deletion_start..deletion_end,
                     replacement.inserted_text(),
                     agent_id,
-                    &buffers_stage,
+                    &buffers_state,
+                    &edited_buffer_agent_id,
                     &set_uneditable_eol_agent_id,
                 )
             }
@@ -492,6 +488,7 @@ fn replace_text_in_point_range(
     insert_text: &str,
     agent_id: AgentId,
     buffers_state: &BuffersState,
+    edited_buffer_agent_id: &Shared<AgentId>,
     set_uneditable_eol_agent_id: &events::SetUneditableEolAgentIds,
 ) {
     debug_assert!(delete_range.start <= delete_range.end);
@@ -560,6 +557,8 @@ fn replace_text_in_point_range(
             !delete_range.is_empty() || !insert_text.is_empty();
 
         if is_on_bytes_triggered {
+            edited_buffer_agent_id.set(agent_id);
+
             buffers_state.skip_next_uneditable_eol.set(true);
 
             // Extend the end of the deleted range by one byte to account

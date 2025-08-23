@@ -1,4 +1,4 @@
-use editor::{AccessMut, AgentId, Edit, Editor, Replacement};
+use editor::{AccessMut, Edit, Editor, Replacement};
 use nohash::IntMap as NoHashMap;
 use smallvec::smallvec_inline;
 
@@ -50,12 +50,7 @@ impl Event for OnBytes {
                     return true;
                 };
 
-                let edited_by = nvim
-                    .events
-                    .agent_ids
-                    .edited_buffer
-                    .remove(&buffer_id)
-                    .unwrap_or(AgentId::UNKNOWN);
+                let edited_by = nvim.events.agent_ids.edited_buffer.take();
 
                 let should_extend_end_by_one = nvim
                     .buffers_state
