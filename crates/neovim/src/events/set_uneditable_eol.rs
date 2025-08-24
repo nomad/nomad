@@ -66,9 +66,27 @@ impl Event for SetUneditableEndOfLine {
                              new_option_value: bool,
                              option: Option,
                              nvim: &mut Neovim| {
-            let buffer = api::Buffer::current();
+            let buffer_id = BufferId::from(api::Buffer::current());
+
+            let Some(mut buffer) = nvim.buffer(buffer_id) else {
+                return false;
+            };
 
             let opts = BufferLocalOpts::new(buffer.clone());
+
+            let events = &mut buffer.nvim.events;
+
+            let Some(callbacks) = &events.on_uneditable_eol_set else {
+                return true;
+            };
+
+            let ids = &mut events.agent_ids.set_uneditable_eol;
+
+            let set_by = match option {
+                Option::Eol => ids.set_eol.take(),
+                Option::FixEol => ids.set_fix_eol.take(),
+                Option::Binary => AgentId::UNKNOWN,
+            };
 
             let value = |option_value: bool| match option {
                 Option::Binary => UneditableEndOfLine::get_inner(
@@ -89,37 +107,10 @@ impl Event for SetUneditableEndOfLine {
             };
 
             let old_value = value(old_option_value);
+
             let new_value = value(new_option_value);
 
-            let Some(callbacks) = nvim
-                .events
-                .on_uneditable_eol_set
-                .as_ref()
-                .map(|cbs| cbs.cloned())
-            else {
-                return true;
-            };
-
-            let ids = &mut nvim.events.agent_ids.set_uneditable_eol;
-
-            let set_by = match option {
-                Option::Eol => ids.set_eol.take(),
-                Option::FixEol => ids.set_fix_eol.take(),
-                Option::Binary => AgentId::UNKNOWN,
-            };
-
-            let buffer_id = BufferId::from(buffer.clone());
-
-            let Some(mut buffer) = nvim.buffer(buffer_id) else {
-                let buffer = api::Buffer::from(buffer_id);
-                tracing::error!(
-                    buffer_name = ?buffer.get_name().ok(),
-                    "UneditableEndOfLine triggered for an invalid buffer",
-                );
-                return true;
-            };
-
-            for callback in callbacks {
+            for callback in callbacks.cloned() {
                 callback((buffer.reborrow(), old_value, new_value, set_by));
             }
 
@@ -139,14 +130,9 @@ impl Event for SetUneditableEndOfLine {
             events::OptionSet::<FixEndOfLine>::register_inner(
                 events,
                 nvim.clone(),
-                move |is_buffer_local, &old_fix_eol, &new_fix_eol, nvim| {
+                move |is_buffer_local, &old_fixeol, &new_fixeol, nvim| {
                     debug_assert!(is_buffer_local);
-                    on_option_set(
-                        old_fix_eol,
-                        new_fix_eol,
-                        Option::FixEol,
-                        nvim,
-                    )
+                    on_option_set(old_fixeol, new_fixeol, Option::FixEol, nvim)
                 },
             );
 

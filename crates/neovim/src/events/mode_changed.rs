@@ -36,22 +36,14 @@ impl Event for ModeChanged {
     ) -> AutocmdId {
         let callback = (move |args: api::types::AutocmdCallbackArgs| {
             nvim.with_mut(|nvim| {
-                let buffer_id = BufferId::from(args.buffer.clone());
-
-                let Some(callbacks) = nvim
-                    .events
-                    .on_mode_changed
-                    .as_ref()
-                    .map(|cbs| cbs.cloned())
-                else {
-                    return true;
-                };
+                let buffer_id = BufferId::from(args.buffer);
 
                 let Some(mut buffer) = nvim.buffer(buffer_id) else {
-                    tracing::error!(
-                        buffer_name = ?args.buffer.get_name().ok(),
-                        "ModeChanged triggered for an invalid buffer",
-                    );
+                    return false;
+                };
+
+                let Some(callbacks) = &buffer.nvim.events.on_mode_changed
+                else {
                     return true;
                 };
 
@@ -64,7 +56,7 @@ impl Event for ModeChanged {
                 let old_mode = ModeStr::new(old_mode);
                 let new_mode = ModeStr::new(new_mode);
 
-                for callback in callbacks {
+                for callback in callbacks.cloned() {
                     callback((
                         buffer.reborrow(),
                         old_mode,

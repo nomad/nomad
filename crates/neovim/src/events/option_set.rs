@@ -1,9 +1,8 @@
 use core::marker::PhantomData;
 
-use editor::{AccessMut, Editor};
+use editor::AccessMut;
 
 use crate::Neovim;
-use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
 use crate::option::NeovimOption;
 use crate::oxi::{self, api};
@@ -63,9 +62,8 @@ impl<T: NeovimOption> OptionSet<T> {
 }
 
 impl<T: WatchedOption> Event for OptionSet<T> {
-    /// A tuple of `(buffer, old_value, new_value)`, where `buffer` is only
-    /// present for buffer-local options.
-    type Args<'a> = (Option<NeovimBuffer<'a>>, &'a T::Value, &'a T::Value);
+    /// A tuple of `(is_local, old_value, new_value)`.
+    type Args<'a> = (bool, &'a T::Value, &'a T::Value);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -91,38 +89,13 @@ impl<T: WatchedOption> Event for OptionSet<T> {
         Self::register_inner(
             events,
             nvim,
-            |is_buffer_local, old_value, new_value, nvim| {
-                let Some(callbacks) = T::callbacks(&mut nvim.events)
-                    .as_ref()
-                    .map(|cbs| cbs.cloned())
-                else {
+            |is_local, old_value, new_value, nvim| {
+                let Some(callbacks) = T::callbacks(&mut nvim.events) else {
                     return true;
                 };
 
-                let mut maybe_buf = if is_buffer_local {
-                    let buffer = api::Buffer::current();
-
-                    match nvim.buffer(BufferId::from(buffer.clone())) {
-                        Some(buffer) => Some(buffer),
-
-                        None => {
-                            tracing::error!(
-                                buffer_name = ?buffer.get_name().ok(),
-                                "OptionSet triggered for an invalid buffer",
-                            );
-                            return true;
-                        },
-                    }
-                } else {
-                    None
-                };
-
-                for callback in callbacks {
-                    callback((
-                        maybe_buf.as_mut().map(|buf| buf.reborrow()),
-                        old_value,
-                        new_value,
-                    ));
+                for callback in callbacks.cloned() {
+                    callback((is_local, old_value, new_value));
                 }
 
                 false
