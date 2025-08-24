@@ -31,11 +31,9 @@ pub(crate) trait Event: Sized {
     /// TODO: docs.
     fn register(
         &self,
-        _events: &Events,
-        _nvim: impl AccessMut<Neovim> + Clone + 'static,
-    ) -> Self::RegisterOutput {
-        todo!();
-    }
+        events: &Events,
+        nvim: impl AccessMut<Neovim> + Clone + 'static,
+    ) -> Self::RegisterOutput;
 
     /// TODO: docs.
     fn unregister(out: Self::RegisterOutput);

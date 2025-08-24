@@ -1870,6 +1870,7 @@ name = "mock"
 version = "0.1.0-dev"
 dependencies = [
  "abs-path",
+ "anyhow",
  "async-broadcast",
  "async-io",
  "async-task",

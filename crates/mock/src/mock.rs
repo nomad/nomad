@@ -125,15 +125,6 @@ where
     fn buffer_at(&self, path: &AbsPath) -> Option<&BufferInner> {
         self.buffers.values().find(|buf| path == &buf.file_path)
     }
-
-    #[track_caller]
-    fn buffer_mut(&mut self, id: BufferId) -> Buffer<'_> {
-        Buffer {
-            inner: self.buffers.get_mut(&id).expect("buffer exists"),
-            callbacks: &self.callbacks,
-            current_buffer: &mut self.current_buffer,
-        }
-    }
 }
 
 impl Callbacks {
@@ -165,19 +156,23 @@ impl Editor for Mock {
     type Selection<'a> = Selection<'a>;
     type SelectionId = SelectionId;
 
-    type BufferSaveError = ();
+    type BufferSaveError = anyhow::Error;
     type CreateBufferError = fs::ReadFileToStringError<MockFs>;
     type SerializeError = SerializeError;
     type DeserializeError = DeserializeError;
 
     fn buffer(&mut self, id: BufferId) -> Option<Self::Buffer<'_>> {
-        self.buffers.contains_key(&id).then_some(self.buffer_mut(id))
+        self.buffers.get_mut(&id).map(|inner| Buffer {
+            inner,
+            callbacks: &self.callbacks,
+            current_buffer: &mut self.current_buffer,
+            fs: &self.fs,
+        })
     }
 
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        self.buffer_at(path)
-            .map(|buffer| buffer.id)
-            .map(|id| self.buffer_mut(id))
+        let buffer_id = self.buffer_at(path)?.id;
+        self.buffer(buffer_id)
     }
 
     async fn create_buffer(
@@ -207,7 +202,7 @@ impl Editor for Mock {
                 BufferInner::new(buffer_id, file_path.to_owned(), contents),
             );
 
-            let mut buffer = this.buffer_mut(buffer_id);
+            let mut buffer = this.buffer(buffer_id).expect("just inserted");
 
             let on_buffer_created = buffer.callbacks.with(|callbacks| {
                 callbacks
@@ -228,7 +223,7 @@ impl Editor for Mock {
     }
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
-        self.current_buffer.map(|id| self.buffer_mut(id))
+        self.buffer(self.current_buffer?)
     }
 
     fn for_each_buffer<Fun>(&mut self, mut fun: Fun)
@@ -240,6 +235,7 @@ impl Editor for Mock {
                 inner,
                 callbacks: &self.callbacks,
                 current_buffer: &mut self.current_buffer,
+                fs: &self.fs,
             })
         }
     }

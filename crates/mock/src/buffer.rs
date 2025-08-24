@@ -14,8 +14,10 @@ use editor::{
     Replacement,
     Shared,
 };
+use fs::{Directory, File, Fs};
 use slotmap::SlotMap;
 
+use crate::fs::MockFs;
 use crate::mock::{self, CallbackKind, Callbacks};
 
 type AnnotationId = slotmap::DefaultKey;
@@ -24,6 +26,7 @@ pub struct Buffer<'a> {
     pub(crate) inner: &'a mut BufferInner,
     pub(crate) callbacks: &'a Callbacks,
     pub(crate) current_buffer: &'a mut Option<BufferId>,
+    pub(crate) fs: &'a MockFs,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -126,6 +129,7 @@ impl<'a> Buffer<'a> {
             inner: self.inner,
             callbacks: self.callbacks,
             current_buffer: self.current_buffer,
+            fs: self.fs,
         }
     }
 }
@@ -365,10 +369,51 @@ impl<'a> editor::Buffer for Buffer<'a> {
     fn schedule_save(
         &mut self,
         _agent_id: AgentId,
-    ) -> impl Future<
-        Output = Result<(), <Self::Editor as editor::Editor>::BufferSaveError>,
-    > + 'static {
-        async move { todo!() }
+    ) -> impl Future<Output = anyhow::Result<()>> + 'static {
+        let contents = self.contents.clone();
+        let fs = self.fs.clone();
+        let file_path = self.file_path.clone();
+
+        async move {
+            let mut file = match fs.node_at_path(&file_path).await? {
+                Some(fs::Node::File(file)) => file,
+
+                Some(other) => {
+                    anyhow::bail!(
+                        "expected a file at {}, found {:?}",
+                        file_path,
+                        other.kind()
+                    );
+                },
+
+                None => {
+                    let (parent_path, file_name) =
+                        file_path.split_last().expect("file path is not root");
+
+                    let parent = match fs
+                        .node_at_path(parent_path)
+                        .await?
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("no directory at {parent_path}")
+                        })? {
+                        fs::Node::Directory(dir) => dir,
+                        other => {
+                            anyhow::bail!(
+                                "expected a directory at {parent_path}, \
+                                 found {:?}",
+                                other.kind()
+                            );
+                        },
+                    };
+
+                    parent.create_file(file_name).await?
+                },
+            };
+
+            file.write(contents).await?;
+
+            todo!("trigger on_saved callbacks");
+        }
     }
 }
 
