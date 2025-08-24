@@ -426,7 +426,7 @@ impl core::fmt::Display for BorrowError {
     }
 }
 
-impl std::error::Error for BorrowError {}
+impl core::error::Error for BorrowError {}
 
 #[derive(Copy, Clone, Default)]
 enum Borrow {

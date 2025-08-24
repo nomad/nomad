@@ -1,8 +1,7 @@
 //! TODO: docs.
 
 use core::cmp::Ordering;
-use core::ops::{Deref, DerefMut};
-use std::ops::Range;
+use core::ops::{Deref, DerefMut, Range};
 
 use collab_types::annotation::AnnotationId;
 use collab_types::text::{

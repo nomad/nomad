@@ -1,9 +1,10 @@
 #![allow(missing_docs)]
 
+use core::iter;
 use std::ffi::OsStr;
 use std::path::{self, Path, PathBuf};
 use std::sync::LazyLock;
-use std::{env, fs, iter};
+use std::{env, fs};
 
 static CARGO_MANIFEST_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     Path::new(&env::var("CARGO_MANIFEST_DIR").expect("is set")).to_owned()

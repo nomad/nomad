@@ -81,6 +81,7 @@ tracing-layers = { path = "./crates/tracing-layers" }
 version = { path = "./crates/version" }
 
 [workspace.lints.clippy]
+alloc_instead_of_core = "warn"
 bool_to_int_with_if = "deny"
 cognitive_complexity = "deny"
 let_underscore_future = "allow"
@@ -88,6 +89,7 @@ module_inception = "allow"
 # multiple_crate_versions = "deny" TODO: re-enable
 needless_collect = "deny"
 same_name_method = "deny"
+std_instead_of_core = "warn"
 too_many_arguments = "deny"
 too_many_lines = "deny"
 trivially_copy_pass_by_ref = "warn"

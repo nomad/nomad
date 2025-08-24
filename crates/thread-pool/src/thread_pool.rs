@@ -5,7 +5,7 @@ use std::panic;
 use executor::{BackgroundSpawner, Task};
 use futures_lite::FutureExt;
 
-type PanicPayload = Box<dyn std::any::Any + Send + 'static>;
+type PanicPayload = Box<dyn core::any::Any + Send + 'static>;
 
 /// TODO: docs.
 #[derive(Clone)]

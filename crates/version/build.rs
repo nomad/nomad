@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
 #![allow(clippy::unwrap_used)]
 
+use core::fmt::Write;
 use core::ops::Deref;
 use std::env;
-use std::fmt::Write;
 use std::fs::File;
 use std::path::Path;
 use std::sync::OnceLock;

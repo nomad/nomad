@@ -1,7 +1,7 @@
 //! TODO: docs
 
+use core::error::Error;
 use core::fmt::{self, Display};
-use std::error::Error as StdError;
 
 use copypasta::{ClipboardContext, ClipboardProvider};
 
@@ -24,18 +24,18 @@ pub fn set<T: Display>(value: T) -> Result<(), ClipboardError> {
 /// TODO: docs
 #[derive(Debug)]
 pub struct ClipboardError {
-    inner: Box<dyn StdError + Send + Sync + 'static>,
+    inner: Box<dyn Error + Send + Sync + 'static>,
     kind: ClipboardErrorKind,
 }
 
 impl ClipboardError {
     #[inline]
-    fn new_get(inner: Box<dyn StdError + Send + Sync + 'static>) -> Self {
+    fn new_get(inner: Box<dyn Error + Send + Sync + 'static>) -> Self {
         Self { kind: ClipboardErrorKind::Get, inner }
     }
 
     #[inline]
-    fn new_set(inner: Box<dyn StdError + Send + Sync + 'static>) -> Self {
+    fn new_set(inner: Box<dyn Error + Send + Sync + 'static>) -> Self {
         Self { kind: ClipboardErrorKind::Set, inner }
     }
 }
@@ -47,7 +47,7 @@ impl Display for ClipboardError {
     }
 }
 
-impl StdError for ClipboardError {}
+impl Error for ClipboardError {}
 
 impl PartialEq for ClipboardError {
     #[inline]

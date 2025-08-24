@@ -1,5 +1,5 @@
 use core::mem;
-use core::ops::{Deref, DerefMut};
+use core::ops::{Deref, DerefMut, Range};
 
 use abs_path::AbsPath;
 
@@ -278,7 +278,7 @@ impl<'a, Ed: EditorAdapter> Buffer for BufferAdapter<'a, Ed> {
     #[inline]
     fn get_text_range(
         &self,
-        byte_range: std::ops::Range<editor::ByteOffset>,
+        byte_range: Range<editor::ByteOffset>,
     ) -> impl editor::Chunks {
         self.inner.get_text_range(byte_range)
     }
@@ -457,7 +457,7 @@ impl<'a, Ed: EditorAdapter> Selection for SelectionAdapter<'a, Ed> {
     }
 
     #[inline]
-    fn byte_range(&self) -> std::ops::Range<editor::ByteOffset> {
+    fn byte_range(&self) -> Range<editor::ByteOffset> {
         self.inner.byte_range()
     }
 

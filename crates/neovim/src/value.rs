@@ -94,7 +94,7 @@ impl lua::Pushable for NeovimValue {
     unsafe fn push(
         self,
         lstate: *mut lua::ffi::State,
-    ) -> Result<std::ffi::c_int, lua::Error> {
+    ) -> Result<core::ffi::c_int, lua::Error> {
         // SAFETY: up to the caller.
         unsafe { self.object.push(lstate) }
     }

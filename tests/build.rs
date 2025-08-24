@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 
+use core::cmp::Ordering;
 use core::str::FromStr;
 use std::env;
 use std::process::Command;
@@ -60,13 +61,13 @@ fn setup_neovim() {
 struct GitVersion(u8, u8, u8);
 
 impl PartialOrd for GitVersion {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for GitVersion {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         let Self(this_major, this_minor, this_patch) = self;
         let Self(other_major, other_minor, other_patch) = other;
         this_major
