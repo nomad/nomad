@@ -7,6 +7,7 @@ use std::{env, io};
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use collab_types::Peer;
 use collab_types::nomad::ulid;
+use editor::module::{Action, Module};
 use editor::{ByteOffset, Context, Editor};
 use executor::Executor;
 use fs::Directory;
@@ -17,7 +18,7 @@ use neovim::{Neovim, mlua, oxi};
 
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::session::{Session, SessionError};
-use crate::{config, join, leave, start, yank};
+use crate::{Collab, config, join, leave, start, yank};
 
 pub type SessionId = ulid::Ulid;
 
@@ -316,9 +317,9 @@ impl CollabEditor for Neovim {
         ctx: &mut Context<Self>,
     ) {
         let prompt = format!(
-            "Started a new collaborative editing session at {} with ID {}. \
-             You can share this ID with other peers to let them join the \
-             session. Would you like to copy it to the clipboard?",
+            "Started a new collaborative editing session at {} with ID \
+             {}.\nYou can share this ID with other peers to let them join \
+             the session. Would you like to copy it to the clipboard?",
             TildePath {
                 path: &session.project_root(),
                 home_dir: Self::home_dir(ctx).await.ok().as_deref(),
@@ -342,10 +343,12 @@ impl CollabEditor for Neovim {
         }
 
         match Self::copy_session_id(session.id(), ctx).await {
-            Ok(()) => ctx.notify_info(
+            Ok(()) => ctx.notify_info(format_args!(
                 "Session ID copied to clipboard. You can also yank it later \
-                 by executing ':Mad collab yank'",
-            ),
+                 by executing ':Mad {} {}'",
+                Collab::<Self>::NAME,
+                yank::Yank::<Self>::NAME,
+            )),
             Err(err) => ctx.notify_error(err),
         }
     }
