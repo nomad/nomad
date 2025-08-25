@@ -74,6 +74,32 @@ impl<'a, S> File<'a, S> {
         self.inner().name()
     }
 
+    /// TODO: docs.
+    pub fn unwrap_binary(self) -> BinaryFile<'a, S> {
+        match self {
+            Self::Binary(file) => file,
+            _ => panic!("called `File::unwrap_binary()` on a non-binary file"),
+        }
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_symlink(self) -> SymlinkFile<'a, S> {
+        match self {
+            Self::Symlink(file) => file,
+            _ => {
+                panic!("called `File::unwrap_symlink()` on a non-symlink file")
+            },
+        }
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_text(self) -> TextFile<'a, S> {
+        match self {
+            Self::Text(file) => file,
+            _ => panic!("called `File::unwrap_text()` on a non-text file"),
+        }
+    }
+
     #[inline]
     pub(crate) fn new(file: PuffFile<'a, S>, state: State<'a>) -> Self {
         match file.metadata() {
@@ -149,6 +175,36 @@ impl<'a, S> FileMut<'a, S> {
     #[inline]
     pub fn name(&self) -> &NodeName {
         self.as_file().name()
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_binary(self) -> BinaryFileMut<'a, S> {
+        match self {
+            Self::Binary(file) => file,
+            _ => panic!(
+                "called `FileMut::unwrap_binary()` on a non-binary file"
+            ),
+        }
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_symlink(self) -> SymlinkFileMut<'a, S> {
+        match self {
+            Self::Symlink(file) => file,
+            _ => {
+                panic!(
+                    "called `FileMut::unwrap_symlink()` on a non-symlink file"
+                )
+            },
+        }
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_text(self) -> TextFileMut<'a, S> {
+        match self {
+            Self::Text(file) => file,
+            _ => panic!("called `FileMut::unwrap_text()` on a non-text file"),
+        }
     }
 
     #[inline]

@@ -43,6 +43,26 @@ impl<'a, S> Node<'a, S> {
         }
     }
 
+    /// TODO: docs.
+    pub fn unwrap_directory(self) -> Directory<'a, S> {
+        match self {
+            Self::Directory(directory) => directory,
+            Self::File(_) => {
+                panic!("called `Node::unwrap_directory()` on a file")
+            },
+        }
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_file(self) -> File<'a, S> {
+        match self {
+            Self::File(file) => file,
+            Self::Directory(_) => {
+                panic!("called `Node::unwrap_file()` on a directory")
+            },
+        }
+    }
+
     #[inline]
     pub(crate) fn new(node: PuffNode<'a, S>, state: State<'a>) -> Self {
         match node {
@@ -75,6 +95,26 @@ impl<'a, S: IsVisible> Node<'a, S> {
 }
 
 impl<'a, S> NodeMut<'a, S> {
+    /// TODO: docs.
+    pub fn unwrap_directory(self) -> DirectoryMut<'a, S> {
+        match self {
+            Self::Directory(directory) => directory,
+            Self::File(_) => {
+                panic!("called `NodeMut::unwrap_directory()` on a file")
+            },
+        }
+    }
+
+    /// TODO: docs.
+    pub fn unwrap_file(self) -> FileMut<'a, S> {
+        match self {
+            Self::File(file) => file,
+            Self::Directory(_) => {
+                panic!("called `NodeMut::unwrap_file()` on a directory")
+            },
+        }
+    }
+
     #[inline]
     pub(crate) fn new(node: PuffNodeMut<'a, S>, state: StateMut<'a>) -> Self {
         match node {
