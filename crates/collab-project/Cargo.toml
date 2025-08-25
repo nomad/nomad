@@ -17,7 +17,7 @@ serde = [
 
 [dependencies]
 cauchy = { workspace = true }
-collab-types = { workspace = true }
+collab-types = { workspace = true, features = ["bincode"] }
 derive_more = { workspace = true }
 fxhash = { workspace = true }
 nohash = { workspace = true }
