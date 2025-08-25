@@ -166,9 +166,9 @@ fn integrate_backlogged_edits(
         },
         fs::FileContents::Symlink(_) => {},
         fs::FileContents::Text(contents) => {
-            contents.decode(state.local_id());
+            let local_id = state.local_id();
             for edit in state.text_backlog_mut().take(global_id) {
-                contents.integrate_edit(edit);
+                contents.integrate_edit(edit, local_id);
             }
         },
     }

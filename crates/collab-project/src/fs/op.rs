@@ -34,9 +34,9 @@ impl FsOp for FileCreation {
             NewFileContents::Symlink(target_path) => {
                 FileContents::Symlink(SymlinkContents::new(target_path))
             },
-            NewFileContents::Text(text) => FileContents::Text(Box::new(
-                TextContents::new(created_by, text),
-            )),
+            NewFileContents::Text(text) => {
+                FileContents::Text(Box::new(TextContents::new(text)))
+            },
         });
 
         let (state, fs) = proj.state_mut();

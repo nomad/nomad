@@ -9,6 +9,7 @@ publish.workspace = true
 [features]
 mock = ["dep:fs", "dep:futures-lite", "dep:mock"]
 serde = [
+  "collab-types/bincode",
   "collab-types/serde",
   "smallvec/serde",
   "smol_str/serde",
@@ -18,7 +19,7 @@ serde = [
 
 [dependencies]
 cauchy = { workspace = true }
-collab-types = { workspace = true, features = ["bincode"] }
+collab-types = { workspace = true }
 derive_more = { workspace = true }
 fxhash = { workspace = true }
 nohash = { workspace = true }

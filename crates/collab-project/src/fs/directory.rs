@@ -224,11 +224,9 @@ impl<'a> DirectoryMut<'a, Editable> {
         file_name: NodeNameBuf,
         file_contents: impl Into<Rope>,
     ) -> Result<(FileCreation, FileMut<'_>), NodeMut<'_>> {
-        let local_id = self.state.local_id();
         let file_contents = file_contents.into();
 
         let contents = FileContents::Text(Box::new(TextContents::new(
-            local_id,
             file_contents.clone(),
         )));
 

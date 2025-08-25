@@ -40,6 +40,7 @@ pub struct DecodeError {
 /// TODO: docs.
 pub(crate) struct State<'proj> {
     contexts: &'proj Contexts,
+    peer_id: PeerId,
 }
 
 /// TODO: docs.
@@ -565,7 +566,7 @@ impl Project {
 
     #[inline]
     pub(crate) fn state(&self) -> State<'_> {
-        State { contexts: &self.contexts }
+        State { contexts: &self.contexts, peer_id: self.peer_id() }
     }
 
     #[inline]
@@ -688,6 +689,12 @@ impl From<&Project> for mock::fs::MockFs {
 }
 
 impl<'proj> State<'proj> {
+    /// Returns the [`PeerId`] of the local peer.
+    #[inline]
+    pub(crate) fn local_id(&self) -> PeerId {
+        self.peer_id
+    }
+
     #[inline]
     pub(crate) fn text_ctx(self) -> &'proj text::TextCtx {
         &self.contexts.text
@@ -697,7 +704,7 @@ impl<'proj> State<'proj> {
 impl StateMut<'_> {
     #[inline]
     pub(crate) fn as_ref(&self) -> State<'_> {
-        State { contexts: self.contexts }
+        State { contexts: self.contexts, peer_id: self.peer_id }
     }
 
     #[inline]
@@ -811,6 +818,11 @@ mod serde_impls {
         fn new(peer_id: PeerId) -> Self {
             Self { inner: fs::Fs::deserialize(peer_id.into()) }
         }
+
+        #[inline]
+        fn peer_id(&self) -> PeerId {
+            PeerId::new(self.inner.peer_id())
+        }
     }
 
     impl ProjectField {
@@ -884,6 +896,8 @@ mod serde_impls {
         where
             Ds: de::Deserializer<'de>,
         {
+            text::serde_impls::LOCAL_PEER_ID.set(Some(self.peer_id()));
+
             deserializer.deserialize_struct(
                 SerializeProject::NAME,
                 ProjectField::AS_SLICE,

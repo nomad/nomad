@@ -1,7 +1,8 @@
 //! TODO: docs.
 
 use core::cmp::Ordering;
-use core::ops::{Deref, DerefMut, Range};
+use core::ops::Range;
+use std::sync::OnceLock;
 
 use collab_types::annotation::AnnotationId;
 use collab_types::text::{
@@ -148,7 +149,7 @@ pub(crate) struct TextCtx {
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub(crate) struct TextContents {
-    crdt: TextCrdt,
+    replica: LazyReplica,
     text: crop::Rope,
     text_backlog: TextBacklog,
 }
@@ -171,11 +172,9 @@ pub(crate) enum TextStateMut<'a> {
 }
 
 #[derive(Clone)]
-#[allow(clippy::large_enum_variant)]
-enum TextCrdt {
-    #[cfg(feature = "serde")]
-    Encoded(cola::EncodedReplica<'static>),
-    Ready(cola::Replica),
+struct LazyReplica {
+    initial_len: usize,
+    replica: OnceLock<Box<cola::Replica>>,
 }
 
 /// TODO: docs.
@@ -276,7 +275,8 @@ impl<'a, S> TextFileMut<'a, S> {
         edit: TextEdit,
     ) -> TextReplacements {
         debug_assert_eq!(edit.file_id, self.inner.global_id());
-        self.contents_mut().integrate_edit(edit)
+        let local_id = self.state.local_id();
+        self.contents_mut().integrate_edit(edit, local_id)
     }
 
     #[inline]
@@ -309,7 +309,7 @@ impl<'a, S: IsVisible> TextFileMut<'a, S> {
     ) -> (CursorId, CursorCreation) {
         let local_id = self.state.local_id();
         let cursor = Cursor {
-            anchor: self.contents_mut().create_cursor(offset),
+            anchor: self.contents_mut().create_cursor(offset, local_id),
             sequence_num: Counter::new(0),
         };
         let (annotation, creation) = self.state.text_ctx_mut().cursors.create(
@@ -327,7 +327,8 @@ impl<'a, S: IsVisible> TextFileMut<'a, S> {
         offset_range: Range<ByteOffset>,
     ) -> (SelectionId, SelectionCreation) {
         let local_id = self.state.local_id();
-        let anchor_range = self.contents_mut().create_selection(offset_range);
+        let anchor_range =
+            self.contents_mut().create_selection(offset_range, local_id);
         let selection = Selection {
             start: anchor_range.start,
             end: anchor_range.end,
@@ -349,7 +350,8 @@ impl<'a, S: IsVisible> TextFileMut<'a, S> {
         R: IntoIterator<Item = TextReplacement>,
     {
         let file_id = self.inner.global_id();
-        self.contents_mut().edit(replacements, file_id)
+        let local_id = self.state.local_id();
+        self.contents_mut().edit(replacements, file_id, local_id)
     }
 }
 
@@ -401,9 +403,11 @@ impl<'a> CursorRef<'a> {
             unreachable!("cursors can only be created on TextFiles");
         };
 
+        let local_id = proj.peer_id();
+
         Some(Self {
             id: cursor.id().into(),
-            offset: contents.resolve_cursor(cursor.data())?,
+            offset: contents.resolve_cursor(cursor.data(), local_id)?,
             file,
             state: proj.state(),
         })
@@ -434,13 +438,14 @@ impl<'a> CursorMut<'a> {
     #[inline]
     pub fn r#move(&mut self, new_offset: ByteOffset) -> CursorMove {
         let file_id = self.annotation().file_id();
+        let local_id = self.proj.peer_id();
         let file_state = self.proj.fs_mut().file(file_id);
 
         let FileContents::Text(contents) = file_state.metadata() else {
             unreachable!("cursors can only be created on TextFiles");
         };
 
-        let new_anchor = contents.create_cursor(new_offset);
+        let new_anchor = contents.create_cursor(new_offset, local_id);
 
         self.annotation_mut().update(|cursor| {
             cursor.anchor = new_anchor;
@@ -524,9 +529,12 @@ impl<'a> SelectionRef<'a> {
             unreachable!("selections can only be created on TextFiles");
         };
 
+        let local_id = proj.peer_id();
+
         Some(Self {
             id: selection.id().into(),
-            offset_range: contents.resolve_selection(selection.data())?,
+            offset_range: contents
+                .resolve_selection(selection.data(), local_id)?,
             state: proj.state(),
             file,
         })
@@ -562,7 +570,8 @@ impl<'a> SelectionMut<'a> {
             unreachable!("selections can only be created on TextFiles");
         };
 
-        let new_anchor_range = contents.create_selection(new_range);
+        let new_anchor_range =
+            contents.create_selection(new_range, self.proj.peer_id());
 
         self.annotation_mut().update(|selection| {
             selection.start = new_anchor_range.start;
@@ -615,34 +624,17 @@ impl<'a> Selections<'a> {
 
 impl TextContents {
     #[inline]
-    pub(crate) fn decode(&mut self, local_id: PeerId) {
-        let local_id = local_id.into_u64();
-
-        match &mut self.crdt {
-            #[cfg(feature = "serde")]
-            TextCrdt::Encoded(encoded) => {
-                match cola::Replica::decode(local_id, encoded) {
-                    Ok(decoded) => self.crdt = TextCrdt::Ready(decoded),
-                    Err(err) => panic!("decoding failed: {err}"),
-                }
-            },
-            TextCrdt::Ready(replica) => {
-                if replica.id() != local_id {
-                    *replica = replica.fork(local_id);
-                }
-            },
-        }
-    }
-
-    #[inline]
     pub(crate) fn integrate_edit(
         &mut self,
         edit: TextEdit,
+        local_id: PeerId,
     ) -> TextReplacements {
         let mut replacements = SmallVec::new();
 
+        let replica = self.replica.get_mut(local_id);
+
         for (insertion, text) in edit.insertions {
-            let Some(byte_offset) = self.crdt.integrate_insertion(&insertion)
+            let Some(byte_offset) = replica.integrate_insertion(&insertion)
             else {
                 self.text_backlog.insert(insertion.text().clone(), text);
                 continue;
@@ -654,7 +646,7 @@ impl TextContents {
             });
         }
 
-        for (text, byte_offset) in self.crdt.backlogged_insertions() {
+        for (text, byte_offset) in replica.backlogged_insertions() {
             let text = self.text_backlog.take(text);
             self.text.insert(byte_offset, &*text);
             replacements.push(TextReplacement {
@@ -663,7 +655,7 @@ impl TextContents {
             });
         }
 
-        for byte_ranges in self.crdt.backlogged_deletions() {
+        for byte_ranges in replica.backlogged_deletions() {
             for deleted_range in byte_ranges.into_iter().rev() {
                 self.text.delete(deleted_range.clone());
                 replacements.push(TextReplacement {
@@ -675,7 +667,7 @@ impl TextContents {
 
         for deletion in edit.deletions {
             for deleted_range in
-                self.crdt.integrate_deletion(&deletion).into_iter().rev()
+                replica.integrate_deletion(&deletion).into_iter().rev()
             {
                 self.text.delete(deleted_range.clone());
                 replacements.push(TextReplacement {
@@ -689,49 +681,62 @@ impl TextContents {
     }
 
     #[inline]
-    pub(crate) fn new(local_id: PeerId, text: crop::Rope) -> Self {
+    pub(crate) fn new(text: crop::Rope) -> Self {
         Self {
-            crdt: TextCrdt::Ready(cola::Replica::new(
-                local_id.into_u64(),
-                text.byte_len(),
-            )),
+            replica: LazyReplica::new(text.byte_len()),
             text,
             text_backlog: TextBacklog::default(),
         }
     }
 
     #[inline]
-    fn create_cursor(&self, offset: ByteOffset) -> cola::Anchor {
-        self.crdt.create_anchor(offset, cola::AnchorBias::Left)
+    fn create_cursor(
+        &self,
+        offset: ByteOffset,
+        local_id: PeerId,
+    ) -> cola::Anchor {
+        self.replica
+            .get(local_id)
+            .create_anchor(offset, cola::AnchorBias::Left)
     }
 
     #[inline]
     fn create_selection(
         &self,
         offset_range: Range<ByteOffset>,
+        local_id: PeerId,
     ) -> Range<cola::Anchor> {
         let byte_range = match offset_range.start.cmp(&offset_range.end) {
             Ordering::Less | Ordering::Equal => offset_range,
             Ordering::Greater => offset_range.start..offset_range.end,
         };
 
+        let replica = self.replica.get(local_id);
+
         let anchor_start =
-            self.crdt.create_anchor(byte_range.start, cola::AnchorBias::Right);
+            replica.create_anchor(byte_range.start, cola::AnchorBias::Right);
 
         let anchor_end =
-            self.crdt.create_anchor(byte_range.end, cola::AnchorBias::Left);
+            replica.create_anchor(byte_range.end, cola::AnchorBias::Left);
 
         anchor_start..anchor_end
     }
 
     #[track_caller]
     #[inline]
-    fn edit<R>(&mut self, replacements: R, file_id: GlobalFileId) -> TextEdit
+    fn edit<R>(
+        &mut self,
+        replacements: R,
+        file_id: GlobalFileId,
+        local_id: PeerId,
+    ) -> TextEdit
     where
         R: IntoIterator<Item = TextReplacement>,
     {
         let mut deletions = SmallVec::new();
         let mut insertions = SmallVec::new();
+
+        let replica = self.replica.get_mut(local_id);
 
         for TextReplacement { deleted_range, inserted_text } in replacements {
             let start = deleted_range.start;
@@ -739,7 +744,7 @@ impl TextContents {
             match start.cmp(&end) {
                 Ordering::Less => {
                     self.text.delete(start..end);
-                    let deletion = self.crdt.deleted(start..end);
+                    let deletion = replica.deleted(start..end);
                     deletions.push(deletion);
                 },
                 Ordering::Equal => {},
@@ -748,7 +753,7 @@ impl TextContents {
 
             if !inserted_text.is_empty() {
                 self.text.insert(start, &*inserted_text);
-                let insertion = self.crdt.inserted(start, inserted_text.len());
+                let insertion = replica.inserted(start, inserted_text.len());
                 insertions.push((insertion, inserted_text));
             }
         }
@@ -757,17 +762,23 @@ impl TextContents {
     }
 
     #[inline]
-    fn resolve_cursor(&self, cursor: &Cursor) -> Option<ByteOffset> {
-        self.crdt.resolve_anchor(cursor.anchor)
+    fn resolve_cursor(
+        &self,
+        cursor: &Cursor,
+        local_id: PeerId,
+    ) -> Option<ByteOffset> {
+        self.replica.get(local_id).resolve_anchor(cursor.anchor)
     }
 
     #[inline]
     fn resolve_selection(
         &self,
         selection: &Selection,
+        local_id: PeerId,
     ) -> Option<Range<ByteOffset>> {
-        let start = self.crdt.resolve_anchor(selection.start)?;
-        let end = self.crdt.resolve_anchor(selection.end)?;
+        let replica = self.replica.get(local_id);
+        let start = replica.resolve_anchor(selection.start)?;
+        let end = replica.resolve_anchor(selection.end)?;
         Some(start..end)
     }
 }
@@ -822,6 +833,37 @@ impl<'a> TextStateMut<'a> {
                 }
             },
         }
+    }
+}
+
+impl LazyReplica {
+    #[inline]
+    fn initialize(&self, local_id: PeerId) {
+        let _ = self.replica.set(Box::new(cola::Replica::new(
+            local_id.into_u64(),
+            self.initial_len,
+        )));
+    }
+
+    #[inline]
+    fn get(&self, local_id: PeerId) -> &cola::Replica {
+        if self.replica.get().is_none() {
+            self.initialize(local_id);
+        }
+        self.replica.get().expect("replica is initialized")
+    }
+
+    #[inline]
+    fn get_mut(&mut self, local_id: PeerId) -> &mut cola::Replica {
+        if self.replica.get().is_none() {
+            self.initialize(local_id);
+        }
+        self.replica.get_mut().expect("replica is initialized")
+    }
+
+    #[inline]
+    fn new(byte_len: usize) -> Self {
+        Self { initial_len: byte_len, replica: OnceLock::new() }
     }
 }
 
@@ -991,9 +1033,13 @@ impl<'a> Iterator for TextFileCursors<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let annotation = self.inner.next()?;
 
+        let local_id = self.file.state.local_id();
+
         if annotation.file_id() == self.file.id() {
-            let Some(offset) =
-                self.file.text_contents().resolve_cursor(annotation.data())
+            let Some(offset) = self
+                .file
+                .text_contents()
+                .resolve_cursor(annotation.data(), local_id)
             else {
                 return self.next();
             };
@@ -1030,9 +1076,13 @@ impl<'a> Iterator for TextFileSelections<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let annotation = self.inner.next()?;
 
+        let local_id = self.file.state.local_id();
+
         if annotation.file_id() == self.file.id() {
-            let Some(offset_range) =
-                self.file.text_contents().resolve_selection(annotation.data())
+            let Some(offset_range) = self
+                .file
+                .text_contents()
+                .resolve_selection(annotation.data(), local_id)
             else {
                 return self.next();
             };
@@ -1118,58 +1168,63 @@ impl annotation::Backlog for Selection {
     }
 }
 
-impl Deref for TextCrdt {
-    type Target = cola::Replica;
-
-    #[track_caller]
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Ready(replica) => replica,
-            #[cfg(feature = "serde")]
-            Self::Encoded(_) => panic!("TextCrdt not yet decoded"),
-        }
-    }
-}
-
-impl DerefMut for TextCrdt {
-    #[track_caller]
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        match self {
-            Self::Ready(replica) => replica,
-            #[cfg(feature = "serde")]
-            Self::Encoded(_) => panic!("TextCrdt not yet decoded"),
-        }
-    }
-}
-
 #[cfg(feature = "serde")]
-mod serde_impls {
+pub(crate) mod serde_impls {
+    use core::cell::Cell;
+
+    use serde::de::Error;
     use serde::{Deserialize, Serialize};
 
     use super::*;
 
-    impl Serialize for TextCrdt {
+    thread_local! {
+        /// TODO: this really needs some docs.
+        pub(crate) static LOCAL_PEER_ID: Cell<Option<PeerId>>
+            = const { Cell::new(None) };
+    }
+
+    impl Serialize for LazyReplica {
         #[inline]
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
-            match self {
-                Self::Ready(replica) => replica.encode().serialize(serializer),
-                Self::Encoded(encoded) => encoded.serialize(serializer),
+            match self.replica.get() {
+                Some(replica) => Ok(replica.encode()),
+                None => Err(self.initial_len),
             }
+            .serialize(serializer)
         }
     }
 
-    impl<'de> Deserialize<'de> for TextCrdt {
+    impl<'de> Deserialize<'de> for LazyReplica {
         #[inline]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            cola::EncodedReplica::deserialize(deserializer).map(Self::Encoded)
+            let local_id = LOCAL_PEER_ID
+                .get()
+                .expect("LOCAL_PEER_ID must be set before deserializing");
+
+            match Result::<cola::EncodedReplica, usize>::deserialize(
+                deserializer,
+            )? {
+                Ok(encoded) => Ok(Self {
+                    initial_len: 0,
+                    replica: cola::Replica::decode(
+                        local_id.into_u64(),
+                        &encoded,
+                    )
+                    .map(Box::new)
+                    .map_err(D::Error::custom)?
+                    .into(),
+                }),
+
+                Err(initial_len) => {
+                    Ok(Self { initial_len, replica: OnceLock::new() })
+                },
+            }
         }
     }
 }

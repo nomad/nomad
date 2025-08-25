@@ -63,7 +63,6 @@ impl ProjectBuilder {
         file_contents: impl Into<Rope>,
     ) -> Result<LocalFileId, CreateError> {
         let contents = FileContents::Text(Box::new(TextContents::new(
-            self.inner.peer_id().into(),
             file_contents.into(),
         )));
 
