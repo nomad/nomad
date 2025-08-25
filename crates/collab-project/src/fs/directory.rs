@@ -226,9 +226,8 @@ impl<'a> DirectoryMut<'a, Editable> {
     ) -> Result<(FileCreation, FileMut<'_>), NodeMut<'_>> {
         let file_contents = file_contents.into();
 
-        let contents = FileContents::Text(Box::new(TextContents::new(
-            file_contents.clone(),
-        )));
+        let contents =
+            FileContents::Text(TextContents::new(file_contents.clone()));
 
         match self.inner.create_file(file_name, contents) {
             Ok((creation, file)) => Ok((

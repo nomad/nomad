@@ -17,7 +17,7 @@ use crate::text::{TextContents, TextFile, TextFileMut};
 pub enum FileContents {
     Binary(BinaryContents),
     Symlink(SymlinkContents),
-    Text(Box<TextContents>),
+    Text(TextContents),
 }
 
 /// TODO: docs.

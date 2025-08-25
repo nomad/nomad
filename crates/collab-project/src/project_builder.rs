@@ -62,9 +62,8 @@ impl ProjectBuilder {
         file_path: impl AsRef<AbsPath>,
         file_contents: impl Into<Rope>,
     ) -> Result<LocalFileId, CreateError> {
-        let contents = FileContents::Text(Box::new(TextContents::new(
-            file_contents.into(),
-        )));
+        let contents =
+            FileContents::Text(TextContents::new(file_contents.into()));
 
         self.inner.push_file(file_path, contents)
     }

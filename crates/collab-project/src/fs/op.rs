@@ -35,7 +35,7 @@ impl FsOp for FileCreation {
                 FileContents::Symlink(SymlinkContents::new(target_path))
             },
             NewFileContents::Text(text) => {
-                FileContents::Text(Box::new(TextContents::new(text)))
+                FileContents::Text(TextContents::new(text))
             },
         });
 
