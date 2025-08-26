@@ -98,6 +98,7 @@ impl Module<Neovim> for Nomad {
         ctx.with_command(auth::login::Login::from(&auth))
             .with_command(auth::logout::Logout::from(&auth))
             .with_command(collab::start::Start::from(&collab))
+            .with_command(collab::join::Join::from(&collab))
             .with_command(version::EmitVersion::new())
             .with_constant(version::VERSION)
             .with_module(auth)
