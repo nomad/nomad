@@ -1,12 +1,14 @@
 use core::mem;
 use core::time::Duration;
 
-use editor::{ByteOffset, Context, Cursor};
+use editor::{AgentId, ByteOffset, Context, Cursor};
 use futures_util::stream::{FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 use neovim::Neovim;
 use neovim::buffer::BufferId;
 use neovim::tests::NeovimExt;
+
+use crate::editor::{CursorCreation, CursorEvent};
 
 #[neovim::test]
 async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
@@ -60,6 +62,34 @@ async fn insert_to_normal(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("<Esc>");
 
     assert_eq!(offsets.next().await.unwrap(), 3);
+}
+
+#[neovim::test]
+async fn cursor_is_removed_from_old_and_created_in_new_when_switching_buffers(
+    ctx: &mut Context<Neovim>,
+) {
+    // Create the first buffer and put some text in it.
+    ctx.create_and_focus_scratch_buffer();
+    ctx.feedkeys("ihello<Esc>");
+
+    let mut events = CursorEvent::new_stream(ctx);
+
+    // Create and focus a second buffer.
+    let new_buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    assert_eq!(
+        events.next().await.unwrap(),
+        CursorEvent::Removed(AgentId::UNKNOWN)
+    );
+
+    assert_eq!(
+        events.next().await.unwrap(),
+        CursorEvent::Created(CursorCreation {
+            buffer_id: new_buffer_id,
+            byte_offset: 0,
+            created_by: AgentId::UNKNOWN,
+        })
+    );
 }
 
 trait ByteOffsetExt {
