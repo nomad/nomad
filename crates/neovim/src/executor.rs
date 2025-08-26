@@ -9,6 +9,7 @@ use executor::{Executor, LocalSpawner};
 use thread_pool::ThreadPool;
 
 use crate::oxi;
+use crate::utils::CallbackExt;
 
 type Runnable = async_task::Runnable<()>;
 
@@ -47,16 +48,20 @@ impl NeovimLocalSpawner {
             oxi::libuv::AsyncHandle::new(move || {
                 let runnable_queue = Rc::clone(&runnable_queue);
 
-                // We schedule the poll to avoid `textlock` and other
-                // synchronization issues.
-                oxi::schedule(move |()| {
+                let poll_tasks = (move |()| {
                     for _ in 0..runnable_queue.len() {
                         runnable_queue
                             .pop_front()
                             .expect("checked queue length")
                             .run();
                     }
-                });
+                })
+                .catch_unwind()
+                .map(|_| ());
+
+                // We schedule the poll to avoid `textlock` and other
+                // synchronization issues.
+                oxi::schedule(poll_tasks);
             })
         }
         .expect("creating an async handle never fails");

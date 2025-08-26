@@ -8,6 +8,7 @@ use slotmap::SlotMap;
 
 use crate::buffer::{BufferId, Point};
 use crate::oxi::api;
+use crate::utils::CallbackExt;
 
 #[derive(Clone)]
 pub(crate) struct DecorationProvider {
@@ -126,8 +127,14 @@ impl DecorationProvider {
         };
 
         let opts = api::opts::DecorationProviderOpts::builder()
-            .on_start(this.on_start())
-            .on_win(this.on_win())
+            .on_start(this.on_start().catch_unwind().map(
+                |maybe_dont_skip_cycle| maybe_dont_skip_cycle.unwrap_or(false),
+            ))
+            .on_win(this.on_win().catch_unwind().map(
+                |maybe_dont_skip_on_lines| {
+                    maybe_dont_skip_on_lines.unwrap_or(false)
+                },
+            ))
             .build();
 
         api::set_decoration_provider(namespace_id, &opts)
