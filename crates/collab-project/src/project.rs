@@ -195,6 +195,14 @@ impl Project {
         }
     }
 
+    /// Creates a new [`Project`] with the given [`PeerId`] but with the same
+    /// internal state as this one.
+    #[cfg(feature = "serde")]
+    pub fn fork(&self, new_peer_id: PeerId) -> Self {
+        Self::decode(&self.encode(), new_peer_id)
+            .expect("encoding roundtrip should be infallible")
+    }
+
     /// TODO: docs.
     #[cfg(feature = "mock")]
     #[inline]
