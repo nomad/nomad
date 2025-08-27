@@ -30,12 +30,7 @@ use crate::config::Config;
 use crate::editors::{CollabEditor, SessionId, Welcome};
 use crate::event_stream::EventStreamBuilder;
 use crate::leave::StopChannels;
-use crate::project::{
-    IdMaps,
-    NewProjectArgs,
-    OverlappingProjectError,
-    Projects,
-};
+use crate::project::{IdMaps, NewProjectArgs, Projects};
 use crate::session::Session;
 
 /// The `Action` used to join an existing collaborative editing session.
@@ -88,11 +83,6 @@ impl<Ed: CollabEditor> Join<Ed> {
         }
         .join(&welcome.project_name);
 
-        let project_guard = self
-            .projects
-            .new_guard(project_root)
-            .map_err(JoinError::OverlappingProject)?;
-
         let local_peer = Peer { id: welcome.peer_id, github_handle };
 
         let (project, buffered) =
@@ -101,7 +91,7 @@ impl<Ed: CollabEditor> Join<Ed> {
                 .map_err(JoinError::RequestProject)?;
 
         let (project_root, stream_builder, id_maps) =
-            write_project(&project, project_guard.root().to_owned(), ctx)
+            write_project(&project, project_root, ctx)
                 .await
                 .map_err(JoinError::WriteProject)?;
 
@@ -112,12 +102,13 @@ impl<Ed: CollabEditor> Join<Ed> {
             .push_filter(Either::Left(project_filter))
             .build(ctx);
 
-        let project_handle = project_guard.activate(NewProjectArgs {
+        let project_handle = self.projects.insert(NewProjectArgs {
             agent_id: event_stream.agent_id(),
             id_maps: id_maps.into(),
             host_id: welcome.host_id,
             local_peer,
             project,
+            project_root: project_root.path().to_owned(),
             remote_peers: welcome.other_peers,
             session_id: welcome.session_id,
         });
@@ -376,9 +367,6 @@ pub enum JoinError<Ed: CollabEditor> {
 
     /// TODO: docs.
     Knock(collab_client::KnockError<Ed::ServerParams>),
-
-    /// TODO: docs.
-    OverlappingProject(OverlappingProjectError),
 
     /// The project filter couldn't be created.
     ProjectFilter(Ed::ProjectFilterError),

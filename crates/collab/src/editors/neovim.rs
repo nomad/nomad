@@ -1,4 +1,3 @@
-use core::marker::PhantomData;
 use core::ops::Range;
 use core::{fmt, future};
 use std::ffi::OsString;
@@ -40,9 +39,6 @@ pub struct PeerTooltip {
 
     /// The remote peer this tooltip is for.
     peer: Peer,
-
-    /// Makes sure that the type is `!Send`.
-    _not_send: PhantomData<*mut ()>,
 }
 
 #[derive(Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq)]
@@ -125,13 +121,7 @@ impl PeerTooltip {
             )
             .expect("couldn't set extmark");
 
-        Self {
-            buffer,
-            cursor_extmark_id,
-            peer,
-            namespace_id,
-            _not_send: PhantomData,
-        }
+        Self { buffer, cursor_extmark_id, peer, namespace_id }
     }
 
     /// Returns the [`Point`] range to be highlighted to represent the remote

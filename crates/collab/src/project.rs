@@ -11,7 +11,7 @@ use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
 use compact_str::format_compact;
 use editor::{AgentId, Buffer, Context, Editor, Shared};
 use fs::{File as _, Fs, Symlink as _};
-use fxhash::{FxHashMap, FxHashSet};
+use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
 use puff::file::{GlobalFileId, LocalFileId};
 use puff::ops::Rename;
@@ -34,20 +34,6 @@ use crate::event::{
 pub struct ProjectHandle<Ed: CollabEditor> {
     inner: Shared<Project<Ed>>,
     projects: Projects<Ed>,
-}
-
-/// TODO: docs.
-#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
-#[display(
-    "cannot start a project at {new_root}, another one is already running at \
-     {existing_root} (sessions cannot overlap)"
-)]
-pub struct OverlappingProjectError {
-    /// TODO: docs.
-    pub existing_root: AbsPathBuf,
-
-    /// TODO: docs.
-    pub new_root: AbsPathBuf,
 }
 
 /// TODO: docs.
@@ -81,13 +67,7 @@ pub(crate) struct Project<Ed: CollabEditor> {
 
 #[derive(cauchy::Debug, cauchy::Clone, cauchy::Default)]
 pub(crate) struct Projects<Ed: CollabEditor> {
-    active: Shared<FxHashMap<SessionId<Ed>, ProjectHandle<Ed>>>,
-    starting: Shared<FxHashSet<AbsPathBuf>>,
-}
-
-pub(crate) struct ProjectGuard<Ed: CollabEditor> {
-    root: AbsPathBuf,
-    projects: Projects<Ed>,
+    inner: Shared<FxHashMap<SessionId<Ed>, ProjectHandle<Ed>>>,
 }
 
 pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
@@ -97,6 +77,7 @@ pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
     pub(crate) local_peer: Peer,
     pub(crate) remote_peers: collab_types::Peers,
     pub(crate) project: collab_project::Project,
+    pub(crate) project_root: AbsPathBuf,
     pub(crate) session_id: SessionId<Ed>,
 }
 
@@ -1127,53 +1108,45 @@ impl<Ed: CollabEditor> Projects<Ed> {
         &self,
         session_id: SessionId<Ed>,
     ) -> Option<ProjectHandle<Ed>> {
-        self.active.with(|map| map.get(&session_id).cloned())
+        self.inner.with(|map| map.get(&session_id).cloned())
     }
 
-    pub(crate) fn new_guard(
+    pub(crate) fn insert(
         &self,
-        project_root: AbsPathBuf,
-    ) -> Result<ProjectGuard<Ed>, OverlappingProjectError> {
-        fn overlaps(l: &AbsPath, r: &AbsPath) -> bool {
-            l.starts_with(r) || r.starts_with(l)
-        }
+        args: NewProjectArgs<Ed>,
+    ) -> ProjectHandle<Ed> {
+        let peers = args
+            .remote_peers
+            .into_iter()
+            .map(|peer| (peer.id, peer))
+            .chain(iter::once((args.local_peer.id, args.local_peer)))
+            .collect();
 
-        let conflicting_root = self
-            .active
-            .with(|map| {
-                map.values().find_map(|handle| {
-                    handle.with(|proj| {
-                        overlaps(&proj.root_path, &project_root)
-                            .then(|| proj.root_path.clone())
-                    })
-                })
-            })
-            .or_else(|| {
-                self.starting.with(|roots| {
-                    roots
-                        .iter()
-                        .find(|root| overlaps(root, &project_root))
-                        .cloned()
-                })
-            });
+        let project = Project {
+            agent_id: args.agent_id,
+            host_id: args.host_id,
+            id_maps: args.id_maps,
+            inner: args.project,
+            peer_selections: FxHashMap::default(),
+            peer_tooltips: FxHashMap::default(),
+            peers,
+            root_path: args.project_root,
+            session_id: args.session_id,
+        };
 
-        if let Some(conflicting_root) = conflicting_root {
-            return Err(OverlappingProjectError {
-                existing_root: conflicting_root,
-                new_root: project_root,
-            });
-        }
+        let session_id = project.session_id;
 
-        let guard = ProjectGuard {
-            root: project_root.clone(),
+        let handle = ProjectHandle {
+            inner: Shared::new(project),
             projects: self.clone(),
         };
 
-        self.starting.with_mut(|map| {
-            assert!(map.insert(project_root));
+        self.inner.with_mut(|map| {
+            let prev = map.insert(session_id, handle.clone());
+            assert!(prev.is_none());
         });
 
-        Ok(guard)
+        handle
     }
 
     pub(crate) async fn select(
@@ -1182,7 +1155,7 @@ impl<Ed: CollabEditor> Projects<Ed> {
         ctx: &mut Context<Ed>,
     ) -> Result<Option<(AbsPathBuf, SessionId<Ed>)>, NoActiveSessionError>
     {
-        let active_sessions = self.active.with(|map| {
+        let active_sessions = self.inner.with(|map| {
             map.iter()
                 .map(|(session_id, handle)| {
                     let root = handle.with(|proj| proj.root_path.clone());
@@ -1203,53 +1176,6 @@ impl<Ed: CollabEditor> Projects<Ed> {
         };
 
         Ok(Some(session.clone()))
-    }
-
-    fn insert(&self, project: Project<Ed>) -> ProjectHandle<Ed> {
-        let session_id = project.session_id;
-        let handle = ProjectHandle {
-            inner: Shared::new(project),
-            projects: self.clone(),
-        };
-        self.active.with_mut(|map| {
-            let prev = map.insert(session_id, handle.clone());
-            assert!(prev.is_none());
-        });
-        handle
-    }
-}
-
-impl<Ed: CollabEditor> ProjectGuard<Ed> {
-    pub(crate) fn activate(
-        self,
-        args: NewProjectArgs<Ed>,
-    ) -> ProjectHandle<Ed> {
-        self.projects.starting.with_mut(|set| {
-            assert!(set.remove(&self.root));
-        });
-
-        let peers = args
-            .remote_peers
-            .into_iter()
-            .map(|peer| (peer.id, peer))
-            .chain(iter::once((args.local_peer.id, args.local_peer)))
-            .collect();
-
-        self.projects.insert(Project {
-            agent_id: args.agent_id,
-            host_id: args.host_id,
-            id_maps: args.id_maps,
-            inner: args.project,
-            peer_selections: FxHashMap::default(),
-            peer_tooltips: FxHashMap::default(),
-            peers,
-            root_path: self.root.clone(),
-            session_id: args.session_id,
-        })
-    }
-
-    pub(crate) fn root(&self) -> &AbsPath {
-        &self.root
     }
 }
 
@@ -1655,18 +1581,10 @@ impl<Ed: CollabEditor> Drop for ProjectHandle<Ed> {
             // Removing the ProjectHandle from the Projects will cause this
             // Drop impl to be called again, so use a non-panicking method
             // to access the inner map.
-            let _ = self.projects.active.try_with_mut(|map| {
+            let _ = self.projects.inner.try_with_mut(|map| {
                 map.remove(&self.session_id());
             });
         }
-    }
-}
-
-impl<Ed: CollabEditor> Drop for ProjectGuard<Ed> {
-    fn drop(&mut self) {
-        self.projects.starting.with_mut(|set| {
-            set.remove(&self.root);
-        });
     }
 }
 

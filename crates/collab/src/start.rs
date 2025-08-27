@@ -25,12 +25,7 @@ use crate::config::Config;
 use crate::editors::CollabEditor;
 use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
-use crate::project::{
-    IdMaps,
-    NewProjectArgs,
-    OverlappingProjectError,
-    Projects,
-};
+use crate::project::{IdMaps, NewProjectArgs, Projects};
 use crate::session::Session;
 use crate::{SessionId, root_markers};
 
@@ -199,19 +194,12 @@ impl<Ed: CollabEditor> Start<Ed> {
             .await
             .map_err(StartError::SearchProjectRoot)?;
 
-        let project_guard = self
-            .projects
-            .new_guard(project_root)
-            .map_err(StartError::OverlappingProject)?;
-
-        if !Ed::confirm_start(project_guard.root(), ctx).await {
+        if !Ed::confirm_start(&project_root, ctx).await {
             return Err(StartError::UserDidNotConfirm);
         }
 
-        let project_name = project_guard
-            .root()
-            .node_name()
-            .ok_or(StartError::ProjectRootIsFsRoot)?;
+        let project_name =
+            project_root.node_name().ok_or(StartError::ProjectRootIsFsRoot)?;
 
         let server_addr = self.config.with(|c| c.server_address.clone());
 
@@ -234,17 +222,18 @@ impl<Ed: CollabEditor> Start<Ed> {
             .map_err(StartError::Knock)?;
 
         let (project, event_stream, id_maps) =
-            Self::read_project(project_guard.root(), welcome.peer_id, ctx)
+            Self::read_project(&project_root, welcome.peer_id, ctx)
                 .await
                 .map_err(StartError::ReadProject)?;
 
-        let project_handle = project_guard.activate(NewProjectArgs {
+        let project_handle = self.projects.insert(NewProjectArgs {
             agent_id: event_stream.agent_id(),
             host_id: welcome.host_id,
             id_maps,
             local_peer: Peer { id: welcome.peer_id, github_handle },
             remote_peers: welcome.other_peers,
             project,
+            project_root,
             session_id: welcome.session_id,
         });
 
@@ -434,9 +423,6 @@ pub enum StartError<Ed: CollabEditor> {
          determine the project root"
     )]
     NoBufferFocused,
-
-    /// TODO: docs.
-    OverlappingProject(OverlappingProjectError),
 
     /// TODO: docs.
     #[display(
