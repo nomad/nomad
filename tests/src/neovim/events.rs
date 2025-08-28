@@ -27,7 +27,7 @@ async fn on_buffer_created_doesnt_fire_for_nameless_buffers(
 }
 
 #[neovim::test]
-async fn on_buffer_created_fires_when_creating_buffer_not_backed_by_a_file(
+fn on_buffer_created_fires_when_creating_buffer_not_backed_by_a_file(
     ctx: &mut Context<Neovim>,
 ) {
     let num_times_fired = Shared::<u8>::new(0);
@@ -44,7 +44,7 @@ async fn on_buffer_created_fires_when_creating_buffer_not_backed_by_a_file(
 }
 
 #[neovim::test]
-async fn on_buffer_created_fires_when_nameless_buffer_is_renamed(
+fn on_buffer_created_fires_when_nameless_buffer_is_renamed(
     ctx: &mut Context<Neovim>,
 ) {
     let num_times_fired = Shared::<u8>::new(0);
@@ -64,7 +64,7 @@ async fn on_buffer_created_fires_when_nameless_buffer_is_renamed(
 }
 
 #[neovim::test]
-async fn on_buffer_created_doesnt_fire_when_named_buffer_is_renamed(
+fn on_buffer_created_doesnt_fire_when_named_buffer_is_renamed(
     ctx: &mut Context<Neovim>,
 ) {
     ctx.command("edit foo.txt");
@@ -82,7 +82,7 @@ async fn on_buffer_created_doesnt_fire_when_named_buffer_is_renamed(
 }
 
 #[neovim::test]
-async fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
+fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
     ctx: &mut Context<Neovim>,
 ) {
     ctx.command("edit foo.txt");
@@ -109,7 +109,7 @@ async fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
 }
 
 #[neovim::test]
-async fn on_cursor_created_doesnt_fire_when_editing_current_buffer(
+fn on_cursor_created_doesnt_fire_when_editing_current_buffer(
     ctx: &mut Context<Neovim>,
 ) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
@@ -132,7 +132,7 @@ async fn on_cursor_created_doesnt_fire_when_editing_current_buffer(
 }
 
 #[neovim::test]
-async fn on_cursor_created_doesnt_fire_when_splitting_current_buffer(
+fn on_cursor_created_doesnt_fire_when_splitting_current_buffer(
     ctx: &mut Context<Neovim>,
 ) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
