@@ -107,3 +107,49 @@ async fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
 
     assert_eq!(num_times_fired.take(), 1);
 }
+
+#[neovim::test]
+async fn on_cursor_created_doesnt_fire_when_editing_current_buffer(
+    ctx: &mut Context<Neovim>,
+) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let buffer_path = ctx.with_borrowed(|ctx| {
+        ctx.current_buffer().unwrap().path().into_owned()
+    });
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.on_cursor_created({
+        let num_times_fired = num_times_fired.clone();
+        move |_, _| num_times_fired.with_mut(|n| *n += 1)
+    });
+
+    // ":edit <path>" triggers BufEnter even if the given path is the one of
+    // the current buffer, so make sure we guard against that.
+    ctx.command(format!("edit {buffer_path}"));
+    assert_eq!(num_times_fired.take(), 0);
+}
+
+#[neovim::test]
+async fn on_cursor_created_doesnt_fire_when_splitting_current_buffer(
+    ctx: &mut Context<Neovim>,
+) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let buffer_path = ctx.with_borrowed(|ctx| {
+        ctx.current_buffer().unwrap().path().into_owned()
+    });
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.on_cursor_created({
+        let num_times_fired = num_times_fired.clone();
+        move |_, _| num_times_fired.with_mut(|n| *n += 1)
+    });
+
+    // ":split <path>" triggers BufEnter even if the given path is the one of
+    // the current buffer, so make sure we guard against that.
+    ctx.command(format!("split {buffer_path}"));
+    assert_eq!(num_times_fired.take(), 0);
+}

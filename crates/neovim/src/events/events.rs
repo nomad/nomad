@@ -31,7 +31,7 @@ pub(crate) struct Events {
         Option<Callbacks<events::SetUneditableEndOfLine>>,
 
     /// The callback registered to the [`BufferCreated`] event, or `None` if no
-    /// callback have been registered to that event.
+    /// callback has been registered to that event.
     pub(crate) on_buffer_created: Option<Callbacks<events::BufferCreated>>,
 
     /// Map from a buffer's ID to the callbacks registered to the [`OnBytes`]
@@ -40,7 +40,7 @@ pub(crate) struct Events {
         NoHashMap<BufferId, Callbacks<events::OnBytes>>,
 
     /// The callback registered to the [`BufEnter`] event, or `None` if no
-    /// callback have been registered to that event.
+    /// callback has been registered to that event.
     pub(crate) on_buffer_focused: Option<Callbacks<events::BufEnter>>,
 
     /// Map from a buffer's ID to the callbacks registered to the
@@ -64,7 +64,7 @@ pub(crate) struct Events {
         NoHashMap<BufferId, Callbacks<events::CursorMoved>>,
 
     /// The callback registered to the [`ModeChanged`] event, or `None` if no
-    /// callback have been registered to that event .
+    /// callback has been registered to that event .
     pub(crate) on_mode_changed: Option<Callbacks<events::ModeChanged>>,
 }
 
