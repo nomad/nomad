@@ -10,6 +10,19 @@ use crate::utils::CallbackExt;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ModeChanged;
 
+impl ModeChanged {
+    #[track_caller]
+    pub(crate) fn parse_args(
+        args: &api::types::AutocmdCallbackArgs,
+    ) -> (ModeStr<'_>, ModeStr<'_>) {
+        debug_assert_eq!(args.event, "ModeChanged");
+        let (old_mode, new_mode) = args.r#match.split_once(':').expect(
+            "expected a string with format \"{{old_mode}}:{{new_mode}}\"",
+        );
+        (ModeStr::new(old_mode), ModeStr::new(new_mode))
+    }
+}
+
 impl Event for ModeChanged {
     type Args<'a> = (NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
@@ -47,14 +60,7 @@ impl Event for ModeChanged {
                     return true;
                 };
 
-                let (old_mode, new_mode) =
-                    args.r#match.split_once(':').expect(
-                        "expected a string with format \
-                         \"{{old_mode}}:{{new_mode}}\"",
-                    );
-
-                let old_mode = ModeStr::new(old_mode);
-                let new_mode = ModeStr::new(new_mode);
+                let (old_mode, new_mode) = Self::parse_args(args);
 
                 for callback in callbacks.cloned() {
                     callback((

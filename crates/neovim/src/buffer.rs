@@ -149,7 +149,7 @@ impl<'a> NeovimBuffer<'a> {
             return None;
         }
 
-        let path = inner.get_name().ok()?.to_str().ok()?.parse().ok()?;
+        let path = inner.name().to_str().ok()?.parse().ok()?;
 
         Some(Self { inner, path: Cow::Owned(path), nvim })
     }

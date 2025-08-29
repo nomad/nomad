@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use editor::{AccessMut, AgentId, Buffer, ByteOffset, Cursor, Shared};
+use editor::{AccessMut, AgentId, Buffer, ByteOffset, Cursor};
 use nvim_oxi::api;
 
 use crate::buffer::{BufferId, NeovimBuffer, Point};
@@ -67,52 +67,17 @@ impl Cursor for NeovimCursor<'_> {
     #[inline]
     fn on_moved<Fun>(
         &mut self,
-        fun: Fun,
+        mut fun: Fun,
         nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
     where
         Fun: FnMut(&NeovimCursor, AgentId) + 'static,
     {
-        let old_point = Shared::<Point>::new(self.point());
-        let fun = Shared::<Fun>::new(fun);
-
-        let buffer_id = self.buffer_id();
-
-        let cursor_moved_handle = self.nvim.events.insert(
-            events::CursorMoved(buffer_id),
-            {
-                let fun = fun.clone();
-                let old_point = old_point.clone();
-                move |(this, moved_by)| {
-                    let new_point = this.point();
-                    if old_point.replace(new_point) != new_point {
-                        fun.with_mut(|fun| fun(&this, moved_by));
-                    }
-                }
-            },
+        self.nvim.events.insert(
+            events::CursorMoved(self.buffer_id()),
+            move |(this, moved_by)| fun(&this, moved_by),
             nvim.clone(),
-        );
-
-        // The cursor position moves one character to the left when going from
-        // normal to insert mode and one character to the right when going
-        // from insert to normal mode with "a".
-        let mode_changed_handle = self.nvim.events.insert(
-            events::ModeChanged,
-            move |(buf, old_mode, new_mode, changed_by)| {
-                if buf.id() == buffer_id
-                    && (old_mode.is_insert() || new_mode.is_insert())
-                {
-                    let this = NeovimCursor::from(buf);
-                    let new_point = this.point();
-                    if old_point.replace(new_point) != new_point {
-                        fun.with_mut(|fun| fun(&this, changed_by));
-                    }
-                }
-            },
-            nvim,
-        );
-
-        cursor_moved_handle.merge(mode_changed_handle)
+        )
     }
 
     #[inline]
@@ -124,9 +89,8 @@ impl Cursor for NeovimCursor<'_> {
     where
         Fun: FnMut(BufferId, AgentId) + 'static,
     {
-        let buffer_id = self.buffer_id();
         self.nvim.events.insert(
-            events::BufLeave(buffer_id),
+            events::BufLeave(self.buffer_id()),
             move |(buf, unfocused_by)| fun(buf.id(), unfocused_by),
             nvim,
         )

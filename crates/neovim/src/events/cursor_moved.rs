@@ -4,7 +4,14 @@ use nohash::IntMap as NoHashMap;
 use crate::Neovim;
 use crate::buffer::{BufferExt, BufferId};
 use crate::cursor::NeovimCursor;
-use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
+use crate::events::{
+    AutocmdId,
+    Callbacks,
+    Event,
+    EventKind,
+    Events,
+    ModeChanged,
+};
 use crate::oxi::api;
 use crate::utils::CallbackExt;
 
@@ -37,63 +44,82 @@ impl Event for CursorMoved {
         events: &Events,
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
-        let callback = (move |args: api::types::AutocmdCallbackArgs| {
-            nvim.with_mut(|nvim| {
-                let buffer_id = BufferId::from(args.buffer.clone());
-
-                let Some(callbacks) = nvim
-                    .events
-                    .on_cursor_moved
-                    .get(&buffer_id)
-                    .map(|cbs| cbs.cloned())
-                else {
-                    return true;
-                };
-
-                let moved_by = nvim
-                    .events
-                    .agent_ids
-                    .moved_cursor
-                    .remove(&buffer_id)
-                    .unwrap_or(AgentId::UNKNOWN);
-
-                let Some(buffer) = nvim.buffer(buffer_id) else {
-                    tracing::error!(
-                        buffer_name = %args.buffer.name(),
-                        "CursorMoved triggered for an invalid buffer",
-                    );
-                    return true;
-                };
-
-                let mut cursor = NeovimCursor::from(buffer);
-
-                for callback in callbacks {
-                    callback((cursor.reborrow(), moved_by));
+        let on_cursor_moved =
+            (move |args: api::types::AutocmdCallbackArgs| {
+                if args.event == "ModeChanged" {
+                    let (old_mode, new_mode) = ModeChanged::parse_args(&args);
+                    // We only care about ModeChanged events if transitioning
+                    // from or to insert mode.
+                    if !old_mode.is_insert() && !new_mode.is_insert() {
+                        return false;
+                    }
                 }
 
-                false
+                nvim.with_mut(|nvim| {
+                    let buffer_id = BufferId::from(args.buffer.clone());
+
+                    let Some(callbacks) = nvim
+                        .events
+                        .on_cursor_moved
+                        .get(&buffer_id)
+                        .map(|cbs| cbs.cloned())
+                    else {
+                        return true;
+                    };
+
+                    let moved_by = nvim
+                        .events
+                        .agent_ids
+                        .moved_cursor
+                        .remove(&buffer_id)
+                        .unwrap_or(AgentId::UNKNOWN);
+
+                    let Some(buffer) = nvim.buffer(buffer_id) else {
+                        tracing::error!(
+                            buffer_name = %args.buffer.name(),
+                            "{:?} triggered for an invalid buffer", args.event,
+                        );
+                        return true;
+                    };
+
+                    let mut cursor = NeovimCursor::from(buffer);
+
+                    for callback in callbacks {
+                        callback((cursor.reborrow(), moved_by));
+                    }
+
+                    false
+                })
             })
-        })
-        .catch_unwind()
-        .map(|maybe_detach| maybe_detach.unwrap_or(true))
-        .into_function();
+            .catch_unwind()
+            .map(|maybe_detach| maybe_detach.unwrap_or(true))
+            .into_function();
 
         // Neovim has 3 separate cursor-move-related autocommand events --
         // CursorMoved, CursorMovedI and CursorMovedC -- which are triggered
         // when the cursor is moved in Normal/Visual mode, Insert mode and in
         // the command line, respectively.
         //
-        // Since ed has no concept of modes, we register the callback on both
-        // CursorMoved and CursorMovedI.
+        // Since our editor API has no concept of modes, we register the
+        // callback on both CursorMoved and CursorMovedI.
+        //
+        // We register on WinEnter because navigating between different window
+        // splits all displaying the same buffer is the same as moving the
+        // cursor.
+        //
+        // We register on ModeChanged because the cursor moves one character to
+        // the left when going from insert mode to normal mode and one
+        // character to the right when going from normal mode to insert mode
+        // with "a".
         api::create_autocmd(
-            ["CursorMoved", "CursorMovedI"],
+            ["CursorMoved", "CursorMovedI", "WinEnter", "ModeChanged"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .buffer(self.0.into())
-                .callback(callback)
+                .callback(on_cursor_moved)
                 .build(),
         )
-        .expect("couldn't create autocmd on CursorMoved{I}")
+        .expect("couldn't create autocmd")
     }
 
     #[inline]
