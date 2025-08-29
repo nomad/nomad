@@ -60,7 +60,22 @@ impl Event for ModeChanged {
                     return true;
                 };
 
-                let (old_mode, new_mode) = Self::parse_args(args);
+                // This causes an ICE on rustc 1.91.0-nightly (69b76df90
+                // 2025-08-23).
+                //
+                // TODO: wait for it to be fixed, then replace the code below
+                // with this one-liner.
+                //
+                // let (old_mode, new_mode) = Self::parse_args(args);
+
+                let (old_mode, new_mode) =
+                    args.r#match.split_once(':').expect(
+                        "expected a string with format \
+                         \"{{old_mode}}:{{new_mode}}\"",
+                    );
+
+                let old_mode = ModeStr::new(old_mode);
+                let new_mode = ModeStr::new(new_mode);
 
                 for callback in callbacks.cloned() {
                     callback((

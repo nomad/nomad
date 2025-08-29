@@ -44,56 +44,55 @@ impl Event for CursorMoved {
         events: &Events,
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
-        let on_cursor_moved =
-            (move |args: api::types::AutocmdCallbackArgs| {
-                if args.event == "ModeChanged" {
-                    let (old_mode, new_mode) = ModeChanged::parse_args(&args);
-                    // We only care about ModeChanged events if transitioning
-                    // from or to insert mode.
-                    if !old_mode.is_insert() && !new_mode.is_insert() {
-                        return false;
-                    }
+        let callback = (move |args: api::types::AutocmdCallbackArgs| {
+            if args.event == "ModeChanged" {
+                let (old_mode, new_mode) = ModeChanged::parse_args(&args);
+                // We only care about ModeChanged events if transitioning from
+                // or to insert mode.
+                if !old_mode.is_insert() && !new_mode.is_insert() {
+                    return false;
+                }
+            }
+
+            nvim.with_mut(|nvim| {
+                let buffer_id = BufferId::from(args.buffer.clone());
+
+                let Some(callbacks) = nvim
+                    .events
+                    .on_cursor_moved
+                    .get(&buffer_id)
+                    .map(|cbs| cbs.cloned())
+                else {
+                    return true;
+                };
+
+                let moved_by = nvim
+                    .events
+                    .agent_ids
+                    .moved_cursor
+                    .remove(&buffer_id)
+                    .unwrap_or(AgentId::UNKNOWN);
+
+                let Some(buffer) = nvim.buffer(buffer_id) else {
+                    tracing::error!(
+                        buffer_name = %args.buffer.name(),
+                        "{:?} triggered for an invalid buffer", args.event,
+                    );
+                    return true;
+                };
+
+                let mut cursor = NeovimCursor::from(buffer);
+
+                for callback in callbacks {
+                    callback((cursor.reborrow(), moved_by));
                 }
 
-                nvim.with_mut(|nvim| {
-                    let buffer_id = BufferId::from(args.buffer.clone());
-
-                    let Some(callbacks) = nvim
-                        .events
-                        .on_cursor_moved
-                        .get(&buffer_id)
-                        .map(|cbs| cbs.cloned())
-                    else {
-                        return true;
-                    };
-
-                    let moved_by = nvim
-                        .events
-                        .agent_ids
-                        .moved_cursor
-                        .remove(&buffer_id)
-                        .unwrap_or(AgentId::UNKNOWN);
-
-                    let Some(buffer) = nvim.buffer(buffer_id) else {
-                        tracing::error!(
-                            buffer_name = %args.buffer.name(),
-                            "{:?} triggered for an invalid buffer", args.event,
-                        );
-                        return true;
-                    };
-
-                    let mut cursor = NeovimCursor::from(buffer);
-
-                    for callback in callbacks {
-                        callback((cursor.reborrow(), moved_by));
-                    }
-
-                    false
-                })
+                false
             })
-            .catch_unwind()
-            .map(|maybe_detach| maybe_detach.unwrap_or(true))
-            .into_function();
+        })
+        .catch_unwind()
+        .map(|maybe_detach| maybe_detach.unwrap_or(true))
+        .into_function();
 
         // Neovim has 3 separate cursor-move-related autocommand events --
         // CursorMoved, CursorMovedI and CursorMovedC -- which are triggered
@@ -116,7 +115,7 @@ impl Event for CursorMoved {
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .buffer(self.0.into())
-                .callback(on_cursor_moved)
+                .callback(callback)
                 .build(),
         )
         .expect("couldn't create autocmd")
