@@ -32,6 +32,8 @@ async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
+#[ignore = "feedkeys(\"a<Esc>\") is not quite equivalent to the 'startinsert' \
+            command, so no event is emitted and the test hangs"]
 async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
 

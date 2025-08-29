@@ -10,19 +10,6 @@ use crate::utils::CallbackExt;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ModeChanged;
 
-impl ModeChanged {
-    #[track_caller]
-    pub(crate) fn parse_args(
-        args: &api::types::AutocmdCallbackArgs,
-    ) -> (ModeStr<'_>, ModeStr<'_>) {
-        debug_assert_eq!(args.event, "ModeChanged");
-        let (old_mode, new_mode) = args.r#match.split_once(':').expect(
-            "expected a string with format \"{{old_mode}}:{{new_mode}}\"",
-        );
-        (ModeStr::new(old_mode), ModeStr::new(new_mode))
-    }
-}
-
 impl Event for ModeChanged {
     type Args<'a> = (NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
@@ -59,14 +46,6 @@ impl Event for ModeChanged {
                 else {
                     return true;
                 };
-
-                // This causes an ICE on rustc 1.91.0-nightly (69b76df90
-                // 2025-08-23).
-                //
-                // TODO: wait for it to be fixed, then replace the code below
-                // with this one-liner.
-                //
-                // let (old_mode, new_mode) = Self::parse_args(args);
 
                 let (old_mode, new_mode) =
                     args.r#match.split_once(':').expect(

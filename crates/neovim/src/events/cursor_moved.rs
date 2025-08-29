@@ -4,14 +4,7 @@ use nohash::IntMap as NoHashMap;
 use crate::Neovim;
 use crate::buffer::{BufferExt, BufferId};
 use crate::cursor::NeovimCursor;
-use crate::events::{
-    AutocmdId,
-    Callbacks,
-    Event,
-    EventKind,
-    Events,
-    ModeChanged,
-};
+use crate::events::{AutocmdId, Callbacks, Event, EventKind, Events};
 use crate::oxi::api;
 use crate::utils::CallbackExt;
 
@@ -45,15 +38,6 @@ impl Event for CursorMoved {
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
         let callback = (move |args: api::types::AutocmdCallbackArgs| {
-            if args.event == "ModeChanged" {
-                let (old_mode, new_mode) = ModeChanged::parse_args(&args);
-                // We only care about ModeChanged events if transitioning from
-                // or to insert mode.
-                if !old_mode.is_insert() && !new_mode.is_insert() {
-                    return false;
-                }
-            }
-
             nvim.with_mut(|nvim| {
                 let buffer_id = BufferId::from(args.buffer.clone());
 
@@ -105,13 +89,8 @@ impl Event for CursorMoved {
         // We register on WinEnter because navigating between different window
         // splits all displaying the same buffer is the same as moving the
         // cursor.
-        //
-        // We register on ModeChanged because the cursor moves one character to
-        // the left when going from insert mode to normal mode and one
-        // character to the right when going from normal mode to insert mode
-        // with "a".
         api::create_autocmd(
-            ["CursorMoved", "CursorMovedI", "WinEnter", "ModeChanged"],
+            ["CursorMoved", "CursorMovedI", "WinEnter"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .buffer(self.0.into())
