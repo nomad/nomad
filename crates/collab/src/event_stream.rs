@@ -205,7 +205,10 @@ impl<Ed: CollabEditor> EventStream<Ed> {
         self.cursor_streams.insert(cursor);
     }
 
-    pub(crate) fn watch_selection(&mut self, selection: Selection<'_, Ed>) {
+    pub(crate) fn watch_selection(
+        &mut self,
+        selection: &mut Selection<'_, Ed>,
+    ) {
         self.selection_streams.insert(selection);
     }
 
@@ -399,28 +402,36 @@ impl<Ed: CollabEditor> EventStream<Ed> {
 
     fn handle_selection_event(
         &mut self,
-        event: event::SelectionEvent<Ed>,
+        mut event: event::SelectionEvent<Ed>,
         ctx: &mut Context<Ed>,
     ) -> Option<event::SelectionEvent<Ed>> {
-        match &event.kind {
-            event::SelectionEventKind::Created(buffer_id, _) => {
+        match &mut event.kind {
+            event::SelectionEventKind::Created(buffer_id, range) => {
+                // We only care about selections in buffers that are part of
+                // the project.
                 if self.buffer_streams.is_watched(buffer_id) {
-                    ctx.with_borrowed(|ctx| {
-                        let selection =
-                            ctx.selection(event.selection_id.clone())?;
-                        self.watch_selection(selection);
-                        Some(event)
-                    })
-                } else {
-                    None
+                    return None;
                 }
+
+                ctx.with_borrowed(|ctx| {
+                    if let Some(mut selection) =
+                        ctx.selection(event.selection_id.clone())
+                    {
+                        // The selected range may have changed since the event
+                        // was sent, so update the event's range to the
+                        // current one.
+                        *range = selection.byte_range();
+                        self.watch_selection(&mut selection);
+                    }
+                });
             },
-            event::SelectionEventKind::Moved(_) => Some(event),
+            event::SelectionEventKind::Moved(_) => (),
             event::SelectionEventKind::Removed => {
                 self.selection_streams.remove(&event.selection_id);
-                Some(event)
             },
         }
+
+        Some(event)
     }
 
     /// Returns whether the given node should be watched.
@@ -703,7 +714,7 @@ impl<Fs: fs::Fs> FileStreams<Fs> {
 
 impl<Ed: CollabEditor> SelectionStreams<Ed> {
     /// Starts receiving [`event::SelectionEvent`]s on the given selection.
-    fn insert(&mut self, mut selection: Selection<'_, Ed>) {
+    fn insert(&mut self, selection: &mut Selection<'_, Ed>) {
         let selection_handles = match self.handles.entry(selection.id()) {
             hash_map::Entry::Occupied(_) => {
                 panic!(
