@@ -169,7 +169,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     ) {
         match message {
             Message::CreatedCursor(cursor_creation) => {
-                self.integrate_cursor_creation(cursor_creation, ctx).await
+                self.integrate_cursor_creation(cursor_creation, ctx)
             },
             Message::CreatedDirectory(directory_creation) => {
                 let _ = self.integrate_fs_op(directory_creation, ctx).await;
@@ -179,7 +179,6 @@ impl<Ed: CollabEditor> Project<Ed> {
             },
             Message::CreatedSelection(selection_creation) => {
                 self.integrate_selection_creation(selection_creation, ctx)
-                    .await
             },
             Message::DeletedDirectory(deletion) => {
                 let _ = self.integrate_fs_op(deletion, ctx).await;
@@ -194,7 +193,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 self.integrate_text_edit(text_edit, ctx).await
             },
             Message::MovedCursor(cursor_movement) => {
-                self.integrate_cursor_move(cursor_movement, ctx).await
+                self.integrate_cursor_move(cursor_movement, ctx)
             },
             Message::MovedDirectory(movement) => {
                 let _ = self.integrate_fs_op(movement, ctx).await;
@@ -204,14 +203,13 @@ impl<Ed: CollabEditor> Project<Ed> {
             },
             Message::MovedSelection(selection_movement) => {
                 self.integrate_selection_movement(selection_movement, ctx)
-                    .await;
             },
             Message::PeerDisconnected(peer_id) => {
-                self.integrate_peer_left(peer_id, ctx).await
+                self.integrate_peer_left(peer_id, ctx)
             },
             Message::PeerJoined(peer) => self.integrate_peer_joined(peer, ctx),
             Message::PeerLeft(peer_id) => {
-                self.integrate_peer_left(peer_id, ctx).await
+                self.integrate_peer_left(peer_id, ctx)
             },
             Message::ProjectRequest(_) => {
                 panic!(
@@ -226,11 +224,10 @@ impl<Ed: CollabEditor> Project<Ed> {
                 );
             },
             Message::RemovedCursor(cursor_deletion) => {
-                self.integrate_cursor_deletion(cursor_deletion, ctx).await
+                self.integrate_cursor_deletion(cursor_deletion, ctx)
             },
             Message::RemovedSelection(selection_deletion) => {
                 self.integrate_selection_deletion(selection_deletion, ctx)
-                    .await;
             },
             Message::RenamedFsNode(rename) => {
                 let _ = self.integrate_fs_op(rename, ctx).await;
@@ -332,12 +329,12 @@ impl<Ed: CollabEditor> Project<Ed> {
 
     /// Integrates the creation of a remote cursor by creating a tooltip
     /// in the corresponding buffer (if it's currently open).
-    pub async fn integrate_cursor_creation(
+    pub fn integrate_cursor_creation(
         &mut self,
         creation: text::CursorCreation,
         ctx: &mut Context<Ed>,
     ) {
-        let try_block = async {
+        let mut try_block = || {
             let cursor = self.inner.integrate_cursor_creation(creation)?;
             let cursor_owner = self.remote_peers.get(cursor.owner())?;
             let buffer_id =
@@ -347,43 +344,42 @@ impl<Ed: CollabEditor> Project<Ed> {
                 cursor.offset(),
                 buffer_id.clone(),
                 ctx,
-            )
-            .await;
+            );
             self.peer_tooltips.insert(cursor.id(), tooltip);
             Some(())
         };
 
-        try_block.await;
+        try_block();
     }
 
-    async fn integrate_cursor_deletion(
+    fn integrate_cursor_deletion(
         &mut self,
         removal: text::CursorRemoval,
         ctx: &mut Context<Ed>,
     ) {
-        let try_block = async {
+        let mut try_block = || {
             let cursor_id = self.inner.integrate_cursor_removal(removal)?;
             let tooltip = self.peer_tooltips.remove(&cursor_id)?;
-            Ed::remove_peer_tooltip(tooltip, ctx).await;
+            Ed::remove_peer_tooltip(tooltip, ctx);
             Some(())
         };
 
-        try_block.await;
+        try_block();
     }
 
-    async fn integrate_cursor_move(
+    fn integrate_cursor_move(
         &mut self,
         movement: text::CursorMove,
         ctx: &mut Context<Ed>,
     ) {
-        let try_block = async {
+        let mut try_block = || {
             let cursor = self.inner.integrate_cursor_move(movement)?;
             let tooltip = self.peer_tooltips.get_mut(&cursor.id())?;
-            Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx).await;
+            Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx);
             Some(())
         };
 
-        try_block.await;
+        try_block();
     }
 
     fn integrate_file_save(
@@ -449,11 +445,7 @@ impl<Ed: CollabEditor> Project<Ed> {
         self.remote_peers.insert(peer);
     }
 
-    async fn integrate_peer_left(
-        &mut self,
-        peer_id: PeerId,
-        ctx: &mut Context<Ed>,
-    ) {
+    fn integrate_peer_left(&mut self, peer_id: PeerId, ctx: &mut Context<Ed>) {
         self.remote_peers.remove(peer_id);
 
         let (cursor_ids, selection_ids) =
@@ -461,24 +453,24 @@ impl<Ed: CollabEditor> Project<Ed> {
 
         for cursor_id in cursor_ids {
             if let Some(tooltip) = self.peer_tooltips.remove(&cursor_id) {
-                Ed::remove_peer_tooltip(tooltip, ctx).await;
+                Ed::remove_peer_tooltip(tooltip, ctx);
             }
         }
 
         for selection_id in selection_ids {
             if let Some(selection) = self.peer_selections.remove(&selection_id)
             {
-                Ed::remove_peer_selection(selection, ctx).await;
+                Ed::remove_peer_selection(selection, ctx);
             }
         }
     }
 
-    async fn integrate_selection_creation(
+    fn integrate_selection_creation(
         &mut self,
         creation: text::SelectionCreation,
         ctx: &mut Context<Ed>,
     ) {
-        let try_block = async {
+        let mut try_block = || {
             let selection =
                 self.inner.integrate_selection_creation(creation)?;
             let file_id = selection.file()?.local_id();
@@ -489,36 +481,35 @@ impl<Ed: CollabEditor> Project<Ed> {
                 selection.offset_range(),
                 buffer_id.clone(),
                 ctx,
-            )
-            .await;
+            );
             self.peer_selections.insert(selection.id(), peer_selection);
             Some(())
         };
 
-        try_block.await;
+        try_block();
     }
 
-    async fn integrate_selection_deletion(
+    fn integrate_selection_deletion(
         &mut self,
         deletion: text::SelectionRemoval,
         ctx: &mut Context<Ed>,
     ) {
-        let try_block = async {
+        let mut try_block = || {
             let sel_id = self.inner.integrate_selection_removal(deletion)?;
             let peer_selection = self.peer_selections.remove(&sel_id)?;
-            Ed::remove_peer_selection(peer_selection, ctx).await;
+            Ed::remove_peer_selection(peer_selection, ctx);
             Some(())
         };
 
-        try_block.await;
+        try_block();
     }
 
-    async fn integrate_selection_movement(
+    fn integrate_selection_movement(
         &mut self,
         movement: text::SelectionMove,
         ctx: &mut Context<Ed>,
     ) {
-        let try_block = async {
+        let mut try_block = || {
             let selection = self.inner.integrate_selection_move(movement)?;
             let peer_selection =
                 self.peer_selections.get_mut(&selection.id())?;
@@ -526,12 +517,11 @@ impl<Ed: CollabEditor> Project<Ed> {
                 peer_selection,
                 selection.offset_range(),
                 ctx,
-            )
-            .await;
+            );
             Some(())
         };
 
-        try_block.await;
+        try_block();
     }
 
     /// Integrates a remote text edit by applying it to the corresponding
@@ -582,7 +572,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 .get_mut(&cursor.id())
                 .expect("there must be a tooltip for each remote cursor");
 
-            let _ = Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx).await;
+            Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx);
         }
     }
 
@@ -669,14 +659,15 @@ impl<Ed: CollabEditor> Project<Ed> {
                     .strip_prefix(&self.root_path)
                     .expect("the buffer is backed by a file in the project");
 
-                let file_id = match self.inner.node_at_path(path_in_proj)? {
-                    Node::File(file) => file.id(),
-                    Node::Directory(_) => return None,
+                let Node::File(File::Text(file)) =
+                    self.inner.node_at_path(path_in_proj)?
+                else {
+                    return None;
                 };
 
                 let ids = &mut self.id_maps;
-                ids.buffer2file.insert(buffer_id.clone(), file_id);
-                ids.file2buffer.insert(file_id, buffer_id);
+                ids.buffer2file.insert(buffer_id.clone(), file.local_id());
+                ids.file2buffer.insert(file.local_id(), buffer_id);
 
                 // TODO: create tooltips and selections for the cursors and
                 // selections of remote peers in the buffer.

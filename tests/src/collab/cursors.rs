@@ -58,7 +58,7 @@ fn remote_peer_tooltip_is_moved_after_integrating_edit() {
             foo_path.to_owned(),
         ));
 
-        proj.integrate_cursor_creation(cursor_creation, ctx).await;
+        proj.integrate_cursor_creation(cursor_creation, ctx);
         // The tooltip should be after the space.
         assert_eq!(*proj.peer_tooltips.get(&cursor_id).unwrap(), 6);
 

@@ -85,7 +85,7 @@ pub trait CollabEditor: Editor {
         selected_range: Range<ByteOffset>,
         buffer_id: Self::BufferId,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Self::PeerSelection>;
+    ) -> Self::PeerSelection;
 
     /// TODO: docs.
     fn create_peer_tooltip(
@@ -93,7 +93,7 @@ pub trait CollabEditor: Editor {
         tooltip_offset: ByteOffset,
         buffer_id: Self::BufferId,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Self::PeerTooltip>;
+    ) -> Self::PeerTooltip;
 
     /// TODO: docs.
     fn default_dir_for_remote_projects(
@@ -116,18 +116,18 @@ pub trait CollabEditor: Editor {
     ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
 
     /// TODO: docs.
-    fn move_peer_selection<'ctx>(
+    fn move_peer_selection(
         selection: &mut Self::PeerSelection,
         offset_range: Range<ByteOffset>,
-        ctx: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx, Self>;
+        ctx: &mut Context<Self>,
+    );
 
     /// TODO: docs.
-    fn move_peer_tooltip<'ctx>(
+    fn move_peer_tooltip(
         tooltip: &mut Self::PeerTooltip,
         tooltip_offset: ByteOffset,
-        ctx: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx, Self>;
+        ctx: &mut Context<Self>,
+    );
 
     /// Called when the [`Join`](join::Join) action returns an error.
     fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>);
@@ -164,13 +164,13 @@ pub trait CollabEditor: Editor {
     fn remove_peer_selection(
         selection: Self::PeerSelection,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = ()>;
+    );
 
     /// TODO: docs.
     fn remove_peer_tooltip(
         tooltip: Self::PeerTooltip,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = ()>;
+    );
 
     /// Prompts the user to select one of the given `(project_root,
     /// session_id)` pairs.

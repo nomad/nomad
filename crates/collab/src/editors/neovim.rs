@@ -1,5 +1,5 @@
+use core::fmt;
 use core::ops::Range;
-use core::{fmt, future};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::{env, io};
@@ -256,7 +256,7 @@ impl CollabEditor for Neovim {
             .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
     }
 
-    async fn create_peer_selection(
+    fn create_peer_selection(
         _remote_peer: Peer,
         selected_range: Range<ByteOffset>,
         buffer_id: Self::BufferId,
@@ -269,7 +269,7 @@ impl CollabEditor for Neovim {
         })
     }
 
-    async fn create_peer_tooltip(
+    fn create_peer_tooltip(
         remote_peer: Peer,
         tooltip_offset: ByteOffset,
         buffer_id: Self::BufferId,
@@ -358,23 +358,20 @@ impl CollabEditor for Neovim {
         selection: &mut Self::PeerSelection,
         selected_range: Range<ByteOffset>,
         ctx: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx> {
+    ) {
         ctx.with_editor(|nvim| {
             nvim.highlight_range(&selection.selection_highlight_handle)
                 .expect("invalid buffer ID")
                 .r#move(selected_range);
         });
-
-        async {}
     }
 
-    fn move_peer_tooltip<'ctx>(
+    fn move_peer_tooltip(
         tooltip: &mut Self::PeerTooltip,
         tooltip_offset: ByteOffset,
-        _: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx> {
+        _: &mut Context<Self>,
+    ) {
         tooltip.r#move(tooltip_offset);
-        future::ready(())
     }
 
     fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>) {
@@ -482,7 +479,7 @@ impl CollabEditor for Neovim {
         }
     }
 
-    async fn remove_peer_selection(
+    fn remove_peer_selection(
         _selection: Self::PeerSelection,
         _ctx: &mut Context<Self>,
     ) {
@@ -490,10 +487,7 @@ impl CollabEditor for Neovim {
         // we don't have to do anything here.
     }
 
-    async fn remove_peer_tooltip(
-        tooltip: Self::PeerTooltip,
-        _: &mut Context<Self>,
-    ) {
+    fn remove_peer_tooltip(tooltip: Self::PeerTooltip, _: &mut Context<Self>) {
         tooltip.remove();
     }
 

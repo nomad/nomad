@@ -3,7 +3,7 @@
 use core::convert::Infallible;
 use core::error::Error;
 use core::ops::Range;
-use core::{fmt, future, ops};
+use core::{fmt, ops};
 
 use abs_path::{AbsPath, AbsPathBuf};
 pub use collab_server::test::TestSessionId as MockSessionId;
@@ -238,7 +238,7 @@ where
         Ok(())
     }
 
-    async fn create_peer_selection(
+    fn create_peer_selection(
         _remote_peer: Peer,
         _selected_range: Range<ByteOffset>,
         _buffer_id: Self::BufferId,
@@ -246,7 +246,7 @@ where
     ) -> Self::PeerSelection {
     }
 
-    async fn create_peer_tooltip(
+    fn create_peer_tooltip(
         _remote_peer: Peer,
         tooltip_offset: ByteOffset,
         _buffer_id: Self::BufferId,
@@ -281,21 +281,19 @@ where
         Ok(ctx.with_editor(|this| this.lsp_root_with.as_mut()?(buffer_id)))
     }
 
-    fn move_peer_selection<'ctx>(
+    fn move_peer_selection(
         _selection: &mut Self::PeerSelection,
         _selected_range: Range<ByteOffset>,
-        _ctx: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx, Ed, F> {
-        async move {}
+        _ctx: &mut Context<Self>,
+    ) {
     }
 
-    fn move_peer_tooltip<'ctx>(
+    fn move_peer_tooltip(
         tooltip: &mut Self::PeerTooltip,
         tooltip_offset: ByteOffset,
-        _ctx: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx, Ed, F> {
+        _ctx: &mut Context<Self>,
+    ) {
         *tooltip = tooltip_offset;
-        future::ready(())
     }
 
     fn on_join_error(_: join::JoinError<Self>, _: &mut Context<Self>) {
@@ -333,13 +331,13 @@ where
         }))
     }
 
-    async fn remove_peer_selection(
+    fn remove_peer_selection(
         _selection: Self::PeerSelection,
         _ctx: &mut Context<Self>,
     ) {
     }
 
-    async fn remove_peer_tooltip(
+    fn remove_peer_tooltip(
         _tooltip: Self::PeerTooltip,
         _ctx: &mut Context<Self>,
     ) {
