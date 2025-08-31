@@ -584,28 +584,40 @@ impl<Ed: CollabEditor> Project<Ed> {
 
     /// Integrates a remote text edit by applying it to the corresponding
     /// buffer, creating the buffer first if necessary.
+    ///
+    /// Returns the ID of the buffer the edit was applied to, or `None` if
+    /// integrating the edit didn't generate any replacements to be applied.
     pub async fn integrate_text_edit(
         &mut self,
         edit: text::TextEdit,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), Ed::CreateBufferError> {
+    ) -> Result<Option<Ed::BufferId>, Ed::CreateBufferError> {
         let Some((file, replacements)) = self.inner.integrate_text_edit(edit)
         else {
-            return Ok(());
+            return Ok(None);
         };
+
+        let file_id = file.local_id();
 
         // If there's already an open buffer for the edited file we can just
         // apply the replacements to it. If not, we have to first create one.
-        let buffer_id = match self.id_maps.file2buffer.get(&file.local_id()) {
+        let buffer_id = match self.id_maps.file2buffer.get(&file_id) {
             Some(buffer_id) => buffer_id.clone(),
             None => {
                 let file_path = self.root_path.clone().concat(file.path());
-                ctx.create_buffer(&file_path, self.agent_id).await?
+                let buffer_id =
+                    ctx.create_buffer(&file_path, self.agent_id).await?;
+                self.synchronize_buffer_created(
+                    buffer_id.clone(),
+                    &file_path,
+                    ctx,
+                );
+                buffer_id
             },
         };
 
         ctx.with_borrowed(|ctx| {
-            ctx.buffer(buffer_id)
+            ctx.buffer(buffer_id.clone())
                 .expect("buffer exists")
                 .schedule_edit(
                     replacements.into_iter().map(Convert::convert),
@@ -615,12 +627,14 @@ impl<Ed: CollabEditor> Project<Ed> {
         })
         .await;
 
+        let Some(File::Text(file)) = self.inner.file(file_id) else {
+            unreachable!("we know this ID maps to a text file");
+        };
+
         // Update the positions of all the remote peers' tooltips in the
         // buffer.
-        for cursor in file
-            .as_file()
-            .cursors()
-            .filter(|cur| cur.owner() != self.local_peer.id)
+        for cursor in
+            file.cursors().filter(|cur| cur.owner() != self.local_peer.id)
         {
             let tooltip = self
                 .peer_tooltips
@@ -630,7 +644,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx);
         }
 
-        Ok(())
+        Ok(Some(buffer_id))
     }
 
     fn map_peers<T, Collector: FromIterator<T>>(
