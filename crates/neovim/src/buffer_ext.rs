@@ -231,7 +231,7 @@ pub trait BufferExt {
                 )
             })
             .expect("could not call col()")
-            - 1
+            .saturating_sub(1)
     }
 
     /// Returns the number of newline characters in the buffer.
