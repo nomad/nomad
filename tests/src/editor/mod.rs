@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 pub(crate) mod buffer;
 pub(crate) mod cursor;
 pub(crate) mod selection;
