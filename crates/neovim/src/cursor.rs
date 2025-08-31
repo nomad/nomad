@@ -126,7 +126,7 @@ impl Cursor for NeovimCursor<'_> {
         // borrow of Neovim.
         utils::schedule(move || {
             api::Window::current()
-                .set_cursor(point.line_idx + 1, point.byte_offset)
+                .set_cursor(point.newline_offset + 1, point.byte_offset)
                 .expect("couldn't set cursor");
         })
     }

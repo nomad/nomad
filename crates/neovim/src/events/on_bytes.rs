@@ -150,15 +150,15 @@ fn replacement_of_on_bytes(
     }
 
     let mut insertion_start =
-        Point { line_idx: start_row, byte_offset: start_col };
+        Point { newline_offset: start_row, byte_offset: start_col };
 
     if should_start_at_next_line {
-        insertion_start.line_idx += 1;
+        insertion_start.newline_offset += 1;
         insertion_start.byte_offset = 0;
     }
 
     let insertion_end = Point {
-        line_idx: start_row + new_end_row,
+        newline_offset: start_row + new_end_row,
         byte_offset: start_col * (new_end_row == 0) as usize + new_end_col,
     };
 

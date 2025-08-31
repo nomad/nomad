@@ -107,7 +107,7 @@ impl PeerTooltip {
         let highlight_range = Self::highlight_range(&buffer, cursor_offset);
 
         let opts = oxi::api::opts::SetExtmarkOpts::builder()
-            .end_row(highlight_range.end.line_idx)
+            .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
             .hl_group("TermCursor")
             .build();
@@ -115,7 +115,7 @@ impl PeerTooltip {
         let cursor_extmark_id = buffer
             .set_extmark(
                 namespace_id,
-                highlight_range.start.line_idx,
+                highlight_range.start.newline_offset,
                 highlight_range.start.byte_offset,
                 &opts,
             )
@@ -135,7 +135,7 @@ impl PeerTooltip {
         let highlight_start = buffer.point_of_byte(cursor_offset);
 
         let is_cursor_at_eol = buffer
-            .byte_len_of_line(highlight_start.line_idx)
+            .num_bytes_in_line_after(highlight_start.newline_offset)
             == highlight_start.byte_offset;
 
         let highlight_end =
@@ -145,7 +145,7 @@ impl PeerTooltip {
             // Apparently this works even if the cursor is on the last line,
             // and nvim_buf_set_extmark won't complain about it.
             if is_cursor_at_eol {
-                Point::new(highlight_start.line_idx + 1, 0)
+                Point::new(highlight_start.newline_offset + 1, 0)
             }
             // If the cursor is in the middle of a line, we set the end of the
             // highlighted range one byte after the start.
@@ -156,7 +156,7 @@ impl PeerTooltip {
             // end to the end of the grapheme.
             else {
                 Point::new(
-                    highlight_start.line_idx,
+                    highlight_start.newline_offset,
                     highlight_start.byte_offset + 1,
                 )
             };
@@ -171,7 +171,7 @@ impl PeerTooltip {
 
         let opts = oxi::api::opts::SetExtmarkOpts::builder()
             .id(self.cursor_extmark_id)
-            .end_row(highlight_range.end.line_idx)
+            .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
             .hl_group("TermCursor")
             .build();
@@ -180,7 +180,7 @@ impl PeerTooltip {
             .buffer
             .set_extmark(
                 self.namespace_id,
-                highlight_range.start.line_idx,
+                highlight_range.start.newline_offset,
                 highlight_range.start.byte_offset,
                 &opts,
             )

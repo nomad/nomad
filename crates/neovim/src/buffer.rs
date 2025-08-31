@@ -70,8 +70,8 @@ pub(crate) struct BuffersState {
 /// The 2D equivalent of a [`ByteOffset`] in a buffer.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Point {
-    /// The index of the line in the buffer.
-    pub line_idx: usize,
+    /// The number of `\n` characters before this point.
+    pub newline_offset: usize,
 
     /// The byte offset in the line.
     pub byte_offset: ByteOffset,
@@ -209,7 +209,7 @@ impl Point {
     /// Creates a new `Point`.
     #[inline]
     pub fn new(line_idx: usize, byte_offset: usize) -> Self {
-        Self { line_idx, byte_offset }
+        Self { newline_offset: line_idx, byte_offset }
     }
 
     #[inline]
@@ -537,8 +537,8 @@ fn replace_text_in_point_range(
 
     if should_clamp_end {
         let end = &mut delete_range.end;
-        end.line_idx -= 1;
-        end.byte_offset = buffer.byte_len_of_line(end.line_idx);
+        end.newline_offset -= 1;
+        end.byte_offset = buffer.num_bytes_in_line_after(end.newline_offset);
     }
 
     let should_clamp_start = delete_range.start > delete_range.end;
@@ -633,7 +633,7 @@ fn replace_text_in_point_range(
 
     buffer
         .set_text(
-            delete_range.start.line_idx..delete_range.end.line_idx,
+            delete_range.start.newline_offset..delete_range.end.newline_offset,
             delete_range.start.byte_offset,
             delete_range.end.byte_offset,
             lines,
@@ -667,7 +667,7 @@ impl From<BufferId> for api::Buffer {
 impl fmt::Debug for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Point")
-            .field(&self.line_idx)
+            .field(&self.newline_offset)
             .field(&self.byte_offset)
             .finish()
     }
@@ -683,8 +683,8 @@ impl PartialOrd for Point {
 impl Ord for Point {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
-        self.line_idx
-            .cmp(&other.line_idx)
+        self.newline_offset
+            .cmp(&other.newline_offset)
             .then(self.byte_offset.cmp(&other.byte_offset))
     }
 }
@@ -692,6 +692,6 @@ impl Ord for Point {
 impl From<Point> for api::types::ExtmarkPosition {
     #[inline]
     fn from(point: Point) -> Self {
-        Self::ByTuple((point.line_idx, point.byte_offset))
+        Self::ByTuple((point.newline_offset, point.byte_offset))
     }
 }

@@ -190,7 +190,7 @@ impl HighlightRanges {
     fn redraw(&mut self, namespace_id: u32) {
         for range in self.inner.values_mut() {
             let opts = api::opts::SetExtmarkOpts::builder()
-                .end_row(range.point_range.end.line_idx)
+                .end_row(range.point_range.end.newline_offset)
                 .end_col(range.point_range.end.byte_offset)
                 .ephemeral(true)
                 .hl_group(&*range.highlight_group_name)
@@ -202,7 +202,7 @@ impl HighlightRanges {
             api::Buffer::from(self.buffer_id)
                 .set_extmark(
                     namespace_id,
-                    range.point_range.start.line_idx,
+                    range.point_range.start.newline_offset,
                     range.point_range.start.byte_offset,
                     &opts,
                 )

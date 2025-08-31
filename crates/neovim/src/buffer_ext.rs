@@ -24,54 +24,12 @@ pub trait BufferExt {
     #[inline]
     fn byte_len(&self) -> ByteOffset {
         let buffer = self.buffer();
-        let line_len = buffer.line_len();
-        let offset = buffer.get_offset(line_len).expect("buffer is valid");
+        let byte_len = buffer
+            .line_count()
+            .and_then(|line_count| buffer.get_offset(line_count))
+            .expect("buffer is valid");
         // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if offset == 1 && self.has_uneditable_eol() { 0 } else { offset }
-    }
-
-    /// Returns the byte length of the line at the given index, *without* any
-    /// trailing newline character.
-    ///
-    /// This is equivalent to `self.line(line_idx).len()`, but faster.
-    #[track_caller]
-    #[inline]
-    fn byte_len_of_line(&self, line_idx: usize) -> ByteOffset {
-        // TODO: benchmark whether this is actually faster than
-        // `self.line(line_idx).len()`.
-
-        let row = (line_idx + 1) as Integer;
-
-        let col: usize =
-            self.buffer()
-                .call(move |()| {
-                    api::call_function(
-                        "col",
-                        (Array::from_iter([
-                            Object::from(row),
-                            Object::from("$"),
-                        ]),),
-                    )
-                })
-                .expect("could not call col()");
-
-        col - 1
-    }
-
-    /// Returns the [`ByteOffset`] corresponding to the given line index, or
-    /// the [`byte_len`](BufferExt::byte_len) if the index is equal to the
-    /// [`line_len`](BufferExt::line_len).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the index is greater than
-    /// [`line_len`](BufferExt::line_len)).
-    #[track_caller]
-    #[inline]
-    fn byte_of_line(&self, line_idx: usize) -> ByteOffset {
-        // get_offset() already takes care of only counting the final newline
-        // if `eol` is enabled.
-        self.buffer().get_offset(line_idx).expect("line index out of bounds")
+        if byte_len == 1 && self.has_uneditable_eol() { 0 } else { byte_len }
     }
 
     /// Converts the given [`Point`] into the corresponding [`ByteOffset`] in
@@ -79,10 +37,8 @@ pub trait BufferExt {
     #[track_caller]
     #[inline]
     fn byte_of_point(&self, point: Point) -> ByteOffset {
-        self.buffer()
-            .get_offset(point.line_idx)
-            .expect("couldn't get line offset")
-            + point.byte_offset
+        debug_assert!(point <= self.point_of_eof());
+        self.num_bytes_before_newline(point.newline_offset) + point.byte_offset
     }
 
     /// Sets the buffer of the currently focused window to this buffer.
@@ -120,31 +76,24 @@ pub trait BufferExt {
             && point == self.point_of_eof()
     }
 
-    /// Returns the contents of the line at the given index, *without* any
-    /// trailing newline character.
+    /// Returns the contents of the first line after the given newline offset,
+    /// *without* any trailing newline character.
     ///
     /// Note that if you just want to know the *length* of the line, you should
-    /// use [`line_len()`](BufferExt::line_len) instead.
+    /// use [`num_bytes_in_line()`](BufferExt::num_bytes_in_line) instead.
     #[track_caller]
     #[inline]
-    fn line(&self, line_idx: usize) -> NvimString {
+    fn line_after(&self, newline_offset: usize) -> NvimString {
         let buffer = self.buffer();
         buffer
             .clone()
             .call(move |()| {
                 api::call_function(
                     "getbufoneline",
-                    (buffer, (line_idx + 1) as Integer),
+                    (buffer, (newline_offset + 1) as Integer),
                 )
             })
             .expect("could not call getbufoneline()")
-    }
-
-    /// Returns the number of lines in the buffer.
-    #[track_caller]
-    #[inline]
-    fn line_len(&self) -> usize {
-        self.buffer().line_count().expect("buffer is valid")
     }
 
     /// Returns the text in the given point range.
@@ -171,7 +120,7 @@ pub trait BufferExt {
             self.is_point_after_uneditable_eol(point_range.end);
 
         if should_clamp_end {
-            point_range.end.line_idx -= 1;
+            point_range.end.newline_offset -= 1;
             point_range.end.byte_offset = Integer::MAX as usize;
 
             // The original start was <= than the end, so if it's now greater
@@ -185,7 +134,8 @@ pub trait BufferExt {
         let lines = self
             .buffer()
             .get_text(
-                point_range.start.line_idx..point_range.end.line_idx,
+                point_range.start.newline_offset
+                    ..point_range.end.newline_offset,
                 point_range.start.byte_offset,
                 point_range.end.byte_offset,
                 &Default::default(),
@@ -237,7 +187,7 @@ pub trait BufferExt {
             buffer: self.buffer(),
             byte_len: self.byte_len(),
             byte_offset,
-            current_line: Some(self.line(point.line_idx)),
+            current_line: Some(self.line_after(point.newline_offset)),
             point,
             _not_static: PhantomData,
         }
@@ -250,41 +200,65 @@ pub trait BufferExt {
         self.buffer().get_name().expect("buffer is valid")
     }
 
-    /// Converts the given [`ByteOffset`] into the corresponding [`Point`] in
-    /// the buffer.
+    /// Returns the number of bytes to the left of the given newline offset.
     #[track_caller]
     #[inline]
-    fn point_of_byte(&self, byte_offset: ByteOffset) -> Point {
-        debug_assert!(byte_offset <= self.byte_len());
+    fn num_bytes_before_newline(&self, newline_offset: usize) -> ByteOffset {
+        debug_assert!(newline_offset <= self.num_newlines());
+        // get_offset() already takes care of only counting the final newline
+        // if `eol` is enabled.
+        self.buffer()
+            .get_offset(newline_offset)
+            .expect("line index out of bounds")
+    }
 
-        // byte2line(1) has a bug where it returns -1 if the buffer's "memline"
-        // (i.e. the object that stores its contents in memory) is not
-        // initialized.
-        //
-        // Because the memline seems to be lazily initialized when the user
-        // first edits the buffer, byte2line(1) will always return -1 on newly
-        // created, empty buffers.
-        //
-        // I brought this up here
-        // https://github.com/neovim/neovim/issues/34199, but it was almost
-        // immediately closed as a "wontfix" for reasons that are still
-        // completely opaque to me.
-        //
-        // The TLDR of that issue is that the maintainers are not only not
-        // willing to fix the bug, but they don't even recognize it as such, so
-        // we have to special-case it.
-        if byte_offset == 0 {
-            return Point::zero();
+    /// Same as `self.line_after(newline_offset).len()`, but faster.
+    #[track_caller]
+    #[inline]
+    fn num_bytes_in_line_after(&self, newline_offset: usize) -> ByteOffset {
+        debug_assert!(newline_offset <= self.num_newlines());
+
+        // TODO: benchmark whether this is actually faster than
+        // `self.line(line_idx).len()`.
+        self.buffer()
+            .call::<_, _, ByteOffset>(move |()| {
+                api::call_function(
+                    "col",
+                    (Array::from_iter([
+                        Object::from((newline_offset + 1) as Integer),
+                        Object::from("$"),
+                    ]),),
+                )
+            })
+            .expect("could not call col()")
+            - 1
+    }
+
+    /// Returns the number of newline characters in the buffer.
+    #[inline]
+    fn num_newlines(&self) -> usize {
+        // Workaround for https://github.com/neovim/neovim/issues/34272.
+        if self.is_empty() {
+            return 0;
         }
-        // byte2line() always returns -1 if the buffer has an uneditable eol
-        // and the byte offset is past it.
-        else if byte_offset == self.byte_len() {
-            return self.point_of_eof();
+        let num_rows = self.buffer().line_count().expect("buffer is valid");
+        num_rows - !self.has_uneditable_eol() as usize
+    }
+
+    /// Returns the number of newline characters to the left of the given byte
+    /// offset.
+    #[inline]
+    fn num_newlines_before_byte(&self, byte_offset: ByteOffset) -> usize {
+        // Fast paths.
+        if byte_offset == 0 {
+            return 0;
+        } else if byte_offset == self.byte_len() {
+            return self.num_newlines();
         }
 
         let buffer = self.buffer();
 
-        let line_idx = buffer
+        buffer
             .clone()
             .call(move |()| {
                 let line_idx = api::call_function::<_, usize>(
@@ -305,14 +279,18 @@ pub trait BufferExt {
                 // of the line they end instead of starting a new one.
                 line_idx + is_offset_after_newline as usize
             })
-            .expect("could not call function in buffer");
+            .expect("could not call function in buffer")
+    }
 
-        let line_byte_offset = self
-            .buffer()
-            .get_offset(line_idx)
-            .expect("line index is within bounds");
-
-        Point::new(line_idx, byte_offset - line_byte_offset)
+    /// Converts the given [`ByteOffset`] into the corresponding [`Point`] in
+    /// the buffer.
+    #[track_caller]
+    #[inline]
+    fn point_of_byte(&self, byte_offset: ByteOffset) -> Point {
+        debug_assert!(byte_offset <= self.byte_len());
+        let newline_offset = self.num_newlines_before_byte(byte_offset);
+        let line_byte_offset = self.num_bytes_before_newline(newline_offset);
+        Point::new(newline_offset, byte_offset - line_byte_offset)
     }
 
     /// Returns the [`Point`] at the end of the buffer.
@@ -320,24 +298,8 @@ pub trait BufferExt {
     /// This is equivalent to `self.point_of_byte(self.byte_len())`.
     #[inline]
     fn point_of_eof(&self) -> Point {
-        // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if self.is_empty() {
-            return Point::zero();
-        }
-
-        let num_rows = self.buffer().line_len();
-
-        let has_uneditable_eol = self.has_uneditable_eol();
-
-        let num_lines = num_rows - 1 + has_uneditable_eol as usize;
-
-        let last_line_len = if has_uneditable_eol {
-            0
-        } else {
-            self.byte_len_of_line(num_rows - 1)
-        };
-
-        Point::new(num_lines, last_line_len)
+        let num_newlines = self.num_newlines();
+        Point::new(num_newlines, self.num_bytes_in_line_after(num_newlines))
     }
 
     /// Returns the selected byte range in the buffer, or `None` if the buffer
@@ -388,10 +350,13 @@ pub trait BufferExt {
             api::call_function::<_, (u32, usize, usize)>("getpos", ('.',))
                 .expect("couldn't call getpos");
 
-        let anchor =
-            Point { line_idx: anchor_row - 1, byte_offset: anchor_col - 1 };
+        let anchor = Point {
+            newline_offset: anchor_row - 1,
+            byte_offset: anchor_col - 1,
+        };
 
-        let head = Point { line_idx: head_row - 1, byte_offset: head_col - 1 };
+        let head =
+            Point { newline_offset: head_row - 1, byte_offset: head_col - 1 };
 
         let (start, end) =
             if anchor <= head { (anchor, head) } else { (head, anchor) };
@@ -436,14 +401,15 @@ pub trait BufferExt {
             (head_row, anchor_row)
         };
 
-        let start_offset = self.byte_of_line(start_row - 1);
+        let start_offset = self.num_bytes_before_newline(start_row - 1);
 
         // Neovim always allows you to select one more character past the end
         // of the line, which is usually interpreted as having selected the
         // following newline.
         //
         // Clearly that doesn't work if you're already at the end of the file.
-        let end_offset = self.byte_of_line(end_row).min(self.byte_len());
+        let end_offset =
+            self.num_bytes_before_newline(end_row).min(self.byte_len());
 
         start_offset..end_offset
     }
@@ -496,14 +462,16 @@ impl Iterator for GraphemeOffsets<'_> {
 
         let line_from_offset = &self
             .current_line
-            .get_or_insert_with(|| self.buffer.line(self.point.line_idx))
+            .get_or_insert_with(|| {
+                self.buffer.line_after(self.point.newline_offset)
+            })
             .as_bytes()[self.point.byte_offset..];
 
         if line_from_offset.is_empty() {
             // We're at the end of the current line, so the next grapheme
             // must be a newline character.
             self.byte_offset += 1;
-            self.point.line_idx += 1;
+            self.point.newline_offset += 1;
             self.point.byte_offset = 0;
             self.current_line = None;
             Some(self.byte_offset)
