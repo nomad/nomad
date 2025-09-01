@@ -641,6 +641,152 @@ fn replace_text_in_point_range(
         .expect("replacing text failed");
 }
 
+fn apply_replacement(
+    buffer: &mut api::Buffer,
+    replacement: Replacement,
+    buffers_state: &BuffersState,
+) {
+    debug_assert!(!replacement.is_no_op());
+
+    let deletion_range = replacement.removed_range();
+    let insert_text = replacement.inserted_text();
+
+    debug_assert!(deletion_range.start <= deletion_range.end);
+    debug_assert!(deletion_range.end <= buffer.num_bytes());
+
+    let deletion_start = buffer.point_of_byte(deletion_range.start);
+    let deletion_end = buffer.point_of_byte(deletion_range.end);
+
+    if !buffer.is_point_after_uneditable_eol(deletion_end) {
+        apply_replacement_whose_deletion_ends_before_fixeol(
+            buffer,
+            deletion_start..deletion_end,
+            insert_text,
+        );
+        return;
+    }
+
+    // The replacement is a pure insertion past the fixeol.
+    if deletion_start == deletion_end {
+        apply_insertion_after_fixeol(buffer, deletion_start, insert_text);
+        return;
+    }
+
+    // The replacement is a pure deletion.
+    if insert_text.is_empty() {
+        apply_deletion_extending_after_fixeol(
+            buffer,
+            deletion_start..deletion_end,
+        );
+        return;
+    }
+
+    // Clamp the end of the deleted range to the end of the previous line.
+    let clamped_end = Point {
+        newline_offset: deletion_end.newline_offset - 1,
+        byte_offset: buffer
+            .num_bytes_in_line_after(deletion_end.newline_offset - 1),
+    };
+
+    // If the text ends with a newline, we can remove the newline and clamp the
+    // end of the deleted range to the previous point.
+    //
+    // For example, if the buffer is "Hello\n", the replacement is delete 4..6,
+    // insert "!\n", then we can delete 4..5 and insert "!" instead.
+    if insert_text.ends_with('\n') {
+        apply_replacement_whose_deletion_ends_before_fixeol(
+            buffer,
+            deletion_start..clamped_end,
+            &insert_text[..insert_text.len() - 1],
+        );
+    } else {
+        apply_replacement_whose_deletion_ends_before_fixeol(
+            buffer,
+            deletion_start..clamped_end,
+            insert_text,
+        );
+        todo!("schedule an edit event that re-inserts the newline");
+    }
+}
+
+fn apply_replacement_whose_deletion_ends_before_fixeol(
+    buffer: &mut api::Buffer,
+    delete_range: Range<Point>,
+    insert_text: &str,
+) {
+    debug_assert!(!buffer.is_point_after_uneditable_eol(delete_range.end));
+
+    let lines = insert_text
+        .lines()
+        // If the text has a trailing newline, Neovim expects an additional
+        // empty line to be included.
+        .chain(insert_text.ends_with('\n').then_some(""));
+
+    buffer
+        .set_text(
+            delete_range.start.newline_offset..delete_range.end.newline_offset,
+            delete_range.start.byte_offset,
+            delete_range.end.byte_offset,
+            lines,
+        )
+        .expect("replacing text failed");
+}
+
+fn apply_insertion_after_fixeol(
+    buffer: &mut api::Buffer,
+    insert_point: Point,
+    insert_text: &str,
+) {
+    debug_assert!(buffer.is_point_after_uneditable_eol(insert_point));
+    debug_assert!(!insert_text.is_empty());
+
+    if !insert_text.ends_with('\n') {
+        todo!("schedule an edit event that inserts the newline");
+    }
+
+    let num_newlines = insert_point.newline_offset;
+
+    buffer
+        .set_lines(num_newlines..num_newlines, true, insert_text.lines())
+        .expect("couldn't insert lines");
+}
+
+fn apply_deletion_extending_after_fixeol(
+    buffer: &mut api::Buffer,
+    Range { start, end }: Range<Point>,
+) {
+    debug_assert!(buffer.is_point_after_uneditable_eol(end));
+
+    // If the start of the deletion range is after a newline (or at the
+    // start of the buffer), we can just delete the last n lines.
+    if start.byte_offset == 0 {
+        let line_range = start.newline_offset..end.newline_offset;
+        buffer.set_lines(line_range, true, [""]).expect("couldn't set lines");
+        return;
+    }
+
+    let clamped_end = Point {
+        newline_offset: end.newline_offset - 1,
+        byte_offset: buffer.num_bytes_in_line_after(end.newline_offset - 1),
+    };
+
+    if clamped_end == start {
+        todo!(
+            "schedule 2 edit events that cancel each other out, the first \
+             that deletes the trailine newline and the second that re-inserts
+             it"
+        );
+    }
+
+    apply_replacement_whose_deletion_ends_before_fixeol(
+        buffer,
+        start..clamped_end,
+        "",
+    );
+
+    todo!("schedule an edit event that inserts the newline");
+}
+
 impl From<api::Buffer> for BufferId {
     #[inline]
     fn from(buf: api::Buffer) -> Self {
