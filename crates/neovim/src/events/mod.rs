@@ -8,7 +8,6 @@ mod cursor_moved;
 mod event;
 mod events;
 mod mode_changed;
-mod on_bytes;
 mod option_set;
 mod set_uneditable_eol;
 
@@ -22,7 +21,6 @@ pub(crate) use cursor_moved::CursorMoved;
 pub(crate) use event::{CallbacksContainer, Event};
 pub(crate) use events::{Callbacks, EventHandle, EventKind, Events};
 pub(crate) use mode_changed::ModeChanged;
-pub(crate) use on_bytes::OnBytes;
 pub(crate) use option_set::OptionSet;
 pub(crate) use set_uneditable_eol::{
     SetUneditableEndOfLine,

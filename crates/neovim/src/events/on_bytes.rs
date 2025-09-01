@@ -17,8 +17,11 @@ impl Event for OnBytes {
     type RegisterOutput = ();
 
     #[inline]
-    fn container<'ev>(&self, events: &'ev mut Events) -> Self::Container<'ev> {
-        &mut events.on_buffer_edited
+    fn container<'ev>(
+        &self,
+        _events: &'ev mut Events,
+    ) -> Self::Container<'ev> {
+        todo!();
     }
 
     #[inline]

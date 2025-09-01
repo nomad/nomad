@@ -11,7 +11,7 @@ use crate::utils::CallbackExt;
 
 const TRIGGER_AUTOCMD_PATTERN: &str = "BufferEditedEventTrigger";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub(crate) struct BufferEdited(pub(crate) BufferId);
 
 /// The output of the [`BufferEdited::register`] method.
@@ -19,12 +19,12 @@ pub(crate) struct BufferEdited(pub(crate) BufferId);
 pub(crate) struct BufferEditedRegisterOutput {
     autocmd_ids: [AutocmdId; 4],
     buffer_id: BufferId,
-    queued_replacements: Shared<SmallVec<[Replacement; 2]>>,
+    queued_edits: Shared<SmallVec<[Edit; 2]>>,
 }
 
 impl BufferEditedRegisterOutput {
-    pub(crate) fn enqueue(&self, replacement: Replacement) {
-        self.queued_replacements.with_mut(|vec| vec.push(replacement));
+    pub(crate) fn enqueue(&self, edit: Edit) {
+        self.queued_edits.with_mut(|vec| vec.push(edit));
     }
 
     pub(crate) fn trigger(&self) {
@@ -45,17 +45,17 @@ impl Event for BufferEdited {
 
     #[inline]
     fn container<'ev>(&self, events: &'ev mut Events) -> Self::Container<'ev> {
-        todo!()
+        &mut events.on_buffer_edited
     }
 
     #[inline]
     fn key(&self) -> BufferId {
-        todo!();
+        self.0
     }
 
     #[inline]
     fn kind(&self) -> EventKind {
-        todo!()
+        EventKind::BufferEdited(*self)
     }
 
     #[inline]
@@ -65,11 +65,11 @@ impl Event for BufferEdited {
         mut nvim: impl AccessMut<Neovim> + Clone + 'static,
     ) -> Self::RegisterOutput {
         let buffer_id = self.0;
-        let queued_replacements = Shared::<SmallVec<_>>::default();
+        let queued_edits = Shared::<SmallVec<_>>::default();
 
-        let mut on_replacement = {
-            let queued_replacements = queued_replacements.clone();
-            move |replacement: Replacement| {
+        let mut on_edit = {
+            let queued_edits = queued_edits.clone();
+            move |edit: Edit| {
                 nvim.with_mut(|nvim| {
                     let Some(mut buffer) = nvim.buffer(buffer_id) else {
                         panic!(
@@ -81,9 +81,9 @@ impl Event for BufferEdited {
                         );
                     };
 
-                    let events = &mut buffer.nvim.events;
-
-                    let Some(callbacks) = events
+                    let Some(callbacks) = buffer
+                        .nvim
+                        .events
                         .on_buffer_edited
                         .get(&buffer_id)
                         .map(|cbs| cbs.cloned())
@@ -91,22 +91,11 @@ impl Event for BufferEdited {
                         return true;
                     };
 
-                    let edit = Edit {
-                        made_by: events.agent_ids.edited_buffer.take(),
-                        replacements: smallvec_inline![replacement],
-                    };
-
-                    let queued_replacements = queued_replacements.take();
+                    let queued_edits = queued_edits.take();
 
                     for callback in callbacks {
                         callback((buffer.reborrow(), &edit));
-
-                        for replacement in queued_replacements.iter().cloned()
-                        {
-                            let edit = Edit {
-                                made_by: AgentId::UNKNOWN,
-                                replacements: smallvec_inline![replacement],
-                            };
+                        for edit in &queued_edits {
                             callback((buffer.reborrow(), &edit));
                         }
                     }
@@ -117,9 +106,19 @@ impl Event for BufferEdited {
         };
 
         let on_bytes = {
-            let mut on_replacement = on_replacement.clone();
+            let queued_edits = queued_edits.clone();
+            let mut on_edit = on_edit.clone();
             move |args: api::opts::OnBytesArgs| {
-                on_replacement(replacement_of_on_bytes(args))
+                let edit = queued_edits
+                    .with_mut(|vec| (!vec.is_empty()).then(|| vec.remove(0)))
+                    .unwrap_or_else(|| Edit {
+                        made_by: AgentId::UNKNOWN,
+                        replacements: smallvec_inline![
+                            replacement_of_on_bytes(args)
+                        ],
+                    });
+
+                on_edit(edit)
             }
         }
         .catch_unwind()
@@ -136,7 +135,7 @@ impl Event for BufferEdited {
             .expect("couldn't attach to buffer");
 
         let on_fixeol_changed = {
-            let mut on_replacement = on_replacement.clone();
+            let mut on_edit = on_edit.clone();
             move |buffer: api::Buffer, old_value, new_value| {
                 debug_assert!(BufferId::from(buffer.clone()) == buffer_id);
 
@@ -159,7 +158,10 @@ impl Event for BufferEdited {
                     _ => return false,
                 };
 
-                on_replacement(replacement)
+                on_edit(Edit {
+                    made_by: AgentId::UNKNOWN,
+                    replacements: smallvec_inline![replacement],
+                })
             }
         };
 
@@ -170,11 +172,11 @@ impl Event for BufferEdited {
         );
 
         let on_manual_trigger = {
-            let queued_replacements = queued_replacements.clone();
+            let queued_edits = queued_edits.clone();
             move |_: api::types::AutocmdCallbackArgs| {
-                queued_replacements
+                queued_edits
                     .with_mut(|vec| (!vec.is_empty()).then(|| vec.remove(0)))
-                    .map(|repl| on_replacement(repl))
+                    .map(|first| on_edit(first))
                     .unwrap_or(false)
             }
         }
@@ -201,7 +203,7 @@ impl Event for BufferEdited {
                 autocmd_id,
             ],
             buffer_id,
-            queued_replacements,
+            queued_edits,
         }
     }
 

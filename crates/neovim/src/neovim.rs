@@ -9,7 +9,6 @@ use editor::{AccessMut, AgentId, Buffer, Editor};
 
 use crate::buffer::{
     BufferId,
-    BuffersState,
     HighlightRange,
     HighlightRangeHandle,
     NeovimBuffer,
@@ -23,9 +22,6 @@ use crate::{api, executor, notify, oxi, serde, value};
 
 /// TODO: docs.
 pub struct Neovim {
-    /// TODO: docs.
-    pub(crate) buffers_state: BuffersState,
-
     /// TODO: docs.
     pub(crate) decoration_provider: DecorationProvider,
 
@@ -124,7 +120,6 @@ impl Neovim {
         let namespace_id = oxi::api::create_namespace(plugin_name);
 
         Self {
-            buffers_state: BuffersState::default(),
             decoration_provider: DecorationProvider::new(namespace_id),
             events: Events::new(augroup_id),
             emitter: Default::default(),

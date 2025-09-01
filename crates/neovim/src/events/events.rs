@@ -34,10 +34,10 @@ pub(crate) struct Events {
     /// callback has been registered to that event.
     pub(crate) on_buffer_created: Option<Callbacks<events::BufferCreated>>,
 
-    /// Map from a buffer's ID to the callbacks registered to the [`OnBytes`]
-    /// event on that buffer.
+    /// Map from a buffer's ID to the callbacks registered to the
+    /// `BufferEdited` event on that buffer.
     pub(crate) on_buffer_edited:
-        NoHashMap<BufferId, Callbacks<events::OnBytes>>,
+        NoHashMap<BufferId, Callbacks<events::BufferEdited>>,
 
     /// The callbacks registered on the [`CursorCreated`] event, or `None` if
     /// no callback has been registered on that event.
@@ -77,9 +77,6 @@ pub(crate) struct AgentIds {
     /// TODO: docs.
     pub(crate) created_cursor: AgentId,
 
-    /// The [`AgentId`] of the agent that last scheduled an edit on a buffer.
-    pub(crate) edited_buffer: Shared<AgentId>,
-
     /// TODO: docs.
     pub(crate) moved_cursor: NoHashMap<BufferId, AgentId>,
 
@@ -110,11 +107,11 @@ pub(crate) enum EventKind {
     CursorCreated(events::CursorCreated),
     BufLeave(events::BufLeave),
     BufferCreated(events::BufferCreated),
+    BufferEdited(events::BufferEdited),
     BufferRemoved(events::BufferRemoved),
     BufWritePost(events::BufWritePost),
     CursorMoved(events::CursorMoved),
     ModeChanged(events::ModeChanged),
-    OnBytes(events::OnBytes),
     UneditableEolSet(events::SetUneditableEndOfLine),
 }
 
@@ -134,10 +131,10 @@ impl Events {
         event.container(self).get_mut(event.key()).is_some()
     }
 
-    pub(crate) fn insert<T: Event>(
+    pub(crate) fn insert<Ev: Event>(
         &mut self,
-        event: T,
-        callback: impl FnMut(T::Args<'_>) + 'static,
+        event: Ev,
+        callback: impl FnMut(Ev::Args<'_>) + 'static,
         nvim: impl AccessMut<Neovim> + Clone + 'static,
     ) -> EventHandle {
         let callback_key = if let Some(callbacks) =
@@ -180,11 +177,11 @@ impl Events {
                 CursorCreated(ev) => self.remove_callback(ev, cb_key),
                 BufLeave(ev) => self.remove_callback(ev, cb_key),
                 BufferCreated(ev) => self.remove_callback(ev, cb_key),
+                BufferEdited(ev) => self.remove_callback(ev, cb_key),
                 BufferRemoved(ev) => self.remove_callback(ev, cb_key),
                 BufWritePost(ev) => self.remove_callback(ev, cb_key),
                 CursorMoved(ev) => self.remove_callback(ev, cb_key),
                 ModeChanged(ev) => self.remove_callback(ev, cb_key),
-                OnBytes(ev) => self.remove_callback(ev, cb_key),
                 UneditableEolSet(ev) => self.remove_callback(ev, cb_key),
             }
         }
@@ -212,19 +209,24 @@ impl Events {
     }
 }
 
-impl<T: Event> Callbacks<T> {
+impl<Ev: Event> Callbacks<Ev> {
     #[allow(clippy::type_complexity)]
     #[inline]
     pub(crate) fn cloned(
         &self,
-    ) -> impl IntoIterator<Item = Rc<dyn Fn(T::Args<'_>)>> + use<T> {
+    ) -> impl IntoIterator<Item = Rc<dyn Fn(Ev::Args<'_>)>> + use<Ev> {
         self.inner.values().map(Rc::clone).collect::<SmallVec<[_; 2]>>()
+    }
+
+    #[inline]
+    pub(crate) fn register_output(&self) -> &Ev::RegisterOutput {
+        &self.register_output
     }
 
     #[inline]
     fn insert(
         &mut self,
-        fun: impl FnMut(T::Args<'_>) + 'static,
+        fun: impl FnMut(Ev::Args<'_>) + 'static,
     ) -> slotmap::DefaultKey {
         let fun = RefCell::new(fun);
 
@@ -239,7 +241,7 @@ impl<T: Event> Callbacks<T> {
     }
 
     #[inline]
-    fn new(output: T::RegisterOutput) -> Self {
+    fn new(output: Ev::RegisterOutput) -> Self {
         Self { inner: Default::default(), register_output: output }
     }
 
