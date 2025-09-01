@@ -1,5 +1,7 @@
 use core::ops::Deref;
 
+use crate::buffer::BufferId;
+use crate::events::{AugroupId, AutocmdId};
 use crate::oxi::{self, api};
 
 /// TODO: docs.
@@ -58,6 +60,15 @@ impl UneditableEndOfLine {
         binary: impl FnOnce() -> bool,
     ) -> bool {
         eol() || (fix_eol() && !binary())
+    }
+
+    #[inline]
+    pub(crate) fn on_set_on(
+        _buffer_id: BufferId,
+        _augroup: AugroupId,
+        _fun: impl FnMut(api::Buffer, bool, bool) -> bool + 'static,
+    ) -> (AutocmdId, AutocmdId, AutocmdId) {
+        todo!();
     }
 }
 

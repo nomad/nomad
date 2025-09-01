@@ -644,7 +644,7 @@ fn replace_text_in_point_range(
 fn apply_replacement(
     buffer: &mut api::Buffer,
     replacement: Replacement,
-    buffers_state: &BuffersState,
+    buffer_edited: Option<&events::BufferEdited>,
 ) {
     debug_assert!(!replacement.is_no_op());
 
@@ -668,15 +668,22 @@ fn apply_replacement(
 
     // The replacement is a pure insertion past the fixeol.
     if deletion_start == deletion_end {
-        apply_insertion_after_fixeol(buffer, deletion_start, insert_text);
+        apply_insertion_after_fixeol(
+            buffer,
+            deletion_start,
+            insert_text,
+            buffer_edited,
+        );
         return;
     }
 
     // The replacement is a pure deletion.
     if insert_text.is_empty() {
-        apply_deletion_extending_after_fixeol(
+        apply_deletion_ending_after_fixeol(
             buffer,
             deletion_start..deletion_end,
+            deletion_range.len(),
+            buffer_edited,
         );
         return;
     }
@@ -691,22 +698,34 @@ fn apply_replacement(
     // If the text ends with a newline, we can remove the newline and clamp the
     // end of the deleted range to the previous point.
     //
-    // For example, if the buffer is "Hello\n", the replacement is delete 4..6,
-    // insert "!\n", then we can delete 4..5 and insert "!" instead.
+    // For example, if the buffer is "Hello\n", the replacement is delete 4..6
+    // and insert "!\n", then we can delete 4..5 and insert "!" instead.
     if insert_text.ends_with('\n') {
         apply_replacement_whose_deletion_ends_before_fixeol(
             buffer,
             deletion_start..clamped_end,
             &insert_text[..insert_text.len() - 1],
         );
-    } else {
-        apply_replacement_whose_deletion_ends_before_fixeol(
-            buffer,
-            deletion_start..clamped_end,
-            insert_text,
-        );
-        todo!("schedule an edit event that re-inserts the newline");
+        return;
     }
+
+    // Enqueue the re-insertion of the newline that this replacement
+    // deletes.
+    if let Some(buffer_edited) = buffer_edited {
+        // We've clamped the end of the deletion range, so it's 1 byte
+        // shorter.
+        let deletion_len = deletion_range.len() - 1;
+        let len_after_edit =
+            buffer.num_bytes() - deletion_len + insert_text.len();
+        let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
+        buffer_edited.enqueue(re_insert_newline);
+    }
+
+    apply_replacement_whose_deletion_ends_before_fixeol(
+        buffer,
+        deletion_start..clamped_end,
+        insert_text,
+    );
 }
 
 fn apply_replacement_whose_deletion_ends_before_fixeol(
@@ -736,12 +755,18 @@ fn apply_insertion_after_fixeol(
     buffer: &mut api::Buffer,
     insert_point: Point,
     insert_text: &str,
+    buffer_edited: Option<&events::BufferEdited>,
 ) {
     debug_assert!(buffer.is_point_after_uneditable_eol(insert_point));
     debug_assert!(!insert_text.is_empty());
 
     if !insert_text.ends_with('\n') {
-        todo!("schedule an edit event that inserts the newline");
+        // Enqueue the insertion of a newline after the inserted text.
+        if let Some(buffer_edited) = buffer_edited {
+            let len_after_edit = buffer.num_bytes() + insert_text.len();
+            let insert_newline = Replacement::insertion(len_after_edit, "\n");
+            buffer_edited.enqueue(insert_newline);
+        }
     }
 
     let num_newlines = insert_point.newline_offset;
@@ -751,11 +776,18 @@ fn apply_insertion_after_fixeol(
         .expect("couldn't insert lines");
 }
 
-fn apply_deletion_extending_after_fixeol(
+fn apply_deletion_ending_after_fixeol(
     buffer: &mut api::Buffer,
     Range { start, end }: Range<Point>,
+    deletion_len: ByteOffset,
+    buffer_edited: Option<&events::BufferEdited>,
 ) {
+    debug_assert!(start < end);
     debug_assert!(buffer.is_point_after_uneditable_eol(end));
+    debug_assert_eq!(
+        deletion_len,
+        buffer.byte_of_point(end) - buffer.byte_of_point(start)
+    );
 
     // If the start of the deletion range is after a newline (or at the
     // start of the buffer), we can just delete the last n lines.
@@ -771,11 +803,24 @@ fn apply_deletion_extending_after_fixeol(
     };
 
     if clamped_end == start {
-        todo!(
-            "schedule 2 edit events that cancel each other out, the first \
-             that deletes the trailine newline and the second that re-inserts
-             it"
-        );
+        let Some(buffer_edited) = buffer_edited else { return };
+        let num_bytes = buffer.num_bytes();
+        let delete_newline = Replacement::deletion(num_bytes - 1..num_bytes);
+        let insert_newline = Replacement::insertion(num_bytes - 1, "\n");
+        buffer_edited.enqueue(delete_newline);
+        buffer_edited.enqueue(insert_newline);
+        buffer_edited.trigger();
+        return;
+    }
+
+    // Enqueue the re-insertion of the newline that this deletion deletes.
+    if let Some(buffer_edited) = buffer_edited {
+        // We've clamped the end of the deletion range, so it's 1 byte
+        // shorter.
+        let deletion_len = deletion_len - 1;
+        let len_after_edit = buffer.num_bytes() - deletion_len;
+        let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
+        buffer_edited.enqueue(re_insert_newline);
     }
 
     apply_replacement_whose_deletion_ends_before_fixeol(
@@ -783,8 +828,6 @@ fn apply_deletion_extending_after_fixeol(
         start..clamped_end,
         "",
     );
-
-    todo!("schedule an edit event that inserts the newline");
 }
 
 impl From<api::Buffer> for BufferId {

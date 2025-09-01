@@ -1,6 +1,7 @@
 mod buf_leave;
 mod buf_write_post;
 mod buffer_created;
+mod buffer_edited;
 mod buffer_removed;
 mod cursor_created;
 mod cursor_moved;
@@ -14,6 +15,7 @@ mod set_uneditable_eol;
 pub(crate) use buf_leave::BufLeave;
 pub(crate) use buf_write_post::BufWritePost;
 pub(crate) use buffer_created::BufferCreated;
+pub(crate) use buffer_edited::BufferEdited;
 pub(crate) use buffer_removed::BufferRemoved;
 pub(crate) use cursor_created::CursorCreated;
 pub(crate) use cursor_moved::CursorMoved;
