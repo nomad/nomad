@@ -18,7 +18,6 @@ pub(crate) struct BufferEdited(pub(crate) BufferId);
 #[derive(Debug, Clone)]
 pub(crate) struct BufferEditedRegisterOutput {
     autocmd_ids: [AutocmdId; 2],
-    buffer_id: BufferId,
     queued_edits: Shared<SmallVec<[Edit; 2]>>,
 }
 
@@ -29,7 +28,6 @@ impl BufferEditedRegisterOutput {
 
     pub(crate) fn trigger(&self) {
         let opts = api::opts::ExecAutocmdsOpts::builder()
-            .buffer(self.buffer_id.into())
             .modeline(false)
             .patterns(TRIGGER_AUTOCMD_PATTERN)
             .build();
@@ -173,7 +171,13 @@ impl Event for BufferEdited {
 
         let on_manual_trigger = {
             let queued_edits = queued_edits.clone();
-            move |_: api::types::AutocmdCallbackArgs| {
+            move |args: api::types::AutocmdCallbackArgs| {
+                // Don't call the function if the autocmd is triggered for a
+                // different buffer.
+                if api::Buffer::from(buffer_id) != args.buffer {
+                    return false;
+                }
+
                 queued_edits
                     .with_mut(|vec| (!vec.is_empty()).then(|| vec.remove(0)))
                     .map(|first| on_edit(first))
@@ -189,15 +193,13 @@ impl Event for BufferEdited {
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .patterns([TRIGGER_AUTOCMD_PATTERN])
-                .buffer(buffer_id.into())
                 .callback(on_manual_trigger)
                 .build(),
         )
-        .expect("couldn't create autocmd");
+        .expect("couldn't create User autocmd");
 
         BufferEditedRegisterOutput {
             autocmd_ids: [option_set_autocmd_id, user_autocmd_id],
-            buffer_id,
             queued_edits,
         }
     }

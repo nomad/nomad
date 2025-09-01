@@ -47,7 +47,10 @@ pub(crate) trait NeovimOption: 'static + Sized {
         + 'static,
     ) -> AutocmdId {
         let on_option_set = (move |args: api::types::AutocmdCallbackArgs| {
-            fun(args.buffer, Self::old_value(), Self::new_value())
+            // Don't call the function if the autocmd is triggered for a
+            // different buffer.
+            api::Buffer::from(buffer_id) == args.buffer
+                && fun(args.buffer, Self::old_value(), Self::new_value())
         })
         .catch_unwind()
         .map(|maybe_detach| maybe_detach.unwrap_or(true))
@@ -57,7 +60,6 @@ pub(crate) trait NeovimOption: 'static + Sized {
             ["OptionSet"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(augroup_id)
-                .buffer(buffer_id.into())
                 .patterns([Self::LONG_NAME])
                 .callback(on_option_set)
                 .build(),
@@ -157,6 +159,12 @@ impl NeovimOption for UneditableEndOfLine {
         + 'static,
     ) -> AutocmdId {
         let on_option_set = (move |args: api::types::AutocmdCallbackArgs| {
+            // Don't call the function if the autocmd is triggered for a
+            // different buffer.
+            if api::Buffer::from(buffer_id) != args.buffer {
+                return false;
+            }
+
             enum Option {
                 Binary,
                 Eol,
@@ -204,7 +212,6 @@ impl NeovimOption for UneditableEndOfLine {
             ["OptionSet"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(augroup_id)
-                .buffer(buffer_id.into())
                 .patterns([
                     EndOfLine::LONG_NAME,
                     FixEndOfLine::LONG_NAME,
