@@ -12,6 +12,7 @@ use executor::{
     LocalTask,
 };
 use futures_lite::future::{self, FutureExt};
+use rand::rngs::StdRng;
 
 use crate::context::{self, EventHandle, ResumeUnwinding, State};
 use crate::editor::{AgentId, Editor};
@@ -190,6 +191,13 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub fn with_editor<T>(&mut self, fun: impl FnOnce(&mut Ed) -> T) -> T {
         self.borrow.with_mut(move |state| fun(state))
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn with_rng<T>(&mut self, fun: impl FnOnce(&mut StdRng) -> T) -> T {
+        self.borrow.with_mut(move |state| fun(state.rng()))
     }
 
     #[inline]

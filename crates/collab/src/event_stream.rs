@@ -10,6 +10,7 @@ use futures_util::future::FusedFuture;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
+use rand::Rng;
 
 use crate::editors::CollabEditor;
 use crate::event::{self, Event};
@@ -154,8 +155,9 @@ impl<Ed: CollabEditor> EventStream<Ed> {
         ctx: &mut Context<Ed>,
     ) -> Result<Event<Ed>, EventError<Ed>> {
         loop {
-            let mut dir_streams = self.dir_streams.inner.as_stream(0);
-            let mut file_streams = self.file_streams.inner.as_stream(0);
+            let seed = ctx.with_rng(Rng::random);
+            let mut dir_streams = self.dir_streams.inner.as_stream(seed);
+            let mut file_streams = self.file_streams.inner.as_stream(seed);
 
             return Ok(select_biased! {
                 buffer_event = self.buffer_streams.select_next_some() => {

@@ -8,6 +8,8 @@ use std::collections::hash_map::Entry;
 use std::panic;
 
 use fxhash::FxHashMap;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 use crate::context::{Borrowed, BorrowedInner};
 use crate::editor::AgentId;
@@ -30,6 +32,7 @@ pub struct State<Ed: Editor> {
     next_agent_id: AgentId,
     panic_handlers: FxHashMap<PluginId, &'static dyn PanicHandler<Ed>>,
     panic_hook: PanicHook<Ed>,
+    rng: StdRng,
 }
 
 /// TODO: docs.
@@ -124,8 +127,14 @@ impl<Ed: Editor> State<Ed> {
     }
 
     #[inline]
-    pub(crate) fn new(editor: Ed) -> Self {
+    pub(crate) fn new(mut editor: Ed) -> Self {
         const RESUME_UNWINDING: &ResumeUnwinding = &ResumeUnwinding;
+
+        let rng: StdRng = editor
+            .rng_seed()
+            .map(SeedableRng::seed_from_u64)
+            .unwrap_or_else(SeedableRng::from_os_rng);
+
         Self {
             panic_hook: PanicHook::set(&editor),
             editor,
@@ -135,12 +144,18 @@ impl<Ed: Editor> State<Ed> {
                 <ResumeUnwinding as Plugin<Ed>>::id(),
                 RESUME_UNWINDING as &'static dyn PanicHandler<Ed>,
             ))),
+            rng,
         }
     }
 
     #[inline]
     pub(crate) fn next_agent_id(&mut self) -> AgentId {
         self.next_agent_id.post_inc()
+    }
+
+    #[inline]
+    pub(crate) fn rng(&mut self) -> &mut StdRng {
+        &mut self.rng
     }
 }
 

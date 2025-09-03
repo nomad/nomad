@@ -213,6 +213,11 @@ impl<Ed: EditorAdapter> Editor for Ed {
     }
 
     #[inline]
+    fn rng_seed(&mut self) -> Option<u64> {
+        self.deref_mut().rng_seed()
+    }
+
+    #[inline]
     fn selection(
         &mut self,
         id: Self::SelectionId,

@@ -255,14 +255,16 @@ dependencies = [
  "event-listener",
  "keyring",
  "neovim",
+ "rand",
  "serde_json",
 ]
 
 [[package]]
 name = "auth-types"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#56d8a7f4c7c70579896f6075642ccc9c5535a543"
+source = "git+ssh://git@github.com/nomad/collab-server.git#f398df854b57ecf3e4692a0d7a58c4072a96cb8f"
 dependencies = [
+ "base64",
  "serde",
  "smol_str",
 ]
@@ -287,6 +289,12 @@ dependencies = [
  "rustc-demangle",
  "windows-targets 0.52.6",
 ]
+
+[[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "benches"
@@ -717,6 +725,7 @@ dependencies = [
  "home",
  "indexmap",
  "neovim",
+ "rand",
  "serde",
  "smallvec",
  "tracing",
@@ -743,7 +752,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#56d8a7f4c7c70579896f6075642ccc9c5535a543"
+source = "git+ssh://git@github.com/nomad/collab-server.git#f398df854b57ecf3e4692a0d7a58c4072a96cb8f"
 dependencies = [
  "bincode",
  "cauchy",
@@ -761,7 +770,7 @@ dependencies = [
 [[package]]
 name = "collab-types"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#56d8a7f4c7c70579896f6075642ccc9c5535a543"
+source = "git+ssh://git@github.com/nomad/collab-server.git#f398df854b57ecf3e4692a0d7a58c4072a96cb8f"
 dependencies = [
  "auth-types",
  "bytes",
@@ -1044,7 +1053,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#56d8a7f4c7c70579896f6075642ccc9c5535a543"
+source = "git+ssh://git@github.com/nomad/collab-server.git#f398df854b57ecf3e4692a0d7a58c4072a96cb8f"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1065,6 +1074,7 @@ dependencies = [
  "fs",
  "futures-lite",
  "fxhash",
+ "rand",
  "serde",
  "smallvec",
  "smol_str",
@@ -1287,7 +1297,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#56d8a7f4c7c70579896f6075642ccc9c5535a543"
+source = "git+ssh://git@github.com/nomad/collab-server.git#f398df854b57ecf3e4692a0d7a58c4072a96cb8f"
 dependencies = [
  "flume",
  "futures-util",
@@ -1798,7 +1808,7 @@ dependencies = [
 [[package]]
 name = "message-channel"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#56d8a7f4c7c70579896f6075642ccc9c5535a543"
+source = "git+ssh://git@github.com/nomad/collab-server.git#f398df854b57ecf3e4692a0d7a58c4072a96cb8f"
 dependencies = [
  "bincode",
  "cauchy",

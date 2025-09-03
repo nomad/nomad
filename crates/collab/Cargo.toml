@@ -35,6 +35,7 @@ fs = { workspace = true, features = ["filter"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["const_new"] }
 tracing = { workspace = true }
