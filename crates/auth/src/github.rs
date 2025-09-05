@@ -69,7 +69,7 @@ fn open_browser(
     let callback_url =
         auth_server_url.join("/github/callback").expect("route is valid");
 
-    let mut github_authorize_url = (&*GITHUB_AUTHORIZE_URL).clone();
+    let mut github_authorize_url = (*GITHUB_AUTHORIZE_URL).clone();
 
     github_authorize_url
         .query_pairs_mut()
