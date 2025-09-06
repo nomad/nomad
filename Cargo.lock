@@ -257,6 +257,7 @@ dependencies = [
  "futures-util",
  "keyring",
  "neovim",
+ "nomad-collab-params",
  "open",
  "rand",
  "reqwest",
@@ -2180,9 +2181,12 @@ dependencies = [
  "auth-types",
  "cauchy",
  "collab-server",
+ "collab-types",
  "derive_more",
+ "reqwest",
  "serde",
  "ulid",
+ "url",
 ]
 
 [[package]]

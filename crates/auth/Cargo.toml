@@ -8,11 +8,16 @@ publish.workspace = true
 
 [features]
 mock = []
+github = [
+  "nomad-collab-params/github-authenticator",
+  "dep:reqwest",
+  "dep:nomad-collab-params",
+]
 neovim = [
+  "github",
   "keyring/apple-native",
   "keyring/secret-service",
   "dep:neovim",
-  "dep:reqwest",
 ]
 
 [dependencies]
@@ -32,6 +37,7 @@ serde_json = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 
 neovim = { workspace = true, optional = true }
+nomad-collab-params = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true, features = ["json"] }
 
 [lints]

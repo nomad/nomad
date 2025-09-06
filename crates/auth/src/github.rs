@@ -7,6 +7,7 @@ use auth_types::{GitHubAccessToken, OAuthState};
 use collab_types::GitHubHandle;
 use editor::{Access, Context, Editor};
 use futures_util::{FutureExt, future, pin_mut};
+use nomad_collab_params::GitHubAuthenticator;
 use rand::Rng;
 use url::Url;
 
@@ -21,12 +22,15 @@ pub(crate) async fn login<Ed: Editor>(
     ctx: &mut Context<Ed>,
 ) -> Result<(GitHubAccessToken, GitHubHandle), GitHubLoginError> {
     let auth_server_url = config.with(|config| config.server_url.clone());
-
     let oauth_state = OAuthState::from_bytes(ctx.with_rng(Rng::random));
+    let http_client = reqwest::Client::new();
 
     let login_request = ctx.spawn_background({
         let auth_server_url = auth_server_url.clone();
-        async move { login_request(&auth_server_url, &oauth_state).await }
+        let http_client = http_client.clone();
+        async move {
+            login_request(&http_client, &auth_server_url, &oauth_state).await
+        }
     });
 
     let open_browser = ctx
@@ -47,12 +51,18 @@ pub(crate) async fn login<Ed: Editor>(
         }
     };
 
-    let _access_token = login_result.map_err(GitHubLoginError::LoginRequest);
+    let access_token = login_result.map_err(GitHubLoginError::LoginRequest)?;
 
-    todo!()
+    let github_handle = GitHubAuthenticator::new(&http_client)
+        .authenticate(&access_token)
+        .await
+        .map_err(GitHubLoginError::Authenticate)?;
+
+    Ok((access_token, github_handle))
 }
 
 async fn login_request(
+    http_client: &reqwest::Client,
     auth_server_url: &Url,
     oauth_state: &OAuthState,
 ) -> reqwest::Result<GitHubAccessToken> {
@@ -60,7 +70,7 @@ async fn login_request(
         .join(&format!("/github/login/{oauth_state}"))
         .expect("route is valid");
 
-    reqwest::get(login_url).await?.json::<GitHubAccessToken>().await
+    http_client.get(login_url).send().await?.json::<GitHubAccessToken>().await
 }
 
 fn open_browser(
@@ -86,6 +96,10 @@ fn open_browser(
 #[derive(Debug, derive_more::Display)]
 #[display("{_0}")]
 pub enum GitHubLoginError {
+    /// Authenticating with the access token received from the server failed.
+    #[display("{_0}")]
+    Authenticate(nomad_collab_params::GitHubAuthError),
+
     /// The login request to the authentication server failed.
     #[display("Login request to the authentication server failed: {_0}")]
     LoginRequest(reqwest::Error),

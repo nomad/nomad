@@ -8,6 +8,7 @@ publish.workspace = true
 
 [features]
 default = ["serde"]
+github-authenticator = ["dep:collab-types", "dep:reqwest", "dep:url"]
 serde = ["dep:serde"]
 
 [dependencies]
@@ -17,7 +18,10 @@ collab-server = { workspace = true }
 derive_more = { workspace = true }
 ulid = { workspace = true, features = ["serde"] }
 
+collab-types = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true, features = ["json"] }
 serde = { workspace = true, optional = true, features = ["derive"] }
+url = { workspace = true, optional = true }
 
 [lints]
 workspace = true

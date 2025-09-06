@@ -8,7 +8,7 @@ mod auth_state;
 mod config;
 mod credential_store;
 mod editors;
-#[cfg(feature = "neovim")]
+#[cfg(feature = "github")]
 pub mod github;
 pub mod login;
 pub mod logout;
