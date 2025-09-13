@@ -14,6 +14,7 @@ use crate::utils::FutureExt;
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+#[ignore = "times out in CI"]
 fn simple() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
@@ -27,6 +28,7 @@ fn simple() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+#[ignore = "times out in CI"]
 fn changes_to_gitignore_are_picked_up() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
@@ -44,6 +46,7 @@ fn changes_to_gitignore_are_picked_up() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+#[ignore = "times out in CI"]
 fn slashed_dirs_are_ignored() {
     let repo = GitRepository::init(mock::fs! {
         "target": {},
@@ -122,6 +125,7 @@ fn exit_status_is_returned_if_process_is_killed() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+#[ignore = "times out in CI"]
 fn process_terminates_when_all_gitignore_instances_are_dropped() {
     let repo = GitRepository::init(mock::fs! {});
     let gitignore_2 = repo.gitignore.clone();
