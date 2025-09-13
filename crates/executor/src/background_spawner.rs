@@ -1,7 +1,7 @@
 use crate::Task;
 
 /// TODO: docs.
-pub trait BackgroundSpawner: Clone + Send + 'static {
+pub trait BackgroundSpawner: Clone + Send {
     /// TODO: docs.
     type Task<T: Send + 'static>: Task<T> + Send;
 
