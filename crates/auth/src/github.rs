@@ -53,7 +53,7 @@ pub(crate) async fn login<Ed: Editor>(
 
     let access_token = login_result.map_err(GitHubLoginError::LoginRequest)?;
 
-    let github_handle = GitHubAuthenticator::new(&http_client)
+    let github_handle = GitHubAuthenticator { http_client }
         .authenticate(&access_token)
         .await
         .map_err(GitHubLoginError::Authenticate)?;

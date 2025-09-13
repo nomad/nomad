@@ -29,6 +29,7 @@ derive_more = { workspace = true }
 editor = { workspace = true }
 event-listener = { workspace = true }
 futures-util = { workspace = true }
+http-client = { workspace = true, features = ["reqwest"] }
 keyring = { workspace = true }
 open = { workspace = true }
 rand = { workspace = true }

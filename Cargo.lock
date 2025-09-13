@@ -255,6 +255,7 @@ dependencies = [
  "editor",
  "event-listener",
  "futures-util",
+ "http-client",
  "keyring",
  "neovim",
  "nomad-collab-params",
@@ -1552,7 +1553,6 @@ dependencies = [
  "reqwest",
  "serde_json",
  "ureq",
- "url",
 ]
 
 [[package]]
@@ -2214,8 +2214,10 @@ dependencies = [
  "collab-server",
  "collab-types",
  "derive_more",
- "reqwest",
+ "http",
+ "http-client",
  "serde",
+ "serde_json",
  "ulid",
  "url",
 ]

@@ -52,11 +52,7 @@ open = "5"
 pin-project-lite = "0.2"
 rand = "0.9"
 rand_chacha = "0.9"
-reqwest = { version = "0.12", default-features = false, features = [
-  "charset",
-  "http2",
-  "rustls-tls",
-] }
+reqwest = { version = "0.12", default-features = false }
 send-future = "0.1"
 serde = "1"
 serde_json = "1"
@@ -83,6 +79,7 @@ editor = { path = "./crates/editor" }
 executor = { path = "./crates/executor" }
 fs = { path = "./crates/fs" }
 gitignore = { path = "./crates/gitignore" }
+http-client = { path = "./crates/http-client" }
 mock = { path = "./crates/mock" }
 neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }

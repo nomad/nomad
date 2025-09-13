@@ -13,7 +13,6 @@ ureq = ["dep:ureq", "dep:executor"]
 
 [dependencies]
 http = { workspace = true }
-url = { workspace = true }
 
 executor = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true, features = [
