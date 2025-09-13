@@ -94,6 +94,7 @@
                   "rustfmt"
                 ];
               })
+              pkgs.cargo-nextest
             ];
           };
         };
