@@ -4,7 +4,7 @@ use core::error::Error;
 pub trait HttpClient: Clone + Send {
     /// The type of error that can occur after [`send`](HttpClient::send)ing a
     /// request.
-    type Error: Error + Send + 'static;
+    type Error: Error + Send;
 
     /// Asynchronously sends an HTTP request and waits for the response.
     fn send(
@@ -23,3 +23,4 @@ impl<T: HttpClient + Sync> HttpClient for &T {
         (*self).send(request).await
     }
 }
+
