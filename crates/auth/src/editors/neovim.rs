@@ -23,6 +23,11 @@ impl AuthEditor for Neovim {
         ctx: &mut Context<Self>,
     ) -> Result<(AccessToken, PeerHandle), Self::LoginError> {
         let (access_token, github_handle) = github::login(config, ctx).await?;
+
+        ctx.notify_info(format_args!(
+            "Successfully logged in as '{github_handle}'",
+        ));
+
         Ok((
             AccessToken::GitHub(access_token),
             PeerHandle::GitHub(github_handle),

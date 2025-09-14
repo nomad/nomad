@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use core::pin::pin;
 use std::io;
 use std::sync::LazyLock;
 
@@ -27,21 +28,16 @@ pub(crate) async fn login<Ed: Editor>(
     let oauth_state = OAuthState::from_bytes(ctx.with_rng(Rng::random));
     let http_client = ctx.http_client();
 
-    let login_request = ctx.spawn_background({
-        let auth_server_url = auth_server_url.clone();
-        let http_client = http_client.clone();
-        async move {
-            login_request(&http_client, &auth_server_url, &oauth_state).await
-        }
-    });
+    let mut login_request =
+        pin!(login_request(&http_client, &auth_server_url, &oauth_state));
 
     let open_browser = ctx
-        .spawn_background(async move {
-            open_browser(&auth_server_url, &oauth_state)
+        .spawn_background({
+            let auth_server_url = auth_server_url.clone();
+            async move { open_browser(&auth_server_url, &oauth_state) }
         })
         .fuse();
 
-    pin_mut!(login_request);
     pin_mut!(open_browser);
 
     let access_token = loop {
@@ -53,7 +49,7 @@ pub(crate) async fn login<Ed: Editor>(
         }
     };
 
-    let github_handle = GitHubAuthenticator { http_client }
+    let github_handle = GitHubAuthenticator { http_client: &http_client }
         .authenticate(&access_token)
         .await
         .map_err(GitHubLoginError::Authenticate)?;

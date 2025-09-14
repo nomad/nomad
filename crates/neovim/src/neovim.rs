@@ -145,9 +145,7 @@ impl Editor for Neovim {
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
     type Executor = executor::NeovimExecutor;
     type EventHandle = EventHandle;
-    type HttpClient = http_client::UreqClient<
-        <Self::Executor as Executor>::BackgroundSpawner,
-    >;
+    type HttpClient = HttpClient;
     type Selection<'a> = NeovimSelection<'a>;
     type SelectionId = BufferId;
 
