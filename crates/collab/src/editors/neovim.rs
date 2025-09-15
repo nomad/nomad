@@ -20,6 +20,7 @@ use nomad_collab_params::ulid;
 
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::session::{SessionError, SessionInfos};
+use crate::tcp_stream_ext::TcpStreamExt;
 use crate::{Collab, config, join, leave, start, yank};
 
 pub type SessionId = ulid::Ulid;
@@ -329,9 +330,9 @@ impl CollabEditor for Neovim {
 
     async fn connect_to_server(
         server_addr: config::ServerAddress,
-        _: &mut Context<Self>,
+        ctx: &mut Context<Self>,
     ) -> Result<Self::Io, Self::ConnectToServerError> {
-        async_net::TcpStream::connect(&*server_addr)
+        <async_net::TcpStream as TcpStreamExt>::connect(server_addr, ctx)
             .await
             .map_err(|inner| NeovimConnectToServerError { inner })
     }

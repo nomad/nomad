@@ -10,6 +10,7 @@ publish.workspace = true
 mock = ["collab-server/server", "collab-server/test", "dep:duplex-stream"]
 neovim = [
   "tls",
+  "dep:async-io",
   "dep:async-net",
   "dep:clipboard",
   "dep:gitignore",
@@ -50,6 +51,7 @@ tracing = { workspace = true }
 duplex-stream = { workspace = true, optional = true }
 
 # Neovim-only dependencies.
+async-io = { workspace = true, optional = true }
 async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
 gitignore = { workspace = true, optional = true }

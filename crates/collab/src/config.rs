@@ -1,11 +1,13 @@
 //! TODO: docs.
 
-use core::fmt;
-use core::ops::Deref;
-use std::rc::Rc;
+use core::{fmt, iter, net, str};
+use std::borrow::Cow;
+use std::net::ToSocketAddrs;
+use std::{io, vec};
 
 use abs_path::AbsPathBuf;
-use collab_types::smol_str::format_smolstr;
+use either::Either;
+use rustls_pki_types::DnsName;
 use serde::de::{Deserialize, Deserializer};
 
 const DEFAULT_DOMAIN: &str = "collab.nomad.foo";
@@ -27,30 +29,43 @@ pub struct Config {
 /// TODO: docs.
 #[derive(Clone)]
 pub struct ServerAddress {
-    inner: Rc<str>,
+    kind: AddressKind,
+    port: u16,
+}
+
+#[derive(Clone)]
+enum AddressKind {
+    Localhost,
+    Ip(net::IpAddr),
+    Domain(DnsName<'static>),
 }
 
 impl Default for ServerAddress {
     fn default() -> Self {
-        Self {
-            inner: format_smolstr!("{DEFAULT_DOMAIN}:{DEFAULT_PORT}")
-                .as_str()
-                .into(),
-        }
+        let Ok(dns_name) = DnsName::try_from(DEFAULT_DOMAIN) else {
+            unreachable!("{DEFAULT_DOMAIN:?} is a valid DNS name")
+        };
+        Self { kind: AddressKind::Domain(dns_name), port: DEFAULT_PORT }
     }
 }
 
 impl fmt::Debug for ServerAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ServerAddress").field(&self.inner).finish()
+        fmt::Display::fmt(self, f)
     }
 }
 
-impl Deref for ServerAddress {
-    type Target = str;
+impl fmt::Display for ServerAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.kind, self.port)
+    }
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+impl str::FromStr for ServerAddress {
+    type Err = core::convert::Infallible;
+
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+        todo!()
     }
 }
 
@@ -59,7 +74,38 @@ impl<'de> Deserialize<'de> for ServerAddress {
     where
         D: Deserializer<'de>,
     {
-        let inner = String::deserialize(deserializer)?;
-        Ok(Self { inner: inner.into() })
+        Cow::<str>::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl ToSocketAddrs for ServerAddress {
+    type Iter =
+        Either<iter::Once<net::SocketAddr>, vec::IntoIter<net::SocketAddr>>;
+
+    fn to_socket_addrs(&self) -> io::Result<Self::Iter> {
+        let ip_addr = match &self.kind {
+            AddressKind::Localhost => {
+                net::IpAddr::V4(net::Ipv4Addr::LOCALHOST)
+            },
+            AddressKind::Ip(ip_addr) => *ip_addr,
+            AddressKind::Domain(dns_name) => {
+                return (dns_name.as_ref(), self.port)
+                    .to_socket_addrs()
+                    .map(Either::Right);
+            },
+        };
+        Ok(Either::Left(iter::once(net::SocketAddr::new(ip_addr, self.port))))
+    }
+}
+
+impl fmt::Display for AddressKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AddressKind::Localhost => f.write_str("localhost"),
+            AddressKind::Ip(ip) => write!(f, "{ip}"),
+            AddressKind::Domain(domain) => f.write_str(domain.as_ref()),
+        }
     }
 }
