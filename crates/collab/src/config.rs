@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use core::net::{IpAddr, Ipv4Addr};
 use core::{fmt, iter, net, num, str};
 use std::borrow::Cow;
 use std::net::ToSocketAddrs;
@@ -7,7 +8,7 @@ use std::{io, vec};
 
 use abs_path::AbsPathBuf;
 use either::Either;
-use rustls_pki_types::DnsName;
+use rustls_pki_types::{DnsName, ServerName};
 use serde::de::{Deserialize, Deserializer};
 
 const DEFAULT_DOMAIN: &str = "collab.nomad.foo";
@@ -29,8 +30,8 @@ pub struct Config {
 /// TODO: docs.
 #[derive(Clone)]
 pub struct ServerAddress {
-    host: Host,
-    port: u16,
+    pub(crate) host: Host,
+    pub(crate) port: u16,
 }
 
 /// The type of error that can occur when parsing a `ServerAddress` from a
@@ -51,8 +52,7 @@ pub enum ServerAddressParseError {
 }
 
 #[derive(Clone)]
-enum Host {
-    Localhost,
+pub(crate) enum Host {
     Ip(net::IpAddr),
     Domain(DnsName<'static>),
 }
@@ -90,7 +90,7 @@ impl str::FromStr for ServerAddress {
             port.parse().map_err(ServerAddressParseError::InvalidPort)?;
 
         let host = if host == "localhost" {
-            Host::Localhost
+            Host::Ip(net::IpAddr::V4(net::Ipv4Addr::LOCALHOST))
         } else if let Ok(ip_addr) = host.parse() {
             Host::Ip(ip_addr)
         } else if let Ok(dns_name) = DnsName::try_from(host) {
@@ -119,25 +119,34 @@ impl ToSocketAddrs for ServerAddress {
         Either<iter::Once<net::SocketAddr>, vec::IntoIter<net::SocketAddr>>;
 
     fn to_socket_addrs(&self) -> io::Result<Self::Iter> {
-        let ip_addr = match &self.host {
-            Host::Localhost => net::IpAddr::V4(net::Ipv4Addr::LOCALHOST),
-            Host::Ip(ip_addr) => *ip_addr,
-            Host::Domain(dns_name) => {
-                return (dns_name.as_ref(), self.port)
-                    .to_socket_addrs()
-                    .map(Either::Right);
-            },
-        };
-        Ok(Either::Left(iter::once(net::SocketAddr::new(ip_addr, self.port))))
+        match &self.host {
+            Host::Ip(ip_addr) => Ok(Either::Left(iter::once(
+                net::SocketAddr::new(*ip_addr, self.port),
+            ))),
+            Host::Domain(dns_name) => (dns_name.as_ref(), self.port)
+                .to_socket_addrs()
+                .map(Either::Right),
+        }
     }
 }
 
 impl fmt::Display for Host {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Host::Localhost => f.write_str("localhost"),
+            Host::Ip(ip) if ip == &IpAddr::V4(Ipv4Addr::LOCALHOST) => {
+                f.write_str("localhost")
+            },
             Host::Ip(ip) => write!(f, "{ip}"),
             Host::Domain(domain) => f.write_str(domain.as_ref()),
+        }
+    }
+}
+
+impl From<Host> for ServerName<'static> {
+    fn from(host: Host) -> Self {
+        match host {
+            Host::Ip(ip_addr) => Self::IpAddress(ip_addr.into()),
+            Host::Domain(dns_name) => Self::DnsName(dns_name),
         }
     }
 }
