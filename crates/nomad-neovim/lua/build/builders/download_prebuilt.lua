@@ -21,6 +21,29 @@ local commands = {
   tar = "tar",
 }
 
+--- Extracts the Nomad version from the workspace's Cargo.toml.
+---
+---@param build_ctx nomad.neovim.build.Context
+---@return nomad.Result<string, string>
+local nomad_version_from_cargo_toml = function(build_ctx)
+  local cargo_toml_path = build_ctx:repo_dir():join("Cargo.toml")
+  local cargo_toml, err_msg = io.open(cargo_toml_path:display(), "r")
+
+  if not cargo_toml then
+    return Result.err(("couldn't open %s: %s"):format(cargo_toml_path, err_msg))
+  end
+
+  for line in cargo_toml:lines() do
+    local version = line:match('^version%s*=%s*"([^"]+)"')
+    if version then
+      cargo_toml:close()
+      return Result.ok(version)
+    end
+  end
+
+  return Result.err(("couldn't extract version from %s"):format(cargo_toml_path))
+end
+
 ---@param exit_code integer
 ---@return string
 local err = function(exit_code)
@@ -89,9 +112,15 @@ local build_fn = function(opts, build_ctx)
     if tag_res:is_err() then return tag_res:map_err(err) end
     if tag == nil then return Result.err("not on a tag") end
 
-    -- FIXME: if the tag is "nightly", this will be "nightly" instead of e.g.
-    -- "x.y.z-dev".
-    local nomad_version = tag:gsub("^v", "")
+    local nomad_version
+    if tag == "nightly" then
+      local version_res = nomad_version_from_cargo_toml(build_ctx)
+      if version_res:is_err() then return version_res:map(function() end) end
+      nomad_version = version_res:unwrap()
+    else
+      nomad_version = tag:gsub("^v", "")
+    end
+
     local name_res = get_archive_name(nomad_version)
     -- We don't offer pre-built artifacts for this machine.
     if name_res:is_err() then return name_res:map(function() end) end
@@ -115,7 +144,6 @@ local build_fn = function(opts, build_ctx)
         :arg("--output")
         :arg(out_dir:join(archive_name):display())
         :arg(get_artifact_url(tag, archive_name))
-        :on_stdout(build_ctx.notify)
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
