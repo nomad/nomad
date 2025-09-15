@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-use core::net::{IpAddr, Ipv4Addr};
 use core::{fmt, iter, net, num, str};
 use std::borrow::Cow;
 use std::net::ToSocketAddrs;
@@ -133,9 +132,6 @@ impl ToSocketAddrs for ServerAddress {
 impl fmt::Display for Host {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Host::Ip(ip) if ip == &IpAddr::V4(Ipv4Addr::LOCALHOST) => {
-                f.write_str("localhost")
-            },
             Host::Ip(ip) => write!(f, "{ip}"),
             Host::Domain(domain) => f.write_str(domain.as_ref()),
         }

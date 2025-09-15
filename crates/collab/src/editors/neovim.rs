@@ -3,15 +3,20 @@ use core::ops::Range;
 use core::{any, fmt};
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::{Arc, OnceLock};
 use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
+use async_net::TcpStream;
 use collab_types::{Peer, PeerId};
 use editor::context::Borrowed;
 use editor::module::{Action, Module};
 use editor::{ByteOffset, Context, Editor};
 use executor::Executor;
 use fs::Directory;
+use futures_rustls::client::TlsStream;
+use futures_rustls::{TlsConnector, rustls};
+use futures_util::future::Either;
 use mlua::{Function, Table};
 use neovim::buffer::{BufferExt, BufferId, HighlightRangeHandle, Point};
 use neovim::notify::ContextExt;
@@ -53,9 +58,15 @@ pub struct NeovimCopySessionIdError {
 }
 
 #[derive(Debug, derive_more::Display, cauchy::Error)]
-#[display("couldn't connect to the server: {inner}")]
-pub struct NeovimConnectToServerError {
-    inner: io::Error,
+pub enum NeovimConnectToServerError {
+    #[display("couldn't establish TCP connection with server: {_0}")]
+    ConnectTcp(io::Error),
+
+    #[display("couldn't establish TLS connection with server: {_0}")]
+    ConnectTls(io::Error),
+
+    #[display("couldn't obtain TLS certificates from OS: {_0}")]
+    Certificates(futures_rustls::rustls::Error),
 }
 
 #[derive(Debug, derive_more::Display, cauchy::Error)]
@@ -287,7 +298,7 @@ impl PeerCursor {
 }
 
 impl CollabEditor for Neovim {
-    type Io = async_net::TcpStream;
+    type Io = Either<TlsStream<TcpStream>, TcpStream>;
     type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerCursor;
     type ProjectFilter = Option<gitignore::GitIgnore>;
@@ -332,9 +343,28 @@ impl CollabEditor for Neovim {
         server_addr: config::ServerAddress,
         ctx: &mut Context<Self>,
     ) -> Result<Self::Io, Self::ConnectToServerError> {
-        <async_net::TcpStream as TcpStreamExt>::connect(server_addr, ctx)
+        let tcp_stream =
+            <TcpStream as TcpStreamExt>::connect(server_addr.clone(), ctx)
+                .await
+                .map_err(NeovimConnectToServerError::ConnectTcp)?;
+
+        // If we're connecting to a loopback address we're probably testing
+        // against a local server without TLS, so use plain TCP.
+        if let config::Host::Ip(ip) = &server_addr.host
+            && ip.is_loopback()
+        {
+            return Ok(Either::Right(tcp_stream));
+        }
+
+        let tls_connector = tls_connector(ctx)
             .await
-            .map_err(|inner| NeovimConnectToServerError { inner })
+            .map_err(NeovimConnectToServerError::Certificates)?;
+
+        tls_connector
+            .connect(server_addr.host.into(), tcp_stream)
+            .await
+            .map(Either::Left)
+            .map_err(NeovimConnectToServerError::ConnectTls)
     }
 
     async fn copy_session_id(
@@ -659,6 +689,28 @@ fn get_lua_value<T: mlua::FromLua>(namespace: &[&str]) -> Option<T> {
             table = table.get::<Table>(*key).ok()?;
         }
     }
+}
+
+async fn tls_connector(
+    ctx: &mut Context<impl Editor>,
+) -> Result<&TlsConnector, rustls::Error> {
+    static TLS_CONNECTOR: OnceLock<TlsConnector> = OnceLock::new();
+
+    if let Some(connector) = TLS_CONNECTOR.get() {
+        return Ok(connector);
+    }
+
+    // Getting the certificates from the OS blocks, so we do it in a
+    // background thread.
+    let client_config = ctx
+        .spawn_background(async {
+            use rustls_platform_verifier::ConfigVerifierExt;
+            rustls::ClientConfig::with_platform_verifier()
+        })
+        .await?;
+
+    Ok(TLS_CONNECTOR
+        .get_or_init(|| TlsConnector::from(Arc::new(client_config))))
 }
 
 impl PeerCursorHighlightGroup {
