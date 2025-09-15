@@ -103,7 +103,7 @@ local build_fn = function(opts, build_ctx)
     local out_dir = build_ctx:repo_dir():join("result")
 
     local mkdir_res = Command.new(commands.mkdir)
-        :args({ "-p", out_dir })
+        :args({ "-p", out_dir:display() })
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
@@ -113,7 +113,7 @@ local build_fn = function(opts, build_ctx)
         -- Follow redirects.
         :arg("--location")
         :arg("--output")
-        :arg(out_dir:join(archive_name))
+        :arg(out_dir:join(archive_name):display())
         :arg(get_artifact_url(tag, archive_name))
         :on_stdout(build_ctx.notify)
         :on_stderr(build_ctx.notify)
@@ -122,15 +122,15 @@ local build_fn = function(opts, build_ctx)
     if curl_res:is_err() then return curl_res:map_err(err) end
 
     local tar_res = Command.new(commands.tar)
-        :args({ "-xzf", out_dir:join(archive_name) })
-        :args({ "-C", out_dir })
+        :args({ "-xzf", out_dir:join(archive_name):display() })
+        :args({ "-C", out_dir:display() })
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
     if tar_res:is_err() then return tar_res:map_err(err) end
 
     return Command.new(commands.cp)
-        :args({ out_dir:join("/lua/*"), "lua/" })
+        :args({ out_dir:join("/lua/*"):display(), "lua/" })
         :current_dir(build_ctx:repo_dir())
         :await(ctx)
         :on_stderr(build_ctx.notify)

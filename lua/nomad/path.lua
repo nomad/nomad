@@ -18,6 +18,12 @@ Path.from_components = function(components)
 end
 
 ---@param self nomad.path.Path
+---@return string
+function Path:display()
+  return self._path
+end
+
+---@param self nomad.path.Path
 ---@param file_name string
 ---@return nomad.path.Path
 function Path:join(file_name)
