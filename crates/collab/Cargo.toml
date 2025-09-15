@@ -9,12 +9,18 @@ publish.workspace = true
 [features]
 mock = ["collab-server/server", "collab-server/test", "dep:duplex-stream"]
 neovim = [
+  "tls",
   "dep:async-net",
   "dep:clipboard",
   "dep:gitignore",
   "dep:home",
   "dep:neovim",
   "dep:nomad-collab-params",
+]
+tls = [
+  "dep:futures-rustls",
+  "dep:rustls-pki-types",
+  "dep:rustls-platform-verifier",
 ]
 
 [dependencies]
@@ -50,6 +56,11 @@ gitignore = { workspace = true, optional = true }
 home = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true }
 nomad-collab-params = { workspace = true, optional = true }
+
+# TLS-only dependencies.
+futures-rustls = { workspace = true, optional = true }
+rustls-pki-types = { workspace = true, optional = true }
+rustls-platform-verifier = { workspace = true, optional = true }
 
 [lints]
 workspace = true

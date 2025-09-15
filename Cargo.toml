@@ -39,6 +39,7 @@ fastrand = "2"
 flume = { version = "0.11", features = ["async"] }
 futures-executor = { version = "0.3" }
 futures-lite = { version = "2", default-features = false }
+futures-rustls = "0.26"
 futures-util = { version = "0.3", default-features = false }
 fxhash = "0.2"
 git2 = { version = "0.20", default-features = false }
@@ -54,6 +55,8 @@ pin-project-lite = "0.2"
 rand = "0.9"
 rand_chacha = "0.9"
 reqwest = { version = "0.12", default-features = false }
+rustls-pki-types = "1"
+rustls-platform-verifier = "0.6"
 send-future = "0.1"
 serde = "1"
 serde_json = "1"
