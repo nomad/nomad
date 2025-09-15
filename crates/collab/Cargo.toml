@@ -39,7 +39,7 @@ futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }
 rand = { workspace = true }
-rustls-pki-types = { workspace = true }
+rustls-pki-types = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["const_new"] }
 tracing = { workspace = true }

@@ -15,7 +15,7 @@ pub mod project;
 mod root_markers;
 pub mod session;
 pub mod start;
-#[cfg(any(feature = "neovim"))]
+#[cfg(feature = "neovim")]
 mod tcp_stream_ext;
 pub mod yank;
 
