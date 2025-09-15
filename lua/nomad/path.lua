@@ -27,8 +27,9 @@ end
 ---@param file_name string
 ---@return nomad.path.Path
 function Path:join(file_name)
-  self._path = self._path .. separator .. file_name
-  return self
+  local new_path = setmetatable({}, Path)
+  new_path._path = self._path .. separator .. file_name
+  return new_path
 end
 
 return {
