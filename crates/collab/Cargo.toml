@@ -18,11 +18,7 @@ neovim = [
   "dep:neovim",
   "dep:nomad-collab-params",
 ]
-tls = [
-  "dep:futures-rustls",
-  "dep:rustls-pki-types",
-  "dep:rustls-platform-verifier",
-]
+tls = ["dep:futures-rustls", "dep:rustls-platform-verifier"]
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
@@ -43,6 +39,7 @@ futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }
 rand = { workspace = true }
+rustls-pki-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["const_new"] }
 tracing = { workspace = true }
@@ -61,7 +58,6 @@ nomad-collab-params = { workspace = true, optional = true }
 
 # TLS-only dependencies.
 futures-rustls = { workspace = true, optional = true }
-rustls-pki-types = { workspace = true, optional = true }
 rustls-platform-verifier = { workspace = true, optional = true }
 
 [lints]

@@ -132,8 +132,8 @@ impl ToSocketAddrs for ServerAddress {
 impl fmt::Display for Host {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Host::Ip(ip) => write!(f, "{ip}"),
-            Host::Domain(domain) => f.write_str(domain.as_ref()),
+            Self::Ip(ip) => write!(f, "{ip}"),
+            Self::Domain(domain) => f.write_str(domain.as_ref()),
         }
     }
 }

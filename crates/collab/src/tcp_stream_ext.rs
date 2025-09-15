@@ -21,7 +21,7 @@ impl TcpStreamExt for async_net::TcpStream {
     async fn connect<Addrs>(
         addrs: Addrs,
         ctx: &mut Context<impl Editor>,
-    ) -> io::Result<async_net::TcpStream>
+    ) -> io::Result<Self>
     where
         Addrs: ToSocketAddrs + Send + 'static,
         Addrs::Iter: Send,
