@@ -42,11 +42,11 @@ pub enum ServerAddressParseError {
     InvalidFormat,
 
     /// The host is not a valid domain name, IP address, or `localhost`.
-    #[display("expected a domain name, IP address, or 'localhost'")]
+    #[display("expected host to be a domain name, IP address, or 'localhost'")]
     InvalidHost,
 
     /// The port is not a valid number.
-    #[display("{_0}")]
+    #[display("invalid port: {_0}")]
     InvalidPort(num::ParseIntError),
 }
 
