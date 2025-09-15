@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use core::{fmt, iter, net, str};
+use core::{fmt, iter, net, num, str};
 use std::borrow::Cow;
 use std::net::ToSocketAddrs;
 use std::{io, vec};
@@ -29,12 +29,29 @@ pub struct Config {
 /// TODO: docs.
 #[derive(Clone)]
 pub struct ServerAddress {
-    kind: AddressKind,
+    host: Host,
     port: u16,
 }
 
+/// The type of error that can occur when parsing a `ServerAddress` from a
+/// string.
+#[derive(Debug, derive_more::Display, cauchy::Error)]
+pub enum ServerAddressParseError {
+    /// The input string is not formatted as `{host}:{port}`.
+    #[display("expected a string formatted as {{host}}:{{port}}")]
+    InvalidFormat,
+
+    /// The host is not a valid domain name, IP address, or `localhost`.
+    #[display("expected a domain name, IP address, or 'localhost'")]
+    InvalidHost,
+
+    /// The port is not a valid number.
+    #[display("{_0}")]
+    InvalidPort(num::ParseIntError),
+}
+
 #[derive(Clone)]
-enum AddressKind {
+enum Host {
     Localhost,
     Ip(net::IpAddr),
     Domain(DnsName<'static>),
@@ -45,7 +62,7 @@ impl Default for ServerAddress {
         let Ok(dns_name) = DnsName::try_from(DEFAULT_DOMAIN) else {
             unreachable!("{DEFAULT_DOMAIN:?} is a valid DNS name")
         };
-        Self { kind: AddressKind::Domain(dns_name), port: DEFAULT_PORT }
+        Self { host: Host::Domain(dns_name), port: DEFAULT_PORT }
     }
 }
 
@@ -57,15 +74,32 @@ impl fmt::Debug for ServerAddress {
 
 impl fmt::Display for ServerAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.kind, self.port)
+        write!(f, "{}:{}", self.host, self.port)
     }
 }
 
 impl str::FromStr for ServerAddress {
-    type Err = core::convert::Infallible;
+    type Err = ServerAddressParseError;
 
-    fn from_str(_s: &str) -> Result<Self, Self::Err> {
-        todo!()
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (host, port) = s
+            .rsplit_once(':')
+            .ok_or(ServerAddressParseError::InvalidFormat)?;
+
+        let port =
+            port.parse().map_err(ServerAddressParseError::InvalidPort)?;
+
+        let host = if host == "localhost" {
+            Host::Localhost
+        } else if let Ok(ip_addr) = host.parse() {
+            Host::Ip(ip_addr)
+        } else if let Ok(dns_name) = DnsName::try_from(host) {
+            Host::Domain(dns_name.to_owned())
+        } else {
+            return Err(ServerAddressParseError::InvalidHost);
+        };
+
+        Ok(Self { host, port })
     }
 }
 
@@ -85,12 +119,10 @@ impl ToSocketAddrs for ServerAddress {
         Either<iter::Once<net::SocketAddr>, vec::IntoIter<net::SocketAddr>>;
 
     fn to_socket_addrs(&self) -> io::Result<Self::Iter> {
-        let ip_addr = match &self.kind {
-            AddressKind::Localhost => {
-                net::IpAddr::V4(net::Ipv4Addr::LOCALHOST)
-            },
-            AddressKind::Ip(ip_addr) => *ip_addr,
-            AddressKind::Domain(dns_name) => {
+        let ip_addr = match &self.host {
+            Host::Localhost => net::IpAddr::V4(net::Ipv4Addr::LOCALHOST),
+            Host::Ip(ip_addr) => *ip_addr,
+            Host::Domain(dns_name) => {
                 return (dns_name.as_ref(), self.port)
                     .to_socket_addrs()
                     .map(Either::Right);
@@ -100,12 +132,12 @@ impl ToSocketAddrs for ServerAddress {
     }
 }
 
-impl fmt::Display for AddressKind {
+impl fmt::Display for Host {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AddressKind::Localhost => f.write_str("localhost"),
-            AddressKind::Ip(ip) => write!(f, "{ip}"),
-            AddressKind::Domain(domain) => f.write_str(domain.as_ref()),
+            Host::Localhost => f.write_str("localhost"),
+            Host::Ip(ip) => write!(f, "{ip}"),
+            Host::Domain(domain) => f.write_str(domain.as_ref()),
         }
     }
 }
