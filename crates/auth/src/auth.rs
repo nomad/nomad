@@ -46,12 +46,9 @@ impl Auth {
 
         let this = Self::default();
 
-        this.state.set_logged_in(crate::auth_state::AuthInfos {
-            access_token: auth_types::AccessToken::GitHub(
-                auth_types::GitHubAccessToken::new(github_handle.as_str()),
-            ),
-            peer_handle: peer_handle::PeerHandle::GitHub(github_handle),
-        });
+        this.state.set_logged_in(auth_types::JsonWebToken::mock(
+            peer_handle::PeerHandle::GitHub(github_handle),
+        ));
 
         this
     }

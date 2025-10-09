@@ -38,12 +38,14 @@ pub struct Claims {
     pub name: Option<SmolStr>,
 
     /// The user's username.
+    #[serde(with = "self::username_serde_impls")]
     pub username: PeerHandle,
 }
 
 /// The possible values for the `sub` claim in a Nomad JWT.
 #[derive(Debug, Copy, Clone)]
 pub enum Subject {
+    /// A GitHub user ID.
     GitHubUserId(u64),
 }
 
@@ -98,5 +100,57 @@ impl<'de> serde::Deserialize<'de> for Subject {
     {
         let s = SmolStr::deserialize(deserializer)?;
         Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+mod username_serde_impls {
+    use std::borrow::Cow;
+
+    use peer_handle::GitHubHandle;
+    use serde::{Deserialize, Deserializer, Serializer};
+    use smol_str::format_smolstr;
+
+    use super::PeerHandle;
+
+    pub(super) fn serialize<S>(
+        peer_handle: &PeerHandle,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let provider = match peer_handle {
+            PeerHandle::GitHub(_) => "github",
+        };
+
+        serializer.serialize_str(&format_smolstr!(
+            "{}:{}",
+            provider,
+            peer_handle
+        ))
+    }
+
+    pub(super) fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<PeerHandle, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let str = <Cow<str>>::deserialize(deserializer)?;
+
+        let (provider, peer_handle) = str
+            .split_once(':')
+            .ok_or_else(|| serde::de::Error::custom("invalid format"))?;
+
+        match provider {
+            "github" => peer_handle
+                .parse::<GitHubHandle>()
+                .map(PeerHandle::GitHub)
+                .map_err(serde::de::Error::custom),
+
+            _ => Err(serde::de::Error::custom(format_args!(
+                "invalid provider {provider:?}"
+            ))),
+        }
     }
 }

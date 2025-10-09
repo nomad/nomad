@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 use core::pin::pin;
+use core::str::FromStr;
 use std::io;
 use std::sync::LazyLock;
 
@@ -67,8 +68,7 @@ async fn login_request<Client: HttpClient>(
         .await
         .map_err(GitHubLoginError::LoginRequest)?;
 
-    serde_json::from_str::<JsonWebToken>(response.body())
-        .map_err(GitHubLoginError::DeserializeResponse)
+    response.body().parse().map_err(GitHubLoginError::ParseResponse)
 }
 
 fn open_browser(
@@ -94,15 +94,6 @@ fn open_browser(
 #[derive(cauchy::Debug, derive_more::Display)]
 #[display("{_0}")]
 pub enum GitHubLoginError<Client: HttpClient> {
-    /// Authenticating with the access token received from the server failed.
-    #[display("{_0}")]
-    Authenticate(nomad_collab_params::GitHubAuthError),
-
-    /// The body of the authentication response we got from GitHub couldn't be
-    /// deserialized into a token.
-    #[display("Couldn't deserialize response into authentication token: {_0}")]
-    DeserializeResponse(serde_json::Error),
-
     /// The login request to the authentication server failed.
     #[display("Login request to the authentication server failed: {_0}")]
     LoginRequest(Client::Error),
@@ -110,4 +101,9 @@ pub enum GitHubLoginError<Client: HttpClient> {
     /// The user's web browser couldn't be opened.
     #[display("Couldn't open URL in web browser: {_0}")]
     OpenBrowser(io::Error),
+
+    /// The body of the response we got from the auth server couldn't be parsed
+    /// into a JWT.
+    #[display("Couldn't deserialize response into authentication token: {_0}")]
+    ParseResponse(<JsonWebToken as FromStr>::Err),
 }

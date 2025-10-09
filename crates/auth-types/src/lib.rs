@@ -6,10 +6,11 @@ mod github_client_id;
 mod json_web_token;
 mod oauth_state;
 
-pub use claims::Claims;
+pub use claims::{Claims, Subject};
 pub use email_address::EmailAddress;
 pub use github_client_id::GitHubClientId;
 pub use json_web_token::JsonWebToken;
+pub use jsonwebtoken;
 pub use oauth_state::{OAuthState, OAuthStateFromStrError};
 pub use peer_handle::{GitHubHandle, PeerHandle};
 

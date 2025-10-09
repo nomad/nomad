@@ -2,6 +2,9 @@ allow-unwrap-in-tests = true
 allowed-duplicate-crates = [
   "getrandom",
   "linux-raw-sys",
+  "rand",
+  "rand_chacha",
+  "rand_core",
   "rustix",
   "thiserror",
   "thiserror-impl",

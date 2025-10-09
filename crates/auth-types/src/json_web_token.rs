@@ -9,7 +9,13 @@ use crate::Claims;
 static AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY: LazyLock<
     jsonwebtoken::DecodingKey,
 > = LazyLock::new(|| {
+    #[cfg(not(feature = "tests"))]
     let contents = include_bytes!("../auth_server_jwt_signing_public_key.pem");
+
+    #[cfg(feature = "tests")]
+    let contents =
+        include_bytes!("../tests/auth_server_jwt_signing_public_key.pem");
+
     jsonwebtoken::DecodingKey::from_ec_pem(contents)
         .expect("public key is valid")
 });
@@ -31,6 +37,37 @@ impl JsonWebToken {
     /// Returns the token's claims.
     pub fn claims(&self) -> &Claims {
         &self.claims
+    }
+
+    /// Creates a mock `JsonWebToken` for the given user.
+    #[cfg(feature = "tests")]
+    pub fn mock(username: peer_handle::PeerHandle) -> Self {
+        let claims = Claims {
+            audience: "tests".into(),
+            expires_at: u64::MAX,
+            issued_at: 0,
+            issuer: env!("CARGO_PKG_NAME").into(),
+            subject: crate::Subject::GitHubUserId(1),
+            email: format!("{}@example.com", username.as_str())
+                .parse()
+                .expect("valid email address"),
+            name: Some("Test User".into()),
+            username,
+        };
+
+        let signing_key = jsonwebtoken::EncodingKey::from_ec_pem(
+            include_bytes!("../tests/auth_server_jwt_signing_private_key.pem"),
+        )
+        .expect("private key is valid");
+
+        let contents = jsonwebtoken::encode(
+            &jsonwebtoken::Header::new(Algorithm::ES256),
+            &claims,
+            &signing_key,
+        )
+        .expect("couldn't encode mock JWT");
+
+        Self { contents: contents.into(), claims }
     }
 }
 
@@ -68,6 +105,7 @@ impl<'de> serde::Deserialize<'de> for JsonWebToken {
     }
 }
 
+#[cfg(feature = "tests")]
 impl From<JsonWebToken> for peer_handle::PeerHandle {
     fn from(jwt: JsonWebToken) -> Self {
         jwt.claims().username.clone()
