@@ -50,7 +50,7 @@ impl JsonWebToken {
         let token_data = jsonwebtoken::decode::<Claims>(
             str,
             &AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY,
-            &jsonwebtoken::Validation::new(Algorithm::ES256),
+            &validation,
         )?;
 
         Ok(Self { contents: str.into(), claims: token_data.claims })

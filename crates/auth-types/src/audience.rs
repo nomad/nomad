@@ -10,7 +10,7 @@ pub struct Client;
 
 impl Audience for Client {
     fn set_audience(validation: &mut jsonwebtoken::Validation) {
-        validation.validate_exp = false;
+        validation.validate_aud = false;
     }
 }
 
