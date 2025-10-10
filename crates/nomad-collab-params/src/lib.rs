@@ -9,3 +9,6 @@ pub use auth_error::AuthError;
 pub use auth_infos::AuthInfos;
 pub use nomad_params::NomadParams;
 pub use {auth_types, ulid};
+
+/// TODO: docs.
+pub const API_VERSION: u32 = 1;
