@@ -196,7 +196,11 @@ fn start_progress_message(
 ) -> String {
     match state {
         StartState::ConnectingToServer(server_addr) => {
-            format!("Connecting to server at {server_addr}")
+            reporter_state.server_address = Some(server_addr.to_owned());
+            start_progress_message(
+                &StartState::StartingSession,
+                reporter_state,
+            )
         },
 
         StartState::StartingSession => {
