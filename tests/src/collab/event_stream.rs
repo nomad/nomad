@@ -1,6 +1,7 @@
 use core::time::Duration;
 
 use abs_path::{AbsPath, AbsPathBuf, path};
+use collab::editors::mock::CollabMock;
 use collab::event::{
     BufferEvent,
     CursorEvent,
@@ -8,7 +9,6 @@ use collab::event::{
     Event,
     EventStream,
 };
-use collab::mock::CollabMock;
 use collab::{CollabEditor, PeerId};
 use editor::{Buffer, ByteOffset, Context, Cursor, Replacement};
 use mock::{EditorExt, Mock};

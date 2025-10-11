@@ -1,7 +1,7 @@
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;
-use collab::mock::CollabMock;
+use collab::editors::mock::CollabMock;
 use collab::start::StartError;
 use mock::{EditorExt, Mock};
 

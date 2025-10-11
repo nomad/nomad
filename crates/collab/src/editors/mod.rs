@@ -1,7 +1,9 @@
+//! Contains the editor-specific implementations of [`CollabEditor`].
+
 #[cfg(feature = "mock")]
 pub mod mock;
 #[cfg(feature = "neovim")]
-mod neovim;
+pub mod neovim;
 
 use core::error::Error;
 use core::fmt::Debug;

@@ -1,5 +1,5 @@
 use abs_path::{AbsPathBuf, path};
-use collab::mock::CollabMock;
+use collab::editors::mock::CollabMock;
 use collab::{Peer, PeerHandle, PeerId};
 use mock::{EditorExt, Mock};
 

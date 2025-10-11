@@ -1,7 +1,7 @@
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;
-use collab::mock::{CollabMock, CollabServer};
+use collab::editors::mock::{CollabMock, CollabServer};
 use fs::Fs;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};

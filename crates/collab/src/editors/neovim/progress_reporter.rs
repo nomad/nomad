@@ -7,6 +7,7 @@ use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
 use neovim::Neovim;
 
+use crate::config;
 use crate::progress::{JoinState, ProgressReporter, StartState};
 
 /// Frames for the spinner animation.
@@ -24,6 +25,7 @@ const SPINNER_UPDATE_INTERVAL: Duration = Duration::from_millis({
 pub struct NeovimProgressReporter {
     message_tx: flume::Sender<Message>,
     project_name: Option<NodeNameBuf>,
+    server_address: Option<config::ServerAddress<'static>>,
 }
 
 struct Message {
@@ -75,31 +77,43 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
         })
         .detach();
 
-        Self { message_tx, project_name: None }
+        Self { message_tx, project_name: None, server_address: None }
     }
 
     fn report_join_progress(
         &mut self,
-        state: JoinState<'_>,
-        _ctx: &mut Context<Neovim>,
+        mut state: JoinState<'_>,
+        _: &mut Context<Neovim>,
     ) {
-        let text = match &state {
-            JoinState::ConnectingToServer { .. }
-            | JoinState::JoiningSession => "Connecting to server".to_owned(),
+        let text = loop {
+            match &state {
+                JoinState::ConnectingToServer { server_addr } => {
+                    self.server_address = Some(server_addr.to_owned());
+                    state = JoinState::JoiningSession;
+                },
 
-            JoinState::ReceivingProject { project_name } => {
-                self.project_name = Some((**project_name).to_owned());
-                format!("Receiving files for {project_name}")
-            },
+                JoinState::JoiningSession => {
+                    let server_addr = self.server_address.as_ref().expect(
+                        "StartingSession must be preceded by \
+                         ConnectingToServer",
+                    );
+                    break format!("Connecting to server at {server_addr}");
+                },
 
-            JoinState::WritingProject { root_path } => {
-                let project_name = self.project_name.as_ref().expect(
-                    "WritingProject must be preceded by ReceivingProject",
-                );
-                format!("Writing {project_name} to {root_path}")
-            },
+                JoinState::ReceivingProject { project_name } => {
+                    self.project_name = Some((**project_name).to_owned());
+                    break format!("Receiving files for {project_name}");
+                },
 
-            JoinState::Done => "Joined session".to_owned(),
+                JoinState::WritingProject { root_path } => {
+                    let project_name = self.project_name.as_ref().expect(
+                        "WritingProject must be preceded by ReceivingProject",
+                    );
+                    break format!("Writing {project_name} to {root_path}");
+                },
+
+                JoinState::Done => break "Joined session".to_owned(),
+            }
         };
 
         let message = Message {
@@ -118,16 +132,27 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
 
     fn report_start_progress(
         &mut self,
-        state: StartState<'_>,
+        mut state: StartState<'_>,
         _: &mut Context<Neovim>,
     ) {
-        let text = match &state {
-            StartState::ConnectingToServer { .. }
-            | StartState::StartingSession => "Connecting to server".to_owned(),
-            StartState::ReadingProject { root_path } => {
-                format!("Reading project at {root_path}")
-            },
-            StartState::Done => "Started session".to_owned(),
+        let text = loop {
+            match &state {
+                StartState::ConnectingToServer { server_addr } => {
+                    self.server_address = Some(server_addr.to_owned());
+                    state = StartState::StartingSession;
+                },
+                StartState::StartingSession => {
+                    let server_addr = self.server_address.as_ref().expect(
+                        "StartingSession must be preceded by \
+                         ConnectingToServer",
+                    );
+                    break format!("Connecting to server at {server_addr}");
+                },
+                StartState::ReadingProject { root_path } => {
+                    break format!("Reading project at {root_path}");
+                },
+                StartState::Done => break "Started session".to_owned(),
+            }
         };
 
         let message = Message {
