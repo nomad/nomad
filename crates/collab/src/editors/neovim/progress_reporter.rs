@@ -226,13 +226,3 @@ fn user_not_logged_in_message() -> String {
         <auth::login::Login as editor::module::AsyncAction::<Neovim>>::NAME
     )
 }
-
-impl Drop for NeovimProgressReporter {
-    fn drop(&mut self) {
-        let _ = self.message_tx.send(Message {
-            level: notify::Level::Info,
-            text: "".to_owned(),
-            is_last: true,
-        });
-    }
-}
