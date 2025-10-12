@@ -27,9 +27,9 @@ impl<Ed: CollabEditor> Collab<Ed> {
         session_id: SessionId<Ed>,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, JoinError<Ed>> {
-        Join::from(self)
-            .call_inner(session_id, &mut Ed::ProgressReporter::new(ctx), ctx)
-            .await
+        let mut reporter =
+            <Ed::ProgressReporter as ProgressReporter<_, Join<_>>>::new(ctx);
+        Join::from(self).call_inner(session_id, &mut reporter, ctx).await
     }
 
     /// Calls the [`Leave`] action.
@@ -45,9 +45,9 @@ impl<Ed: CollabEditor> Collab<Ed> {
         &self,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, StartError<Ed>> {
-        Start::from(self)
-            .call_inner(&mut Ed::ProgressReporter::new(ctx), ctx)
-            .await
+        let mut reporter =
+            <Ed::ProgressReporter as ProgressReporter<_, Start<_>>>::new(ctx);
+        Start::from(self).call_inner(&mut reporter, ctx).await
     }
 
     /// Calls the [`Yank`] action.

@@ -182,7 +182,7 @@ impl<Ed: CollabEditor> Start<Ed> {
     #[allow(clippy::too_many_lines)]
     pub(crate) async fn call_inner(
         &self,
-        progress_reporter: &mut Ed::ProgressReporter,
+        progress_reporter: &mut impl ProgressReporter<Ed, Self>,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, StartError<Ed>> {
         let jwt = self
@@ -209,7 +209,7 @@ impl<Ed: CollabEditor> Start<Ed> {
 
         let server_addr = self.config.with(|c| c.server_address.clone());
 
-        progress_reporter.report_start_progress(
+        progress_reporter.report_progress(
             StartState::ConnectingToServer(server_addr.borrow()),
             ctx,
         );
@@ -226,8 +226,7 @@ impl<Ed: CollabEditor> Start<Ed> {
             ),
         };
 
-        progress_reporter
-            .report_start_progress(StartState::StartingSession, ctx);
+        progress_reporter.report_progress(StartState::StartingSession, ctx);
 
         let welcome = collab_client::knock(reader, writer, knock)
             .await
@@ -235,7 +234,7 @@ impl<Ed: CollabEditor> Start<Ed> {
 
         let local_peer = welcome.peer;
 
-        progress_reporter.report_start_progress(
+        progress_reporter.report_progress(
             StartState::ReadingProject(Cow::Borrowed(&project_root)),
             ctx,
         );
@@ -297,17 +296,24 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
     type Args = ();
 
     async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
-        let mut progress_reporter = Ed::ProgressReporter::new(ctx);
+        let mut progress_reporter =
+            <Ed::ProgressReporter as ProgressReporter<Ed, Self>>::new(ctx);
 
         match self.call_inner(&mut progress_reporter, ctx).await {
             Ok(session_infos) => {
-                let state = StartState::Done(Ok(()));
-                progress_reporter.report_start_progress(state, ctx);
+                ProgressReporter::<Ed, Self>::report_success(
+                    progress_reporter,
+                    (),
+                    ctx,
+                );
                 Ed::on_session_started(&session_infos, ctx).await;
             },
             Err(start_error) => {
-                let state = StartState::Done(Err(start_error));
-                progress_reporter.report_start_progress(state, ctx);
+                ProgressReporter::<Ed, Self>::report_error(
+                    progress_reporter,
+                    start_error,
+                    ctx,
+                );
             },
         }
     }

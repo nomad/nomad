@@ -49,7 +49,7 @@ impl<Ed: CollabEditor> Join<Ed> {
     pub(crate) async fn call_inner(
         &self,
         session_id: SessionId<Ed>,
-        progress_reporter: &mut Ed::ProgressReporter,
+        progress_reporter: &mut impl ProgressReporter<Ed, Self>,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, JoinError<Ed>> {
         let jwt = self
@@ -59,7 +59,7 @@ impl<Ed: CollabEditor> Join<Ed> {
 
         let server_addr = self.config.with(|c| c.server_address.clone());
 
-        progress_reporter.report_join_progress(
+        progress_reporter.report_progress(
             JoinState::ConnectingToServer(server_addr.borrow()),
             ctx,
         );
@@ -76,7 +76,7 @@ impl<Ed: CollabEditor> Join<Ed> {
             ),
         };
 
-        progress_reporter.report_join_progress(JoinState::JoiningSession, ctx);
+        progress_reporter.report_progress(JoinState::JoiningSession, ctx);
 
         let mut welcome = collab_client::knock(reader, writer, knock)
             .await
@@ -95,7 +95,7 @@ impl<Ed: CollabEditor> Join<Ed> {
         }
         .join(&welcome.project_name);
 
-        progress_reporter.report_join_progress(
+        progress_reporter.report_progress(
             JoinState::ReceivingProject(Cow::Borrowed(&welcome.project_name)),
             ctx,
         );
@@ -105,7 +105,7 @@ impl<Ed: CollabEditor> Join<Ed> {
                 .await
                 .map_err(JoinError::RequestProject)?;
 
-        progress_reporter.report_join_progress(
+        progress_reporter.report_progress(
             JoinState::WritingProject(Cow::Borrowed(&project_root)),
             ctx,
         );
@@ -185,16 +185,23 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
         command::Parse(session_id): Self::Args,
         ctx: &mut Context<Ed>,
     ) {
-        let mut progress_reporter = Ed::ProgressReporter::new(ctx);
+        let mut progress_reporter =
+            <Ed::ProgressReporter as ProgressReporter<Ed, Self>>::new(ctx);
 
         match self.call_inner(session_id, &mut progress_reporter, ctx).await {
             Ok(_session_infos) => {
-                let state = JoinState::Done(Ok(()));
-                progress_reporter.report_join_progress(state, ctx);
+                ProgressReporter::<Ed, Self>::report_success(
+                    progress_reporter,
+                    (),
+                    ctx,
+                );
             },
             Err(join_error) => {
-                let state = JoinState::Done(Err(join_error));
-                progress_reporter.report_join_progress(state, ctx);
+                ProgressReporter::<Ed, Self>::report_error(
+                    progress_reporter,
+                    join_error,
+                    ctx,
+                );
             },
         }
     }

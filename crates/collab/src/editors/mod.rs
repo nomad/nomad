@@ -17,7 +17,7 @@ use editor::{ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::session::SessionInfos;
-use crate::{config, leave, progress, session, yank};
+use crate::{config, join, leave, progress, session, start, yank};
 
 /// An [`Editor`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -34,7 +34,8 @@ pub trait CollabEditor: Editor {
 
     /// A type that editor implementations can use to show progress updates to
     /// the user.
-    type ProgressReporter: progress::ProgressReporter<Self>;
+    type ProgressReporter: progress::ProgressReporter<Self, start::Start<Self>>
+        + progress::ProgressReporter<Self, join::Join<Self>>;
 
     /// TODO: docs.
     type ProjectFilter: fs::filter::Filter<Self::Fs, Error: Send> + Send + Sync;
