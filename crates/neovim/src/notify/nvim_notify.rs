@@ -151,9 +151,9 @@ impl NvimNotifyProgressReporter {
                     spinner_frame_idx %= SPINNER_FRAMES.len();
                 },
 
-                next_update = notifications.next() => {
-                    match next_update {
-                        Some(next_update) => notif = next_update,
+                maybe_notif = notifications.next() => {
+                    match maybe_notif {
+                        Some(next_notif) => notif = next_notif,
                         None => break,
                     }
                 },
