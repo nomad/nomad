@@ -73,6 +73,13 @@ impl NvimEchoProgressReporter {
             // chance to read it.
             async_io::Timer::after(wait_duration).await;
 
+            // Also wait to mess with the message area if the user is currently
+            // interacting with it (e.g. they're being show the "Hit-enter"
+            // prompt, the "-- more --" prompt, etc).
+            while api::get_mode().mode.as_bytes().first() == Some(&b'r') {
+                async_io::Timer::after(Duration::from_millis(200)).await;
+            }
+
             Self::clear_message_area();
 
             // Reset the cmdheight to its initial value.
