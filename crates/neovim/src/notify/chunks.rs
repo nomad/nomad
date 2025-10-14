@@ -1,3 +1,5 @@
+use core::ops::Deref;
+
 use compact_str::CompactString;
 use smallvec::SmallVec;
 
@@ -19,6 +21,10 @@ impl Chunks {
     /// Appends a chunk with no highlight group.
     #[inline]
     pub fn push(&mut self, chunk_text: impl Into<CompactString>) -> &mut Self {
+        let chunk_text = chunk_text.into();
+        if chunk_text.is_empty() {
+            return self;
+        }
         self.inner.push(Chunk::new(chunk_text));
         self
     }
@@ -30,6 +36,10 @@ impl Chunks {
         text: impl Into<CompactString>,
         hl_group: impl Into<CompactString>,
     ) -> &mut Self {
+        let text = text.into();
+        if text.is_empty() {
+            return self;
+        }
         self.inner.push(Chunk::new_highlighted(text, hl_group));
         self
     }
@@ -68,5 +78,14 @@ impl From<core::fmt::Arguments<'_>> for Chunks {
                 compact_str::format_compact!("{args}")
             )],
         }
+    }
+}
+
+impl Deref for Chunks {
+    type Target = [Chunk];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }

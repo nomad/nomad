@@ -51,6 +51,7 @@ http = "1.3"
 indexmap = "2"
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }
+memchr = "2"
 nohash = "0.2"
 notify = "8"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }

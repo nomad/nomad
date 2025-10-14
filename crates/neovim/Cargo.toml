@@ -25,6 +25,7 @@ flume = { workspace = true }
 fs = { workspace = true }
 futures-util = { workspace = true }
 http-client = { workspace = true, features = ["ureq"] }
+memchr = { workspace = true }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }
 nvim-oxi = { workspace = true, features = ["libuv", "mlua", "neovim-0-11"] }

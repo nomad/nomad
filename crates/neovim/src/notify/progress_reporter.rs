@@ -1,28 +1,31 @@
 use editor::Context;
 use editor::context::BorrowState;
 
-use crate::Neovim;
-use crate::notify::{self, NvimNotify, NvimNotifyProgressReporter};
+use crate::{Neovim, notify};
 
 /// TODO: docs.
 pub enum ProgressReporter {
     /// TODO: docs.
-    NvimNotify(NvimNotifyProgressReporter),
+    NvimEcho(notify::NvimEchoProgressReporter),
+
+    /// TODO: docs.
+    NvimNotify(notify::NvimNotifyProgressReporter),
 }
 
 impl ProgressReporter {
     /// Creates a new progress reporter.
     pub fn new(ctx: &mut Context<Neovim, impl BorrowState>) -> Self {
-        if NvimNotify::is_installed() {
-            Self::NvimNotify(NvimNotifyProgressReporter::new(ctx))
+        if notify::NvimNotify::is_installed() {
+            Self::NvimNotify(notify::NvimNotifyProgressReporter::new(ctx))
         } else {
-            todo!()
+            Self::NvimEcho(notify::NvimEchoProgressReporter::new(ctx))
         }
     }
 
     /// TODO: docs.
     pub fn report_error(self, chunks: notify::Chunks) {
         match self {
+            Self::NvimEcho(inner) => inner.report_error(chunks),
             Self::NvimNotify(inner) => inner.report_error(chunks),
         }
     }
@@ -30,6 +33,7 @@ impl ProgressReporter {
     /// TODO: docs.
     pub fn report_progress(&self, chunks: notify::Chunks) {
         match self {
+            Self::NvimEcho(inner) => inner.report_progress(chunks),
             Self::NvimNotify(inner) => inner.report_progress(chunks),
         }
     }
@@ -37,6 +41,7 @@ impl ProgressReporter {
     /// TODO: docs.
     pub fn report_success(self, chunks: notify::Chunks) {
         match self {
+            Self::NvimEcho(inner) => inner.report_success(chunks),
             Self::NvimNotify(inner) => inner.report_success(chunks),
         }
     }

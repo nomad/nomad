@@ -2439,6 +2439,7 @@ dependencies = [
  "fs",
  "futures-util",
  "http-client",
+ "memchr",
  "neovim-macros",
  "nohash",
  "nvim-oxi",

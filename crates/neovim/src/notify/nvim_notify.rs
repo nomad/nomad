@@ -7,17 +7,18 @@ use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
 use nvim_oxi::mlua;
 
-use crate::notify::{self, Level, VimNotifyProvider};
+use crate::notify::{self, VimNotifyProvider};
 use crate::{Neovim, oxi, utils};
 
 /// Frames for the spinner animation.
-const SPINNER_FRAMES: &[char] = &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
+pub(super) const SPINNER_FRAMES: &[char] =
+    &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
 
 /// How many revolutions per minute the spinner should complete.
 const SPINNER_RPM: u8 = 75;
 
 /// How often the spinner should be updated to achieve the desired RPM.
-const SPINNER_UPDATE_INTERVAL: Duration = Duration::from_millis({
+pub(super) const SPINNER_UPDATE_INTERVAL: Duration = Duration::from_millis({
     (60_000.0 / ((SPINNER_RPM as u16 * SPINNER_FRAMES.len() as u16) as f32))
         .round() as u64
 });
@@ -36,7 +37,7 @@ struct ProgressNotification {
 }
 
 #[derive(PartialEq, Eq)]
-enum ProgressNotificationKind {
+pub(super) enum ProgressNotificationKind {
     Progress,
     Success,
     Error,
@@ -107,33 +108,23 @@ impl NvimNotifyProgressReporter {
             .expect("failed to set 'title'");
 
         loop {
-            let level = match notif.kind {
-                ProgressNotificationKind::Error => Level::Error,
-                _ => Level::Info,
-            };
-
             let hide_from_history =
                 notif.kind != ProgressNotificationKind::Error;
-
-            let icon = match notif.kind {
-                ProgressNotificationKind::Progress => {
-                    Some(SPINNER_FRAMES[spinner_frame_idx])
-                },
-                ProgressNotificationKind::Success => Some('✔'),
-                // Don't explicitly set the icon for errors, use whatever
-                // the user has configured.
-                ProgressNotificationKind::Error => None,
-            };
 
             opts.raw_set("hide_from_history", hide_from_history)
                 .expect("failed to set 'hide_from_history'");
 
-            opts.raw_set("icon", icon).expect("failed to set 'icon'");
+            opts.raw_set("icon", notif.kind.icon(spinner_frame_idx))
+                .expect("failed to set 'icon'");
 
             opts.raw_set("replace", prev_id).expect("failed to set 'replace'");
 
             let record = notify
-                .call::<mlua::Table>((&*notif.message, level as u8, &opts))
+                .call::<mlua::Table>((
+                    &*notif.message,
+                    notif.kind.log_level() as u8,
+                    &opts,
+                ))
                 .expect("failed to call 'notify'");
 
             if notif.kind != ProgressNotificationKind::Progress {
@@ -167,6 +158,23 @@ impl NvimNotifyProgressReporter {
                 TrySendError::Disconnected(_) => unreachable!(),
                 TrySendError::Full(_) => {},
             }
+        }
+    }
+}
+
+impl ProgressNotificationKind {
+    pub(super) fn icon(&self, spinner_frame_idx: usize) -> char {
+        match self {
+            Self::Progress => SPINNER_FRAMES[spinner_frame_idx],
+            Self::Success => '✔',
+            Self::Error => '✘',
+        }
+    }
+
+    fn log_level(&self) -> notify::Level {
+        match self {
+            Self::Progress | Self::Success => notify::Level::Info,
+            Self::Error => notify::Level::Error,
         }
     }
 }
