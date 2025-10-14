@@ -1,14 +1,14 @@
 use core::time::Duration;
 
-use editor::Context;
-use editor::context::BorrowState;
 use editor::notify::{Notification, NotificationId};
+use executor::LocalSpawner;
 use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
 use nvim_oxi::mlua;
 
+use crate::executor::NeovimLocalSpawner;
 use crate::notify::{self, VimNotifyProvider};
-use crate::{Neovim, oxi, utils};
+use crate::{oxi, utils};
 
 /// Frames for the spinner animation.
 pub(super) const SPINNER_FRAMES: &[char] =
@@ -45,9 +45,9 @@ pub(super) enum ProgressNotificationKind {
 
 impl NvimNotify {
     pub(crate) fn notify(
+        namespace: &editor::notify::Namespace,
         message_chunks: notify::Chunks,
         level: notify::Level,
-        namespace: &editor::notify::Namespace,
     ) {
         let lua = mlua::lua();
 
@@ -77,12 +77,17 @@ impl NvimNotify {
 
 impl NvimNotifyProgressReporter {
     /// Creates a new progress reporter.
-    pub fn new(ctx: &mut Context<Neovim, impl BorrowState>) -> Self {
+    pub fn new(
+        namespace: editor::notify::Namespace,
+        spawner: &mut NeovimLocalSpawner,
+    ) -> Self {
         let (notif_tx, notif_rx) = flume::bounded::<ProgressNotification>(4);
 
-        ctx.spawn_and_detach(async move |ctx| {
-            Self::event_loop(notif_rx, ctx.namespace(), &mlua::lua()).await;
-        });
+        spawner
+            .spawn(async move {
+                Self::event_loop(notif_rx, &namespace, &mlua::lua()).await;
+            })
+            .detach();
 
         Self { notification_tx: notif_tx }
     }

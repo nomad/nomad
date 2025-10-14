@@ -1,4 +1,6 @@
+use editor::Editor;
 use editor::context::{BorrowState, Context};
+use executor::Executor;
 use nvim_oxi::api::types::LogLevel;
 
 use crate::notify::{Chunks, ProgressReporter};
@@ -42,16 +44,20 @@ impl<Bs: BorrowState> NotifyContextExt for Context<Neovim, Bs> {
     ) {
         if notify::NvimNotify::is_installed() {
             notify::NvimNotify::notify(
+                self.namespace(),
                 notification_message.into(),
                 notification_level,
-                self.namespace(),
             )
         } else {
-            notify::NvimEcho::notify(
-                notification_message.into(),
-                notification_level,
-                self,
-            )
+            let namespace = self.namespace().clone();
+            self.with_editor(|nvim| {
+                notify::NvimEcho::notify(
+                    &namespace,
+                    notification_message.into(),
+                    notification_level,
+                    nvim.executor().local_spawner(),
+                )
+            })
         }
     }
 }

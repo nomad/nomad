@@ -1,5 +1,6 @@
-use editor::Context;
 use editor::context::BorrowState;
+use editor::{Context, Editor};
+use executor::Executor;
 
 use crate::{Neovim, notify};
 
@@ -15,11 +16,23 @@ pub enum ProgressReporter {
 impl ProgressReporter {
     /// Creates a new progress reporter.
     pub fn new(ctx: &mut Context<Neovim, impl BorrowState>) -> Self {
-        if notify::NvimNotify::is_installed() {
-            Self::NvimNotify(notify::NvimNotifyProgressReporter::new(ctx))
-        } else {
-            Self::NvimEcho(notify::NvimEchoProgressReporter::new(ctx))
-        }
+        let namespace = ctx.namespace().clone();
+
+        ctx.with_editor(|nvim| {
+            let local_spawner = nvim.executor().local_spawner();
+
+            if notify::NvimNotify::is_installed() {
+                Self::NvimNotify(notify::NvimNotifyProgressReporter::new(
+                    namespace,
+                    local_spawner,
+                ))
+            } else {
+                Self::NvimEcho(notify::NvimEchoProgressReporter::new(
+                    namespace,
+                    local_spawner,
+                ))
+            }
+        })
     }
 
     /// TODO: docs.

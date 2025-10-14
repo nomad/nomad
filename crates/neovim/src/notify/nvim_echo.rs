@@ -3,18 +3,18 @@ use core::time::Duration;
 use core::{fmt, iter};
 use std::borrow::Cow;
 
-use editor::Context;
-use editor::context::BorrowState;
+use executor::LocalSpawner;
 use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
 use nvim_oxi::api;
 
+use crate::executor::NeovimLocalSpawner;
+use crate::notify;
 use crate::notify::nvim_notify::{
     ProgressNotificationKind,
     SPINNER_FRAMES,
     SPINNER_UPDATE_INTERVAL,
 };
-use crate::{Neovim, notify};
 
 #[cfg(not(feature = "nightly"))]
 type OptsOrMessageId = api::opts::EchoOpts;
@@ -61,9 +61,10 @@ enum EventLoopOutput {
 
 impl NvimEcho {
     pub(crate) fn notify(
+        namespace: &editor::notify::Namespace,
         message_chunks: notify::Chunks,
         level: notify::Level,
-        ctx: &mut Context<Neovim, impl BorrowState>,
+        spawner: &mut NeovimLocalSpawner,
     ) {
         let (icon, hl_group) = match level {
             notify::Level::Trace => ('🔍', None),
@@ -75,7 +76,7 @@ impl NvimEcho {
         };
 
         let chunks = NvimEchoChunks {
-            title: Title { icon, hl_group, namespace: ctx.namespace() },
+            title: Title { icon, hl_group, namespace },
             message_chunks,
         };
 
@@ -88,15 +89,17 @@ impl NvimEcho {
         api::echo(chunks.to_iter(true), true, &Default::default())
             .expect("couldn't echo notification message");
 
-        ctx.spawn_and_detach(async move |_| {
-            Self::clear_message_area(Duration::from_millis(match level {
-                notify::Level::Error => 3500,
-                _ => 2500,
-            }))
-            .await;
+        spawner
+            .spawn(async move {
+                Self::clear_message_area(Duration::from_millis(match level {
+                    notify::Level::Error => 3500,
+                    _ => 2500,
+                }))
+                .await;
 
-            Self::restore_cmdheight(initial_cmdheight);
-        });
+                Self::restore_cmdheight(initial_cmdheight);
+            })
+            .detach();
     }
 
     /// Clears the message area after the given duration.
@@ -149,35 +152,40 @@ impl NvimEcho {
 
 impl NvimEchoProgressReporter {
     /// Creates a new progress reporter.
-    pub fn new(ctx: &mut Context<Neovim, impl BorrowState>) -> Self {
+    pub fn new(
+        namespace: editor::notify::Namespace,
+        spawner: &mut NeovimLocalSpawner,
+    ) -> Self {
         let (notif_tx, notif_rx) = flume::bounded::<ProgressNotification>(4);
 
-        ctx.spawn_and_detach(async move |ctx| {
-            let initial_cmdheight = NvimEcho::get_initial_cmdheight();
+        spawner
+            .spawn(async move {
+                let initial_cmdheight = NvimEcho::get_initial_cmdheight();
 
-            let mut current_cmdheight = initial_cmdheight;
+                let mut current_cmdheight = initial_cmdheight;
 
-            let output = Self::event_loop(
-                notif_rx,
-                ctx.namespace(),
-                &mut current_cmdheight,
-            )
-            .await;
+                let output = Self::event_loop(
+                    notif_rx,
+                    &namespace,
+                    &mut current_cmdheight,
+                )
+                .await;
 
-            NvimEcho::clear_message_area(Duration::from_millis(
-                match output {
-                    EventLoopOutput::Success => 2500,
-                    EventLoopOutput::Error => 3500,
-                    EventLoopOutput::Cancelled => 0,
-                },
-            ))
-            .await;
+                NvimEcho::clear_message_area(Duration::from_millis(
+                    match output {
+                        EventLoopOutput::Success => 2500,
+                        EventLoopOutput::Error => 3500,
+                        EventLoopOutput::Cancelled => 0,
+                    },
+                ))
+                .await;
 
-            // Reset the cmdheight to its initial value.
-            if current_cmdheight != initial_cmdheight {
-                NvimEcho::restore_cmdheight(initial_cmdheight);
-            }
-        });
+                // Reset the cmdheight to its initial value.
+                if current_cmdheight != initial_cmdheight {
+                    NvimEcho::restore_cmdheight(initial_cmdheight);
+                }
+            })
+            .detach();
 
         Self { notification_tx: notif_tx }
     }
