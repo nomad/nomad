@@ -223,6 +223,19 @@ impl VimNotifyProvider for NvimNotify {
     }
 }
 
+#[cfg(feature = "nightly")]
+impl From<ProgressNotificationKind>
+    for nvim_oxi::api::types::ProgressMessageStatus
+{
+    fn from(kind: ProgressNotificationKind) -> Self {
+        match kind {
+            ProgressNotificationKind::Progress => Self::Running,
+            ProgressNotificationKind::Success => Self::Success,
+            ProgressNotificationKind::Error => Self::Failed,
+        }
+    }
+}
+
 /// Returns a handle to the `notify` function from the `nvim-notify` plugin.
 fn notify(lua: &mlua::Lua) -> mlua::Function {
     debug_assert!(NvimNotify::is_installed());

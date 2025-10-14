@@ -15,6 +15,12 @@ use crate::notify::nvim_notify::{
 };
 use crate::{Neovim, notify};
 
+#[cfg(not(feature = "nightly"))]
+type OptsOrMessageId = api::opts::EchoOpts;
+
+#[cfg(feature = "nightly")]
+type OptsOrMessageId = Option<api::types::EchoMessageId>;
+
 /// TODO: docs.
 pub struct NvimEcho {}
 
@@ -123,12 +129,38 @@ impl NvimEchoProgressReporter {
     fn echo(
         chunks: &NvimEchoChunks<'_>,
         notif_kind: ProgressNotificationKind,
-        opts: &mut api::opts::EchoOpts,
+        opts_or_message_id: &mut OptsOrMessageId,
     ) {
         let add_to_history = notif_kind == ProgressNotificationKind::Error;
 
-        api::echo(chunks.to_iter(), add_to_history, opts)
+        #[cfg(not(feature = "nightly"))]
+        let opts = opts_or_message_id;
+
+        #[cfg(feature = "nightly")]
+        let opts = {
+            let mut builder = api::opts::EchoOpts::builder();
+
+            if let Some(message_id) = opts_or_message_id.take() {
+                builder.id(message_id);
+            }
+
+            builder
+                .kind("progress")
+                .title(chunks.title.to_string())
+                .status(notif_kind.into())
+                .build()
+        };
+
+        #[cfg(feature = "nightly")]
+        let opts = &opts;
+
+        let _message_id = api::echo(chunks.to_iter(), add_to_history, opts)
             .expect("couldn't echo progress message");
+
+        #[cfg(feature = "nightly")]
+        {
+            *opts_or_message_id = Some(_message_id);
+        }
     }
 
     async fn event_loop(
@@ -142,7 +174,7 @@ impl NvimEchoProgressReporter {
 
         let mut spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL);
         let mut spinner_frame_idx = 0;
-        let mut opts = api::opts::EchoOpts::default();
+        let mut opts_or_msg_id = OptsOrMessageId::default();
 
         let mut chunks = NvimEchoChunks {
             title: Title {
@@ -164,7 +196,7 @@ impl NvimEchoProgressReporter {
                 *current_cmdheight = min_cmdheight;
             }
 
-            Self::echo(&chunks, last_notif_kind, &mut opts);
+            Self::echo(&chunks, last_notif_kind, &mut opts_or_msg_id);
 
             match last_notif_kind {
                 ProgressNotificationKind::Success => {
@@ -182,7 +214,7 @@ impl NvimEchoProgressReporter {
                         spinner_frame_idx += 1;
                         spinner_frame_idx %= SPINNER_FRAMES.len();
                         chunks.title.icon = SPINNER_FRAMES[spinner_frame_idx];
-                        Self::echo(&chunks, last_notif_kind, &mut opts);
+                        Self::echo(&chunks, last_notif_kind, &mut opts_or_msg_id);
                         continue 'spin;
                     },
 
@@ -246,13 +278,22 @@ impl NvimEchoChunks<'_> {
     }
 
     fn to_iter(&self) -> impl Iterator<Item = (Cow<'_, str>, Option<&str>)> {
-        iter::once((Cow::Owned(self.title.to_string()), self.title.hl_group))
-            .chain(iter::once((Cow::Borrowed("\n"), None::<&str>)))
-            .chain(
-                self.message_chunks.iter().map(|chunk| {
-                    (Cow::Borrowed(chunk.text()), chunk.hl_group())
-                }),
-            )
+        #[cfg(not(feature = "nightly"))]
+        let title = iter::once((
+            Cow::Owned(self.title.to_string()),
+            self.title.hl_group,
+        ));
+
+        // On Nightly the title is given to `nvim_echo` via the opts, so we
+        // don't need to include it in the iterator.
+        #[cfg(feature = "nightly")]
+        let title = iter::empty();
+
+        title.chain(iter::once((Cow::Borrowed("\n"), None::<&str>))).chain(
+            self.message_chunks
+                .iter()
+                .map(|chunk| (Cow::Borrowed(chunk.text()), chunk.hl_group())),
+        )
     }
 }
 
