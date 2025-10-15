@@ -32,4 +32,5 @@ disallowed-methods = [
   { path = "async_fs::File::open", replacement = "crate::File::new" },
   { path = "async_fs::OpenOptions::open", replacement = "crate::File::new" },
   { path = "async_fs::read_dir", replacement = "crate::Directory::list_metas" },
+  { path = "async_fs::read", replacement = "crate::File::read" },
 ]

@@ -2,7 +2,7 @@ use core::ops::{Deref, DerefMut};
 use std::io;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use futures_util::{AsyncWriteExt, stream};
+use futures_util::{AsyncReadExt, AsyncWriteExt, stream};
 
 use crate::file_descriptor_permit::FileDescriptorPermit;
 use crate::{Directory, IoErrorExt, Metadata, RealFs};
@@ -35,11 +35,17 @@ impl File {
     #[inline]
     async fn with_inner<R>(
         &mut self,
-        fun: impl AsyncFnOnce(&mut FileInner) -> R,
+        fun: impl AsyncFnOnce(
+            &mut FileInner,
+            &mut async_fs::Metadata,
+            &AbsPath,
+        ) -> R,
     ) -> io::Result<R> {
         loop {
             match &mut self.inner {
-                Some(inner) => break Ok(fun(inner).await),
+                Some(inner) => {
+                    break Ok(fun(inner, &mut self.metadata, &self.path).await);
+                },
                 None => {
                     self.inner = Some(FileInner::open(&self.path).await?);
                 },
@@ -131,9 +137,16 @@ impl fs::File for File {
 
     #[inline]
     async fn read(&self) -> Result<Vec<u8>, Self::ReadError> {
-        async_fs::read(self.path())
-            .await
-            .with_context(|| format!("couldn't read file at {}", self.path()))
+        // We have to create a new file because reading needs an exclusive
+        // borrow, and we don't have that here.
+        //
+        // TODO: can we read via &self if we don't move the cursor?
+        let mut file = FileInner::open(self.path()).await?;
+        let mut bytes = Vec::with_capacity(self.metadata.len() as usize);
+        file.read_to_end(&mut bytes).await.with_context(|| {
+            format!("couldn't read file at {}", self.path())
+        })?;
+        Ok(bytes)
     }
 
     #[inline]
@@ -151,17 +164,27 @@ impl fs::File for File {
         Chunks::IntoIter: Send,
         Chunk: AsRef<[u8]> + Send,
     {
-        self.with_inner(async move |file| {
-            for chunk in chunks {
-                file.write_all(chunk.as_ref()).await?;
-            }
-            file.sync_all().await?;
+        self.with_inner(async move |file, meta, path| {
+            let write = async {
+                for chunk in chunks {
+                    file.write_all(chunk.as_ref()).await?;
+                }
+                file.sync_all().await
+            };
+
+            write.await.with_context(|| {
+                format!("couldn't write to file at {path}")
+            })?;
+
+            let new_meta = file.metadata().await.with_context(|| {
+                format!("couldn't get new metadata for file at {path}")
+            })?;
+
+            *meta = new_meta;
+
             Ok(())
         })
-        .await
-        .with_context(|| {
-            format!("couldn't write to file at {}", self.path())
-        })?
+        .await?
     }
 }
 
