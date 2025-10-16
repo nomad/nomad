@@ -195,12 +195,16 @@ impl CollabEditor for Neovim {
         buffer_id: Self::BufferId,
         ctx: &mut Context<Self>,
     ) -> Self::PeerSelection {
-        ctx.with_borrowed(|ctx| {
-            let buffer = ctx.buffer(buffer_id).expect("invalid buffer ID");
-            let _hl_group = PeerSelectionHighlightGroup::group_id(remote_peer.id);
-            let hl_handle = buffer.highlight_range(selected_range, "Visual");
-            NeovimPeerSelection { selection_highlight_handle: hl_handle }
-        })
+        let buffer = oxi::api::Buffer::from(buffer_id);
+
+        let namespace_id = ctx.with_editor(|nvim| nvim.namespace_id());
+
+        NeovimPeerSelection::create(
+            remote_peer.id,
+            buffer,
+            selected_range,
+            namespace_id,
+        )
     }
 
     fn create_peer_tooltip(
@@ -307,13 +311,9 @@ impl CollabEditor for Neovim {
     fn move_peer_selection(
         selection: &mut Self::PeerSelection,
         selected_range: Range<ByteOffset>,
-        ctx: &mut Context<Self>,
+        _: &mut Context<Self>,
     ) {
-        ctx.with_editor(|nvim| {
-            nvim.highlight_range(&selection.selection_highlight_handle)
-                .expect("invalid buffer ID")
-                .r#move(selected_range);
-        });
+        selection.r#move(selected_range);
     }
 
     fn move_peer_tooltip(
@@ -432,11 +432,10 @@ impl CollabEditor for Neovim {
     }
 
     fn remove_peer_selection(
-        _selection: Self::PeerSelection,
+        selection: Self::PeerSelection,
         _ctx: &mut Context<Self>,
     ) {
-        // Dropping the selection will automatically remove the highlight, so
-        // we don't have to do anything here.
+        selection.remove();
     }
 
     fn remove_peer_tooltip(

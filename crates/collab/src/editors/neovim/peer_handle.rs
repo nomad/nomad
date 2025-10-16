@@ -141,6 +141,9 @@ impl NeovimPeerHandle {
         // FIXME: this also doesn't handle tabs correctly. For those, we'd have
         // to count the number of tabs in the cursor line up to the cursor's
         // offset and multiply that by the value of the 'tabstop' option.
+        //
+        // FIXME: this also doesn't handle soft wraps correctly. I'm not sure
+        // what to do about those.
         let target_col = cursor_point.byte_offset;
 
         let mut opts_builder = api::opts::SetExtmarkOpts::builder();
