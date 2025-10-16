@@ -1,6 +1,5 @@
-use core::cell::Cell;
+use core::fmt;
 use core::ops::Range;
-use core::{any, fmt};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -8,7 +7,7 @@ use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use async_net::TcpStream;
-use collab_types::{Peer, PeerId};
+use collab_types::Peer;
 use compact_str::format_compact;
 use editor::context::Borrowed;
 use editor::module::{Action, Module};
@@ -19,38 +18,25 @@ use futures_rustls::client::TlsStream;
 use futures_rustls::{TlsConnector, rustls};
 use futures_util::future::Either;
 use mlua::{Function, Table};
-use neovim::buffer::{BufferExt, BufferId, HighlightRangeHandle, Point};
+use neovim::buffer::{BufferExt, BufferId};
 use neovim::notify::{self, NotifyContextExt};
 use neovim::{Neovim, mlua, oxi};
 use nomad_collab_params::ulid;
 
-use crate::editors::neovim::NeovimProgressReporter;
+use crate::editors::neovim::{
+    NeovimPeerSelection,
+    NeovimProgressReporter,
+    PeerCursor,
+    PeerCursorHighlightGroup,
+    PeerHighlightGroup,
+    PeerSelectionHighlightGroup,
+};
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::session::{SessionError, SessionInfos};
 use crate::tcp_stream_ext::TcpStreamExt;
 use crate::{Collab, config, leave, yank};
 
 pub type SessionId = ulid::Ulid;
-
-pub struct NeovimPeerSelection {
-    selection_highlight_handle: HighlightRangeHandle,
-}
-
-/// Holds the state needed to display a remote peer's cursor in a buffer.
-pub struct PeerCursor {
-    /// The buffer the cursor is in.
-    buffer: oxi::api::Buffer,
-
-    /// The extmark ID of the highlight representing the cursor's head.
-    cursor_extmark_id: u32,
-
-    /// The ID of the namespace the
-    /// [`cursor_extmark_id`](Self::cursor_extmark_id) belongs to.
-    namespace_id: u32,
-
-    /// The remote peer this tooltip is for.
-    peer: Peer,
-}
 
 #[derive(Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq)]
 #[display("couldn't copy {} to clipboard: {}", session_id, inner)]
@@ -105,198 +91,11 @@ pub struct NeovimLspRootError {
     root_dir: String,
 }
 
-/// The highlight group used to highlight a remote peer's cursor.
-struct PeerCursorHighlightGroup;
-
-/// The highlight group used to highlight a remote peer's selection.
-struct PeerSelectionHighlightGroup;
-
 /// An [`AbsPath`] wrapper whose `Display` impl replaces the path's home
 /// directory with `~`.
 struct TildePath<'a> {
     path: &'a AbsPath,
     home_dir: Option<&'a AbsPath>,
-}
-
-/// A trait implemented by types that represent highlight groups used to
-/// highlight a piece of UI (like a cursor or selection) that belongs to a
-/// remote peer.
-trait RemotePeerHighlightGroup: WithGroupIds {
-    /// The prefix of each highlight group name.
-    const NAME_PREFIX: &'static str;
-
-    #[track_caller]
-    fn create_all() {
-        debug_assert!(
-            Self::with_group_ids(|ids| ids.iter().all(|id| id.get() == 0)),
-            "{}::create_all() has already been called",
-            any::type_name::<Self>()
-        );
-
-        Self::with_group_ids(|group_ids| {
-            for (group_idx, group_id) in group_ids.iter().enumerate() {
-                group_id.set(Self::create(group_idx.saturating_add(1)));
-            }
-        });
-    }
-
-    #[track_caller]
-    fn new(peer_id: PeerId) -> impl oxi::api::SetExtmarkHlGroup {
-        Self::with_group_ids(|group_ids| {
-            let group_idx = peer_id.into_u64().saturating_sub(1) as usize
-                % group_ids.len();
-
-            let group_id = group_ids[group_idx].get();
-
-            debug_assert!(
-                group_id > 0,
-                "{}::create_all() has not been called",
-                any::type_name::<Self>()
-            );
-
-            i64::from(group_id)
-        })
-    }
-
-    /// Returns the `opts` to pass to [`set_hl`](oxi::api::set_hl) when
-    /// creating the highlight group.
-    fn set_hl_opts() -> oxi::api::opts::SetHighlightOpts;
-
-    #[doc(hidden)]
-    fn create(suffix: usize) -> u32 {
-        let name = Self::name(suffix);
-
-        oxi::api::set_hl(0, name.as_ref(), &Self::set_hl_opts())
-            .expect("couldn't create highlight group");
-
-        oxi::api::get_hl_id_by_name(name.as_ref())
-            .expect("couldn't get highlight group ID")
-    }
-
-    #[doc(hidden)]
-    fn name(suffix: usize) -> impl AsRef<str> {
-        compact_str::format_compact!("{}{}", Self::NAME_PREFIX, suffix)
-    }
-}
-
-trait WithGroupIds {
-    fn with_group_ids<R>(fun: impl FnOnce(&[Cell<u32>]) -> R) -> R;
-}
-
-impl PeerCursor {
-    /// Creates a new tooltip representing the given remote peer's cursor at
-    /// the given byte offset in the given buffer.
-    fn create(
-        peer: Peer,
-        mut buffer: oxi::api::Buffer,
-        cursor_offset: ByteOffset,
-        namespace_id: u32,
-    ) -> Self {
-        let highlight_range = Self::highlight_range(&buffer, cursor_offset);
-
-        let opts = oxi::api::opts::SetExtmarkOpts::builder()
-            .end_row(highlight_range.end.newline_offset)
-            .end_col(highlight_range.end.byte_offset)
-            .hl_group(PeerCursorHighlightGroup::new(peer.id))
-            .build();
-
-        let cursor_extmark_id = buffer
-            .set_extmark(
-                namespace_id,
-                highlight_range.start.newline_offset,
-                highlight_range.start.byte_offset,
-                &opts,
-            )
-            .expect("couldn't set extmark");
-
-        Self { buffer, cursor_extmark_id, peer, namespace_id }
-    }
-
-    /// Returns the [`Point`] range to be highlighted to represent the remote
-    /// peer's cursor at the given byte offset.
-    fn highlight_range(
-        buffer: &oxi::api::Buffer,
-        cursor_offset: ByteOffset,
-    ) -> Range<Point> {
-        debug_assert!(cursor_offset <= buffer.num_bytes());
-
-        let mut highlight_start = buffer.point_of_byte(cursor_offset);
-
-        let is_cursor_at_eol = buffer
-            .num_bytes_in_line_after(highlight_start.newline_offset)
-            == highlight_start.byte_offset;
-
-        if is_cursor_at_eol {
-            // If the cursor is after the uneditable eol, set the start
-            // position to the end of the previous line.
-            if cursor_offset == buffer.num_bytes()
-                && buffer.has_uneditable_eol()
-            {
-                let highlight_end = highlight_start;
-                highlight_start.newline_offset -= 1;
-                highlight_start.byte_offset = buffer
-                    .num_bytes_in_line_after(highlight_start.newline_offset);
-                return highlight_start..highlight_end;
-            }
-        }
-
-        let highlight_end =
-            // If the cursor is at the end of the line, we set the end of the
-            // highlighted range to the start of the next line.
-            //
-            // Apparently this works even if the cursor is on the last line,
-            // and nvim_buf_set_extmark won't complain about it.
-            if is_cursor_at_eol {
-                Point::new(highlight_start.newline_offset + 1, 0)
-            }
-            // If the cursor is in the middle of a line, we set the end of the
-            // highlighted range one byte after the start.
-            //
-            // This works because Neovim already handles offset clamping for
-            // us, so even if the grapheme to the immediate right of the cursor
-            // is multi-byte, Neovim will automatically extend the highlight's
-            // end to the end of the grapheme.
-            else {
-                Point::new(
-                    highlight_start.newline_offset,
-                    highlight_start.byte_offset + 1,
-                )
-            };
-
-        highlight_start..highlight_end
-    }
-
-    /// Moves the tooltip to the given offset.
-    fn r#move(&mut self, cursor_offset: ByteOffset) {
-        let highlight_range =
-            Self::highlight_range(&self.buffer, cursor_offset);
-
-        let opts = oxi::api::opts::SetExtmarkOpts::builder()
-            .id(self.cursor_extmark_id)
-            .end_row(highlight_range.end.newline_offset)
-            .end_col(highlight_range.end.byte_offset)
-            .hl_group(PeerCursorHighlightGroup::new(self.peer.id))
-            .build();
-
-        let new_extmark_id = self
-            .buffer
-            .set_extmark(
-                self.namespace_id,
-                highlight_range.start.newline_offset,
-                highlight_range.start.byte_offset,
-                &opts,
-            )
-            .expect("couldn't set extmark");
-
-        debug_assert_eq!(new_extmark_id, self.cursor_extmark_id);
-    }
-
-    /// Removes the tooltip from the buffer.
-    fn remove(mut self) {
-        self.buffer
-            .del_extmark(self.namespace_id, self.cursor_extmark_id)
-            .expect("couldn't delete extmark");
-    }
 }
 
 impl CollabEditor for Neovim {
@@ -719,46 +518,6 @@ async fn tls_connector(
 
     Ok(TLS_CONNECTOR
         .get_or_init(|| TlsConnector::from(Arc::new(client_config))))
-}
-
-impl PeerCursorHighlightGroup {
-    thread_local! {
-        static GROUP_IDS: Cell<[u32; 16]> = const { Cell::new([0; _]) };
-    }
-}
-
-impl PeerSelectionHighlightGroup {
-    thread_local! {
-        static GROUP_IDS: Cell<[u32; 16]> = const { Cell::new([0; _]) };
-    }
-}
-
-impl WithGroupIds for PeerCursorHighlightGroup {
-    fn with_group_ids<R>(fun: impl FnOnce(&[Cell<u32>]) -> R) -> R {
-        Self::GROUP_IDS.with(|ids| fun(ids.as_array_of_cells().as_slice()))
-    }
-}
-
-impl WithGroupIds for PeerSelectionHighlightGroup {
-    fn with_group_ids<R>(fun: impl FnOnce(&[Cell<u32>]) -> R) -> R {
-        Self::GROUP_IDS.with(|ids| fun(ids.as_array_of_cells().as_slice()))
-    }
-}
-
-impl RemotePeerHighlightGroup for PeerCursorHighlightGroup {
-    const NAME_PREFIX: &str = "NomadCollabPeerCursor";
-
-    fn set_hl_opts() -> oxi::api::opts::SetHighlightOpts {
-        oxi::api::opts::SetHighlightOpts::builder().link("Cursor").build()
-    }
-}
-
-impl RemotePeerHighlightGroup for PeerSelectionHighlightGroup {
-    const NAME_PREFIX: &str = "NomadCollabPeerSelection";
-
-    fn set_hl_opts() -> oxi::api::opts::SetHighlightOpts {
-        oxi::api::opts::SetHighlightOpts::builder().link("Visual").build()
-    }
 }
 
 impl fmt::Display for TildePath<'_> {
