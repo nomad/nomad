@@ -1,27 +1,27 @@
 use core::cell::Cell;
 use core::ops::Range;
 
-use collab_types::Peer;
+use collab_types::PeerId;
 use editor::ByteOffset;
 use neovim::buffer::{BufferExt, Point};
 use neovim::oxi::api;
 
 use crate::editors::neovim::PeerHighlightGroup;
 
-/// Holds the state needed to display a remote peer's cursor in a buffer.
-pub struct PeerCursor {
+/// A remote peer's cursor in a buffer.
+pub struct NeovimPeerCursor {
     /// The buffer the cursor is in.
     buffer: api::Buffer,
 
-    /// The extmark ID of the highlight representing the cursor's head.
-    cursor_extmark_id: u32,
+    /// The ID of the extmark used to display the cursor.
+    extmark_id: u32,
 
-    /// The ID of the namespace the
-    /// [`cursor_extmark_id`](Self::cursor_extmark_id) belongs to.
+    /// The ID of the namespace the [`extmark_id`](Self::extmark_id) belongs
+    /// to.
     namespace_id: u32,
 
-    /// The remote peer this tooltip is for.
-    peer: Peer,
+    /// The remote peer's ID.
+    peer_id: PeerId,
 }
 
 /// The highlight group used to highlight a remote peer's cursor.
@@ -33,11 +33,11 @@ impl PeerCursorHighlightGroup {
     }
 }
 
-impl PeerCursor {
-    /// Creates a new tooltip representing the given remote peer's cursor at
-    /// the given byte offset in the given buffer.
+impl NeovimPeerCursor {
+    /// Creates a new cursor for the remote peer with given ID at the given
+    /// byte offset in the given buffer.
     pub(super) fn create(
-        peer: Peer,
+        peer_id: PeerId,
         mut buffer: api::Buffer,
         cursor_offset: ByteOffset,
         namespace_id: u32,
@@ -47,7 +47,7 @@ impl PeerCursor {
         let opts = api::opts::SetExtmarkOpts::builder()
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group(PeerCursorHighlightGroup::new(peer.id))
+            .hl_group(PeerCursorHighlightGroup::new(peer_id))
             .build();
 
         let cursor_extmark_id = buffer
@@ -59,19 +59,19 @@ impl PeerCursor {
             )
             .expect("couldn't set extmark");
 
-        Self { buffer, cursor_extmark_id, peer, namespace_id }
+        Self { buffer, extmark_id: cursor_extmark_id, peer_id, namespace_id }
     }
 
-    /// Moves the tooltip to the given offset.
+    /// Moves the cursor to the given offset.
     pub(super) fn r#move(&mut self, cursor_offset: ByteOffset) {
         let highlight_range =
             Self::highlight_range(&self.buffer, cursor_offset);
 
         let opts = api::opts::SetExtmarkOpts::builder()
-            .id(self.cursor_extmark_id)
+            .id(self.extmark_id)
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group(PeerCursorHighlightGroup::new(self.peer.id))
+            .hl_group(PeerCursorHighlightGroup::new(self.peer_id))
             .build();
 
         let new_extmark_id = self
@@ -84,13 +84,13 @@ impl PeerCursor {
             )
             .expect("couldn't set extmark");
 
-        debug_assert_eq!(new_extmark_id, self.cursor_extmark_id);
+        debug_assert_eq!(new_extmark_id, self.extmark_id);
     }
 
-    /// Removes the tooltip from the buffer.
+    /// Removes the cursor from the buffer.
     pub(super) fn remove(mut self) {
         self.buffer
-            .del_extmark(self.namespace_id, self.cursor_extmark_id)
+            .del_extmark(self.namespace_id, self.extmark_id)
             .expect("couldn't delete extmark");
     }
 

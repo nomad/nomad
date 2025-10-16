@@ -24,10 +24,12 @@ use neovim::{Neovim, mlua, oxi};
 use nomad_collab_params::ulid;
 
 use crate::editors::neovim::{
+    NeovimPeerCursor,
+    NeovimPeerHandle,
     NeovimPeerSelection,
     NeovimProgressReporter,
-    PeerCursor,
     PeerCursorHighlightGroup,
+    PeerHandleHighlightGroup,
     PeerHighlightGroup,
     PeerSelectionHighlightGroup,
 };
@@ -101,7 +103,7 @@ struct TildePath<'a> {
 impl CollabEditor for Neovim {
     type Io = Either<TlsStream<TcpStream>, TcpStream>;
     type PeerSelection = NeovimPeerSelection;
-    type PeerTooltip = PeerCursor;
+    type PeerTooltip = (NeovimPeerCursor, NeovimPeerHandle);
     type ProgressReporter = NeovimProgressReporter;
     type ProjectFilter = Option<gitignore::GitIgnore>;
     type ServerParams = nomad_collab_params::NomadParams;
@@ -208,8 +210,24 @@ impl CollabEditor for Neovim {
         ctx: &mut Context<Self>,
     ) -> Self::PeerTooltip {
         let buffer = oxi::api::Buffer::from(buffer_id);
+
         let namespace_id = ctx.with_editor(|nvim| nvim.namespace_id());
-        PeerCursor::create(remote_peer, buffer, tooltip_offset, namespace_id)
+
+        let cursor = NeovimPeerCursor::create(
+            remote_peer.id,
+            buffer.clone(),
+            tooltip_offset,
+            namespace_id,
+        );
+
+        let handle = NeovimPeerHandle::create(
+            remote_peer,
+            buffer,
+            tooltip_offset,
+            namespace_id,
+        );
+
+        (cursor, handle)
     }
 
     async fn default_dir_for_remote_projects(
@@ -299,15 +317,17 @@ impl CollabEditor for Neovim {
     }
 
     fn move_peer_tooltip(
-        tooltip: &mut Self::PeerTooltip,
-        tooltip_offset: ByteOffset,
+        (cursor, handle): &mut Self::PeerTooltip,
+        new_offset: ByteOffset,
         _: &mut Context<Self>,
     ) {
-        tooltip.r#move(tooltip_offset);
+        cursor.r#move(new_offset);
+        handle.r#move(new_offset);
     }
 
     fn on_init(_: &mut Context<Self, Borrowed>) {
         PeerCursorHighlightGroup::create_all();
+        PeerHandleHighlightGroup::create_all();
         PeerSelectionHighlightGroup::create_all();
     }
 
@@ -419,8 +439,12 @@ impl CollabEditor for Neovim {
         // we don't have to do anything here.
     }
 
-    fn remove_peer_tooltip(tooltip: Self::PeerTooltip, _: &mut Context<Self>) {
-        tooltip.remove();
+    fn remove_peer_tooltip(
+        (cursor, handle): Self::PeerTooltip,
+        _: &mut Context<Self>,
+    ) {
+        cursor.remove();
+        handle.remove();
     }
 
     async fn select_session<'pairs>(
