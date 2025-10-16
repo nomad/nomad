@@ -49,7 +49,7 @@ impl NeovimPeerCursor {
         let opts = api::opts::SetExtmarkOpts::builder()
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group(i64::from(hl_group_id))
+            .hl_group(hl_group_id)
             .build();
 
         let extmark_id = buffer
@@ -73,7 +73,7 @@ impl NeovimPeerCursor {
             .id(self.extmark_id)
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group(i64::from(self.hl_group_id))
+            .hl_group(self.hl_group_id)
             .build();
 
         let new_extmark_id = self
