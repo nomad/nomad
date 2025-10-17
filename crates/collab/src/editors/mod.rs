@@ -16,8 +16,9 @@ use editor::context::Borrowed;
 use editor::{ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
+use crate::progress::ProgressReporter;
 use crate::project::Project;
-use crate::{config, join, leave, pause, progress, session, start, yank};
+use crate::{config, join, leave, pause, resume, session, start, yank};
 
 /// An [`Editor`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -34,8 +35,8 @@ pub trait CollabEditor: Editor {
 
     /// A type that editor implementations can use to show progress updates to
     /// the user.
-    type ProgressReporter: progress::ProgressReporter<Self, start::Start<Self>>
-        + progress::ProgressReporter<Self, join::Join<Self>>;
+    type ProgressReporter: ProgressReporter<Self, start::Start<Self>>
+        + ProgressReporter<Self, join::Join<Self>>;
 
     /// TODO: docs.
     type ProjectFilter: fs::filter::Filter<Self::Fs, Error: Send> + Send + Sync;
@@ -157,6 +158,12 @@ pub trait CollabEditor: Editor {
     fn on_peer_joined(
         peer: &Peer,
         proj: &Project<Self>,
+        ctx: &mut Context<Self>,
+    );
+
+    /// Called when the [`Resume`](resume::Resume) action returns an error.
+    fn on_resume_error(
+        error: resume::ResumeError<Self>,
         ctx: &mut Context<Self>,
     );
 

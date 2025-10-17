@@ -15,6 +15,7 @@ mod pausable_stream;
 pub mod pause;
 pub mod progress;
 pub mod project;
+pub mod resume;
 mod root_markers;
 pub mod session;
 pub mod start;

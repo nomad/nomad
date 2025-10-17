@@ -9,6 +9,7 @@ use crate::join::{Join, JoinError};
 use crate::leave::{self, Leave, LeaveError};
 use crate::pause::{Pause, PauseError};
 use crate::progress::ProgressReporter;
+use crate::resume::{Resume, ResumeError};
 use crate::session::{SessionInfos, Sessions};
 use crate::start::{Start, StartError};
 use crate::yank::{Yank, YankError};
@@ -49,6 +50,14 @@ impl<Ed: CollabEditor> Collab<Ed> {
         Pause::from(self).call_inner(ctx).await
     }
 
+    /// Calls the [`Resume`] action.
+    pub async fn resume(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), ResumeError<Ed>> {
+        Resume::from(self).call_inner(ctx).await
+    }
+
     /// Calls the [`Start`] action.
     pub async fn start(
         &self,
@@ -77,10 +86,12 @@ impl<Ed: CollabEditor> Module<Ed> for Collab<Ed> {
         ctx.with_command(Join::from(self))
             .with_command(Leave::from(self))
             .with_command(Pause::from(self))
+            .with_command(Resume::from(self))
             .with_command(Start::from(self))
             .with_command(Yank::from(self))
             .with_function(Join::from(self))
             .with_function(Leave::from(self))
+            .with_function(Resume::from(self))
             .with_function(Pause::from(self))
             .with_function(Start::from(self))
             .with_function(Yank::from(self));

@@ -37,7 +37,7 @@ use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::Project;
 use crate::session::{SessionError, SessionInfos};
 use crate::tcp_stream_ext::TcpStreamExt;
-use crate::{Collab, config, leave, pause, yank};
+use crate::{Collab, config, leave, pause, resume, yank};
 
 pub type SessionId = ulid::Ulid;
 
@@ -374,6 +374,13 @@ impl CollabEditor for Neovim {
             );
 
         ctx.notify_info(chunks);
+    }
+
+    fn on_resume_error(
+        error: resume::ResumeError<Self>,
+        ctx: &mut Context<Self>,
+    ) {
+        ctx.notify_error(error.to_string());
     }
 
     fn on_session_ended(infos: &SessionInfos<Self>, ctx: &mut Context<Self>) {
