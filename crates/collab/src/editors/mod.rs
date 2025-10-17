@@ -16,7 +16,6 @@ use editor::context::Borrowed;
 use editor::{ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
-use crate::session::SessionInfos;
 use crate::{config, join, leave, progress, session, start, yank};
 
 /// An [`Editor`] subtrait defining additional capabilities needed by the
@@ -143,6 +142,12 @@ pub trait CollabEditor: Editor {
     /// Called when the [`Leave`](leave::Leave) action returns an error.
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>);
 
+    /// Called when a session ends.
+    fn on_session_ended(
+        session_infos: &session::SessionInfos<Self>,
+        ctx: &mut Context<Self>,
+    );
+
     /// Called when running a session returns an error.
     fn on_session_error(
         error: session::SessionError<Self>,
@@ -152,7 +157,7 @@ pub trait CollabEditor: Editor {
     /// Called after the [`Start`](start::Start) action successfully starts a
     /// new session, just before running the session's event loop.
     fn on_session_started(
-        session_infos: &SessionInfos<Self>,
+        session_infos: &session::SessionInfos<Self>,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
 

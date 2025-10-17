@@ -272,18 +272,14 @@ impl<Ed: CollabEditor> Start<Ed> {
             message_tx: welcome.tx,
             project,
             stop_rx: self.stop_channels.insert(welcome.session_id),
-            _remove_on_drop: self.sessions.insert(session_infos.clone()),
+            remove_on_drop: self.sessions.insert(session_infos.clone()),
         };
 
         ctx.with_namespace([
             ctx.namespace().plugin_name(),
             Collab::<Ed>::NAME,
         ])
-        .spawn_local(async move |ctx| {
-            if let Err(err) = session.run(ctx).await {
-                Ed::on_session_error(err, ctx);
-            }
-        })
+        .spawn_local(async move |ctx| session.run(ctx).await)
         .detach();
 
         Ok(session_infos)

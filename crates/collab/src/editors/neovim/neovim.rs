@@ -335,6 +335,8 @@ impl CollabEditor for Neovim {
         ctx.notify_error(error.to_string());
     }
 
+    fn on_session_ended(_: &SessionInfos<Self>, _: &mut Context<Self>) {}
+
     fn on_session_error(error: SessionError<Self>, ctx: &mut Context<Self>) {
         ctx.notify_error(error.to_string());
     }

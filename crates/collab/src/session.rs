@@ -7,8 +7,7 @@ use abs_path::AbsPathBuf;
 use collab_server::client as collab_client;
 use collab_types::{Peer, PeerId};
 use editor::{Access, Context, Shared};
-use flume::Receiver;
-use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
+use futures_util::{FutureExt, SinkExt, StreamExt, select_biased};
 use fxhash::FxHashMap;
 use smallvec::SmallVec;
 
@@ -49,17 +48,13 @@ pub struct SessionInfos<Ed: CollabEditor> {
 #[display("{_0}")]
 pub enum SessionError<Ed: CollabEditor> {
     /// TODO: docs.
-    EventRx(#[from] EventError<Ed>),
+    Event(#[from] EventError<Ed>),
 
     /// TODO: docs.
     Integrate(#[from] IntegrateError<Ed>),
 
     /// TODO: docs.
     MessageRx(#[from] collab_client::ReceiveError),
-
-    /// TODO: docs.
-    #[display("the server kicked this peer out of the session")]
-    MessageRxExhausted,
 
     /// TODO: docs.
     MessageTx(#[from] io::Error),
@@ -88,10 +83,10 @@ pub(crate) struct Session<Ed: CollabEditor> {
     pub(crate) project: Project<Ed>,
 
     /// TODO: docs.
-    pub(crate) stop_rx: Receiver<StopRequest>,
+    pub(crate) stop_rx: flume::Receiver<StopRequest>,
 
     /// TODO: docs.
-    pub(crate) _remove_on_drop: RemoveOnDrop<Ed>,
+    pub(crate) remove_on_drop: RemoveOnDrop<Ed>,
 }
 
 /// TODO: docs.
@@ -112,7 +107,7 @@ pub(crate) struct RemoveOnDrop<Ed: CollabEditor> {
 impl<Ed: CollabEditor> Sessions<Ed> {
     /// Returns the infos for the session with the given ID, if any.
     pub fn get(&self, session_id: SessionId<Ed>) -> Option<SessionInfos<Ed>> {
-        self.inner.with(|inner| inner.get(&session_id).cloned())
+        self.with(session_id, |infos| infos.cloned())
     }
 
     /// Inserts the given infos.
@@ -167,6 +162,16 @@ impl<Ed: CollabEditor> Sessions<Ed> {
     fn remove(&self, session_id: SessionId<Ed>) -> bool {
         self.inner.with_mut(|inner| inner.remove(&session_id).is_some())
     }
+
+    /// Runs the given function with the infos for the session with the given
+    /// ID, if any.
+    fn with<R>(
+        &self,
+        session_id: SessionId<Ed>,
+        fun: impl FnOnce(Option<&SessionInfos<Ed>>) -> R,
+    ) -> R {
+        self.inner.with(|inner| fun(inner.get(&session_id)))
+    }
 }
 
 impl<Ed: CollabEditor> SessionInfos<Ed> {
@@ -207,23 +212,34 @@ impl RemotePeers {
 }
 
 impl<Ed: CollabEditor> Session<Ed> {
-    pub(crate) async fn run(
-        self,
+    pub(crate) async fn run(mut self, ctx: &mut Context<Ed>) {
+        match self.run_event_loop(ctx).await {
+            Ok(()) => {
+                self.with_infos(|infos| Ed::on_session_ended(infos, ctx))
+            },
+            Err(err) => Ed::on_session_error(err, ctx),
+        }
+    }
+
+    /// Runs the session's event loop until:
+    ///
+    /// * a [`StopRequest`] is received;
+    /// * the [`Message`] receiver is exhausted;
+    /// * an error occurs.
+    async fn run_event_loop(
+        &mut self,
         ctx: &mut Context<Ed>,
     ) -> Result<(), SessionError<Ed>> {
         let Self {
-            mut event_stream,
+            event_stream,
             message_rx,
             message_tx,
-            mut project,
+            project,
             stop_rx,
-            _remove_on_drop,
+            ..
         } = self;
 
-        pin_mut!(message_rx);
-        pin_mut!(message_tx);
-
-        let mut stop_stream = stop_rx.into_stream();
+        let mut stop_stream = stop_rx.stream();
 
         loop {
             select_biased! {
@@ -235,8 +251,11 @@ impl<Ed: CollabEditor> Session<Ed> {
                     }
                 },
                 maybe_message_res = message_rx.next() => {
-                    let message = maybe_message_res
-                        .ok_or(SessionError::MessageRxExhausted)??;
+                    let Some(message_res) = maybe_message_res else {
+                        return Ok(())
+                    };
+
+                    let message = message_res?;
 
                     for message in project.integrate(message, ctx).await? {
                         message_tx.send(message).await?;
@@ -248,6 +267,16 @@ impl<Ed: CollabEditor> Session<Ed> {
                 },
             }
         }
+    }
+
+    /// Calls the given function with the infos for this session.
+    fn with_infos<R>(&self, f: impl FnOnce(&SessionInfos<Ed>) -> R) -> R {
+        self.remove_on_drop.sessions.with(
+            self.remove_on_drop.session_id,
+            |maybe_infos| {
+                f(maybe_infos.expect("session is alive, so infos must exist"))
+            },
+        )
     }
 }
 

@@ -304,6 +304,8 @@ where
         unimplemented!()
     }
 
+    fn on_session_ended(_: &SessionInfos<Self>, _: &mut Context<Self>) {}
+
     fn on_session_error(_: SessionError<Self>, _: &mut Context<Self>) {
         unimplemented!()
     }

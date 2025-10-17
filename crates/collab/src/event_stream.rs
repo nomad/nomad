@@ -420,8 +420,8 @@ impl<Ed: CollabEditor> EventStream<Ed> {
                         ctx.selection(event.selection_id.clone())
                     {
                         // The selected range may have changed since the event
-                        // was sent, so update the event's range to the
-                        // current one.
+                        // was sent, so update the event's range to the current
+                        // one.
                         *range = selection.byte_range();
                         self.watch_selection(&mut selection);
                     }
