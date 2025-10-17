@@ -302,6 +302,10 @@ where
 
     fn on_leave_error(_: leave::LeaveError, _: &mut Context<Self>) {}
 
+    fn on_peer_left(_: &Peer, _: &AbsPath, _: &mut Context<Self>) {}
+
+    fn on_peer_joined(_: &Peer, _: &AbsPath, _: &mut Context<Self>) {}
+
     fn on_session_ended(_: &SessionInfos<Self>, _: &mut Context<Self>) {}
 
     fn on_session_error(_: SessionError<Self>, _: &mut Context<Self>) {}

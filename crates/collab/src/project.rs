@@ -499,12 +499,14 @@ impl<Ed: CollabEditor> Project<Ed> {
         Ok(renames)
     }
 
-    fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
+    fn integrate_peer_joined(&self, peer: Peer, ctx: &mut Context<Ed>) {
+        Ed::on_peer_joined(&peer, &self.root_path, ctx);
+
         self.remote_peers.insert(peer);
     }
 
     fn integrate_peer_left(&mut self, peer_id: PeerId, ctx: &mut Context<Ed>) {
-        self.remote_peers.remove(peer_id);
+        let peer = self.remote_peers.remove(peer_id);
 
         let (cursor_ids, selection_ids) =
             self.inner.integrate_peer_disconnection(peer_id);
@@ -521,6 +523,8 @@ impl<Ed: CollabEditor> Project<Ed> {
                 Ed::remove_peer_selection(selection, ctx);
             }
         }
+
+        Ed::on_peer_left(&peer, &self.root_path, ctx);
     }
 
     fn integrate_selection_creation(

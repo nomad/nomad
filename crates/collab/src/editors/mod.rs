@@ -142,6 +142,16 @@ pub trait CollabEditor: Editor {
     /// Called when the [`Leave`](leave::Leave) action returns an error.
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>);
 
+    /// Called when a peer leaves the session rooted at the given path.
+    fn on_peer_left(peer: &Peer, root_path: &AbsPath, ctx: &mut Context<Self>);
+
+    /// Called when a peer joins the session rooted at the given path.
+    fn on_peer_joined(
+        peer: &Peer,
+        root_path: &AbsPath,
+        ctx: &mut Context<Self>,
+    );
+
     /// Called when a session ends.
     fn on_session_ended(
         session_infos: &session::SessionInfos<Self>,
