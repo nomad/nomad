@@ -1,3 +1,4 @@
+use core::ops::Range;
 use core::time::Duration;
 
 use abs_path::{AbsPath, AbsPathBuf, path};
@@ -8,9 +9,11 @@ use collab::event::{
     CursorEventKind,
     Event,
     EventStream,
+    SelectionEvent,
+    SelectionEventKind,
 };
 use collab::{CollabEditor, PeerId};
-use editor::{Buffer, ByteOffset, Context, Cursor, Replacement};
+use editor::{Buffer, ByteOffset, Context, Cursor, Replacement, Selection};
 use mock::{EditorExt, Mock};
 
 use crate::utils::FutureExt;
@@ -62,6 +65,32 @@ fn creating_buffer_emits_event() {
 
         assert_eq!(buffer_id, foo_id);
         assert_eq!(file_path, path!("/foo.txt"));
+    });
+}
+
+#[test]
+fn creating_selection_emits_event() {
+    let fs = mock::fs! {
+        "foo.txt": "hello world",
+    };
+
+    CollabMock::new(Mock::new(fs)).block_on(async |ctx| {
+        let agent_id = ctx.new_agent_id();
+
+        let foo_id =
+            ctx.create_buffer(path!("/foo.txt"), agent_id).await.unwrap();
+
+        let mut event_stream = EventStream::new(path!("/"), ctx).await;
+
+        let foo_selection_id = ctx.with_borrowed(|ctx| {
+            ctx.buffer(foo_id).unwrap().create_selection(0..5, agent_id).id()
+        });
+
+        let (selection_id, offset_range) =
+            event_stream.next_as_selection_created(ctx).await;
+
+        assert_eq!(selection_id, foo_selection_id);
+        assert_eq!(offset_range, 0..5);
     });
 }
 
@@ -233,6 +262,34 @@ trait EventStreamExt<Ed: CollabEditor> {
                     (buffer_id, replacements)
                 },
                 other => panic!("expected Edited event, got {other:?}"),
+            }
+        }
+    }
+
+    fn next_as_selection(
+        &mut self,
+        ctx: &mut Context<Ed>,
+    ) -> impl Future<Output = SelectionEvent<Ed>> {
+        async move {
+            match self.event_stream().next(ctx).await {
+                Ok(Event::Selection(event)) => event,
+                Ok(other) => panic!("expected SelectionEvent, got {other:?}"),
+                Err(err) => panic!("{err}"),
+            }
+        }
+    }
+
+    fn next_as_selection_created(
+        &mut self,
+        ctx: &mut Context<Ed>,
+    ) -> impl Future<Output = (Ed::SelectionId, Range<ByteOffset>)> {
+        async move {
+            let event = self.next_as_selection(ctx).await;
+            match event.kind {
+                SelectionEventKind::Created(_buffer_id, offset_range) => {
+                    (event.selection_id, offset_range)
+                },
+                other => panic!("expected Created event, got {other:?}"),
             }
         }
     }
