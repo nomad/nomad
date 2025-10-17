@@ -121,7 +121,16 @@ enum SessionEndReason {
 impl<Ed: CollabEditor> Sessions<Ed> {
     /// Returns the infos for the session with the given ID, if any.
     pub fn get(&self, session_id: SessionId<Ed>) -> Option<SessionInfos<Ed>> {
-        self.with(session_id, |infos| infos.cloned())
+        self.with_session(session_id, |infos| infos.cloned())
+    }
+
+    /// Calls the given function on the infos of all the current sessions.
+    pub(crate) fn for_each(&self, mut fun: impl FnMut(&SessionInfos<Ed>)) {
+        self.with(|map| {
+            for infos in map.values() {
+                fun(infos);
+            }
+        });
     }
 
     /// Inserts the given infos.
@@ -179,7 +188,7 @@ impl<Ed: CollabEditor> Sessions<Ed> {
 
     /// Runs the given function with the infos for the session with the given
     /// ID, if any.
-    fn with<R>(
+    fn with_session<R>(
         &self,
         session_id: SessionId<Ed>,
         fun: impl FnOnce(Option<&SessionInfos<Ed>>) -> R,
@@ -203,6 +212,15 @@ impl<Ed: CollabEditor> SessionInfos<Ed> {
 }
 
 impl RemotePeers {
+    /// Calls the given function on all the remote peers.
+    pub(crate) fn for_each(&self, mut fun: impl FnMut(&Peer)) {
+        self.with(|map| {
+            for peer in map.values() {
+                fun(peer);
+            }
+        });
+    }
+
     pub(crate) fn get(&self, peer_id: PeerId) -> Option<Peer> {
         self.inner.with(|inner| inner.get(&peer_id).cloned())
     }
@@ -298,12 +316,23 @@ where
 
     /// Calls the given function with the infos for this session.
     fn with_infos<R>(&self, f: impl FnOnce(&SessionInfos<Ed>) -> R) -> R {
-        self.remove_on_drop.sessions.with(
+        self.remove_on_drop.sessions.with_session(
             self.remove_on_drop.session_id,
             |maybe_infos| {
                 f(maybe_infos.expect("session is alive, so infos must exist"))
             },
         )
+    }
+}
+
+impl<Ed: CollabEditor> Access<FxHashMap<SessionId<Ed>, SessionInfos<Ed>>>
+    for Sessions<Ed>
+{
+    fn with<R>(
+        &self,
+        fun: impl FnOnce(&FxHashMap<SessionId<Ed>, SessionInfos<Ed>>) -> R,
+    ) -> R {
+        self.inner.with(fun)
     }
 }
 

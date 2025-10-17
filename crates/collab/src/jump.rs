@@ -1,7 +1,7 @@
 //! TODO: docs.
 
 use collab_types::{GitHubHandle, PeerHandle};
-use editor::command::{self, CompletionFn, ToCompletionFn};
+use editor::command::{self, CommandArgs, CommandCompletion, CommandCursor};
 use editor::module::AsyncAction;
 use editor::{ByteOffset, Context};
 use smallvec::SmallVec;
@@ -69,10 +69,33 @@ impl<Ed: CollabEditor> From<&Collab<Ed>> for Jump<Ed> {
     }
 }
 
-impl<Ed: CollabEditor> ToCompletionFn<Ed> for Jump<Ed> {
-    fn to_completion_fn(&self) -> impl CompletionFn + 'static {
-        |_command_args: command::CommandArgs<'_>, _byte_offset: ByteOffset| {
-            SmallVec::<[command::CommandCompletion; 2]>::new()
+impl<Ed: CollabEditor> command::ToCompletionFn<Ed> for Jump<Ed> {
+    fn to_completion_fn(&self) -> impl command::CompletionFn + 'static {
+        let sessions = self.sessions.clone();
+
+        move |command_args: CommandArgs<'_>, byte_offset: ByteOffset| {
+            let mut completions = SmallVec::<[_; 2]>::new();
+
+            let handle_prefix = match command_args.to_cursor(byte_offset) {
+                CommandCursor::InArg { arg, offset }
+                    if offset == byte_offset =>
+                {
+                    &arg.as_str()[..offset]
+                },
+                _ => return completions,
+            };
+
+            sessions.for_each(|session_infos| {
+                session_infos.remote_peers.for_each(|peer| {
+                    if peer.handle.as_str().starts_with(handle_prefix) {
+                        completions.push(CommandCompletion::from_str(
+                            peer.handle.as_str(),
+                        ));
+                    }
+                })
+            });
+
+            completions
         }
     }
 }
