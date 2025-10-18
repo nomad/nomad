@@ -19,7 +19,7 @@ use smallvec::SmallVec;
 use crate::CollabEditor;
 use crate::convert::Convert;
 use crate::event::{self, Event};
-use crate::session::RemotePeers;
+use crate::peers::RemotePeers;
 
 /// TODO: docs.
 pub struct Project<Ed: CollabEditor> {

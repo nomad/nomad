@@ -32,9 +32,10 @@ use crate::editors::{CollabEditor, SessionId, Welcome};
 use crate::event_stream::EventStreamBuilder;
 use crate::leave::StopChannels;
 use crate::pausable_stream::PausableStream;
+use crate::peers::RemotePeers;
 use crate::progress::{JoinState, ProgressReporter};
 use crate::project::{self, IdMaps};
-use crate::session::{RemotePeers, Session, SessionInfos, Sessions};
+use crate::session::{Session, SessionInfos, Sessions};
 
 /// The `Action` used to join an existing collaborative editing session.
 #[derive(cauchy::Clone)]

@@ -14,6 +14,7 @@ pub mod leave;
 mod list_ext;
 mod pausable_stream;
 pub mod pause;
+pub mod peers;
 pub mod progress;
 pub mod project;
 pub mod resume;

@@ -16,6 +16,7 @@ use smallvec::SmallVec;
 use crate::editors::ActionForSelectedSession;
 use crate::event_stream::{EventError, EventStream};
 use crate::leave::StopRequest;
+use crate::peers::RemotePeers;
 use crate::project::{IntegrateError, Project, SynchronizeError};
 use crate::{CollabEditor, SessionId, pausable_stream};
 
@@ -69,11 +70,6 @@ pub enum SessionError<Ed: CollabEditor> {
 }
 
 /// TODO: docs.
-#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
-#[display("there's no active collaborative editing session")]
-pub struct NoActiveSessionError;
-
-/// TODO: docs.
 pub(crate) struct Session<Ed: CollabEditor, Tx, Rx> {
     /// TODO: docs.
     pub(crate) event_stream: EventStream<Ed>,
@@ -95,13 +91,9 @@ pub(crate) struct Session<Ed: CollabEditor, Tx, Rx> {
 }
 
 /// TODO: docs.
-#[derive(Debug, Default, Clone)]
-pub struct RemotePeers {
-    /// A map of all the peers currently in the session.
-    ///
-    /// It also includes the local peer, so it's guaranteed to never be empty.
-    inner: Shared<FxHashMap<PeerId, Peer>>,
-}
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
+#[display("there's no active collaborative editing session")]
+pub(crate) struct NoActiveSessionError;
 
 /// TODO: docs.
 pub(crate) struct RemoveOnDrop<Ed: CollabEditor> {
@@ -211,45 +203,6 @@ impl<Ed: CollabEditor> SessionInfos<Ed> {
     }
 }
 
-impl RemotePeers {
-    /// Calls the given function on all the remote peers.
-    pub(crate) fn for_each(&self, mut fun: impl FnMut(&Peer)) {
-        self.with(|map| {
-            for peer in map.values() {
-                fun(peer);
-            }
-        });
-    }
-
-    pub(crate) fn get(&self, peer_id: PeerId) -> Option<Peer> {
-        self.inner.with(|inner| inner.get(&peer_id).cloned())
-    }
-
-    #[track_caller]
-    pub(crate) fn insert(&self, peer: Peer) {
-        self.inner.with_mut(|inner| match inner.entry(peer.id) {
-            hash_map::Entry::Vacant(vacant) => {
-                vacant.insert(peer);
-            },
-            hash_map::Entry::Occupied(occupied) => {
-                panic!(
-                    "peer with ID {:?} already exists: {:?}",
-                    peer.id,
-                    occupied.get()
-                )
-            },
-        });
-    }
-
-    #[track_caller]
-    pub(crate) fn remove(&self, peer_id: PeerId) -> Peer {
-        self.inner.with_mut(|inner| match inner.remove(&peer_id) {
-            Some(peer) => peer,
-            None => panic!("no peer with ID {:?} exists", peer_id),
-        })
-    }
-}
-
 impl<Ed, Tx, Rx> Session<Ed, Tx, Rx>
 where
     Ed: CollabEditor,
@@ -333,28 +286,6 @@ impl<Ed: CollabEditor> Access<FxHashMap<SessionId<Ed>, SessionInfos<Ed>>>
         fun: impl FnOnce(&FxHashMap<SessionId<Ed>, SessionInfos<Ed>>) -> R,
     ) -> R {
         self.inner.with(fun)
-    }
-}
-
-impl Access<FxHashMap<PeerId, Peer>> for RemotePeers {
-    fn with<R>(&self, fun: impl FnOnce(&FxHashMap<PeerId, Peer>) -> R) -> R {
-        self.inner.with(fun)
-    }
-}
-
-impl From<collab_types::Peers> for RemotePeers {
-    fn from(peers: collab_types::Peers) -> Self {
-        peers.into_iter().collect::<Self>()
-    }
-}
-
-impl FromIterator<collab_types::Peer> for RemotePeers {
-    fn from_iter<T: IntoIterator<Item = collab_types::Peer>>(iter: T) -> Self {
-        Self {
-            inner: Shared::new(
-                iter.into_iter().map(|peer| (peer.id, peer)).collect(),
-            ),
-        }
     }
 }
 

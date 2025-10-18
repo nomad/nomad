@@ -27,10 +27,11 @@ use crate::editors::CollabEditor;
 use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
 use crate::pausable_stream::PausableStream;
+use crate::peers::RemotePeers;
 use crate::progress::{ProgressReporter, StartState};
 use crate::project::{self, IdMaps};
 use crate::root_markers;
-use crate::session::{RemotePeers, Session, SessionInfos, Sessions};
+use crate::session::{Session, SessionInfos, Sessions};
 
 /// TODO: docs.
 pub type ProjectFilter<Ed> =

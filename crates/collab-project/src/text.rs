@@ -61,7 +61,7 @@ pub struct TextFileMut<'a, S = Editable> {
 }
 
 /// TODO: docs.
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CursorId {
     inner: AnnotationId,
 }
@@ -80,7 +80,7 @@ pub struct CursorMut<'a> {
 }
 
 /// TODO: docs.
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SelectionId {
     inner: AnnotationId,
 }
