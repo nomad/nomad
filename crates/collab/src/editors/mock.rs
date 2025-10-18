@@ -317,6 +317,9 @@ where
 
     fn on_session_error(_: SessionError<Self>, _: &mut Context<Self>) {}
 
+    async fn on_session_joined(_: &SessionInfos<Self>, _: &mut Context<Self>) {
+    }
+
     fn on_session_left(_: &SessionInfos<Self>, _: &mut Context<Self>) {}
 
     async fn on_session_started(

@@ -405,6 +405,71 @@ impl CollabEditor for Neovim {
         ctx.notify_error(error.to_string());
     }
 
+    async fn on_session_joined(
+        infos: &SessionInfos<Self>,
+        ctx: &mut Context<Self>,
+    ) {
+        let host = infos
+            .remote_peers
+            .get(infos.host_id)
+            .expect("session must have host peer");
+
+        let Some((peer_handle, cursor_id)) = host
+            .main_cursor_id()
+            .map(|cursor_id| (host.into_inner().handle, cursor_id))
+            .or_else(|| {
+                infos.remote_peers.find_map(|peer| {
+                    peer.main_cursor_id()
+                        .map(|cursor_id| (peer.handle.clone(), cursor_id))
+                })
+            })
+        else {
+            // None of the remote peers has a cursor in the project, so we
+            // can't offer the user to jump to any position.
+            return;
+        };
+
+        // Skip one tick of the event loop. See comment in `on_session_started`
+        // for details.
+        neovim::utils::schedule(|| ()).await;
+
+        let prompt = format!(
+            "Joined a new collaborative editing session under \
+             {}.\n{peer_handle} is currently in <file>. Would you like to \
+             jump to their position?",
+            notifications::path_chunk(&infos.project_root_path, ctx).text(),
+        );
+
+        let options = ["Yes", "No"];
+
+        let Ok(choice) = oxi::api::call_function::<_, u8>(
+            "confirm",
+            (prompt, options.join("\n")),
+        ) else {
+            return;
+        };
+
+        match choice {
+            0 | 2 => return,
+            1 => {},
+            _ => unreachable!("only provided {} options", options.len()),
+        }
+
+        // match infos
+        //     .controller()
+        //     .with_proj(async |proj, ctx| {
+        //         jump::Jump::jump_to(proj, cursor_id, ctx).await
+        //     })
+        //     .await
+        // {
+        //     Some(Ok(())) => {},
+        //     Some(Err(err)) => {
+        //         Self::on_jump_error(jump::JumpError::CreateBuffer(err))
+        //     },
+        //     None => ctx.notify_warn("The session has ended"),
+        // }
+    }
+
     fn on_session_left(infos: &SessionInfos<Self>, ctx: &mut Context<Self>) {
         let mut chunks = notify::Chunks::default();
 

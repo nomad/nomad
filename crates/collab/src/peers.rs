@@ -59,6 +59,13 @@ impl RemotePeers {
         })
     }
 
+    pub(crate) fn find_map<T>(
+        &self,
+        fun: impl FnMut(&RemotePeer) -> Option<T>,
+    ) -> Option<T> {
+        self.with(|map| map.values().find_map(fun))
+    }
+
     /// Returns the [`Peer`] with the given ID, if any.
     pub(crate) fn get(&self, peer_id: PeerId) -> Option<RemotePeer> {
         self.inner.with(|inner| inner.get(&peer_id).cloned())
@@ -99,6 +106,10 @@ impl RemotePeer {
     /// editors that support multiple cursors.
     pub fn main_cursor_id(&self) -> Option<CursorId> {
         self.main_cursor_id
+    }
+
+    pub(crate) fn into_inner(self) -> Peer {
+        self.inner
     }
 
     fn new(peer: Peer, proj: &collab_project::Project) -> Self {

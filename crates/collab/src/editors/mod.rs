@@ -182,14 +182,19 @@ pub trait CollabEditor: Editor {
         ctx: &mut Context<Self>,
     );
 
+    /// Called when a new session is joined.
+    fn on_session_joined(
+        session_infos: &session::SessionInfos<Self>,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = ()>;
+
     /// Called when the user leaves a session.
     fn on_session_left(
         session_infos: &session::SessionInfos<Self>,
         ctx: &mut Context<Self>,
     );
 
-    /// Called after the [`Start`](start::Start) action successfully starts a
-    /// new session, just before running the session's event loop.
+    /// Called when a new session is started.
     fn on_session_started(
         session_infos: &session::SessionInfos<Self>,
         ctx: &mut Context<Self>,
