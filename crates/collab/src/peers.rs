@@ -101,8 +101,13 @@ impl RemotePeer {
         self.main_cursor_id
     }
 
-    fn new(_peer: Peer, _proj: &collab_project::Project) -> Self {
-        todo!();
+    fn new(peer: Peer, proj: &collab_project::Project) -> Self {
+        let main_cursor_id = proj
+            .cursors()
+            .filter_map(|cur| (cur.owner() == peer.id).then_some(cur.id()))
+            .min();
+
+        Self { inner: peer, main_cursor_id }
     }
 }
 
