@@ -19,7 +19,6 @@ use mlua::{Function, Table};
 use neovim::buffer::{BufferExt, BufferId};
 use neovim::notify::{self, NotifyContextExt};
 use neovim::{Neovim, mlua, oxi};
-use nomad_collab_params::ulid;
 
 use crate::editors::neovim::{
     NeovimPeerCursor,
@@ -36,9 +35,7 @@ use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::Project;
 use crate::session::{NoActiveSessionError, SessionError, SessionInfos};
 use crate::tcp_stream_ext::TcpStreamExt;
-use crate::{config, copy_id, jump, leave, pause, resume};
-
-pub type SessionId = ulid::Ulid;
+use crate::{SessionId, config, copy_id, jump, leave, pause, resume};
 
 #[derive(Debug, derive_more::Display, cauchy::Error)]
 pub enum NeovimConnectToServerError {
@@ -328,7 +325,7 @@ impl CollabEditor for Neovim {
     }
 
     fn on_copied_session_id(
-        session_id: crate::SessionId<Self>,
+        session_id: SessionId<Self>,
         ctx: &mut Context<Self>,
     ) {
         let mut chunks = notify::Chunks::default();
@@ -550,7 +547,7 @@ impl CollabEditor for Neovim {
         // [with]: https://github.com/user-attachments/assets/031d24e9-e030-4611-872c-1b51d3076e23
         neovim::utils::schedule(|| ()).await;
 
-        let session_id = &infos.session_id;
+        let session_id = infos.session_id.clone();
 
         let prompt = format!(
             "Started a new collaborative editing session at {} with ID \
@@ -575,11 +572,12 @@ impl CollabEditor for Neovim {
             _ => unreachable!("only provided {} options", options.len()),
         }
 
-        if let Err(err) = copy_id::CopyId::copy_id(session_id, ctx) {
-            Self::on_copy_session_id_error(
-                copy_id::CopyIdError::CopySessionId(err, session_id.clone()),
+        match copy_id::CopyId::copy_id(&session_id, ctx) {
+            Ok(()) => Self::on_copied_session_id(session_id, ctx),
+            Err(err) => Self::on_copy_session_id_error(
+                copy_id::CopyIdError::CopySessionId(err, session_id),
                 ctx,
-            );
+            ),
         }
     }
 
@@ -623,10 +621,10 @@ impl CollabEditor for Neovim {
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, SessionId<Self>)],
         action: ActionForSelectedSession,
         ctx: &mut Context<Self>,
-    ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
+    ) -> Option<&'pairs (AbsPathBuf, SessionId<Self>)> {
         let select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
 
         let items = {
