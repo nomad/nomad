@@ -37,7 +37,7 @@ use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::Project;
 use crate::session::{SessionError, SessionInfos};
 use crate::tcp_stream_ext::TcpStreamExt;
-use crate::{Collab, config, jump, leave, pause, resume, yank};
+use crate::{Collab, config, copy_id, jump, leave, pause, resume};
 
 pub type SessionId = ulid::Ulid;
 
@@ -562,7 +562,7 @@ impl CollabEditor for Neovim {
 
                 chunks
                     .push(
-                        "Session ID copied to clipboard. You can also yank \
+                        "Session ID copied to clipboard. You can also copy \
                          it later by executing:",
                     )
                     .push_newline()
@@ -571,7 +571,7 @@ impl CollabEditor for Neovim {
                         format_compact!(
                             "Mad {} {}",
                             Collab::<Self>::NAME,
-                            yank::Yank::<Self>::NAME
+                            copy_id::CopyId::<Self>::NAME
                         ),
                         "Title",
                     );
@@ -582,7 +582,10 @@ impl CollabEditor for Neovim {
         }
     }
 
-    fn on_yank_error(error: yank::YankError<Self>, ctx: &mut Context<Self>) {
+    fn on_copy_session_id_error(
+        error: copy_id::CopyIdError<Self>,
+        ctx: &mut Context<Self>,
+    ) {
         ctx.notify_error(error.to_string());
     }
 

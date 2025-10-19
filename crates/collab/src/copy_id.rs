@@ -11,15 +11,15 @@ use crate::session::{NoActiveSessionError, Sessions};
 /// An `Action` that pastes the [`SessionId`](crate::editors::SessionId) of any
 /// active session to the user's clipboard.
 #[derive(cauchy::Clone)]
-pub struct Yank<Ed: CollabEditor> {
+pub struct CopyId<Ed: CollabEditor> {
     sessions: Sessions<Ed>,
 }
 
-impl<Ed: CollabEditor> Yank<Ed> {
+impl<Ed: CollabEditor> CopyId<Ed> {
     pub(crate) async fn call_inner(
         &self,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), YankError<Ed>> {
+    ) -> Result<(), CopyIdError<Ed>> {
         let Some((_, session_id)) = self
             .sessions
             .select(ActionForSelectedSession::CopySessionId, ctx)
@@ -30,47 +30,47 @@ impl<Ed: CollabEditor> Yank<Ed> {
 
         Ed::copy_session_id(session_id, ctx)
             .await
-            .map_err(YankError::PasteSessionId)
+            .map_err(CopyIdError::CopySessionId)
     }
 }
 
-impl<Ed: CollabEditor> AsyncAction<Ed> for Yank<Ed> {
-    const NAME: &str = "yank";
+impl<Ed: CollabEditor> AsyncAction<Ed> for CopyId<Ed> {
+    const NAME: &str = "copy-id";
 
     type Args = ();
 
     async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
         if let Err(err) = self.call_inner(ctx).await {
-            Ed::on_yank_error(err, ctx);
+            Ed::on_copy_session_id_error(err, ctx);
         }
     }
 }
 
-/// The type of error that can occur when [`Yank`]ing fails.
+/// The type of error that can occur when [`CopyId`] fails.
 #[derive(
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
-pub enum YankError<Ed: CollabEditor> {
+pub enum CopyIdError<Ed: CollabEditor> {
+    /// TODO: docs.
+    #[display("{_0}")]
+    CopySessionId(Ed::CopySessionIdError),
+
     /// TODO: docs.
     #[display("{}", NoActiveSessionError)]
     NoActiveSession,
-
-    /// TODO: docs.
-    #[display("{_0}")]
-    PasteSessionId(Ed::CopySessionIdError),
 }
 
-impl<Ed: CollabEditor> From<&Collab<Ed>> for Yank<Ed> {
+impl<Ed: CollabEditor> From<&Collab<Ed>> for CopyId<Ed> {
     fn from(collab: &Collab<Ed>) -> Self {
         Self { sessions: collab.sessions.clone() }
     }
 }
 
-impl<Ed: CollabEditor> ToCompletionFn<Ed> for Yank<Ed> {
+impl<Ed: CollabEditor> ToCompletionFn<Ed> for CopyId<Ed> {
     fn to_completion_fn(&self) {}
 }
 
-impl<Ed: CollabEditor> From<NoActiveSessionError> for YankError<Ed> {
+impl<Ed: CollabEditor> From<NoActiveSessionError> for CopyIdError<Ed> {
     fn from(_: NoActiveSessionError) -> Self {
         Self::NoActiveSession
     }

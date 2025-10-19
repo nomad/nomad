@@ -5,6 +5,7 @@
 mod collab;
 pub mod config;
 mod convert;
+pub mod copy_id;
 pub mod editors;
 pub mod event;
 mod event_stream;
@@ -23,7 +24,6 @@ pub mod session;
 pub mod start;
 #[cfg(feature = "neovim")]
 mod tcp_stream_ext;
-pub mod yank;
 
 pub use collab::Collab;
 pub use collab_types::{Peer, PeerHandle, PeerId};

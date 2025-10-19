@@ -15,7 +15,7 @@ use editor::{AgentId, ByteOffset, Context, Editor, EditorAdapter};
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::Project;
 use crate::session::{SessionError, SessionInfos};
-use crate::{config, jump, leave, pause, resume, yank};
+use crate::{config, jump, leave, pause, resume, copy_id};
 
 #[allow(clippy::type_complexity)]
 pub struct CollabMock<Ed: Editor, F = ()> {
@@ -337,7 +337,7 @@ where
     ) {
     }
 
-    fn on_yank_error(_: yank::YankError<Self>, _: &mut Context<Self>) {}
+    fn on_copy_session_id_error(_: copy_id::CopyIdError<Self>, _: &mut Context<Self>) {}
 
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,

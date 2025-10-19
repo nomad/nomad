@@ -18,7 +18,8 @@ use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::progress::ProgressReporter;
 use crate::project::Project;
-use crate::{config, join, jump, leave, pause, resume, session, start, yank};
+use crate::session::{SessionError, SessionInfos};
+use crate::{config, copy_id, join, jump, leave, pause, resume, start};
 
 /// An [`Editor`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -181,36 +182,36 @@ pub trait CollabEditor: Editor {
 
     /// Called when a session ends.
     fn on_session_ended(
-        session_infos: &session::SessionInfos<Self>,
+        session_infos: &SessionInfos<Self>,
         ctx: &mut Context<Self>,
     );
 
     /// Called when running a session returns an error.
-    fn on_session_error(
-        error: session::SessionError<Self>,
-        ctx: &mut Context<Self>,
-    );
+    fn on_session_error(error: SessionError<Self>, ctx: &mut Context<Self>);
 
     /// Called when a new session is joined.
     fn on_session_joined(
-        session_infos: &session::SessionInfos<Self>,
+        session_infos: &SessionInfos<Self>,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
 
     /// Called when the user leaves a session.
     fn on_session_left(
-        session_infos: &session::SessionInfos<Self>,
+        session_infos: &SessionInfos<Self>,
         ctx: &mut Context<Self>,
     );
 
     /// Called when a new session is started.
     fn on_session_started(
-        session_infos: &session::SessionInfos<Self>,
+        session_infos: &SessionInfos<Self>,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
 
-    /// Called when the [`Yank`](yank::Yank) action returns an error.
-    fn on_yank_error(error: yank::YankError<Self>, ctx: &mut Context<Self>);
+    /// Called when the [`CopyId`](copy_id::CopyId) action returns an error.
+    fn on_copy_session_id_error(
+        error: copy_id::CopyIdError<Self>,
+        ctx: &mut Context<Self>,
+    );
 
     /// TODO: docs.
     fn project_filter(

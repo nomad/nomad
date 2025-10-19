@@ -5,6 +5,7 @@ use editor::module::{ApiCtx, Module};
 use editor::{Context, Shared};
 
 use crate::config::Config;
+use crate::copy_id::{CopyId, CopyIdError};
 use crate::editors::{CollabEditor, SessionId};
 use crate::join::{Join, JoinError};
 use crate::jump::{Jump, JumpError};
@@ -14,7 +15,6 @@ use crate::progress::ProgressReporter;
 use crate::resume::{Resume, ResumeError};
 use crate::session::{SessionInfos, Sessions};
 use crate::start::{Start, StartError};
-use crate::yank::{Yank, YankError};
 
 /// TODO: docs.
 pub struct Collab<Ed: CollabEditor> {
@@ -25,6 +25,14 @@ pub struct Collab<Ed: CollabEditor> {
 }
 
 impl<Ed: CollabEditor> Collab<Ed> {
+    /// Calls the [`CopyId`] action.
+    pub async fn copy_id(
+        &self,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), CopyIdError<Ed>> {
+        CopyId::from(self).call_inner(ctx).await
+    }
+
     /// Calls the [`Join`] action with the given session ID.
     pub async fn join(
         &self,
@@ -77,14 +85,6 @@ impl<Ed: CollabEditor> Collab<Ed> {
             <Ed::ProgressReporter as ProgressReporter<_, Start<_>>>::new(ctx);
         Start::from(self).call_inner(&mut reporter, ctx).await
     }
-
-    /// Calls the [`Yank`] action.
-    pub async fn yank(
-        &self,
-        ctx: &mut Context<Ed>,
-    ) -> Result<(), YankError<Ed>> {
-        Yank::from(self).call_inner(ctx).await
-    }
 }
 
 impl<Ed: CollabEditor> Module<Ed> for Collab<Ed> {
@@ -93,20 +93,20 @@ impl<Ed: CollabEditor> Module<Ed> for Collab<Ed> {
     type Config = Config;
 
     fn api(&self, ctx: &mut ApiCtx<Ed>) {
-        ctx.with_command(Join::from(self))
+        ctx.with_command(CopyId::from(self))
+            .with_command(Join::from(self))
             .with_command(Jump::from(self))
             .with_command(Leave::from(self))
             .with_command(Pause::from(self))
             .with_command(Resume::from(self))
             .with_command(Start::from(self))
-            .with_command(Yank::from(self))
+            .with_function(CopyId::from(self))
             .with_function(Jump::from(self))
             .with_function(Join::from(self))
             .with_function(Leave::from(self))
             .with_function(Resume::from(self))
             .with_function(Pause::from(self))
-            .with_function(Start::from(self))
-            .with_function(Yank::from(self));
+            .with_function(Start::from(self));
     }
 
     fn on_init(&self, ctx: &mut Context<Ed, Borrowed<'_>>) {
