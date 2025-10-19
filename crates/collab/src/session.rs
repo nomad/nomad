@@ -42,6 +42,9 @@ pub struct SessionInfos<Ed: CollabEditor> {
     /// The remote used to pause/resume receiving [`Message`]s.
     pub(crate) rx_remote: pausable_stream::Remote,
 
+    /// TODO: docs.
+    pub(crate) project_access: ProjectAccess<Ed>,
+
     /// The path to the root of the project.
     pub(crate) project_root_path: AbsPathBuf,
 
@@ -81,6 +84,9 @@ pub(crate) struct Session<Ed: CollabEditor, Tx, Rx> {
     pub(crate) message_tx: Tx,
 
     /// TODO: docs.
+    pub(crate) project_access: ProjectAccess<Ed>,
+
+    /// TODO: docs.
     pub(crate) project: Project<Ed>,
 
     /// TODO: docs.
@@ -91,15 +97,22 @@ pub(crate) struct Session<Ed: CollabEditor, Tx, Rx> {
 }
 
 /// TODO: docs.
-#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
-#[display("there's no active collaborative editing session")]
-pub(crate) struct NoActiveSessionError;
+#[derive(cauchy::Debug, cauchy::Default, cauchy::Clone)]
+pub(crate) struct ProjectAccess<Ed: CollabEditor> {
+    #[debug(skip)]
+    inner: Option<Shared<Project<Ed>>>,
+}
 
 /// TODO: docs.
 pub(crate) struct RemoveOnDrop<Ed: CollabEditor> {
     sessions: Sessions<Ed>,
     session_id: SessionId<Ed>,
 }
+
+/// TODO: docs.
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
+#[display("there's no active collaborative editing session")]
+pub(crate) struct NoActiveSessionError;
 
 /// Represents the reasons a session can end, excluding [errors](SessionError).
 enum SessionEndReason {
@@ -280,6 +293,16 @@ where
                 f(maybe_infos.expect("session is alive, so infos must exist"))
             },
         )
+    }
+}
+
+impl<Ed: CollabEditor> ProjectAccess<Ed> {
+    /// TODO: docs.
+    pub(crate) async fn with<R>(
+        &self,
+        _fun: impl AsyncFnOnce(&Project<Ed>) -> R + 'static,
+    ) -> Option<R> {
+        todo!();
     }
 }
 

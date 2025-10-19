@@ -147,6 +147,7 @@ impl<Ed: CollabEditor> Join<Ed> {
             local_peer,
             remote_peers,
             rx_remote: message_rx.remote(),
+            project_access: Default::default(),
             project_root_path: project_root.path().to_owned(),
             session_id: welcome.session_id,
         };
@@ -156,6 +157,7 @@ impl<Ed: CollabEditor> Join<Ed> {
             message_rx,
             message_tx: welcome.tx,
             project,
+            project_access: session_infos.project_access.clone(),
             stop_rx: self.stop_channels.insert(welcome.session_id),
             remove_on_drop: self.sessions.insert(session_infos.clone()),
         };

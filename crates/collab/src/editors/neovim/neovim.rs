@@ -429,8 +429,8 @@ impl CollabEditor for Neovim {
             return;
         };
 
-        // Skip one tick of the event loop. See comment in `on_session_started`
-        // for details.
+        // Skip one tick of the event loop. See the comment in
+        // `on_session_started` for details.
         neovim::utils::schedule(|| ()).await;
 
         let prompt = format!(
