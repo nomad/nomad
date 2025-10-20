@@ -34,7 +34,7 @@ pub trait Api: 'static + Sized {
         completion_fn: CompletionFn,
     ) where
         Command: FnMut(CommandArgs) + 'static,
-        CompletionFn: FnMut(CommandArgs, ByteOffset) -> Completions + 'static,
+        CompletionFn: FnMut(CommandArgs<ByteOffset>) -> Completions + 'static,
         Completions: IntoIterator<Item = CommandCompletion>;
 
     /// TODO: docs.

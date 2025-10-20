@@ -30,8 +30,7 @@ pub trait CompletionFn {
     /// TODO: docs.
     fn call(
         &mut self,
-        args: CommandArgs,
-        cursor_offset: ByteOffset,
+        args: CommandArgs<ByteOffset>,
     ) -> impl IntoIterator<Item = CommandCompletion>;
 }
 
@@ -106,8 +105,7 @@ impl CompletionFn for () {
     #[inline]
     fn call(
         &mut self,
-        _: CommandArgs,
-        _: ByteOffset,
+        _: CommandArgs<ByteOffset>,
     ) -> impl IntoIterator<Item = CommandCompletion> {
         core::iter::empty::<CommandCompletion>()
     }
@@ -115,15 +113,14 @@ impl CompletionFn for () {
 
 impl<F, R> CompletionFn for F
 where
-    F: FnMut(CommandArgs, ByteOffset) -> R,
+    F: FnMut(CommandArgs<ByteOffset>) -> R,
     R: IntoIterator<Item = CommandCompletion>,
 {
     #[inline]
     fn call(
         &mut self,
-        args: CommandArgs,
-        offset: ByteOffset,
+        args: CommandArgs<ByteOffset>,
     ) -> impl IntoIterator<Item = CommandCompletion> {
-        (self)(args, offset)
+        (self)(args)
     }
 }

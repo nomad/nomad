@@ -11,51 +11,47 @@ use crate::notify;
 
 /// TODO: docs.
 #[derive(Copy, Clone)]
-pub struct CommandArgs<'a> {
+pub struct CommandArgs<'a, CursorOffset = ()> {
     inner: &'a str,
+    cursor_offset: CursorOffset,
 }
 
 /// A group of adjacent non-whitespace characters in a [`CommandArgs`].
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct CommandArg<'a> {
-    inner: &'a str,
-    idx: CommandArgIdx,
-}
+    /// The argument's text, guaranteed to be non-empty and not contain
+    /// whitespace.
+    word: &'a str,
 
-/// The index of a [`CommandArg`] in a [`CommandArgs`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CommandArgIdx {
-    pub(crate) start: ByteOffset,
-    pub(crate) end: ByteOffset,
+    /// The offset of argument word in the original [`CommandArgs`].
+    offset: ByteOffset,
+
+    /// The index of this argument in the original [`CommandArgs`].
+    index: usize,
 }
 
 /// An iterator over the [`CommandArg`]s of a [`CommandArgs`].
 #[derive(Clone)]
 pub struct CommandArgsIter<'a> {
+    /// The portion of the original [`CommandArgs::inner`] that hasn't been
+    /// yielded yet.
     inner: &'a str,
-    last_idx_end: ByteOffset,
+
+    /// The offset of `inner` in the original [`CommandArgs`].
+    offset: ByteOffset,
+
+    /// The number of arguments yielded so far.
+    num_yielded: usize,
 }
 
 /// TODO: docs.
 #[derive(Debug, Copy, Clone)]
-pub enum CommandCursor<'a> {
+pub enum CursorPosition<'a> {
     /// TODO: docs.
-    InArg {
-        /// TODO: docs.
-        arg: CommandArg<'a>,
-
-        /// TODO: docs.
-        offset: ByteOffset,
-    },
+    InArg(CommandArg<'a>, ByteOffset),
 
     /// TODO: docs.
-    BetweenArgs {
-        /// TODO: docs.
-        prev: Option<CommandArg<'a>>,
-
-        /// TODO: docs.
-        next: Option<CommandArg<'a>>,
-    },
+    BetweenArgs(Option<CommandArg<'a>>, Option<CommandArg<'a>>),
 }
 
 /// A compatibility wrapper from `FromStr` to `TryFrom<CommandArgs<'_>>`.
@@ -101,16 +97,7 @@ pub enum ParseFromCommandArgsError<'a, T> {
     WrongNum(CommandArgsWrongNumError<'a>),
 }
 
-impl<'a> CommandArgs<'a> {
-    /// TODO: docs.
-    #[inline]
-    pub fn arg(&self, idx: CommandArgIdx) -> Option<CommandArg<'a>> {
-        (self.inner.len() <= idx.end).then_some(CommandArg {
-            idx,
-            inner: &self.inner[idx.start..idx.end],
-        })
-    }
-
+impl<'a, C> CommandArgs<'a, C> {
     /// TODO: docs.
     #[inline]
     pub fn as_str(&self) -> &'a str {
@@ -132,7 +119,7 @@ impl<'a> CommandArgs<'a> {
     /// TODO: docs.
     #[inline]
     pub fn iter(&self) -> CommandArgsIter<'a> {
-        CommandArgsIter { inner: self.as_str(), last_idx_end: 0 }
+        CommandArgsIter { inner: self.as_str(), offset: 0, num_yielded: 0 }
     }
 
     /// TODO: docs.
@@ -140,33 +127,13 @@ impl<'a> CommandArgs<'a> {
     pub fn len(&self) -> usize {
         self.iter().count()
     }
+}
 
-    /// TODO: docs.
+impl<'a> CommandArgs<'a> {
+    /// Creates a new [`CommandArgs`] from the given arguments string.
     #[inline]
     pub fn new(args: &'a str) -> Self {
-        Self { inner: args }
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn to_cursor(&self, offset: ByteOffset) -> CommandCursor<'a> {
-        debug_assert!(offset <= self.inner.len());
-
-        let mut prev = None;
-        for arg in self.iter() {
-            let idx = arg.idx();
-            if offset < idx.start {
-                return CommandCursor::BetweenArgs { prev, next: Some(arg) };
-            }
-            if offset <= idx.end {
-                return CommandCursor::InArg {
-                    arg,
-                    offset: offset - idx.start,
-                };
-            }
-            prev = Some(arg);
-        }
-        CommandCursor::BetweenArgs { prev, next: None }
+        Self { inner: args, cursor_offset: () }
     }
 
     #[inline]
@@ -178,36 +145,72 @@ impl<'a> CommandArgs<'a> {
     }
 }
 
+impl<'a> CommandArgs<'a, ByteOffset> {
+    /// The offset of the cursor in the arguments string.
+    pub fn cursor_offset(&self) -> ByteOffset {
+        self.cursor_offset
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn cursor_pos(&self) -> CursorPosition<'a> {
+        let mut prev = None;
+        for arg in self.iter() {
+            if self.cursor_offset() < arg.offset() {
+                return CursorPosition::BetweenArgs(prev, Some(arg));
+            }
+            if self.cursor_offset() <= arg.offset() + arg.len() {
+                return CursorPosition::InArg(
+                    arg,
+                    self.cursor_offset() - arg.offset(),
+                );
+            }
+            prev = Some(arg);
+        }
+        CursorPosition::BetweenArgs(prev, None)
+    }
+
+    /// Creates a new [`CommandArgs`] from the given arguments string and
+    /// cursor offset.
+    #[track_caller]
+    #[inline]
+    pub fn new(args: &'a str, cursor_offset: ByteOffset) -> Self {
+        assert!(cursor_offset <= args.len(), "cursor offset out of bounds");
+        Self { inner: args, cursor_offset }
+    }
+}
+
 impl<'a> CommandArg<'a> {
     /// TODO: docs.
     #[inline]
     pub fn as_str(&self) -> &'a str {
-        self.inner
+        self.word
     }
 
-    /// TODO: docs.
+    /// The index of this argument in the original [`CommandArgs`].
     #[inline]
-    pub fn end(&self) -> ByteOffset {
-        self.idx.end
+    pub fn index(&self) -> usize {
+        self.index
     }
 
-    /// Returns the index of the argument in the [`CommandArgs`].
+    /// Returns `true` if this is the first argument in the original
+    /// [`CommandArgs`].
     #[inline]
-    pub fn idx(&self) -> CommandArgIdx {
-        self.idx
+    pub fn is_first(&self) -> bool {
+        self.index == 0
     }
 
-    /// TODO: doc.
+    /// The offset of argument word in the original [`CommandArgs`].
     #[inline]
-    pub fn start(&self) -> ByteOffset {
-        self.idx.start
+    pub fn offset(&self) -> ByteOffset {
+        self.offset
     }
 }
 
 impl<'a> CommandArgsIter<'a> {
     #[inline]
     pub(crate) fn remainder(self) -> CommandArgs<'a> {
-        CommandArgs { inner: self.inner }
+        CommandArgs::<()>::new(self.inner)
     }
 }
 
@@ -226,15 +229,16 @@ impl fmt::Debug for ArgsList<'_> {
     }
 }
 
-impl fmt::Debug for CommandArgs<'_> {
+impl fmt::Debug for CommandArgs<'_, ()> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("CommandArgs").field(&ArgsList(self.iter())).finish()
+        fmt::Debug::fmt(&self.inner, f)
     }
 }
 
-impl fmt::Debug for CommandArg<'_> {
+impl fmt::Debug for CommandArgs<'_, ByteOffset> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("CommandArg").field(self).finish()
+        let (pre, post) = self.inner.split_at(self.cursor_offset);
+        write!(f, "\"{}|{}\"", pre.escape_debug(), post.escape_debug())
     }
 }
 
@@ -250,7 +254,7 @@ impl Deref for CommandArg<'_> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.inner
+        self.word
     }
 }
 
@@ -301,15 +305,17 @@ impl<'a> Iterator for CommandArgsIter<'a> {
         }
         let len_whitespace = args.len() - args.trim_start().len();
         let trimmed = &args[len_whitespace..];
-        let len_arg = trimmed.find(' ').unwrap_or(trimmed.len());
-        let (arg, rest) = trimmed.split_at(len_arg);
+        let arg_len = trimmed.find(' ').unwrap_or(trimmed.len());
+        let (arg, rest) = trimmed.split_at(arg_len);
         self.inner = rest;
-        let idx_start = self.last_idx_end + len_whitespace;
-        let idx_end = idx_start + len_arg;
-        self.last_idx_end = idx_end;
-        (len_arg > 0).then_some(CommandArg {
-            inner: arg,
-            idx: CommandArgIdx { start: idx_start, end: idx_end },
+        let arg_offset = self.offset + len_whitespace;
+        self.offset = arg_offset + arg_len;
+        let index = self.num_yielded;
+        self.num_yielded += 1;
+        (arg_len > 0).then_some(CommandArg {
+            word: arg,
+            offset: arg_offset,
+            index,
         })
     }
 }
@@ -489,7 +495,7 @@ mod tests {
 
     #[test]
     fn command_args_iter() {
-        let args = CommandArgs::new("  foo bar  baz   ");
+        let args = CommandArgs::<()>::new("  foo bar  baz   ");
         let mut iter = args.iter();
         assert_eq!(iter.next().unwrap(), "foo");
         assert_eq!(iter.next().unwrap(), "bar");

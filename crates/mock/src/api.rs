@@ -45,7 +45,7 @@ impl editor::Api for Api {
         _: CompletionFn,
     ) where
         Command: FnMut(CommandArgs) + 'static,
-        CompletionFn: FnMut(CommandArgs, ByteOffset) -> Completions + 'static,
+        CompletionFn: FnMut(CommandArgs<ByteOffset>) -> Completions + 'static,
         Completions: IntoIterator<Item = CommandCompletion>,
     {
     }

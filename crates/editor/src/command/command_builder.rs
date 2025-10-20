@@ -17,7 +17,7 @@ type CommandHandler<B> =
     Box<dyn FnMut(CommandArgs, &mut Context<B, Borrowed<'_>>)>;
 
 type CommandCompletionFn =
-    Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
+    Box<dyn FnMut(CommandArgs<ByteOffset>) -> Vec<CommandCompletion>>;
 
 pub(crate) struct CommandBuilder<Ed: Editor> {
     plugin_id: PluginId,
@@ -208,10 +208,9 @@ impl CommandCompletionsBuilder {
         Ed: Editor,
     {
         let mut completion_fn = command.to_completion_fn();
-        let completion_fn: CommandCompletionFn =
-            Box::new(move |args, offset| {
-                completion_fn.call(args, offset).into_iter().collect()
-            });
+        let completion_fn: CommandCompletionFn = Box::new(move |args| {
+            completion_fn.call(args).into_iter().collect()
+        });
         self.handlers.insert(Cmd::NAME, completion_fn);
     }
 
@@ -227,23 +226,21 @@ impl CommandCompletionsBuilder {
     #[inline]
     pub(crate) fn build(
         mut self,
-    ) -> impl FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion> + 'static
+    ) -> impl FnMut(CommandArgs<ByteOffset>) -> Vec<CommandCompletion> + 'static
     {
         self.remove_empty_modules();
-        move |args: CommandArgs, cursor: ByteOffset| {
-            self.complete(args, cursor)
-        }
+        move |args: CommandArgs<ByteOffset>| self.complete(args)
     }
 
     #[inline]
     fn complete(
         &mut self,
-        mut args: CommandArgs,
-        mut offset: ByteOffset,
+        args: CommandArgs<ByteOffset>,
     ) -> Vec<CommandCompletion> {
-        debug_assert!(offset <= args.byte_len());
+        let mut cursor_offset = args.cursor_offset();
+        let mut iter = args.iter();
 
-        let Some(arg) = args.pop_front() else {
+        let Some(first_arg) = iter.next() else {
             return self
                 .handlers
                 .keys()
@@ -253,10 +250,10 @@ impl CommandCompletionsBuilder {
                 .collect();
         };
 
-        if offset <= arg.end() {
-            let prefix = offset
-                .checked_sub(arg.start())
-                .map(|off| &arg.as_str()[..off])
+        if cursor_offset <= first_arg.offset() + first_arg.len() {
+            let prefix = cursor_offset
+                .checked_sub(first_arg.offset())
+                .map(|off| &first_arg.as_str()[..off])
                 .unwrap_or("");
 
             return self
@@ -268,13 +265,20 @@ impl CommandCompletionsBuilder {
                 .map(CommandCompletion::from_static_str)
                 .collect();
         } else {
-            offset -= arg.end();
+            cursor_offset -= first_arg.offset() + first_arg.len();
         }
 
-        if let Some(command) = self.handlers.get_mut(arg.as_str()) {
-            (command)(args, offset)
-        } else if let Some(submodule) = self.submodules.get_mut(arg.as_str()) {
-            submodule.complete(args, offset)
+        let remainder = CommandArgs::<ByteOffset>::new(
+            iter.remainder().as_str(),
+            cursor_offset,
+        );
+
+        if let Some(command) = self.handlers.get_mut(first_arg.as_str()) {
+            (command)(remainder)
+        } else if let Some(submodule) =
+            self.submodules.get_mut(first_arg.as_str())
+        {
+            submodule.complete(remainder)
         } else {
             Vec::new()
         }

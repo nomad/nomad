@@ -44,12 +44,12 @@ impl Api for NeovimApi {
         mut completion_fun: CompFun,
     ) where
         Cmd: FnMut(CommandArgs) + 'static,
-        CompFun: FnMut(CommandArgs, ByteOffset) -> Comps + 'static,
+        CompFun: FnMut(CommandArgs<ByteOffset>) -> Comps + 'static,
         Comps: IntoIterator<Item = CommandCompletion>,
     {
         let command =
             Function::from_fn_mut(move |args: api::types::CommandArgs| {
-                command(CommandArgs::new(
+                command(CommandArgs::<()>::new(
                     args.args.as_deref().unwrap_or_default(),
                 ))
             });
@@ -60,6 +60,7 @@ impl Api for NeovimApi {
                 String,
                 usize,
             )| {
+                let command_str = command_str.as_str();
                 // Trim any leading whitespace.
                 let initial_len = command_str.len();
                 let command_str = command_str.trim_start();
@@ -74,10 +75,13 @@ impl Api for NeovimApi {
                 let args = &command_str[subcommand_starts_from..];
                 cursor_offset -= subcommand_starts_from;
 
-                completion_fun(CommandArgs::new(args), cursor_offset)
-                    .into_iter()
-                    .map(|comp| comp.as_str().to_owned())
-                    .collect::<Vec<_>>()
+                completion_fun(CommandArgs::<ByteOffset>::new(
+                    args,
+                    cursor_offset,
+                ))
+                .into_iter()
+                .map(|comp| comp.as_str().to_owned())
+                .collect::<Vec<_>>()
             },
         );
 

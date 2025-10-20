@@ -4,7 +4,7 @@ use core::cell::OnceCell;
 
 use collab_project::text::CursorId;
 use collab_types::{GitHubHandle, PeerHandle};
-use editor::command::{self, CommandArgs, CommandCompletion, CommandCursor};
+use editor::command::{self, CommandArgs, CommandCompletion, CursorPosition};
 use editor::module::AsyncAction;
 use editor::{AgentId, ByteOffset, Context};
 use smallvec::SmallVec;
@@ -158,15 +158,14 @@ impl<Ed: CollabEditor> command::ToCompletionFn<Ed> for Jump<Ed> {
     fn to_completion_fn(&self) -> impl command::CompletionFn + 'static {
         let sessions = self.sessions.clone();
 
-        move |command_args: CommandArgs<'_>, byte_offset: ByteOffset| {
+        move |command_args: CommandArgs<'_, ByteOffset>| {
             let mut completions = SmallVec::<[_; 2]>::new();
 
-            let handle_prefix = match command_args.to_cursor(byte_offset) {
-                CommandCursor::InArg { arg, offset }
-                    if offset == byte_offset =>
-                {
+            let handle_prefix = match command_args.cursor_pos() {
+                CursorPosition::InArg(arg, offset) if arg.is_first() => {
                     &arg.as_str()[..offset]
                 },
+                CursorPosition::BetweenArgs(prev, _) if prev.is_none() => "",
                 _ => return completions,
             };
 
