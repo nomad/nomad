@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use core::cell::Cell;
 use core::pin::Pin;
 use core::task::{self, Poll, ready};
 use std::collections::{VecDeque, hash_map};
@@ -115,6 +116,7 @@ pub(crate) struct ProjectAccess<Ed: CollabEditor> {
     callbacks: Shared<VecDeque<ProjectAccessCallback<Ed>>>,
     #[debug(skip)]
     event: Rc<event_listener::Event>,
+    event_loop_has_started: Rc<Cell<bool>>,
 }
 
 /// TODO: docs.
@@ -339,8 +341,10 @@ impl<Ed: CollabEditor> ProjectAccess<Ed> {
             "only the session's event loop should be notified"
         );
 
-        // If no one was notified it means the event loop is not running.
-        if num_notified == 0 {
+        // If no one was notified, then either the session event loop hasn't
+        // started yet, or it has already ended. In the latter case, we remove
+        // the callback we just pushed and return early.
+        if num_notified == 0 && self.event_loop_has_started.get() {
             let _ = self
                 .callbacks
                 .with_mut(|queue| queue.pop_back().expect("just pushed"));
@@ -351,7 +355,7 @@ impl<Ed: CollabEditor> ProjectAccess<Ed> {
     }
 
     fn callback_stream(
-        &self,
+        &mut self,
     ) -> impl FusedStream<Item = ProjectAccessCallback<Ed>> {
         pin_project_lite::pin_project! {
             struct CallbackStream<'this, Ed: CollabEditor> {
@@ -369,7 +373,7 @@ impl<Ed: CollabEditor> ProjectAccess<Ed> {
                 ctx: &mut task::Context<'_>,
             ) -> Poll<Option<Self::Item>> {
                 let mut this = self.project();
-                let ProjectAccess { callbacks, event } = this.access;
+                let ProjectAccess { callbacks, event, .. } = this.access;
 
                 loop {
                     match callbacks.with_mut(|queue| queue.pop_front()) {
@@ -388,6 +392,8 @@ impl<Ed: CollabEditor> ProjectAccess<Ed> {
                 false
             }
         }
+
+        self.event_loop_has_started.set(true);
 
         CallbackStream { access: self, listener: self.event.listen() }
     }
