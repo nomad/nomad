@@ -128,8 +128,8 @@ impl DisplayablePipeline for join::Join<Neovim> {
 
             JoinState::ReceivingProject(bytes_received, bytes_total) => {
                 let new_percentage =
-                    (bytes_received as f32 / bytes_total as f32).round()
-                        as Percentage;
+                    ((bytes_received as f32 / bytes_total as f32) * 100.0)
+                        .round() as Percentage;
 
                 match reporter_state.percentage {
                     // Only emit an update when the progress percentage
