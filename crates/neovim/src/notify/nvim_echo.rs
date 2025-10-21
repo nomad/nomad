@@ -274,6 +274,7 @@ impl NvimEchoProgressReporter {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn event_loop(
         notif_rx: flume::Receiver<ProgressNotification>,
         namespace: &editor::notify::Namespace,
@@ -283,9 +284,13 @@ impl NvimEchoProgressReporter {
             return EventLoopOutput::Cancelled;
         };
 
-        let mut spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL);
+        let mut spin = match first_notif.kind {
+            ProgressNotificationKind::Progress(Some(_)) => {
+                async_io::Timer::never()
+            },
+            _ => async_io::Timer::interval(SPINNER_UPDATE_INTERVAL),
+        };
         let mut spinner_frame_idx = 0;
-        let mut opts_or_msg_id = OptsOrMessageId::default();
 
         let mut chunks = NvimEchoChunks {
             title: Title {
@@ -295,6 +300,8 @@ impl NvimEchoProgressReporter {
             },
             message_chunks: first_notif.chunks,
         };
+
+        let mut opts_or_msg_id = OptsOrMessageId::default();
 
         let mut last_notif_kind = first_notif.kind;
 
@@ -336,6 +343,25 @@ impl NvimEchoProgressReporter {
                         chunks.title.icon = notif.kind.icon(spinner_frame_idx);
                         chunks.title.hl_group = Some(notif.kind.hl_group());
                         chunks.message_chunks = notif.chunks;
+
+                        match (last_notif_kind, notif.kind) {
+                            // Stop spinning if we've started showing
+                            // percentages.
+                            (
+                                ProgressNotificationKind::Progress(None),
+                                ProgressNotificationKind::Progress(Some(_)),
+                            ) => spin = async_io::Timer::never(),
+
+                            // Start spinning if we've stopped showing
+                            // percentages.
+                            (
+                                ProgressNotificationKind::Progress(Some(_)),
+                                ProgressNotificationKind::Progress(None),
+                            ) => spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL),
+
+                            _ => {},
+                        }
+
                         last_notif_kind = notif.kind;
                         break 'spin;
                     },

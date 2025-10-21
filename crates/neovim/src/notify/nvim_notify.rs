@@ -131,12 +131,10 @@ impl NvimNotifyProgressReporter {
         namespace: &editor::notify::Namespace,
         mlua: &mlua::Lua,
     ) {
-        let mut spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL);
-        let mut notifications = notif_rx.into_stream();
+        let Ok(first_notif) = notif_rx.recv_async().await else { return };
 
-        let Some(mut notif) = notifications.next().await else { return };
+        let mut spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL);
         let mut spinner_frame_idx = 0;
-        let mut prev_id = None;
 
         let notify = notify(mlua);
 
@@ -146,6 +144,10 @@ impl NvimNotifyProgressReporter {
 
         opts.raw_set("title", namespace.dot_separated().to_string())
             .expect("failed to set 'title'");
+
+        let mut record_id = None;
+
+        let mut notif = first_notif;
 
         loop {
             let hide_from_history =
@@ -160,38 +162,73 @@ impl NvimNotifyProgressReporter {
             )
             .expect("failed to set 'icon'");
 
-            opts.raw_set("replace", prev_id).expect("failed to set 'replace'");
-
-            let record = notify
-                .call::<mlua::Table>((
-                    notif.chunks.concat_text(),
-                    notify::Level::from(notif.kind) as u8,
-                    &opts,
-                ))
-                .expect("failed to call 'notify'");
+            Self::notify(&notif, &opts, &mut record_id, &notify);
 
             if !matches!(notif.kind, ProgressNotificationKind::Progress(_)) {
                 break;
             }
 
-            prev_id = record
-                .get::<mlua::Integer>("id")
-                .map(Some)
-                .expect("failed to get notification ID from record");
+            'spin: loop {
+                select_biased! {
+                    _ = spin.next().fuse() => {
+                        spinner_frame_idx += 1;
+                        spinner_frame_idx %= SPINNER_FRAMES.len();
+                        let frame = SPINNER_FRAMES[spinner_frame_idx];
+                        opts.raw_set("icon", frame).expect("failed to set 'icon'");
+                        Self::notify(&notif, &opts, &mut record_id, &notify);
+                        continue 'spin;
+                    },
 
-            select_biased! {
-                _ = spin.next().fuse() => {
-                    spinner_frame_idx += 1;
-                    spinner_frame_idx %= SPINNER_FRAMES.len();
-                },
+                    maybe_notif = notif_rx.recv_async() => {
+                        let Ok(new_notif) = maybe_notif else { return; };
 
-                maybe_notif = notifications.next() => {
-                    match maybe_notif {
-                        Some(next_notif) => notif = next_notif,
-                        None => break,
+                        match (notif.kind, new_notif.kind) {
+                            // Stop spinning if we've started showing
+                            // percentages.
+                            (
+                                ProgressNotificationKind::Progress(None),
+                                ProgressNotificationKind::Progress(Some(_)),
+                            ) => spin = async_io::Timer::never(),
+
+                            // Start spinning if we've stopped showing
+                            // percentages.
+                            (
+                                ProgressNotificationKind::Progress(Some(_)),
+                                ProgressNotificationKind::Progress(None),
+                            ) => spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL),
+
+                            _ => {},
+                        }
+
+                        notif = new_notif;
+                        break 'spin;
                     }
-                },
+                }
             }
+        }
+    }
+
+    fn notify(
+        notif: &ProgressNotification,
+        opts: &mlua::Table,
+        record_id: &mut Option<mlua::Integer>,
+        notify: &mlua::Function,
+    ) {
+        let record = notify
+            .call::<mlua::Table>((
+                notif.chunks.concat_text(),
+                notify::Level::from(notif.kind) as u8,
+                opts,
+            ))
+            .expect("failed to call 'notify'");
+
+        let new_id = record
+            .get::<mlua::Integer>("id")
+            .expect("failed to get notification ID from record");
+
+        if record_id.is_none_or(|id| id != new_id) {
+            opts.raw_set("replace", new_id).expect("failed to set 'replace'");
+            *record_id = Some(new_id);
         }
     }
 }
