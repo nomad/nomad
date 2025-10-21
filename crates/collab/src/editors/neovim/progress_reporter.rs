@@ -118,7 +118,7 @@ impl DisplayablePipeline for join::Join<Neovim> {
                 connecting_to_server(server_addr)
             },
 
-            JoinState::ReceivingProject(project_name) => {
+            JoinState::ReceivedWelcome(project_name) => {
                 reporter_state.project_name =
                     Some((**project_name).to_owned());
                 let mut chunks = notify::Chunks::default();
@@ -127,6 +127,10 @@ impl DisplayablePipeline for join::Join<Neovim> {
                     notifications::PROJ_NAME_HL_GROUP,
                 );
                 chunks
+            },
+
+            JoinState::ReceivingProject(_bytes_received, _bytes_total) => {
+                todo!();
             },
 
             JoinState::WritingProject(root_path) => {

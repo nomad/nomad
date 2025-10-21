@@ -96,7 +96,7 @@ impl<Ed: CollabEditor> Join<Ed> {
         .join(&welcome.project_name);
 
         progress_reporter.report_progress(
-            JoinState::ReceivingProject(Cow::Borrowed(&welcome.project_name)),
+            JoinState::ReceivedWelcome(Cow::Borrowed(&welcome.project_name)),
             ctx,
         );
 
@@ -227,8 +227,8 @@ impl<Ed: CollabEditor> ToCompletionFn<Ed> for Join<Ed> {
 async fn request_project<Ed: CollabEditor>(
     local_id: PeerId,
     welcome: &mut Welcome<Ed>,
-    _progress_reporter: &mut impl ProgressReporter<Ed, Join<Ed>>,
-    _ctx: &mut Context<Ed>,
+    progress_reporter: &mut impl ProgressReporter<Ed, Join<Ed>>,
+    ctx: &mut Context<Ed>,
 ) -> Result<(Project, Vec<MessageFragment>), RequestProjectError> {
     let request_id = MessageId { sender_id: local_id, message_seq: 0 };
 
@@ -246,6 +246,9 @@ async fn request_project<Ed: CollabEditor>(
 
     let mut buffered = Vec::new();
 
+    let mut bytes_received = 0;
+    let mut bytes_total = None;
+
     loop {
         let fragment = welcome
             .rx
@@ -253,15 +256,33 @@ async fn request_project<Ed: CollabEditor>(
             .await
             .ok_or(RequestProjectError::SessionEnded)??;
 
-        if fragment.header.response_id().is_some_and(|id| id == request_id) {
+        if fragment.header.response_id().is_none_or(|id| id != request_id) {
             buffered.push(fragment);
             continue;
+        }
+
+        bytes_received += fragment.payload_len;
+
+        if let Some(bytes_total) = bytes_total {
+            progress_reporter.report_progress(
+                JoinState::ReceivingProject(bytes_received, bytes_total),
+                ctx,
+            );
         }
 
         let Some(message) = fragment.message else { continue };
 
         match message {
-            Message::ProjectResponseManifest(_manifest) => todo!(),
+            Message::ProjectResponseManifest(manifest) => {
+                bytes_total = Some(manifest.encoded_project_len);
+                progress_reporter.report_progress(
+                    JoinState::ReceivingProject(
+                        bytes_received,
+                        manifest.encoded_project_len,
+                    ),
+                    ctx,
+                );
+            },
             Message::ProjectResponse(response) => {
                 break Ok((
                     Project::decode(&response.encoded_project, local_id)?,

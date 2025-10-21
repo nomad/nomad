@@ -70,10 +70,16 @@ pub enum JoinState<'a> {
     /// respond with a [`Welcome`](collab_server::client::Welcome) message.
     JoiningSession,
 
-    /// We've received the [`Welcome`](collab_server::client::Welcome) message,
-    /// and are now waiting to receive the project with the given name from
-    /// another peer in the session.
-    ReceivingProject(Cow<'a, NodeName>),
+    /// We've received the [`Welcome`](collab_server::client::Welcome) message
+    /// for the project with the given name.
+    ReceivedWelcome(Cow<'a, NodeName>),
+
+    /// A tuple of `(bytes_received, bytes_total)`, representing the total
+    /// number of bytes in the [encoded project] and the number of bytes
+    /// received so far.
+    ///
+    /// [encoded project]: collab_types::ProjectResponse::encoded_project
+    ReceivingProject(usize, usize),
 
     /// We've received the project, and are now writing it to disk under the
     /// directory at the given path.
@@ -107,10 +113,11 @@ impl JoinState<'_> {
                 JoinState::ConnectingToServer(server_addr.to_owned())
             },
             Self::JoiningSession => JoinState::JoiningSession,
-            Self::ReceivingProject(project_name) => {
-                JoinState::ReceivingProject(Cow::Owned(
-                    project_name.clone().into_owned(),
-                ))
+            Self::ReceivedWelcome(project_name) => JoinState::ReceivedWelcome(
+                Cow::Owned(project_name.clone().into_owned()),
+            ),
+            Self::ReceivingProject(num_received, num_total) => {
+                JoinState::ReceivingProject(*num_received, *num_total)
             },
             Self::WritingProject(root_path) => JoinState::WritingProject(
                 Cow::Owned(root_path.clone().into_owned()),
