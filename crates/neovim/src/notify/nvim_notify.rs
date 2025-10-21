@@ -1,5 +1,7 @@
+use core::fmt;
 use core::time::Duration;
 
+use compact_str::ToCompactString;
 use executor::LocalSpawner;
 use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
@@ -31,6 +33,11 @@ pub struct NvimNotify;
 /// TODO: docs.
 pub struct NvimNotifyProgressReporter {
     notification_tx: flume::Sender<ProgressNotification>,
+}
+
+pub(super) enum Icon {
+    Char(char),
+    Percentage(notify::Percentage),
 }
 
 impl NvimNotify {
@@ -147,8 +154,11 @@ impl NvimNotifyProgressReporter {
             opts.raw_set("hide_from_history", hide_from_history)
                 .expect("failed to set 'hide_from_history'");
 
-            opts.raw_set("icon", notif.kind.icon(spinner_frame_idx))
-                .expect("failed to set 'icon'");
+            opts.raw_set(
+                "icon",
+                &*notif.kind.icon(spinner_frame_idx).to_compact_string(),
+            )
+            .expect("failed to set 'icon'");
 
             opts.raw_set("replace", prev_id).expect("failed to set 'replace'");
 
@@ -187,12 +197,14 @@ impl NvimNotifyProgressReporter {
 }
 
 impl ProgressNotificationKind {
-    pub(super) fn icon(self, spinner_frame_idx: usize) -> char {
-        match self {
-            Self::Progress(_) => SPINNER_FRAMES[spinner_frame_idx],
+    pub(super) fn icon(self, spinner_frame_idx: usize) -> Icon {
+        let char = match self {
+            Self::Progress(Some(perc)) => return Icon::Percentage(perc),
+            Self::Progress(None) => SPINNER_FRAMES[spinner_frame_idx],
             Self::Success => '✔',
             Self::Error => '✘',
-        }
+        };
+        Icon::Char(char)
     }
 }
 
@@ -205,6 +217,15 @@ impl From<ProgressNotificationKind>
             ProgressNotificationKind::Progress(_) => Self::Running,
             ProgressNotificationKind::Success => Self::Success,
             ProgressNotificationKind::Error => Self::Failed,
+        }
+    }
+}
+
+impl fmt::Display for Icon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Char(c) => write!(f, "{}", c),
+            Self::Percentage(perc) => write!(f, "{perc}%"),
         }
     }
 }

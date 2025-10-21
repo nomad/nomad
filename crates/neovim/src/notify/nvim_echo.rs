@@ -1,8 +1,8 @@
 use core::cell::Cell;
 use core::time::Duration;
 use core::{fmt, iter};
-use std::borrow::Cow;
 
+use compact_str::{CompactString, ToCompactString};
 use executor::LocalSpawner;
 use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
@@ -10,7 +10,11 @@ use nvim_oxi::api;
 
 use crate::executor::NeovimLocalSpawner;
 use crate::notify;
-use crate::notify::nvim_notify::{SPINNER_FRAMES, SPINNER_UPDATE_INTERVAL};
+use crate::notify::nvim_notify::{
+    Icon,
+    SPINNER_FRAMES,
+    SPINNER_UPDATE_INTERVAL,
+};
 use crate::notify::progress_reporter::{
     ProgressNotification,
     ProgressNotificationKind,
@@ -43,7 +47,7 @@ struct NvimEchoChunks<'ns> {
 }
 
 struct Title<'ns> {
-    icon: char,
+    icon: Icon,
     namespace: &'ns editor::notify::Namespace,
     hl_group: Option<&'static str>,
 }
@@ -71,7 +75,7 @@ impl NvimEcho {
         };
 
         let chunks = NvimEchoChunks {
-            title: Title { icon, hl_group, namespace },
+            title: Title { icon: Icon::Char(icon), hl_group, namespace },
             message_chunks,
         };
 
@@ -240,9 +244,14 @@ impl NvimEchoProgressReporter {
                 builder.id(message_id);
             }
 
+            if let ProgressNotificationKind::Progress(Some(perc)) = notif_kind
+            {
+                builder.percent(perc);
+            }
+
             builder
                 .kind("progress")
-                .title(chunks.title.to_string())
+                .title(&*chunks.title.to_compact_string())
                 .status(notif_kind.into())
                 .build()
         };
@@ -315,7 +324,7 @@ impl NvimEchoProgressReporter {
                     _ = spin.next().fuse() => {
                         spinner_frame_idx += 1;
                         spinner_frame_idx %= SPINNER_FRAMES.len();
-                        chunks.title.icon = SPINNER_FRAMES[spinner_frame_idx];
+                        chunks.title.icon = Icon::Char(SPINNER_FRAMES[spinner_frame_idx]);
                         Self::echo(&chunks, last_notif_kind, &mut opts_or_msg_id);
                         continue 'spin;
                     },
@@ -361,24 +370,30 @@ impl NvimEchoChunks<'_> {
     fn to_iter(
         &self,
         include_title: bool,
-    ) -> impl Iterator<Item = (Cow<'_, str>, Option<&str>)> {
-        let title = include_title.then(|| {
-            (Cow::Owned(self.title.to_string()), self.title.hl_group)
-        });
+    ) -> impl Iterator<Item = (nvim_oxi::String, Option<&str>)> {
+        let title = include_title
+            .then(|| (self.title.to_compact_string(), self.title.hl_group));
 
         title
             .into_iter()
-            .chain(iter::once((Cow::Borrowed("\n"), None::<&str>)))
-            .chain(
-                self.message_chunks.iter().map(|chunk| {
-                    (Cow::Borrowed(chunk.text()), chunk.hl_group())
-                }),
-            )
+            .chain(iter::once((CompactString::const_new("\n"), None::<&str>)))
+            .chain(self.message_chunks.iter().map(|chunk| {
+                (chunk.text_as_compact_str().clone(), chunk.hl_group())
+            }))
+            .map(|(text, hl_group)| (text.as_str().into(), hl_group))
     }
 }
 
 impl fmt::Display for Title<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // On Nightly the percentage is set in the opts, so we don't need to
+        // include it in the title.
+        if matches!(self.icon, Icon::Percentage(_))
+            && cfg!(feature = "nightly")
+        {
+            return self.namespace.dot_separated().fmt(f);
+        }
+
         write!(f, "{} {}", self.icon, self.namespace.dot_separated())
     }
 }
