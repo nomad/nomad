@@ -740,8 +740,10 @@ impl TextContents {
             });
         }
 
-        for byte_ranges in replica.backlogged_deletions() {
-            for deleted_range in byte_ranges.into_iter().rev() {
+        for deletion in edit.deletions {
+            for deleted_range in
+                replica.integrate_deletion(&deletion).into_iter().rev()
+            {
                 self.text.delete(deleted_range.clone());
                 replacements.push(TextReplacement {
                     deleted_range,
@@ -750,10 +752,8 @@ impl TextContents {
             }
         }
 
-        for deletion in edit.deletions {
-            for deleted_range in
-                replica.integrate_deletion(&deletion).into_iter().rev()
-            {
+        for byte_ranges in replica.backlogged_deletions() {
+            for deleted_range in byte_ranges.into_iter().rev() {
                 self.text.delete(deleted_range.clone());
                 replacements.push(TextReplacement {
                     deleted_range,
