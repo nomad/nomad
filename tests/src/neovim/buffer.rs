@@ -189,6 +189,52 @@ async fn inserting_via_api_in_empty_buf_with_eol_causes_newline_insertion(
 }
 
 #[neovim::test]
+async fn single_insertion_ending_in_newline_in_empty_buf_with_eol_doesnt_cause_extra_newline_insertion(
+    ctx: &mut Context<Neovim>,
+) {
+    let agent_id = ctx.new_agent_id();
+
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.with_borrowed(|ctx| {
+        let mut buf = ctx.buffer(buffer_id).unwrap();
+        let _ = buf.schedule_insertion(0, "foo\n", agent_id);
+    });
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, agent_id);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "foo\n")]);
+}
+
+#[neovim::test]
+async fn multiple_insertions_ending_in_newline_in_empty_buf_with_eol_doesnt_cause_extra_newline_insertion(
+    ctx: &mut Context<Neovim>,
+) {
+    let agent_id = ctx.new_agent_id();
+
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.with_borrowed(|ctx| {
+        let mut buf = ctx.buffer(buffer_id).unwrap();
+        let _ = buf.schedule_edit(
+            [
+                Replacement::insertion(0, "foo"),
+                Replacement::insertion(3, "\n"),
+            ],
+            agent_id,
+        );
+    });
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, agent_id);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "foo\n")]);
+}
+
+#[neovim::test]
 async fn inserting_by_typing_in_empty_buf_with_eol_causes_newline_insertion(
     ctx: &mut Context<Neovim>,
 ) {

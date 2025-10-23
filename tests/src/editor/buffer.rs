@@ -29,7 +29,7 @@ pub(crate) async fn fuzz_edits(
 
             // Apply the replacement to the string.
             expected_contents.replace_range(
-                replacement.removed_range(),
+                replacement.deleted_range(),
                 replacement.inserted_text(),
             );
 

@@ -7,7 +7,7 @@ pub(crate) trait Convert<T> {
 impl Convert<collab_project::text::TextReplacement> for editor::Replacement {
     fn convert(self) -> collab_project::text::TextReplacement {
         collab_project::text::TextReplacement {
-            deleted_range: self.removed_range(),
+            deleted_range: self.deleted_range(),
             inserted_text: self.inserted_text().into(),
         }
     }

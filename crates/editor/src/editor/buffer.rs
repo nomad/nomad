@@ -178,6 +178,12 @@ impl Replacement {
 
     /// TODO: docs.
     #[inline]
+    pub fn deleted_range(&self) -> Range<ByteOffset> {
+        self.removed_range.clone()
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn deletion(byte_range: Range<ByteOffset>) -> Self {
         Self::new(byte_range, "")
     }
@@ -208,12 +214,6 @@ impl Replacement {
         inserted_text: impl Into<SmolStr>,
     ) -> Self {
         Self { removed_range, inserted_text: inserted_text.into() }
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn removed_range(&self) -> Range<ByteOffset> {
-        self.removed_range.clone()
     }
 }
 

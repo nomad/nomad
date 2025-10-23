@@ -2331,6 +2331,7 @@ dependencies = [
  "serde_path_to_error",
  "slotmap",
  "smallvec",
+ "smol_str",
  "strsim",
  "thread-pool",
  "tracing",

@@ -219,13 +219,13 @@ impl CursorInner {
     /// Updates the cursor's offset in the buffer in response to the given
     /// replacement being applied to it.
     pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
-        if replacement.removed_range().start <= self.offset {
-            self.offset = if self.offset <= replacement.removed_range().end {
+        if replacement.deleted_range().start <= self.offset {
+            self.offset = if self.offset <= replacement.deleted_range().end {
                 // The cursor falls within the deleted range.
-                replacement.removed_range().start
+                replacement.deleted_range().start
             } else {
                 // The cursor is after the deleted range.
-                let range = replacement.removed_range();
+                let range = replacement.deleted_range();
                 let range_len = range.end - range.start;
                 self.offset - range_len
             } + replacement.inserted_text().len();
@@ -237,18 +237,18 @@ impl SelectionInner {
     /// Updates the selections's offset range in the buffer in response to the
     /// given replacement being applied to it.
     pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
-        if self.offset_range.end <= replacement.removed_range().start {
+        if self.offset_range.end <= replacement.deleted_range().start {
             // <selection><deletion>
             return;
         }
 
-        if self.offset_range.start <= replacement.removed_range().start {
+        if self.offset_range.start <= replacement.deleted_range().start {
             // One of:
             //
             // <selection>           <selection>     <----selection---->
             //       <deletion>      <deletion->         <deletion>
-            self.offset_range.end = replacement.removed_range().start;
-        } else if self.offset_range.start < replacement.removed_range().end {
+            self.offset_range.end = replacement.deleted_range().start;
+        } else if self.offset_range.start < replacement.deleted_range().end {
             // One of:
             //
             //    <selection>            <selection>
@@ -256,16 +256,16 @@ impl SelectionInner {
             let len_selection =
                 self.offset_range.end - self.offset_range.start;
             let len_overlap =
-                replacement.removed_range().end.min(self.offset_range.end)
+                replacement.deleted_range().end.min(self.offset_range.end)
                     - self.offset_range.start;
-            self.offset_range.start = replacement.removed_range().start
+            self.offset_range.start = replacement.deleted_range().start
                 + replacement.inserted_text().len();
             self.offset_range.end =
                 self.offset_range.start + len_selection - len_overlap;
         } else {
             // <deletion><selection>
-            let len_deletion = replacement.removed_range().end
-                - replacement.removed_range().start;
+            let len_deletion = replacement.deleted_range().end
+                - replacement.deleted_range().start;
             self.offset_range.start -= len_deletion;
             self.offset_range.end -= len_deletion;
 
@@ -366,7 +366,7 @@ impl<'a> editor::Buffer for Buffer<'a> {
 
         for replacement in &edit.replacements {
             self.contents.replace_range(
-                replacement.removed_range(),
+                replacement.deleted_range(),
                 replacement.inserted_text(),
             );
             for cursor in self.cursors.values_mut() {

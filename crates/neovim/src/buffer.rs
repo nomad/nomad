@@ -18,6 +18,7 @@ use editor::{
 };
 use futures_util::FutureExt;
 use smallvec::{SmallVec, smallvec_inline};
+use smol_str::format_smolstr;
 
 pub use crate::buffer_ext::{BufferExt, GraphemeOffsets};
 use crate::convert::Convert;
@@ -298,10 +299,29 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
     {
         let buffer_id = self.id();
 
-        let replacements = replacements
-            .into_iter()
-            .filter(|repl| !repl.is_no_op())
-            .collect::<SmallVec<[_; 1]>>();
+        let replacements_iter = replacements.into_iter();
+        let mut replacements = SmallVec::<[Replacement; 2]>::new();
+
+        for replacement in replacements_iter {
+            if replacement.is_no_op() {
+                continue;
+            }
+
+            // If the replacement inserts a single newline, check if we can
+            // merge it with a previous insertion.
+            if replacement.deleted_range().is_empty()
+                && replacement.inserted_text() == "\n"
+                && let Some(last) = replacements.last_mut()
+                && last.deleted_range().start + last.inserted_text().len()
+                    == replacement.deleted_range().start
+            {
+                let text = format_smolstr!("{}{}", last.inserted_text(), "\n");
+                *last = Replacement::new(last.deleted_range(), text);
+                continue;
+            }
+
+            replacements.push(replacement);
+        }
 
         let buffer_edited = self
             .nvim
@@ -406,7 +426,7 @@ fn apply_replacement(
 ) {
     debug_assert!(!replacement.is_no_op());
 
-    let deletion_range = replacement.removed_range();
+    let deletion_range = replacement.deleted_range();
     let insert_text = replacement.inserted_text();
 
     debug_assert!(deletion_range.start <= deletion_range.end);
