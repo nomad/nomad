@@ -8,8 +8,6 @@ allowed-duplicate-crates = [
   "rustix",
   "thiserror",
   "thiserror-impl",
-  "toml_datetime",
-  "toml_edit",
   "windows-sys",
   "windows-targets",
   "windows_aarch64_gnullvm",

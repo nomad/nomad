@@ -209,7 +209,11 @@ impl Editor for Neovim {
 
     #[inline]
     fn emitter(&mut self) -> Self::Emitter<'_> {
-        notify::NeovimEmitter::new(self.executor().local_spawner())
+        let namespace_id = self.namespace_id();
+        notify::NeovimEmitter::new(
+            self.executor().local_spawner(),
+            namespace_id,
+        )
     }
 
     #[inline]

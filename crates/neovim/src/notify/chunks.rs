@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 use crate::notify::Chunk;
 
 /// The chunks of text forming a notification message.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Chunks {
     inner: SmallVec<[Chunk; 4]>,
 }

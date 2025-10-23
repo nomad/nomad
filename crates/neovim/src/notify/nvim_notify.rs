@@ -1,3 +1,4 @@
+use core::ops::Range;
 use core::time::Duration;
 use core::{any, fmt};
 
@@ -5,8 +6,9 @@ use compact_str::ToCompactString;
 use executor::LocalSpawner;
 use flume::TrySendError;
 use futures_util::{FutureExt, StreamExt, select_biased};
-use nvim_oxi::mlua;
+use nvim_oxi::{api, mlua};
 
+use crate::buffer::Point;
 use crate::executor::NeovimLocalSpawner;
 use crate::notify::progress_reporter::{
     ProgressNotification,
@@ -40,22 +42,35 @@ pub(super) enum Icon {
     Percentage(notify::Percentage),
 }
 
+struct HlRanges<'chunks, Lines: Iterator> {
+    lines: Lines,
+    current_line: Option<Lines::Item>,
+    message_chunks: &'chunks notify::Chunks,
+}
+
 impl NvimNotify {
     pub(crate) fn notify(
         namespace: &editor::notify::Namespace,
         message_chunks: notify::Chunks,
         level: notify::Level,
+        namespace_id: u32,
     ) {
         let lua = mlua::lua();
 
         let notify = notify(&lua);
 
         let opts = lua
-            .create_table_with_capacity(0, 1)
+            .create_table_with_capacity(0, 2)
             .expect("failed to create options table");
 
         opts.raw_set("title", namespace.dot_separated().to_string())
             .expect("failed to set 'title'");
+
+        opts.raw_set(
+            "on_open",
+            Self::on_open(message_chunks.clone(), namespace_id),
+        )
+        .expect("failed to set 'on_open'");
 
         notify
             .call::<mlua::Value>((
@@ -69,6 +84,37 @@ impl NvimNotify {
     #[inline]
     pub(super) fn is_installed() -> bool {
         utils::is_module_available("notify")
+    }
+
+    fn on_open(
+        message_chunks: notify::Chunks,
+        namespace_id: u32,
+    ) -> mlua::Function {
+        mlua::lua()
+            .create_function(move |_, window: api::Window| {
+                let Ok(mut buf) = window.get_buf() else { return Ok(()) };
+                let Ok(lines) = buf
+                    .line_count()
+                    .and_then(|count| buf.get_lines(0..count, true))
+                else {
+                    return Ok(());
+                };
+                let hl_ranges = HlRanges::new(lines, &message_chunks);
+                for (hl_group, point_range) in hl_ranges {
+                    let _ = buf.set_extmark(
+                        namespace_id,
+                        point_range.start.newline_offset,
+                        point_range.end.byte_offset,
+                        &api::opts::SetExtmarkOpts::builder()
+                            .end_row(point_range.start.newline_offset)
+                            .end_col(point_range.end.byte_offset)
+                            .hl_group(hl_group)
+                            .build(),
+                    );
+                }
+                Ok(())
+            })
+            .expect("couldn't create function")
     }
 }
 
@@ -242,6 +288,12 @@ impl ProgressNotificationKind {
     }
 }
 
+impl<'chunks, Lines: Iterator> HlRanges<'chunks, Lines> {
+    fn new(lines: Lines, message_chunks: &'chunks notify::Chunks) -> Self {
+        HlRanges { lines, current_line: None, message_chunks }
+    }
+}
+
 #[cfg(feature = "nightly")]
 impl From<ProgressNotificationKind>
     for nvim_oxi::api::types::ProgressMessageStatus
@@ -261,6 +313,16 @@ impl fmt::Display for Icon {
             Self::Char(c) => write!(f, "{}", c),
             Self::Percentage(perc) => write!(f, "{perc}%"),
         }
+    }
+}
+
+impl<'chunks, Lines: Iterator<Item = nvim_oxi::String>> Iterator
+    for HlRanges<'chunks, Lines>
+{
+    type Item = (&'chunks str, Range<Point>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
     }
 }
 

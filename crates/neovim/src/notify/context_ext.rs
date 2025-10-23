@@ -48,10 +48,12 @@ impl<Bs: BorrowState> NotifyContextExt for Context<Neovim, Bs> {
         notification_level: LogLevel,
     ) {
         if notify::NvimNotify::is_installed() {
+            let namespace_id = self.with_editor(|nvim| nvim.namespace_id());
             notify::NvimNotify::notify(
                 self.namespace(),
                 notification_message.into(),
                 notification_level,
+                namespace_id,
             )
         } else {
             let namespace = self.namespace().clone();
