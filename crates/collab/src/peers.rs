@@ -27,6 +27,11 @@ pub struct RemotePeer {
 }
 
 impl RemotePeers {
+    /// Returns the [`RemotePeer`] with the given ID, if any.
+    pub fn get(&self, peer_id: PeerId) -> Option<RemotePeer> {
+        self.inner.with(|inner| inner.get(&peer_id).cloned())
+    }
+
     /// Creates a new [`RemotePeers`] instance from the given peers.
     pub fn new(
         peers: impl IntoIterator<Item = Peer>,
@@ -65,11 +70,6 @@ impl RemotePeers {
         fun: impl FnMut(&RemotePeer) -> Option<T>,
     ) -> Option<T> {
         self.with(|map| map.values().find_map(fun))
-    }
-
-    /// Returns the [`Peer`] with the given ID, if any.
-    pub(crate) fn get(&self, peer_id: PeerId) -> Option<RemotePeer> {
-        self.inner.with(|inner| inner.get(&peer_id).cloned())
     }
 
     #[track_caller]

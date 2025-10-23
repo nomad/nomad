@@ -27,6 +27,8 @@ pub struct Project {
 
 /// An error returned when trying to acquire a mutable reference to some
 /// resource (like cursors or selections) that is not owned by the local peer.
+#[derive(Debug, derive_more::Display, cauchy::Error)]
+#[display("the local peer is not the owner of the requested resource")]
 pub struct LocalPeerIsNotOwnerError;
 
 /// TODO: docs.

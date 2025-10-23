@@ -398,8 +398,8 @@ impl<Ed: CollabEditor> Project<Ed> {
         .await
     }
 
-    /// Integrates the creation of a remote cursor by creating a tooltip
-    /// in the corresponding buffer (if it's currently open).
+    /// Integrates the creation of a remote cursor, creating a tooltip in the
+    /// corresponding buffer (if it's currently open).
     pub fn integrate_cursor_creation(
         &mut self,
         creation: text::CursorCreation,
@@ -438,15 +438,20 @@ impl<Ed: CollabEditor> Project<Ed> {
         try_block();
     }
 
-    fn integrate_cursor_deletion(
+    /// Integrates the deletion of a remote cursor.
+    pub fn integrate_cursor_deletion(
         &mut self,
         removal: text::CursorRemoval,
         ctx: &mut Context<Ed>,
     ) {
         let mut try_block = || {
             let cursor_id = self.inner.integrate_cursor_removal(removal)?;
-            let tooltip = self.peer_tooltips.remove(&cursor_id)?;
-            Ed::remove_peer_tooltip(tooltip, ctx);
+
+            // Remove any UI element associated with this cursor.
+            if let Some(tooltip) = self.peer_tooltips.remove(&cursor_id) {
+                Ed::remove_peer_tooltip(tooltip, ctx);
+            }
+
             // Check if this was a peer's main cursor.
             self.remote_peers.with_mut(|map| {
                 if let Some(peer) = map.get_mut(&cursor_id.owner())
@@ -455,6 +460,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                     peer.remove_main_cursor();
                 }
             });
+
             Some(())
         };
 
