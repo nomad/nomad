@@ -193,8 +193,8 @@ impl HighlightRangeHandle {
 impl Point {
     /// Creates a new `Point`.
     #[inline]
-    pub fn new(line_idx: usize, byte_offset: usize) -> Self {
-        Self { newline_offset: line_idx, byte_offset }
+    pub fn new(newline_offset: usize, byte_offset: usize) -> Self {
+        Self { newline_offset, byte_offset }
     }
 
     #[inline]

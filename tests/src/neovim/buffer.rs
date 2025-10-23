@@ -260,6 +260,63 @@ async fn dd_in_last_line_with_no_eol_deletes_trailing_newline(
     assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
 }
 
+/// Makes sure we have a workaround for
+/// https://github.com/neovim/neovim/issues/35557.
+#[neovim::test]
+async fn dd_in_buffer_with_single_line_deletes_whole_buffer(
+    ctx: &mut Context<Neovim>,
+) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    ctx.feedkeys("iHello<Esc>");
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.feedkeys("dd");
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..6)]);
+}
+
+/// Same as [`dd_in_buffer_with_single_line_deletes_whole_buffer`] but with
+/// 'eol' and 'fixeol' unset, so that the buffer doesn't have a trailing
+/// newline.
+#[neovim::test]
+#[ignore = "We don't have a workaround for this, it should be fixed upstream"]
+async fn dd_in_buffer_with_single_line_and_no_eol_deletes_whole_buffer(
+    ctx: &mut Context<Neovim>,
+) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
+    api::set_option_value("eol", false, &opts).unwrap();
+    api::set_option_value("fixeol", false, &opts).unwrap();
+
+    ctx.feedkeys("iHello<Esc>");
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.feedkeys("dd");
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..5)]);
+}
+
+#[neovim::test]
+#[allow(non_snake_case)]
+async fn dG_from_first_row_deletes_whole_buffer(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    ctx.feedkeys("iHello<CR>World<Esc>gg");
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.feedkeys("dG");
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..12)]);
+}
+
 #[neovim::test]
 fn grapheme_offsets_empty(ctx: &mut Context<Neovim>) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();

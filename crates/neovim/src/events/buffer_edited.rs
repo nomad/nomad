@@ -251,6 +251,19 @@ fn replacement_of_on_bytes(args: api::opts::OnBytesArgs) -> Replacement {
         byte_offset: start_col * (new_end_row == 0) as usize + new_end_col,
     };
 
+    // Workaround for edge cases like `dd` in a buffer with a single line or
+    // `dG` from the first line in a buffer, where the entire contents of the
+    // buffer are deleted but the end position given to `on_bytes` is out of
+    // bounds.
+    //
+    // See https://github.com/neovim/neovim/issues/35557 for an example.
+    if insertion_start == Point::zero()
+        && insertion_end == Point::new(1, 0)
+        && buffer.is_empty()
+    {
+        return Replacement::deletion(deletion_start..deletion_end);
+    }
+
     Replacement::new(
         deletion_start..deletion_end,
         &*buffer.get_text_in_point_range(insertion_start..insertion_end),
