@@ -1,5 +1,8 @@
+use core::iter;
+
 use editor::{AccessMut, AgentId, Edit, Editor, Replacement, Shared};
 use nohash::IntMap as NoHashMap;
+use nvim_oxi::api::opts::ShouldDetach;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::Neovim;
@@ -13,6 +16,44 @@ const TRIGGER_AUTOCMD_PATTERN: &str = "BufferEditedEventTrigger";
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct BufferEdited(pub(crate) BufferId);
+
+impl BufferEdited {
+    fn on_edits<'a>(
+        nvim: &mut impl AccessMut<Neovim>,
+        buffer_id: BufferId,
+        edits: impl IntoIterator<Item = &'a Edit> + Clone,
+    ) -> ShouldDetach {
+        nvim.with_mut(|nvim| {
+            let Some(mut buffer) = nvim.buffer(buffer_id) else {
+                panic!(
+                    "callback triggered for an invalid buffer{}",
+                    api::Buffer::from(buffer_id)
+                        .get_name()
+                        .map(|name| format!(": {name}"))
+                        .unwrap_or_default()
+                );
+            };
+
+            let Some(callbacks) = buffer
+                .nvim
+                .events
+                .on_buffer_edited
+                .get(&buffer_id)
+                .map(|cbs| cbs.cloned())
+            else {
+                return true;
+            };
+
+            for callback in callbacks {
+                for edit in edits.clone() {
+                    callback((buffer.reborrow(), edit));
+                }
+            }
+
+            false
+        })
+    }
+}
 
 /// The output of the [`BufferEdited::register`] method.
 #[derive(Debug, Clone)]
@@ -66,58 +107,23 @@ impl Event for BufferEdited {
         let buffer_id = self.0;
         let queued_edits = Shared::<SmallVec<_>>::default();
 
-        let mut on_edit = {
-            let queued_edits = queued_edits.clone();
-            move |edit: Edit| {
-                nvim.with_mut(|nvim| {
-                    let Some(mut buffer) = nvim.buffer(buffer_id) else {
-                        panic!(
-                            "callback triggered for an invalid buffer{}",
-                            api::Buffer::from(buffer_id)
-                                .get_name()
-                                .map(|name| format!(": {name}"))
-                                .unwrap_or_default()
-                        );
-                    };
-
-                    let Some(callbacks) = buffer
-                        .nvim
-                        .events
-                        .on_buffer_edited
-                        .get(&buffer_id)
-                        .map(|cbs| cbs.cloned())
-                    else {
-                        return true;
-                    };
-
-                    let queued_edits = queued_edits.take();
-
-                    for callback in callbacks {
-                        callback((buffer.reborrow(), &edit));
-                        for edit in &queued_edits {
-                            callback((buffer.reborrow(), edit));
-                        }
-                    }
-
-                    false
-                })
-            }
-        };
-
         let on_bytes = {
             let queued_edits = queued_edits.clone();
-            let mut on_edit = on_edit.clone();
+            let mut nvim = nvim.clone();
             move |args: api::opts::OnBytesArgs| {
-                let edit = queued_edits
-                    .with_mut(|vec| (!vec.is_empty()).then(|| vec.remove(0)))
-                    .unwrap_or_else(|| Edit {
+                let queued = queued_edits.take();
+
+                if queued.is_empty() {
+                    let edit = Edit {
                         made_by: AgentId::UNKNOWN,
                         replacements: smallvec_inline![
                             replacement_of_on_bytes(args)
                         ],
-                    });
-
-                on_edit(edit)
+                    };
+                    Self::on_edits(&mut nvim, buffer_id, iter::once(&edit))
+                } else {
+                    Self::on_edits(&mut nvim, buffer_id, &queued)
+                }
             }
         }
         .catch_unwind()
@@ -134,7 +140,7 @@ impl Event for BufferEdited {
             .expect("couldn't attach to buffer");
 
         let on_fixeol_changed = {
-            let mut on_edit = on_edit.clone();
+            let mut nvim = nvim.clone();
             move |buffer: api::Buffer, old_value, new_value| {
                 debug_assert!(BufferId::from(buffer.clone()) == buffer_id);
 
@@ -157,10 +163,12 @@ impl Event for BufferEdited {
                     _ => return false,
                 };
 
-                on_edit(Edit {
+                let edit = Edit {
                     made_by: AgentId::UNKNOWN,
                     replacements: smallvec_inline![replacement],
-                })
+                };
+
+                Self::on_edits(&mut nvim, buffer_id, iter::once(&edit))
             }
         };
 
@@ -180,10 +188,13 @@ impl Event for BufferEdited {
                     return false;
                 }
 
-                queued_edits
-                    .with_mut(|vec| (!vec.is_empty()).then(|| vec.remove(0)))
-                    .map(|first| on_edit(first))
-                    .unwrap_or(false)
+                let queued = queued_edits.take();
+
+                if !queued.is_empty() {
+                    Self::on_edits(&mut nvim, buffer_id, &queued)
+                } else {
+                    false
+                }
             }
         }
         .catch_unwind()
