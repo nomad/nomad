@@ -113,9 +113,7 @@ impl NeovimPeerCursor {
         if is_cursor_at_eol {
             // If the cursor is after the uneditable eol, set the start
             // position to the end of the previous line.
-            if cursor_offset == buffer.num_bytes()
-                && buffer.has_uneditable_eol()
-            {
+            if buffer.is_point_after_uneditable_eol(highlight_start) {
                 let highlight_end = highlight_start;
                 highlight_start.newline_offset -= 1;
                 highlight_start.byte_offset = buffer
