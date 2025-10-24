@@ -107,8 +107,11 @@ impl Module<Neovim> for Nomad {
 
     fn on_init(&self, ctx: &mut Context<Neovim, Borrowed>) {
         let subscriber = tracing_subscriber::Registry::default()
-            .with(ctx.tracing_layer())
             .with(self.file_appender(ctx).with_filter(LevelFilter::INFO));
+
+        // Only show logs in the message area in debug builds.
+        #[cfg(debug_assertions)]
+        let subscriber = subscriber.with(ctx.tracing_layer());
 
         if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
             panic!("failed to set global tracing subscriber: {err}");
