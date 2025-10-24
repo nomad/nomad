@@ -1,7 +1,7 @@
 use core::fmt;
 use core::ops::Deref;
 
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
 use smallvec::SmallVec;
 
 use crate::notify::Chunk;
@@ -13,6 +13,13 @@ pub struct Chunks {
 }
 
 impl Chunks {
+    /// Appends the chunks from another [`Chunks`] instance to this one.
+    #[inline]
+    pub fn concat(&mut self, other: impl Into<Self>) -> &mut Self {
+        self.inner.extend(other.into().inner);
+        self
+    }
+
     /// Concatenates the texts of all chunks into a single string.
     #[inline]
     pub fn concat_text(&self) -> String {
@@ -65,6 +72,15 @@ impl fmt::Debug for Chunks {
     }
 }
 
+impl Deref for Chunks {
+    type Target = [Chunk];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl From<&str> for Chunks {
     #[inline]
     fn from(s: &str) -> Self {
@@ -97,11 +113,44 @@ impl From<editor::notify::Message> for Chunks {
     }
 }
 
-impl Deref for Chunks {
-    type Target = [Chunk];
-
+impl From<&editor::module::PanicInfo> for Chunks {
     #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+    fn from(panic_info: &editor::module::PanicInfo) -> Self {
+        let mut chunks = Self::default();
+
+        chunks.push("Panicked");
+
+        if let Some(location) = &panic_info.location {
+            chunks.push(" at ").concat(location);
+        }
+
+        if let Some(payload) = panic_info.payload_as_str() {
+            chunks.push(":").push_newline().push(payload);
+        }
+
+        chunks
+            .push_newline()
+            .push_newline()
+            .push("Please open an issue at ")
+            .push_highlighted("https://github.com/nomad/nomad", "Underlined")
+            .push("!");
+
+        chunks
+    }
+}
+
+impl From<&editor::module::PanicLocation> for Chunks {
+    #[inline]
+    fn from(location: &editor::module::PanicLocation) -> Self {
+        let mut chunks = Self::default();
+
+        chunks
+            .push_highlighted(location.file(), "String")
+            .push_highlighted(":", "Comment")
+            .push_highlighted(location.line().to_compact_string(), "Number")
+            .push_highlighted(":", "Comment")
+            .push_highlighted(location.column().to_compact_string(), "Number");
+
+        chunks
     }
 }
