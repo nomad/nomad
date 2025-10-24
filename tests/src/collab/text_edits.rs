@@ -42,8 +42,8 @@ fn integrating_text_edit_moves_remote_peer_tooltip() {
                 id: project_2.peer_id(),
                 handle: PeerHandle::GitHub("peer2".parse().unwrap()),
             },
+            peer_cursors: Default::default(),
             peer_selections: Default::default(),
-            peer_tooltips: Default::default(),
             remote_peers: RemotePeers::new([remote_peer], &project_2),
             root_path: AbsPathBuf::root(),
             inner: project_2,
@@ -61,12 +61,12 @@ fn integrating_text_edit_moves_remote_peer_tooltip() {
 
         proj.integrate_cursor_creation(cursor_creation, ctx);
         // The tooltip should be after the space.
-        assert_eq!(*proj.peer_tooltips.get(&cursor_id).unwrap(), 6);
+        assert_eq!(*proj.peer_cursors.get(&cursor_id).unwrap(), 6);
 
         proj.integrate_text_edit(insert_comma, ctx).await.unwrap();
         // After integrating the insertion, the tooltip should stay after
         // the space.
-        assert_eq!(*proj.peer_tooltips.get(&cursor_id).unwrap(), 7);
+        assert_eq!(*proj.peer_cursors.get(&cursor_id).unwrap(), 7);
     });
 }
 
@@ -110,8 +110,8 @@ fn integrating_text_edit_creates_buffer() {
                 id: project_2.peer_id(),
                 handle: PeerHandle::GitHub("peer2".parse().unwrap()),
             },
+            peer_cursors: Default::default(),
             peer_selections: Default::default(),
-            peer_tooltips: Default::default(),
             remote_peers: RemotePeers::new([remote_peer], &project_2),
             root_path: AbsPathBuf::root(),
             inner: project_2,
@@ -126,6 +126,6 @@ fn integrating_text_edit_creates_buffer() {
         assert_eq!(ctx.buffer_ids().collect::<Vec<_>>(), [buffer_id]);
 
         // The buffer should display a tooltip at the end of the file.
-        assert_eq!(*proj.peer_tooltips.get(&cursor_id).unwrap(), 11);
+        assert_eq!(*proj.peer_cursors.get(&cursor_id).unwrap(), 11);
     });
 }

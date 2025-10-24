@@ -35,13 +35,13 @@ pub struct Project<Ed: CollabEditor> {
     /// TODO: docs.
     pub local_peer: Peer,
 
+    /// Map from a remote cursor's ID to the corresponding cursor displayed in
+    /// the editor.
+    pub peer_cursors: FxHashMap<CursorId, Ed::PeerTooltip>,
+
     /// Map from a remote selections's ID to the corresponding selection
     /// displayed in the editor.
     pub peer_selections: FxHashMap<SelectionId, Ed::PeerSelection>,
-
-    /// Map from a remote cursor's ID to the corresponding tooltip displayed in
-    /// the editor.
-    pub peer_tooltips: FxHashMap<CursorId, Ed::PeerTooltip>,
 
     /// The remote peers currently in the session.
     pub remote_peers: RemotePeers,
@@ -165,7 +165,7 @@ enum FsNodeContents {
 
 impl<Ed: CollabEditor> Project<Ed> {
     pub(crate) fn drop(self, ctx: &mut Context<Ed>) {
-        for tooltip in self.peer_tooltips.into_values() {
+        for tooltip in self.peer_cursors.into_values() {
             Ed::remove_peer_tooltip(tooltip, ctx);
         }
 
@@ -440,7 +440,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 ctx,
             );
 
-            self.peer_tooltips.insert(cursor.id(), tooltip);
+            self.peer_cursors.insert(cursor.id(), tooltip);
 
             Some(())
         };
@@ -458,7 +458,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             let cursor_id = self.inner.integrate_cursor_removal(removal)?;
 
             // Remove any UI element associated with this cursor.
-            if let Some(tooltip) = self.peer_tooltips.remove(&cursor_id) {
+            if let Some(tooltip) = self.peer_cursors.remove(&cursor_id) {
                 Ed::remove_peer_tooltip(tooltip, ctx);
             }
 
@@ -484,7 +484,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     ) {
         let mut try_block = || {
             let cursor = self.inner.integrate_cursor_move(movement)?;
-            let tooltip = self.peer_tooltips.get_mut(&cursor.id())?;
+            let tooltip = self.peer_cursors.get_mut(&cursor.id())?;
             Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx);
             Some(())
         };
@@ -563,7 +563,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             self.inner.integrate_peer_disconnection(peer_id);
 
         for cursor_id in cursor_ids {
-            if let Some(tooltip) = self.peer_tooltips.remove(&cursor_id) {
+            if let Some(tooltip) = self.peer_cursors.remove(&cursor_id) {
                 Ed::remove_peer_tooltip(tooltip, ctx);
             }
         }
@@ -686,7 +686,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             unreachable!("we know this ID maps to a text file");
         };
 
-        Self::update_cursors(&file, &mut self.peer_tooltips, ctx);
+        Self::update_cursors(&file, &mut self.peer_cursors, ctx);
         Self::update_selections(&file, &mut self.peer_selections, ctx);
 
         Ok(Some(buffer_id))
@@ -780,10 +780,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 self.synchronize_buffer_edited(buffer_id, replacements, ctx)
             },
             event::BufferEvent::Removed(buffer_id) => {
-                let ids = &mut self.id_maps;
-                if let Some(file_id) = ids.buffer2file.remove(&buffer_id) {
-                    ids.file2buffer.remove(&file_id);
-                }
+                self.synchronize_buffer_deleted(buffer_id);
                 None
             },
             event::BufferEvent::Saved(buffer_id) => {
@@ -827,7 +824,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 buffer_id.clone(),
                 ctx,
             );
-            self.peer_tooltips.insert(cursor.id(), tooltip);
+            self.peer_cursors.insert(cursor.id(), tooltip);
         }
 
         // Display the selections of the remote peers in the buffer.
@@ -842,6 +839,28 @@ impl<Ed: CollabEditor> Project<Ed> {
                 ctx,
             );
             self.peer_selections.insert(selection.id(), peer_selection);
+        }
+    }
+
+    /// Synchronizes the project's state with the deletion of the buffer with
+    /// the given ID.
+    pub fn synchronize_buffer_deleted(&mut self, buffer_id: Ed::BufferId) {
+        let Some(file_id) = self.id_maps.buffer2file.remove(&buffer_id) else {
+            return;
+        };
+
+        self.id_maps.file2buffer.remove(&file_id);
+
+        let Some(File::Text(file)) = self.inner.file(file_id) else {
+            unreachable!("we know this ID maps to a text file");
+        };
+
+        for cursor in file.cursors() {
+            self.peer_cursors.remove(&cursor.id());
+        }
+
+        for selection in file.selections() {
+            self.peer_selections.remove(&selection.id());
         }
     }
 
@@ -862,7 +881,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             unreachable!("we know this ID maps to a text file");
         };
 
-        Self::update_cursors(&file, &mut self.peer_tooltips, ctx);
+        Self::update_cursors(&file, &mut self.peer_cursors, ctx);
         Self::update_selections(&file, &mut self.peer_selections, ctx);
 
         Some(Message::EditedText(text_edit))

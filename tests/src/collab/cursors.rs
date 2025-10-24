@@ -5,7 +5,7 @@ use collab::{Peer, PeerHandle, PeerId};
 use mock::{EditorExt, Mock};
 
 #[test]
-fn remote_peer_tooltip_is_present_when_opening_buffer() {
+fn remote_peer_cursor_is_present_when_opening_buffer() {
     let fs = mock::fs! {
         "foo.txt": "hello world",
     };
@@ -37,8 +37,8 @@ fn remote_peer_tooltip_is_present_when_opening_buffer() {
                 id: project_2.peer_id(),
                 handle: PeerHandle::GitHub("peer2".parse().unwrap()),
             },
+            peer_cursors: Default::default(),
             peer_selections: Default::default(),
-            peer_tooltips: Default::default(),
             remote_peers: RemotePeers::new([remote_peer], &project_2),
             root_path: AbsPathBuf::root(),
             inner: project_2,
@@ -55,7 +55,7 @@ fn remote_peer_tooltip_is_present_when_opening_buffer() {
 
         // Peer 1 created a cursor at offset 5, so peer 2 should display a
         // tooltip at that offset.
-        assert_eq!(*proj.peer_tooltips.get(&cursor_id).unwrap(), 5);
+        assert_eq!(*proj.peer_cursors.get(&cursor_id).unwrap(), 5);
     });
 }
 
@@ -92,8 +92,8 @@ fn main_cursor_is_removed_when_cursor_deletion_is_received() {
                 id: project_2.peer_id(),
                 handle: PeerHandle::GitHub("peer2".parse().unwrap()),
             },
+            peer_cursors: Default::default(),
             peer_selections: Default::default(),
-            peer_tooltips: Default::default(),
             remote_peers: RemotePeers::new([remote_peer], &project_2),
             root_path: AbsPathBuf::root(),
             inner: project_2,
@@ -112,5 +112,62 @@ fn main_cursor_is_removed_when_cursor_deletion_is_received() {
             .main_cursor_id();
 
         assert_eq!(peer1_main_cursor, None);
+    });
+}
+
+#[test]
+fn remote_peer_cursor_is_deleted_when_buffer_is_deleted() {
+    let fs = mock::fs! {
+        "foo.txt": "hello world",
+    };
+
+    let mut project_1 =
+        collab_project::Project::from_mock(PeerId::new(1), fs.root());
+
+    project_1
+        .node_at_path_mut(path!("/foo.txt"))
+        .unwrap()
+        .unwrap_file()
+        .unwrap_text()
+        .create_cursor(5);
+
+    let project_2 = project_1.fork(PeerId::new(2));
+
+    CollabMock::new(Mock::new(fs)).block_on(async move |ctx| {
+        let agent_id = ctx.new_agent_id();
+
+        let remote_peer = Peer {
+            id: project_1.peer_id(),
+            handle: PeerHandle::GitHub("peer1".parse().unwrap()),
+        };
+
+        let mut proj = collab::project::Project::<CollabMock<Mock>> {
+            agent_id,
+            id_maps: Default::default(),
+            local_peer: Peer {
+                id: project_2.peer_id(),
+                handle: PeerHandle::GitHub("peer2".parse().unwrap()),
+            },
+            peer_cursors: Default::default(),
+            peer_selections: Default::default(),
+            remote_peers: RemotePeers::new([remote_peer], &project_2),
+            root_path: AbsPathBuf::root(),
+            inner: project_2,
+        };
+
+        let foo_path = path!("/foo.txt");
+
+        let buffer_id = ctx.create_buffer(foo_path, agent_id).await.unwrap();
+
+        // First, let the project synchronize the buffer creation.
+        proj.synchronize_buffer_created(buffer_id, foo_path, ctx);
+
+        assert_eq!(proj.peer_cursors.len(), 1);
+
+        // Synchronize the buffer deletion.
+        proj.synchronize_buffer_deleted(buffer_id);
+
+        // The project should have removed the remote peer's cursor.
+        assert_eq!(proj.peer_cursors.len(), 0);
     });
 }

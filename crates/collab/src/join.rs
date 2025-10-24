@@ -134,8 +134,8 @@ impl<Ed: CollabEditor> Join<Ed> {
             id_maps: id_maps.into(),
             inner: project,
             local_peer: local_peer.clone(),
+            peer_cursors: FxHashMap::default(),
             peer_selections: FxHashMap::default(),
-            peer_tooltips: FxHashMap::default(),
             remote_peers: remote_peers.clone(),
             root_path: project_root.path().to_owned(),
         };
