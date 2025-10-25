@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  # push:
-  #   branches:
-  #     - main
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -18,8 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -62,7 +61,6 @@ jobs:
       - name: Generate coverage report
         run: |
           cargo llvm-cov --no-report --workspace
-          cargo llvm-cov --no-report --package=tests
           cargo llvm-cov report --codecov --output-path codecov.json
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
@@ -110,8 +108,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +127,7 @@ jobs:
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run unit tests
-        run: cargo nextest run --workspace --no-fail-fast
+        run: cargo nextest run --workspace --exclude tests --no-fail-fast
       - name: Run integration tests
         run: cargo nextest run --package=tests --no-fail-fast
 
@@ -140,8 +137,7 @@ jobs:
       fail-fast: false
       matrix:
         neovim: [stable, nightly]
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         include:
           - neovim: stable
             devshell: ".#ci-tests-neovim"
@@ -167,4 +163,9 @@ jobs:
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run Neovim tests
-        run: cargo nextest run --package=tests --features=${{ matrix.features }} --no-fail-fast
+        run: |
+          cargo nextest run \
+            --package=tests \
+            --features=${{ matrix.features }} \
+            --no-fail-fast \
+              neovim::
