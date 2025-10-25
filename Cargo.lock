@@ -513,9 +513,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.41"
+version = "1.2.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac9fe6cdbb24b6ade63616c0a0688e45bb56732262c158df3c0c4bea4ca47cb7"
+checksum = "739eb0f94557554b3ca9a86d2d37bebd49c5e6d0c1d2bda35ba5bdac830befc2"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -718,7 +718,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "cauchy",
  "collab-types",
@@ -737,7 +737,7 @@ dependencies = [
 [[package]]
 name = "collab-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "bytes",
  "cauchy",
@@ -1006,9 +1006,9 @@ dependencies = [
 
 [[package]]
 name = "deranged"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41953f86f8a05768a6cda24def994fd2f424b04ec5c719cf89989779f199071"
+checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
 dependencies = [
  "powerfmt",
 ]
@@ -1076,7 +1076,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1268,9 +1268,9 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.1.4"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc5a4e564e38c699f2880d3fda590bedc2e69f3f84cd48b457bd892ce61d0aa9"
+checksum = "bfe33edd8e85a12a67454e37f8c75e730830d83e313556ab9ebf9ee7fbeb3bfb"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -1306,7 +1306,7 @@ dependencies = [
 [[package]]
 name = "frames"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1457,7 +1457,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "flume",
  "futures-util",
@@ -1612,11 +1612,11 @@ dependencies = [
 
 [[package]]
 name = "home"
-version = "0.5.11"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "589533453244b0995c858700322199b2becb13b627df2851f64a2775d024abcf"
+checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2174,7 +2174,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 [[package]]
 name = "message-channel"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "bincode",
  "cauchy",
@@ -2811,7 +2811,7 @@ checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 [[package]]
 name = "peer-handle"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/collab-server.git#653da07b4e6051a69580ce298e2e1b243f123deb"
+source = "git+ssh://git@github.com/nomad/collab-server.git#6b6f4fac548f3e991871dd22f68c7452c8467a51"
 dependencies = [
  "cauchy",
  "derive_more",
@@ -2990,9 +2990,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.101"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de"
+checksum = "5ee95bc4ef87b8d5ba32e8b7714ccc834865276eab0aed5c9958d00ec45f49e8"
 dependencies = [
  "unicode-ident",
 ]
@@ -3688,12 +3688,12 @@ dependencies = [
 
 [[package]]
 name = "smol_str"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9676b89cd56310a87b93dec47b11af744f34d5fc9f367b829474eec0a891350d"
+checksum = "3498b0a27f93ef1402f20eefacfaa1691272ac4eca1cdc8c596cb0a245d6cbf5"
 dependencies = [
  "borsh",
- "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -3757,9 +3757,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.107"
+version = "2.0.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a26dbd934e5451d21ef060c018dae56fc073894c5a7896f882928a76e6d081b"
+checksum = "da58917d35242480a05c2897064da0a80589a2a0476c9a3f2fdc83b53502e917"
 dependencies = [
  "proc-macro2",
  "quote",
