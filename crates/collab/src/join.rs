@@ -402,8 +402,7 @@ async fn write_file<Fs: fs::Fs>(
                 .await
                 .map_err(WriteProjectError::CreateFile)?;
 
-            // TODO: write the Rope w/o allocating an intermediate string.
-            file.write(text_file.contents().to_string())
+            file.write_chunks(text_file.contents().chunks())
                 .await
                 .map_err(WriteProjectError::WriteFile)?;
 
