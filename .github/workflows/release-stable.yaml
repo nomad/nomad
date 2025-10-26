@@ -3,18 +3,11 @@ name: Release Stable
 on:
   push:
     tags:
-      # On every push of a semver-formatted tag (with no pre-release label).
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      # On every push of a YYYY.MM.PATCH-formatted tag.
+      - "[2-9][0-9][0-9][0-9].0[1-9].[0-9]+"
+      - "[2-9][0-9][0-9][0-9].1[0-2].[0-9]+"
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Verify that the tag's version matches the workspace's version
-        uses: ./.github/actions/verify-tag-version-matches-workspace
-
   release-stable:
     needs: setup
     uses: ./.github/workflows/build-and-release.yaml
