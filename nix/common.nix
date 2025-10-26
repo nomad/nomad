@@ -1,4 +1,4 @@
-{ ... }:
+{ inputs, ... }:
 
 {
   perSystem =
@@ -72,6 +72,13 @@
         # enabled (excluding packages from the Rust toolchain like cargo and
         # rustc).
         nativeBuildInputs = with pkgs; [ pkg-config ];
+
+        # The contents of the /RELEASE_TAG file, or null if it doesn't exist.
+        releaseTag =
+          let
+            releaseTagPath = inputs.self + "/RELEASE_TAG";
+          in
+          if builtins.pathExists releaseTagPath then lib.fileContents releaseTagPath else null;
 
         # A compiled version of the xtask executable defined in this workspace.
         xtask = crane.lib.buildPackage (

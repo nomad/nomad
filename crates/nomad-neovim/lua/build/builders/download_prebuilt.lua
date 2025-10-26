@@ -21,29 +21,6 @@ local commands = {
   tar = "tar",
 }
 
---- Extracts the Nomad version from the workspace's Cargo.toml.
----
----@param build_ctx nomad.neovim.build.Context
----@return nomad.Result<string, string>
-local nomad_version_from_cargo_toml = function(build_ctx)
-  local cargo_toml_path = build_ctx:repo_dir():join("Cargo.toml")
-  local cargo_toml, err_msg = io.open(cargo_toml_path:display(), "r")
-
-  if not cargo_toml then
-    return Result.err(("couldn't open %s: %s"):format(cargo_toml_path, err_msg))
-  end
-
-  for line in cargo_toml:lines() do
-    local version = line:match('^version%s*=%s*"([^"]+)"')
-    if version then
-      cargo_toml:close()
-      return Result.ok(version)
-    end
-  end
-
-  return Result.err(("couldn't extract version from %s"):format(cargo_toml_path))
-end
-
 ---@param exit_code integer
 ---@return string
 local err = function(exit_code)
@@ -58,9 +35,9 @@ end
 --- TODO: either eliminate one of the two sources of truth (not sure how), or
 --- add a test in CI that fails if they diverge.
 ---
----@param nomad_version string
+---@param tag string
 ---@return nomad.Result<string, string>
-local get_archive_name = function(nomad_version)
+local get_archive_name = function(tag)
   local arch = ({
     ["x64"] = "x86_64",
     ["arm64"] = "aarch64",
@@ -85,7 +62,7 @@ local get_archive_name = function(nomad_version)
   )
 
   return Result.ok(("nomad-%s-for-neovim-%s-%s-%s.tar.gz")
-    :format(nomad_version, neovim_version, os, arch))
+    :format(tag, neovim_version, os, arch))
 end
 
 local get_artifact_url = function(tag, artifact_name)
@@ -112,20 +89,10 @@ local build_fn = function(opts, build_ctx)
     if tag_res:is_err() then return tag_res:map_err(err) end
     if tag == nil then return Result.err("not on a tag") end
 
-    local nomad_version
-    if tag == "nightly" then
-      local version_res = nomad_version_from_cargo_toml(build_ctx)
-      if version_res:is_err() then return version_res:map(function() end) end
-      nomad_version = version_res:unwrap()
-    else
-      nomad_version = tag:gsub("^v", "")
-    end
-
-    local name_res = get_archive_name(nomad_version)
+    local archive_name_res = get_archive_name(tag)
     -- We don't offer pre-built artifacts for this machine.
-    if name_res:is_err() then return name_res:map(function() end) end
-
-    local archive_name = name_res:unwrap()
+    if archive_name_res:is_err() then return archive_name_res:map(function() end) end
+    local archive_name = archive_name_res:unwrap()
 
     -- /result is gitignored, which makes it a good place to store the
     -- downloaded archive under.

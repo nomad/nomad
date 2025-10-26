@@ -28,8 +28,6 @@
                 src = src.rust craneLib;
                 strictDeps = true;
               };
-
-              releaseTagPath = inputs.self + "/RELEASE_TAG";
             in
             depsArgs
             // {
@@ -45,8 +43,8 @@
                 COMMIT_HASH = inputs.self.rev or (lib.removeSuffix "-dirty" inputs.self.dirtyRev);
                 COMMIT_UNIX_TIMESTAMP = toString inputs.self.lastModified;
               }
-              // (lib.optionalAttrs (builtins.pathExists releaseTagPath) {
-                RELEASE_TAG = lib.fileContents releaseTagPath;
+              // (lib.optionalAttrs (common.releaseTag != null) {
+                RELEASE_TAG = common.releaseTag;
               });
             };
 

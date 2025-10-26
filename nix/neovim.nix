@@ -16,6 +16,8 @@
       ...
     }:
     let
+      inherit (common) releaseTag;
+
       xtask = "${common.xtask}/bin/xtask";
 
       crateInfos = builtins.fromJSON (
@@ -69,7 +71,7 @@
           targetCrane.commonArgs
           // {
             pname = crateInfos.name;
-            version = crateInfos.version;
+            version = if releaseTag != null then releaseTag else "dev";
             src = pluginSrc;
             doCheck = false;
             buildPhaseCargoCommand = ''
@@ -107,8 +109,8 @@
       mkReleaseArtifacts =
         targetPackageSets:
         pkgs.stdenv.mkDerivation {
-          inherit (crateInfos) version;
           pname = "${crateInfos.name}-release-artifacts";
+          version = if releaseTag != null then releaseTag else "dev";
           src = null;
           dontUnpack = true;
           nativeBuildInputs = with pkgs; [
@@ -153,13 +155,13 @@
               mkArchiveName =
                 args:
                 let
-                  inherit (common) workspaceName;
-                  inherit (crateInfos) version;
+                  inherit (common) releaseTag workspaceName;
+                  tag = if releaseTag != null then "-${releaseTag}" else "";
                   neovimVersion = mkNeovimVersion args.isNightly;
                   arch = common.getArchString args.targetPkgs;
                   os = common.getOSString args.targetPkgs;
                 in
-                "${workspaceName}-${version}-for-neovim-${neovimVersion}-${os}-${arch}.tar.gz";
+                "${workspaceName}${tag}-for-neovim-${neovimVersion}-${os}-${arch}.tar.gz";
 
               archivePlugins =
                 let
