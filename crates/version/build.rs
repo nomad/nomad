@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 #![allow(clippy::unwrap_used)]
 
-use core::fmt::Write;
 use core::ops::Deref;
 use std::env;
 use std::fs::File;
@@ -11,20 +10,24 @@ use std::sync::OnceLock;
 use chrono::Datelike;
 use git2::Repository;
 
+const COMMIT_HASH_ENV: &str = "COMMIT_HASH";
+const COMMIT_UNIX_TIMESTAMP_ENV: &str = "COMMIT_UNIX_TIMESTAMP";
+const RELEASE_TAG_ENV: &str = "RELEASE_TAG";
+
 fn main() {
     let mut file = GeneratedFile::default();
-    add_commit_infos(&mut file);
-    add_version_infos(&mut file);
+    add_commit(&mut file);
+    add_tag(&mut file);
     file.create();
 }
 
-fn add_commit_infos(file: &mut GeneratedFile) {
+fn add_commit(file: &mut GeneratedFile) {
     let repo = LazyRepo::default();
 
-    let commit_hash = env::var("COMMIT_HASH")
+    let commit_hash = env::var(COMMIT_HASH_ENV)
         .unwrap_or_else(|_| repo.head_commit().id().to_string());
 
-    let commit_unix_timestamp = env::var("COMMIT_UNIX_TIMESTAMP")
+    let commit_unix_timestamp = env::var(COMMIT_UNIX_TIMESTAMP_ENV)
         .map(|env_var| env_var.parse::<i64>().unwrap())
         .unwrap_or_else(|_| repo.head_commit().time().seconds());
 
@@ -32,10 +35,21 @@ fn add_commit_infos(file: &mut GeneratedFile) {
         chrono::DateTime::from_timestamp(commit_unix_timestamp, 0)
             .expect("invalid timestamp");
 
-    file.add_const("COMMIT_SHORT_HASH", &commit_hash[..7])
-        .add_const("COMMIT_YEAR", commit_date.year() as u16)
-        .add_const("COMMIT_MONTH", commit_date.month() as u8)
-        .add_const("COMMIT_DAY", commit_date.day() as u8);
+    file.contents.push_str(&format!(
+        r#"
+pub(crate) const COMMIT: crate::version::Commit = crate::version::Commit {{
+    hash: "{commit_hash}",
+    date: crate::version::Date {{
+        year: {},
+        month: {},
+        day: {},
+    }},
+}};
+"#,
+        commit_date.year(),
+        commit_date.month(),
+        commit_date.day(),
+    ));
 
     if let Some(repo) = repo.inner() {
         // Trigger a rebuild when new commits are made.
@@ -51,16 +65,43 @@ fn add_commit_infos(file: &mut GeneratedFile) {
     }
 }
 
-fn add_version_infos(file: &mut GeneratedFile) {
-    let major = env::var("CARGO_PKG_VERSION_MAJOR").unwrap();
-    let minor = env::var("CARGO_PKG_VERSION_MINOR").unwrap();
-    let patch = env::var("CARGO_PKG_VERSION_PATCH").unwrap();
-    let pre = env::var("CARGO_PKG_VERSION_PRE").unwrap();
+fn add_tag(file: &mut GeneratedFile) {
+    let tag_path = "crate::version::ReleaseTag";
 
-    file.add_const("MAJOR", major.parse::<u8>().unwrap())
-        .add_const("MINOR", minor.parse::<u8>().unwrap())
-        .add_const("PATCH", patch.parse::<u8>().unwrap())
-        .add_const("PRE", (!pre.is_empty()).then_some(&*pre));
+    let tag = match env::var(RELEASE_TAG_ENV) {
+        Ok(tag) if tag == "nightly" => format!("Some({tag_path}::Nightly)"),
+
+        Ok(tag) => {
+            let try_block = || {
+                let mut parts = tag.split('.');
+                let year = parts.next()?;
+                let month = parts.next()?;
+                let patch = parts.next()?;
+                Some(format!(
+                    "Some({tag_path}::Stable {{ year: {year}, month: \
+                     {month}, patch: {patch}}})"
+                ))
+            };
+            try_block().unwrap_or_else(|| {
+                panic!(
+                    "expected ${RELEASE_TAG_ENV} to be formatted as \
+                     YYYY.MM.PATCH",
+                )
+            })
+        },
+
+        Err(env::VarError::NotPresent) => "None".to_owned(),
+
+        Err(env::VarError::NotUnicode(_)) => {
+            panic!("${RELEASE_TAG_ENV} is not valid unicode")
+        },
+    };
+
+    file.contents.push_str(&format!(
+        "pub(crate) const TAG: Option<{tag_path}> = {tag};",
+    ));
+
+    println!("cargo:rerun-if-env-changed={RELEASE_TAG_ENV}");
 }
 
 #[derive(Default)]
@@ -70,18 +111,6 @@ struct GeneratedFile {
 
 impl GeneratedFile {
     const NAME: &'static str = "generated.rs";
-
-    fn add_const<T>(&mut self, name: &str, value: T) -> &mut Self
-    where
-        T: DisplayType,
-    {
-        write!(&mut self.contents, "pub(crate) const {name}: ").unwrap();
-        T::display_type(&mut self.contents);
-        self.contents.push_str(" = ");
-        T::display_value(&value, &mut self.contents);
-        self.contents.push_str(";\n");
-        self
-    }
 
     fn create(self) {
         use std::io::Write;
@@ -126,60 +155,4 @@ fn out_file(file_name: &str) -> File {
     File::create(&out_path).unwrap_or_else(|err| {
         panic!("couldn't create file at {out_path:?}: {err}")
     })
-}
-
-trait DisplayType {
-    fn display_type(buf: &mut String);
-    fn display_value(&self, buf: &mut String);
-}
-
-impl DisplayType for u8 {
-    fn display_type(buf: &mut String) {
-        buf.push_str("u8");
-    }
-
-    fn display_value(&self, buf: &mut String) {
-        write!(buf, "{self}").unwrap()
-    }
-}
-
-impl DisplayType for u16 {
-    fn display_type(buf: &mut String) {
-        buf.push_str("u16");
-    }
-
-    fn display_value(&self, buf: &mut String) {
-        write!(buf, "{self}").unwrap()
-    }
-}
-
-impl DisplayType for &str {
-    fn display_type(buf: &mut String) {
-        buf.push_str("&str");
-    }
-
-    fn display_value(&self, buf: &mut String) {
-        write!(buf, "\"{self}\"").unwrap()
-    }
-}
-
-impl<T: DisplayType> DisplayType for Option<T> {
-    fn display_type(buf: &mut String) {
-        buf.push_str("Option<");
-        T::display_type(buf);
-        buf.push('>');
-    }
-
-    fn display_value(&self, buf: &mut String) {
-        match self {
-            Some(value) => {
-                write!(buf, "Some(").unwrap();
-                value.display_value(buf);
-                write!(buf, ")").unwrap();
-            },
-            None => {
-                buf.push_str("None");
-            },
-        }
-    }
 }
