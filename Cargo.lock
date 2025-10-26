@@ -248,7 +248,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "auth"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "auth-types",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "auth-types"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
  "base64",
  "cauchy",
@@ -327,7 +327,7 @@ checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
 name = "benches"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "anyhow",
@@ -631,7 +631,7 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "clipboard"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "arboard",
  "either",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "collab"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "async-io",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "collab-project"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "bincode",
  "cauchy",
@@ -1124,7 +1124,7 @@ dependencies = [
 
 [[package]]
 name = "editor"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -1226,7 +1226,7 @@ dependencies = [
 
 [[package]]
 name = "executor"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "async-task",
  "pin-project-lite",
@@ -1317,7 +1317,7 @@ dependencies = [
 
 [[package]]
 name = "fs"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -1521,7 +1521,7 @@ dependencies = [
 
 [[package]]
 name = "gitignore"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "http-client"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "axum-core",
  "executor",
@@ -2260,7 +2260,7 @@ dependencies = [
 
 [[package]]
 name = "mock"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "anyhow",
@@ -2287,7 +2287,7 @@ dependencies = [
 
 [[package]]
 name = "mock-macros"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2305,7 +2305,7 @@ dependencies = [
 
 [[package]]
 name = "neovim"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "async-io",
@@ -2341,7 +2341,7 @@ dependencies = [
 
 [[package]]
 name = "neovim-macros"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2366,7 +2366,7 @@ dependencies = [
 
 [[package]]
 name = "nomad-collab-params"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
  "auth-types",
  "cauchy",
@@ -2379,7 +2379,7 @@ dependencies = [
 
 [[package]]
 name = "nomad-neovim"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "auth",
@@ -3169,7 +3169,7 @@ dependencies = [
 
 [[package]]
 name = "real-fs"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "async-fs",
@@ -3288,7 +3288,7 @@ dependencies = [
 
 [[package]]
 name = "root-finder"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -3801,7 +3801,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "async-io",
@@ -3868,7 +3868,7 @@ dependencies = [
 
 [[package]]
 name = "thread-pool"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "executor",
  "flume",
@@ -4110,7 +4110,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-layers"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "cauchy",
@@ -4296,7 +4296,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "chrono",
  "editor",
@@ -4889,7 +4889,7 @@ checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 
 [[package]]
 name = "xtask"
-version = "0.1.0-dev"
+version = "0.0.0"
 dependencies = [
  "abs-path",
  "anyhow",
