@@ -261,6 +261,9 @@ impl From<start::StartError<Neovim>> for notify::Chunks {
             start::StartError::UserNotLoggedIn => {
                 let mut chunks = Self::default();
 
+                let auth =
+                    <auth::Auth as editor::module::Module<Neovim>>::NAME;
+
                 let login =
                     <auth::login::Login as editor::module::AsyncAction<
                         Neovim,
@@ -273,7 +276,10 @@ impl From<start::StartError<Neovim>> for notify::Chunks {
                     )
                     .push_newline()
                     .push_highlighted(":", "Comment")
-                    .push_highlighted(format_compact!("Mad {login}"), "Title");
+                    .push_highlighted(
+                        format_compact!("Mad {auth} {login}"),
+                        "Title",
+                    );
 
                 chunks
             },

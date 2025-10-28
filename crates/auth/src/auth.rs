@@ -65,7 +65,10 @@ impl<Ed: AuthEditor> Module<Ed> for Auth {
     type Config = Config;
 
     fn api(&self, ctx: &mut ApiCtx<Ed>) {
-        ctx.with_function(Login::from(self)).with_function(Logout::from(self));
+        ctx.with_command(Login::from(self))
+            .with_command(Logout::from(self))
+            .with_function(Login::from(self))
+            .with_function(Logout::from(self));
     }
 
     fn on_init(&self, ctx: &mut Context<Ed, Borrowed>) {
