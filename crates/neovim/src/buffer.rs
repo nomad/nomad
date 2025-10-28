@@ -23,7 +23,7 @@ use smol_str::format_smolstr;
 pub use crate::buffer_ext::{BufferExt, GraphemeOffsets};
 use crate::convert::Convert;
 use crate::cursor::NeovimCursor;
-use crate::oxi::{self, BufHandle, api};
+use crate::oxi::{self, BufHandle, api, mlua};
 use crate::{Neovim, decoration_provider, events, utils};
 
 /// TODO: docs.
@@ -179,7 +179,7 @@ impl<'a> HighlightRange<'a> {
         buffer: api::Buffer,
         handle: &'a HighlightRangeHandle,
     ) -> Self {
-        debug_assert_eq!(BufferId(buffer.handle()), handle.buffer_id());
+        debug_assert_eq!(BufferId::from(buffer.clone()), handle.buffer_id());
         Self { buffer, handle }
     }
 }
@@ -723,6 +723,12 @@ impl Hash for BufferId {
 }
 
 impl nohash::IsEnabled for BufferId {}
+
+impl mlua::IntoLua for BufferId {
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+        self.0.into_lua(lua)
+    }
+}
 
 impl From<BufferId> for api::Buffer {
     #[inline]

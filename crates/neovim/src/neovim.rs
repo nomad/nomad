@@ -137,7 +137,7 @@ impl Neovim {
         .expect("couldn't set 'buflisted' on new buffer");
 
         // We expect an integer because 'bufload' returns 0 on success.
-        api::call_function::<_, u8>("bufload", (buffer.handle(),))
+        api::call_function::<_, u8>("bufload", (buffer.clone(),))
             .expect("couldn't bufload");
 
         BufferId::from(buffer)

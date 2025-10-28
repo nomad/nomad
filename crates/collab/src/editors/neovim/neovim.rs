@@ -223,8 +223,7 @@ impl CollabEditor for Neovim {
             let lua = mlua::lua();
 
             let opts = lua.create_table().ok()?;
-            opts.raw_set("bufnr", oxi::api::Buffer::from(buffer_id).handle())
-                .ok()?;
+            opts.raw_set("bufnr", buffer_id).ok()?;
 
             get_lua_value::<Function>(&["vim", "lsp", "get_clients"])?
                 .call::<Table>(opts)
