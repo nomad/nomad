@@ -9,7 +9,9 @@ use editor::module::Plugin;
 use editor::notify::Namespace;
 use editor::{AccessMut, AgentId, Buffer, Editor};
 use either::Either;
+use nvim_oxi::api;
 
+use crate::api::NeovimApi;
 use crate::buffer::{
     BufferId,
     HighlightRange,
@@ -21,11 +23,10 @@ use crate::cursor::NeovimCursor;
 use crate::decoration_provider::DecorationProvider;
 use crate::events::{self, EventHandle, Events};
 use crate::selection::NeovimSelection;
-use crate::{api, executor, notify, oxi, serde, value};
+use crate::{executor, notify, serde, value};
 
 /// The type of error returned by [`Neovim::data_dir_path()`].
-pub type DataDirError =
-    Either<oxi::api::Error, abs_path::AbsPathNotAbsoluteError>;
+pub type DataDirError = Either<api::Error, abs_path::AbsPathNotAbsoluteError>;
 
 type HttpClient = http_client::UreqClient<
     <<Neovim as Editor>::Executor as Executor>::BackgroundSpawner,
@@ -48,7 +49,7 @@ impl Neovim {
     /// Returns the path to the user's data directory used by Neovim.
     #[inline]
     pub fn data_dir_path(&self) -> Result<AbsPathBuf, DataDirError> {
-        oxi::api::call_function::<_, String>("stdpath", ("data",))
+        api::call_function::<_, String>("stdpath", ("data",))
             .map_err(Either::Left)
             .and_then(|path| path.parse::<AbsPathBuf>().map_err(Either::Right))
     }
@@ -81,13 +82,13 @@ impl Neovim {
     #[track_caller]
     #[inline]
     pub fn new(plugin_name: &str) -> Self {
-        let augroup_id = oxi::api::create_augroup(
+        let augroup_id = api::create_augroup(
             plugin_name,
-            &oxi::api::opts::CreateAugroupOpts::builder().clear(true).build(),
+            &api::opts::CreateAugroupOpts::builder().clear(true).build(),
         )
         .expect("couldn't create augroup");
 
-        let namespace_id = oxi::api::create_namespace(plugin_name);
+        let namespace_id = api::create_namespace(plugin_name);
 
         let mut executor = executor::NeovimExecutor::default();
 
@@ -122,14 +123,21 @@ impl Neovim {
             }
         });
 
-        let buffer = oxi::api::call_function::<_, oxi::api::Buffer>(
+        let buffer = api::call_function::<_, api::Buffer>(
             "bufadd",
             (file_path.as_str(),),
         )
         .expect("couldn't bufadd");
 
+        api::set_option_value(
+            "buflisted",
+            true,
+            &api::opts::OptionOpts::builder().buf(buffer.clone()).build(),
+        )
+        .expect("couldn't set 'buflisted' on new buffer");
+
         // We expect an integer because 'bufload' returns 0 on success.
-        oxi::api::call_function::<_, u8>("bufload", (buffer.handle(),))
+        api::call_function::<_, u8>("bufload", (buffer.handle(),))
             .expect("couldn't bufload");
 
         BufferId::from(buffer)
@@ -137,7 +145,7 @@ impl Neovim {
 }
 
 impl Editor for Neovim {
-    type Api = api::NeovimApi;
+    type Api = NeovimApi;
     type Buffer<'a> = NeovimBuffer<'a>;
     type BufferId = BufferId;
     type Cursor<'a> = NeovimCursor<'a>;
@@ -163,7 +171,7 @@ impl Editor for Neovim {
 
     #[inline]
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        for buf_id in oxi::api::list_bufs().map(Into::into) {
+        for buf_id in api::list_bufs().map(Into::into) {
             let Some(buffer) = self.buffer(buf_id) else { continue };
             if &*buffer.path() == path {
                 // SAFETY: Rust is dumb.
@@ -185,7 +193,7 @@ impl Editor for Neovim {
 
     #[inline]
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
-        self.buffer(BufferId::from(oxi::api::Buffer::current()))
+        self.buffer(BufferId::from(api::Buffer::current()))
     }
 
     #[inline]
@@ -193,7 +201,7 @@ impl Editor for Neovim {
     where
         Fun: FnMut(Self::Buffer<'_>),
     {
-        for buf_id in oxi::api::list_bufs().map(Into::into) {
+        for buf_id in api::list_bufs().map(Into::into) {
             if let Some(buffer) = self.buffer(buf_id) {
                 fun(buffer);
             }

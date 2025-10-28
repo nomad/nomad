@@ -187,8 +187,7 @@ impl fmt::Display for Path<'_> {
             let mut names = config_path.names().peekable();
             // The first name is the plugin's.
             names.next();
-            loop {
-                let Some(name) = names.next() else { break };
+            while let Some(name) = names.next() {
                 f.write_str(name)?;
                 if names.peek().is_some() {
                     f.write_str(".")?;
