@@ -18,11 +18,11 @@ pub enum ProgressReporter {
 
 pub(super) struct ProgressNotification {
     pub(super) chunks: notify::Chunks,
-    pub(super) kind: ProgressNotificationKind,
+    pub(super) status: ProgressStatus,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum ProgressNotificationKind {
+pub(super) enum ProgressStatus {
     Progress(Option<notify::Percentage>),
     Success,
     Error,
@@ -52,10 +52,8 @@ impl ProgressReporter {
 
     /// TODO: docs.
     pub fn report_error(self, chunks: notify::Chunks) {
-        let notif = ProgressNotification {
-            chunks,
-            kind: ProgressNotificationKind::Error,
-        };
+        let notif =
+            ProgressNotification { chunks, status: ProgressStatus::Error };
         match self {
             Self::NvimEcho(inner) => inner.send_notification(notif),
             Self::NvimNotify(inner) => inner.send_notification(notif),
@@ -70,7 +68,7 @@ impl ProgressReporter {
     ) {
         let notif = ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Progress(percentage),
+            status: ProgressStatus::Progress(percentage),
         };
         match self {
             Self::NvimEcho(inner) => inner.send_notification(notif),
@@ -80,10 +78,8 @@ impl ProgressReporter {
 
     /// TODO: docs.
     pub fn report_success(self, chunks: notify::Chunks) {
-        let notif = ProgressNotification {
-            chunks,
-            kind: ProgressNotificationKind::Success,
-        };
+        let notif =
+            ProgressNotification { chunks, status: ProgressStatus::Success };
         match self {
             Self::NvimEcho(inner) => inner.send_notification(notif),
             Self::NvimNotify(inner) => inner.send_notification(notif),
@@ -91,9 +87,9 @@ impl ProgressReporter {
     }
 }
 
-impl From<ProgressNotificationKind> for notify::Level {
-    fn from(kind: ProgressNotificationKind) -> Self {
-        use ProgressNotificationKind::*;
+impl From<ProgressStatus> for notify::Level {
+    fn from(kind: ProgressStatus) -> Self {
+        use ProgressStatus::*;
         match kind {
             Progress(_) | Success => Self::Info,
             Error => Self::Error,

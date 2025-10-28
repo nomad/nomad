@@ -105,11 +105,8 @@ fn main_cursor_is_removed_when_cursor_deletion_is_received() {
         proj.integrate_cursor_deletion(cursor_deletion, ctx);
 
         // The cursor we removed was peer1's main, so it should be None now.
-        let peer1_main_cursor = proj
-            .remote_peers
-            .get(project_1.peer_id())
-            .unwrap()
-            .main_cursor();
+        let peer1_main_cursor =
+            proj.remote_peers.get(project_1.peer_id()).unwrap().main_cursor();
 
         assert_eq!(peer1_main_cursor, None);
     });
@@ -166,11 +163,8 @@ fn main_cursor_is_set_to_smallest_remaining_cursor_when_deletion_is_received()
         );
 
         // The new main cursor for peer 1 should be cursor 2.
-        let peer1_main_cursor = proj
-            .remote_peers
-            .get(project_1.peer_id())
-            .unwrap()
-            .main_cursor();
+        let peer1_main_cursor =
+            proj.remote_peers.get(project_1.peer_id()).unwrap().main_cursor();
         assert_eq!(peer1_main_cursor, Some(cursor2));
 
         // Delete cursor 2.
@@ -180,11 +174,8 @@ fn main_cursor_is_set_to_smallest_remaining_cursor_when_deletion_is_received()
         );
 
         // The new main cursor for peer 1 should be cursor 3.
-        let peer1_main_cursor = proj
-            .remote_peers
-            .get(project_1.peer_id())
-            .unwrap()
-            .main_cursor();
+        let peer1_main_cursor =
+            proj.remote_peers.get(project_1.peer_id()).unwrap().main_cursor();
         assert_eq!(peer1_main_cursor, Some(cursor3));
     });
 }

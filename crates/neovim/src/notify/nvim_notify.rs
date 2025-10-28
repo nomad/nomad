@@ -11,10 +11,7 @@ use nvim_oxi::{api, mlua};
 use crate::buffer::Point;
 use crate::executor::NeovimLocalSpawner;
 use crate::notify::Chunk;
-use crate::notify::progress_reporter::{
-    ProgressNotification,
-    ProgressNotificationKind,
-};
+use crate::notify::progress_reporter::{ProgressNotification, ProgressStatus};
 use crate::{notify, utils};
 
 /// Frames for the spinner animation.
@@ -63,16 +60,16 @@ impl NvimNotify {
 
         let opts = lua
             .create_table_with_capacity(0, 2)
-            .expect("failed to create options table");
+            .expect("couldn't create options table");
 
         opts.raw_set("title", namespace.dot_separated().to_string())
-            .expect("failed to set 'title'");
+            .expect("couldn't set 'title'");
 
         opts.raw_set(
             "on_open",
             Self::on_open(message_chunks.clone(), namespace_id),
         )
-        .expect("failed to set 'on_open'");
+        .expect("couldn't set 'on_open'");
 
         notify
             .call::<mlua::Value>((
@@ -80,7 +77,7 @@ impl NvimNotify {
                 level as u8,
                 &opts,
             ))
-            .expect("failed to call 'notify'");
+            .expect("couldn't call 'notify'");
     }
 
     #[inline]
@@ -153,7 +150,7 @@ impl NvimNotifyProgressReporter {
     pub fn report_error(self, chunks: notify::Chunks) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Error,
+            status: ProgressStatus::Error,
         });
     }
 
@@ -165,7 +162,7 @@ impl NvimNotifyProgressReporter {
     ) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Progress(perc),
+            status: ProgressStatus::Progress(perc),
         });
     }
 
@@ -173,7 +170,7 @@ impl NvimNotifyProgressReporter {
     pub fn report_success(self, chunks: notify::Chunks) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Success,
+            status: ProgressStatus::Success,
         });
     }
 
@@ -202,30 +199,29 @@ impl NvimNotifyProgressReporter {
         let notify = notify(mlua);
 
         let opts = mlua
-            .create_table_with_capacity(0, 4)
-            .expect("failed to create options table");
+            .create_table_with_capacity(0, 5)
+            .expect("couldn't create options table");
 
         opts.raw_set("title", namespace.dot_separated().to_string())
-            .expect("failed to set 'title'");
+            .expect("couldn't set 'title'");
 
         let mut notif = first_notif;
 
         loop {
-            let hide_from_history =
-                notif.kind != ProgressNotificationKind::Error;
+            let hide_from_history = notif.status != ProgressStatus::Error;
 
             opts.raw_set("hide_from_history", hide_from_history)
-                .expect("failed to set 'hide_from_history'");
+                .expect("couldn't set 'hide_from_history'");
 
             opts.raw_set(
                 "icon",
-                &*notif.kind.icon(spinner_frame_idx).to_compact_string(),
+                &*notif.status.icon(spinner_frame_idx).to_compact_string(),
             )
-            .expect("failed to set 'icon'");
+            .expect("couldn't set 'icon'");
 
             Self::notify(&notif, &opts, &notify);
 
-            if !matches!(notif.kind, ProgressNotificationKind::Progress(_)) {
+            if !matches!(notif.status, ProgressStatus::Progress(_)) {
                 break;
             }
 
@@ -235,7 +231,7 @@ impl NvimNotifyProgressReporter {
                         spinner_frame_idx += 1;
                         spinner_frame_idx %= SPINNER_FRAMES.len();
                         let frame = SPINNER_FRAMES[spinner_frame_idx];
-                        opts.raw_set("icon", frame).expect("failed to set 'icon'");
+                        opts.raw_set("icon", frame).expect("couldn't set 'icon'");
                         Self::notify(&notif, &opts, &notify);
                         continue 'spin;
                     },
@@ -243,19 +239,19 @@ impl NvimNotifyProgressReporter {
                     maybe_notif = notif_rx.recv_async() => {
                         let Ok(new_notif) = maybe_notif else { return; };
 
-                        match (notif.kind, new_notif.kind) {
+                        match (notif.status, new_notif.status) {
                             // Stop spinning if we've started showing
                             // percentages.
                             (
-                                ProgressNotificationKind::Progress(None),
-                                ProgressNotificationKind::Progress(Some(_)),
+                                ProgressStatus::Progress(None),
+                                ProgressStatus::Progress(Some(_)),
                             ) => spin.clear(),
 
                             // Start spinning if we've stopped showing
                             // percentages.
                             (
-                                ProgressNotificationKind::Progress(Some(_)),
-                                ProgressNotificationKind::Progress(None),
+                                ProgressStatus::Progress(Some(_)),
+                                ProgressStatus::Progress(None),
                             ) => spin.set_interval(SPINNER_UPDATE_INTERVAL),
 
                             _ => {},
@@ -274,23 +270,36 @@ impl NvimNotifyProgressReporter {
         opts: &mlua::Table,
         notify: &mlua::Function,
     ) {
+        let timeout = match notif.status {
+            // Keep the notification window open for as long as we're emitting
+            // progress messages. Without this, the window would be closed if
+            // the time between two consecutive progress updates is greater
+            // than the 'timeout' value configured by the user.
+            ProgressStatus::Progress(_) => mlua::Value::Boolean(false),
+            // Re-enable the timeout when we emit the final progress message.
+            ProgressStatus::Success => mlua::Value::Integer(2500),
+            ProgressStatus::Error => mlua::Value::Integer(3500),
+        };
+
+        opts.raw_set("timeout", timeout).expect("couldn't set 'timeout'");
+
         let record = notify
             .call::<mlua::Table>((
                 notif.chunks.concat_text(),
-                notify::Level::from(notif.kind) as u8,
+                notify::Level::from(notif.status) as u8,
                 opts,
             ))
-            .expect("failed to call 'notify'");
+            .expect("couldn't call 'notify'");
 
         let new_id = record
             .get::<mlua::Integer>("id")
-            .expect("failed to get notification ID from record");
+            .expect("couldn't get notification ID from record");
 
-        opts.raw_set("replace", new_id).expect("failed to set 'replace'");
+        opts.raw_set("replace", new_id).expect("couldn't set 'replace'");
     }
 }
 
-impl ProgressNotificationKind {
+impl ProgressStatus {
     pub(super) fn icon(self, spinner_frame_idx: usize) -> Icon {
         let char = match self {
             Self::Progress(Some(perc)) => return Icon::Percentage(perc),
@@ -317,14 +326,12 @@ where
 }
 
 #[cfg(feature = "nightly")]
-impl From<ProgressNotificationKind>
-    for nvim_oxi::api::types::ProgressMessageStatus
-{
-    fn from(kind: ProgressNotificationKind) -> Self {
-        match kind {
-            ProgressNotificationKind::Progress(_) => Self::Running,
-            ProgressNotificationKind::Success => Self::Success,
-            ProgressNotificationKind::Error => Self::Failed,
+impl From<ProgressStatus> for nvim_oxi::api::types::ProgressMessageStatus {
+    fn from(status: ProgressStatus) -> Self {
+        match status {
+            ProgressStatus::Progress(_) => Self::Running,
+            ProgressStatus::Success => Self::Success,
+            ProgressStatus::Error => Self::Failed,
         }
     }
 }
@@ -397,7 +404,7 @@ fn notify(lua: &mlua::Lua) -> mlua::Function {
 
     let nvim_notify = require
         .call::<mlua::Table>("notify")
-        .expect("failed to require 'notify' module");
+        .expect("couldn't require 'notify' module");
 
     nvim_notify
         .get::<mlua::Function>("notify")

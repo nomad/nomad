@@ -15,10 +15,7 @@ use crate::notify::nvim_notify::{
     SPINNER_FRAMES,
     SPINNER_UPDATE_INTERVAL,
 };
-use crate::notify::progress_reporter::{
-    ProgressNotification,
-    ProgressNotificationKind,
-};
+use crate::notify::progress_reporter::{ProgressNotification, ProgressStatus};
 
 #[cfg(not(feature = "nightly"))]
 type OptsOrMessageId = api::opts::EchoOpts;
@@ -193,7 +190,7 @@ impl NvimEchoProgressReporter {
     pub fn report_error(self, chunks: notify::Chunks) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Error,
+            status: ProgressStatus::Error,
         });
     }
 
@@ -205,7 +202,7 @@ impl NvimEchoProgressReporter {
     ) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Progress(perc),
+            status: ProgressStatus::Progress(perc),
         });
     }
 
@@ -213,7 +210,7 @@ impl NvimEchoProgressReporter {
     pub fn report_success(self, chunks: notify::Chunks) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Success,
+            status: ProgressStatus::Success,
         });
     }
 
@@ -231,10 +228,10 @@ impl NvimEchoProgressReporter {
 
     fn echo(
         chunks: &NvimEchoChunks<'_>,
-        notif_kind: ProgressNotificationKind,
+        status: ProgressStatus,
         opts_or_message_id: &mut OptsOrMessageId,
     ) {
-        let add_to_history = notif_kind == ProgressNotificationKind::Error;
+        let add_to_history = status == ProgressStatus::Error;
 
         #[cfg(not(feature = "nightly"))]
         let opts = opts_or_message_id;
@@ -247,15 +244,14 @@ impl NvimEchoProgressReporter {
                 builder.id(message_id);
             }
 
-            if let ProgressNotificationKind::Progress(Some(perc)) = notif_kind
-            {
+            if let ProgressStatus::Progress(Some(perc)) = status {
                 builder.percent(perc);
             }
 
             builder
                 .kind("progress")
                 .title(&*chunks.title.to_compact_string())
-                .status(notif_kind.into())
+                .status(status.into())
                 .build()
         };
 
@@ -287,18 +283,16 @@ impl NvimEchoProgressReporter {
             return EventLoopOutput::Cancelled;
         };
 
-        let mut spin = match first_notif.kind {
-            ProgressNotificationKind::Progress(Some(_)) => {
-                async_io::Timer::never()
-            },
+        let mut spin = match first_notif.status {
+            ProgressStatus::Progress(Some(_)) => async_io::Timer::never(),
             _ => async_io::Timer::interval(SPINNER_UPDATE_INTERVAL),
         };
         let mut spinner_frame_idx = 0;
 
         let mut chunks = NvimEchoChunks {
             title: Title {
-                icon: first_notif.kind.icon(spinner_frame_idx),
-                hl_group: Some(first_notif.kind.hl_group()),
+                icon: first_notif.status.icon(spinner_frame_idx),
+                hl_group: Some(first_notif.status.hl_group()),
                 namespace,
             },
             message_chunks: first_notif.chunks,
@@ -306,7 +300,7 @@ impl NvimEchoProgressReporter {
 
         let mut opts_or_msg_id = OptsOrMessageId::default();
 
-        let mut last_notif_kind = first_notif.kind;
+        let mut last_status = first_notif.status;
 
         loop {
             // We need to increase the cmdheight if its current value is
@@ -317,16 +311,12 @@ impl NvimEchoProgressReporter {
                 *current_cmdheight = min_cmdheight;
             }
 
-            Self::echo(&chunks, last_notif_kind, &mut opts_or_msg_id);
+            Self::echo(&chunks, last_status, &mut opts_or_msg_id);
 
-            match last_notif_kind {
-                ProgressNotificationKind::Success => {
-                    return EventLoopOutput::Success;
-                },
-                ProgressNotificationKind::Error => {
-                    return EventLoopOutput::Error;
-                },
-                ProgressNotificationKind::Progress(_) => {},
+            match last_status {
+                ProgressStatus::Success => return EventLoopOutput::Success,
+                ProgressStatus::Error => return EventLoopOutput::Error,
+                ProgressStatus::Progress(_) => {},
             }
 
             'spin: loop {
@@ -335,7 +325,7 @@ impl NvimEchoProgressReporter {
                         spinner_frame_idx += 1;
                         spinner_frame_idx %= SPINNER_FRAMES.len();
                         chunks.title.icon = Icon::Char(SPINNER_FRAMES[spinner_frame_idx]);
-                        Self::echo(&chunks, last_notif_kind, &mut opts_or_msg_id);
+                        Self::echo(&chunks, last_status, &mut opts_or_msg_id);
                         continue 'spin;
                     },
 
@@ -343,29 +333,29 @@ impl NvimEchoProgressReporter {
                         let Ok(notif) = maybe_notif else {
                             return EventLoopOutput::Cancelled;
                         };
-                        chunks.title.icon = notif.kind.icon(spinner_frame_idx);
-                        chunks.title.hl_group = Some(notif.kind.hl_group());
+                        chunks.title.icon = notif.status.icon(spinner_frame_idx);
+                        chunks.title.hl_group = Some(notif.status.hl_group());
                         chunks.message_chunks = notif.chunks;
 
-                        match (last_notif_kind, notif.kind) {
+                        match (last_status, notif.status) {
                             // Stop spinning if we've started showing
                             // percentages.
                             (
-                                ProgressNotificationKind::Progress(None),
-                                ProgressNotificationKind::Progress(Some(_)),
+                                ProgressStatus::Progress(None),
+                                ProgressStatus::Progress(Some(_)),
                             ) => spin.clear(),
 
                             // Start spinning if we've stopped showing
                             // percentages.
                             (
-                                ProgressNotificationKind::Progress(Some(_)),
-                                ProgressNotificationKind::Progress(None),
+                                ProgressStatus::Progress(Some(_)),
+                                ProgressStatus::Progress(None),
                             ) => spin.set_interval(SPINNER_UPDATE_INTERVAL),
 
                             _ => {},
                         }
 
-                        last_notif_kind = notif.kind;
+                        last_status = notif.status;
                         break 'spin;
                     },
                 }
@@ -374,7 +364,7 @@ impl NvimEchoProgressReporter {
     }
 }
 
-impl ProgressNotificationKind {
+impl ProgressStatus {
     fn hl_group(self) -> &'static str {
         match self {
             Self::Progress(_) => "DiagnosticInfo",
