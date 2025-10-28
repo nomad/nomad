@@ -820,6 +820,22 @@ async fn save_buffer_via_write(ctx: &mut Context<Neovim>) {
     assert_eq!(saved_by.copied(), Some(AgentId::UNKNOWN));
 }
 
+#[neovim::test]
+#[ignore = "https://github.com/neovim/neovim/issues/36370"]
+async fn search_and_replace(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    ctx.feedkeys("iHello");
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.command("s/llo/y");
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert_eq!(&*edit.replacements, &[Replacement::new(2..5, "y")]);
+}
+
 mod ed_buffer {
     //! Contains the editor-agnostic buffer tests.
 
