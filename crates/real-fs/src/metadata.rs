@@ -6,6 +6,7 @@ use abs_path::NodeName;
 use crate::{Inode, RealFs};
 
 /// TODO: docs.
+#[derive(Debug)]
 pub struct Metadata {
     pub(crate) inner: async_fs::Metadata,
     pub(crate) node_kind: fs::NodeKind,

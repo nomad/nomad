@@ -1,3 +1,4 @@
+use core::fmt;
 use std::ffi::OsString;
 
 use abs_path::{InvalidNodeNameError, NodeName};
@@ -5,7 +6,7 @@ use abs_path::{InvalidNodeNameError, NodeName};
 use crate::{Fs, NodeKind};
 
 /// TODO: docs.
-pub trait Metadata: Send + Sync {
+pub trait Metadata: fmt::Debug + Send + Sync {
     /// TODO: docs.
     type Fs: Fs;
 
