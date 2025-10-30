@@ -465,12 +465,13 @@ async fn read_node<Fs: fs::Fs>(
 
 /// The type of error that can occur when [`Start`]ing a session fails.
 #[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
-#[display("{_0}")]
 pub enum StartError<Ed: CollabEditor> {
     /// TODO: docs.
+    #[display("Couldn't connect to server: {_0}")]
     ConnectToServer(Ed::ConnectToServerError),
 
     /// TODO: docs.
+    #[display("{_0}")]
     Knock(collab_client::KnockError<Ed::ServerParams>),
 
     /// TODO: docs.
@@ -492,6 +493,7 @@ pub enum StartError<Ed: CollabEditor> {
     ReadProject(ReadProjectError<Ed>),
 
     /// TODO: docs.
+    #[display("Couldn't find project root: {_0}")]
     SearchProjectRoot(SearchProjectRootError<Ed>),
 
     /// TODO: docs.
