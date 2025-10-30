@@ -62,6 +62,25 @@ can take it and run it on your own infrastructure if you don't trust us.
 
 ## `:Mad collab join <session_id>`
 
+This command lets you join an existing collaborative editing session. When you
+run it, it ask the collab server to add you to the session with the given ID.
+If that succeeds, a copy of the project will be requested from one of the other
+peers currently in the session.
+
+Obtaining the initial copy can take a while, depending on the size of the
+project, the upload speed of the project's sender, and your download speed.
+
+Once the project has been received, it will be written to disk under
+`$XDG_DATA_HOME/nvim/nomad/collab/remote-projects/<project_name>`, and you'll
+be prompted to jump to the position of another peer that's already in it (by
+default, the host).
+
+From that point on, you can start editing all files in the project as you
+normally would! Every time you make an edit, move your cursor, select some
+text, or save a buffer, that event will be sent to the other peers in the
+session, creating the illusion of a shared workspace while everyone
+independently works on their own copy.
+
 ## `:Mad collab copy-id`
 
 This command copies the session ID of the collaborative session you're
@@ -81,7 +100,7 @@ remaining peers currently in it (this limitation may be removed in the future).
 
 ## `:Mad collab pause`
 
-This command causes Nomad to stop applying all remote events being received
+This command causes Nomad to stop applying the remote events being received
 from the other peers. While a session is paused, all incoming events are
 buffered in memory until the session is resumed (see the following command).
 
