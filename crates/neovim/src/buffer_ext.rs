@@ -430,8 +430,14 @@ pub trait BufferExt {
 }
 
 impl BufferExt for api::Buffer {
+    #[track_caller]
     #[inline]
     fn buffer(&self) -> api::Buffer {
+        debug_assert!(
+            self.is_loaded(),
+            "called a BufferExt method on an unloaded buffer ({:?})",
+            self.get_name()
+        );
         self.clone()
     }
 }
