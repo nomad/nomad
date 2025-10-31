@@ -15,10 +15,11 @@ local Command = require("nomad.neovim.command")
 ---@type table<string, string>
 local commands = {
   chmod = "chmod",
-  cp = "cp",
   curl = "curl",
   git = "git",
   mkdir = "mkdir",
+  mv = "mv",
+  rm = "rm",
   tar = "tar",
 }
 
@@ -95,12 +96,11 @@ local build_fn = function(opts, build_ctx)
     if archive_name_res:is_err() then return archive_name_res:map(function() end) end
     local archive_name = archive_name_res:unwrap()
 
-    -- /result is gitignored, which makes it a good place to store the
-    -- downloaded archive under.
-    local out_dir = build_ctx:repo_dir():join("result")
+    -- NOTE: /artifacts is gitignored.
+    local artifacts_dir = build_ctx:repo_dir():join("artifacts")
 
     local mkdir_res = Command.new(commands.mkdir)
-        :args({ "-p", out_dir:display() })
+        :args({ "-p", artifacts_dir:display() })
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
@@ -110,30 +110,42 @@ local build_fn = function(opts, build_ctx)
         -- Follow redirects.
         :arg("--location")
         :arg("--output")
-        :arg(out_dir:join(archive_name):display())
         :arg(get_artifact_url(tag, archive_name))
+        :arg(artifacts_dir:join(archive_name):display())
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
     if curl_res:is_err() then return curl_res:map_err(err) end
 
     local tar_res = Command.new(commands.tar)
-        :args({ "-xzf", out_dir:join(archive_name):display() })
-        :args({ "-C", out_dir:display() })
+        :args({ "-xzf", archive_name })
+        :current_dir(artifacts_dir)
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
     if tar_res:is_err() then return tar_res:map_err(err) end
 
-    -- Add write permissions.
+    -- The 'lua' directory extracted from the tarball doesn't have write
+    -- permissions by default, which are needed to move it and delete it on
+    -- subsequent runs.
     local chmod_res = Command.new(commands.chmod)
-        :args({ "-R", "u+w", out_dir:display() })
+        :args({ "-R", "u+w", "lua" })
+        :current_dir(artifacts_dir)
+        :on_stderr(build_ctx.notify)
         :await(ctx)
 
     if chmod_res:is_err() then return chmod_res:map_err(err) end
 
-    return Command.new(commands.cp)
-        :args({ "-r", out_dir:join("lua"):display() .. "/.", "lua/" })
+    local rm_res = Command.new(commands.rm)
+        :args({ "-rf", "lua" })
+        :current_dir(build_ctx:repo_dir())
+        :on_stderr(build_ctx.notify)
+        :await(ctx)
+
+    if rm_res:is_err() then return rm_res:map_err(err) end
+
+    return Command.new(commands.mv)
+        :args({ artifacts_dir:join("lua"):display(), "lua" })
         :current_dir(build_ctx:repo_dir())
         :on_stderr(build_ctx.notify)
         :await(ctx)

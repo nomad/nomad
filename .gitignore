@@ -1,5 +1,6 @@
 /.direnv
 /.envrc
+/artifacts
 /lua/*
 !/lua/nomad/
 /result
