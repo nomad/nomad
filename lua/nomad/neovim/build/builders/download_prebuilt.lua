@@ -110,8 +110,8 @@ local build_fn = function(opts, build_ctx)
         -- Follow redirects.
         :arg("--location")
         :arg("--output")
-        :arg(get_artifact_url(tag, archive_name))
         :arg(artifacts_dir:join(archive_name):display())
+        :arg(get_artifact_url(tag, archive_name))
         :on_stderr(build_ctx.notify)
         :await(ctx)
 
