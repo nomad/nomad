@@ -232,10 +232,14 @@ impl str::FromStr for IncludePaths {
     type Err = <AbsPathBuf as str::FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.split(',')
-            .map(AbsPathBuf::from_str)
-            .collect::<Result<_, _>>()
-            .map(|vec| Self { vec })
+        if s.is_empty() {
+            Ok(Self { vec: Vec::new() })
+        } else {
+            s.split(',')
+                .map(AbsPathBuf::from_str)
+                .collect::<Result<_, _>>()
+                .map(|vec| Self { vec })
+        }
     }
 }
 

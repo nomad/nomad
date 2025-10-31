@@ -57,28 +57,33 @@
           # Use native crane unless cross-compiling.
           targetCrane = if isCross then crane.overridePkgs targetPkgs else crane;
           craneLib = targetCrane.lib;
-          pluginSrc = src.any [ src.filters.rust src.filters.lua ] craneLib;
+          rustPlugin = craneLib.buildPackage (
+            targetCrane.commonArgs
+            // {
+              pname = cargoToml.package.name;
+              version = if releaseTag != null then releaseTag else "dev";
+              src = src.rust craneLib;
+              doCheck = false;
+              buildPhaseCargoCommand = ''
+                ${lib.getExe common.xtask} neovim build \
+                  ${lib.optionalString isNightly "--nightly"} \
+                  ${lib.optionalString isRelease "--release"} \
+                  ${lib.optionalString isCross "--target=${hostPlatform.rust.rustcTarget}"} \
+                  --out-dir=$out \
+                  --includes=
+              '';
+              # Installation was already handled by the build command.
+              doNotPostBuildInstallCargoBinaries = true;
+              installPhaseCommand = "";
+            }
+          );
         in
-        craneLib.buildPackage (
-          targetCrane.commonArgs
-          // {
-            pname = cargoToml.package.name;
-            version = if releaseTag != null then releaseTag else "dev";
-            src = pluginSrc;
-            doCheck = false;
-            buildPhaseCargoCommand = ''
-              ${lib.getExe common.xtask} neovim build \
-                ${lib.optionalString isNightly "--nightly"} \
-                ${lib.optionalString isRelease "--release"} \
-                ${lib.optionalString isCross "--target=${hostPlatform.rust.rustcTarget}"} \
-                --out-dir=$out \
-                --includes='${pluginSrc}/lua/nomad'
-            '';
-            # Installation was already handled by the build command.
-            doNotPostBuildInstallCargoBinaries = true;
-            installPhaseCommand = "";
-          }
-        );
+        targetPkgs.runCommand cargoToml.package.name { } ''
+          mkdir -p $out
+          cp -r ${rustPlugin}/lua $out/
+          chmod -R +w $out/lua
+          cp -r ${../lua}/* $out/lua
+        '';
 
       mkTests =
         {
