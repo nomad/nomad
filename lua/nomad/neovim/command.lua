@@ -22,12 +22,9 @@ Command.new = function(cmd)
 end
 
 ---@param cmd string
----@return nomad.future.Future<boolean>
+---@return boolean
 Command.is_in_path = function(cmd)
-  return Command.new("command")
-      :args({ "-v", cmd })
-      :into_future()
-      :map(function(res) return res:is_ok() end)
+  return vim.fn.executable(cmd) == 1
 end
 
 ---@param self nomad.neovim.Command
