@@ -27,36 +27,25 @@ local Command = require("nomad.neovim.command")
 local Builder = require("nomad.neovim.build.builder")
 
 ---@param commands [string]
----@return nomad.future.Future<nomad.Result<nil, string>>
+---@return nomad.Result<nil, string>
 local check_commands_in_path = function(commands)
-  return future.async(function(ctx)
-    ---@param command string
-    ---@return nomad.future.Future<string?>
-    local is_missing = function(command)
-      return Command.is_in_path(command):map(function(is_in_path)
-        if not is_in_path then return command end
-      end)
-    end
+  local missing_commands = vim.tbl_filter(function(command)
+    return not Command.is_in_path(command)
+  end, commands)
 
-    local futures = vim.tbl_map(is_missing, commands)
-    local outputs = future.join_all_unordered(futures):await(ctx)
-    local filter_nil = function(x) return x ~= nil end
-    local missing_commands = vim.tbl_filter(filter_nil, outputs)
+  if #missing_commands == 0 then
+    return Result.ok(nil)
+  else
+    -- Sort the missing commands alphabetically to make the error message
+    -- stable across runs.
+    table.sort(missing_commands)
 
-    if #missing_commands == 0 then
-      return Result.ok(nil)
-    else
-      -- Sort the missing commands alphabetically to make the error message
-      -- stable across runs.
-      table.sort(missing_commands)
-
-      return Result.err(("command%s not in $PATH: %s")
-        :format(
-          #missing_commands == 1 and "" or "s",
-          table.concat(missing_commands, ", ")
-        ))
-    end
-  end)
+    return Result.err(("command%s not in $PATH: %s")
+      :format(
+        #missing_commands == 1 and "" or "s",
+        table.concat(missing_commands, ", ")
+      ))
+  end
 end
 
 ---@param spec nomad.neovim.build.BuilderSpec
@@ -65,7 +54,7 @@ end
 local make_build_fn = function(spec, opts)
   return function(build_ctx)
     return future.async(function(ctx)
-      local commands_res = check_commands_in_path(spec.commands):await(ctx)
+      local commands_res = check_commands_in_path(spec.commands)
       if commands_res:is_err() then return commands_res end
       return spec.build_fn(opts, build_ctx):await(ctx)
     end)
