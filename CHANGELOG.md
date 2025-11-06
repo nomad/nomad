@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- A panic that could occur if the file associated with a watched buffer was
+  modified outside of Neovim ([#25][pr-25]);
+
 ## [2025.11.1] - 2025-11-05
 
 ### Fixed
@@ -13,6 +16,7 @@
 
 Initial release.
 
+[pr-25]: https://github.com/nomad/nomad/pull/25
 [pr-24]: https://github.com/nomad/nomad/pull/24
 
 [unreleased]: https://github.com/nomad/nomad/compare/2025.11.1...HEAD
