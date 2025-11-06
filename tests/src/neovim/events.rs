@@ -107,6 +107,28 @@ async fn on_buffer_created_fires_when_creating_buffer_via_the_editor_api(
 }
 
 #[neovim::test]
+async fn on_buffer_created_doesnt_fire_when_file_is_modified(
+    ctx: &mut Context<Neovim>,
+) {
+    let tempfile = RealFs::default().tempfile().await.unwrap();
+
+    ctx.command(format!("edit {}", tempfile.path()));
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.on_buffer_created({
+        let num_times_fired = num_times_fired.clone();
+        move |_, _| num_times_fired.with_mut(|n| *n += 1)
+    });
+
+    std::fs::write(tempfile.path(), "new contents").unwrap();
+
+    ctx.command("checktime");
+
+    assert_eq!(num_times_fired.take(), 0);
+}
+
+#[neovim::test]
 #[ignore = "fails in CI"]
 fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
     ctx: &mut Context<Neovim>,
