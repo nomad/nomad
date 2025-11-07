@@ -1,9 +1,12 @@
 use abs_path::path;
-use editor::{AgentId, Buffer, Context, Shared};
+use editor::{AgentId, Buffer, Context, Edit, Replacement, Shared};
 use fs::File;
+use futures_util::stream::StreamExt;
 use neovim::tests::NeovimExt;
 use neovim::{Neovim, oxi};
 use real_fs::RealFs;
+
+use crate::editor::buffer::EditExt;
 
 #[neovim::test]
 async fn on_buffer_created_doesnt_fire_for_unnamed_buffers(
@@ -126,6 +129,33 @@ async fn on_buffer_created_doesnt_fire_when_file_is_modified(
     ctx.command("checktime");
 
     assert_eq!(num_times_fired.take(), 0);
+}
+
+#[neovim::test]
+#[ignore = "https://github.com/neovim/neovim/issues/36474"]
+async fn on_buffer_edited_fires_when_file_is_modified(
+    ctx: &mut Context<Neovim>,
+) {
+    let tempfile = RealFs::default().tempfile().await.unwrap();
+
+    ctx.command(format!("edit {}", tempfile.path()));
+
+    let buffer_id = ctx.with_borrowed(|ctx| {
+        let mut buffer = ctx.current_buffer().unwrap();
+        assert_eq!(buffer.get_text(), "");
+        let _ = buffer.schedule_insertion(0, "initial text", AgentId::UNKNOWN);
+        buffer.id()
+    });
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    std::fs::write(tempfile.path(), "new text").unwrap();
+
+    ctx.command("checktime");
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert_eq!(&*edit.replacements, &[Replacement::new(0..13, "new text\n")]);
 }
 
 #[neovim::test]
