@@ -159,7 +159,6 @@ async fn on_buffer_edited_fires_when_file_is_modified(
 }
 
 #[neovim::test]
-#[ignore = "fails in CI"]
 fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
     ctx: &mut Context<Neovim>,
 ) {
