@@ -27,7 +27,7 @@ use crate::selection::NeovimSelection;
 use crate::{executor, notify, serde, value};
 
 /// The type of error returned by [`Neovim::data_dir_path()`].
-pub type DataDirError = Either<api::Error, abs_path::AbsPathNotAbsoluteError>;
+pub type DataDirError = Either<api::Error, abs_path::NormalizeError>;
 
 type HttpClient = http_client::UreqClient<
     <<Neovim as Editor>::Executor as Executor>::BackgroundSpawner,
@@ -52,7 +52,14 @@ impl Neovim {
     pub fn data_dir_path(&self) -> Result<AbsPathBuf, DataDirError> {
         api::call_function::<_, String>("stdpath", ("data",))
             .map_err(Either::Left)
-            .and_then(|path| path.parse::<AbsPathBuf>().map_err(Either::Right))
+            .and_then(|path| {
+                // I've seen 'stdpath' return paths like
+                // /Users/noib3/dev/repro/.repro//data/nvim when using Lazy's
+                // 'lazy.minit' module, so normalize the path to be safe.
+                AbsPath::normalize(&path)
+                    .map_err(Either::Right)
+                    .map(|path| path.into_owned())
+            })
     }
 
     /// TODO: docs.

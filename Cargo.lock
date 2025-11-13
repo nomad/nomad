@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "abs-path"
 version = "0.1.0"
-source = "git+https://github.com/nomad/abs-path.git#c9f47071a05cc80bcff4af7b65754a23f2edb6ad"
+source = "git+https://github.com/nomad/abs-path.git#d81ad7c2550a0a46eeefbc7db5b47ff6f772cc11"
 dependencies = [
  "abs-path-core",
  "abs-path-macros",
@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "abs-path-core"
 version = "0.1.0"
-source = "git+https://github.com/nomad/abs-path.git#c9f47071a05cc80bcff4af7b65754a23f2edb6ad"
+source = "git+https://github.com/nomad/abs-path.git#d81ad7c2550a0a46eeefbc7db5b47ff6f772cc11"
 dependencies = [
  "compact_str",
  "serde",
@@ -24,7 +24,7 @@ dependencies = [
 [[package]]
 name = "abs-path-macros"
 version = "0.1.0"
-source = "git+https://github.com/nomad/abs-path.git#c9f47071a05cc80bcff4af7b65754a23f2edb6ad"
+source = "git+https://github.com/nomad/abs-path.git#d81ad7c2550a0a46eeefbc7db5b47ff6f772cc11"
 dependencies = [
  "abs-path-core",
  "quote",
