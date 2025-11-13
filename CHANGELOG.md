@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- An error that could occur on startup if `vim.fn.stdpath('data')` returned a
+  path with consecutive salash characters (e.g.
+  `/home/user//.local/share/nvim`) ([#30][pr-30]);
+
 - A panic that could occur if the file associated with a watched buffer was
   modified outside of Neovim ([#25][pr-25]);
 
@@ -16,6 +20,7 @@
 
 Initial release.
 
+[pr-30]: https://github.com/nomad/nomad/pull/30
 [pr-25]: https://github.com/nomad/nomad/pull/25
 [pr-24]: https://github.com/nomad/nomad/pull/24
 
