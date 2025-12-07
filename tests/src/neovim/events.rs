@@ -310,7 +310,7 @@ fn on_cursor_removed_doesnt_fire_when_setting_buffer_of_unfocused_window(
     opts.win = Some(oxi::api::Window::current());
 
     let mut new_win =
-        oxi::api::open_win(buffer_id.into(), false, &opts).unwrap();
+        oxi::api::open_win(&(buffer_id.into()), false, &opts).unwrap();
     let new_buf = oxi::api::create_buf(true, false).unwrap();
 
     // The window is not focused, so setting its buffer shouldn't trigger the
