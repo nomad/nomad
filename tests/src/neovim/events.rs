@@ -4,6 +4,7 @@ use fs::File;
 use futures_util::stream::StreamExt;
 use neovim::tests::NeovimExt;
 use neovim::{Neovim, oxi};
+use oxi::api::types::{SplitDirection, WindowConfig};
 use real_fs::RealFs;
 
 use crate::editor::buffer::EditExt;
@@ -285,4 +286,35 @@ fn on_cursor_moved_fires_when_window_is_split(ctx: &mut Context<Neovim>) {
     // should cause the event to fire.
     ctx.command("split");
     assert_eq!(num_times_fired.take(), 1);
+}
+
+// Tests that we have a workaround for
+// https://github.com/neovim/neovim/issues/20907
+#[neovim::test]
+fn on_cursor_removed_doesnt_fire_when_setting_buffer_of_unfocused_window(
+    ctx: &mut Context<Neovim>,
+) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.with_borrowed(|ctx| {
+        ctx.cursor(buffer_id).unwrap().on_removed({
+            let num_times_fired = num_times_fired.clone();
+            move |_, _| num_times_fired.with_mut(|n| *n += 1)
+        })
+    });
+
+    let mut opts = WindowConfig::default();
+    opts.split = Some(SplitDirection::Left);
+    opts.win = Some(oxi::api::Window::current());
+
+    let mut new_win =
+        oxi::api::open_win(buffer_id.into(), false, &opts).unwrap();
+    let new_buf = oxi::api::create_buf(true, false).unwrap();
+
+    // The window is not focused, so setting its buffer shouldn't trigger the
+    // event,
+    new_win.set_buf(&new_buf).unwrap();
+    assert_eq!(num_times_fired.take(), 0);
 }
